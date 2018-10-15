@@ -10,7 +10,7 @@ import types
 import collections
 import warnings
 import matplotlib.pyplot as plt
-import functional
+from torchvision.transforms import functional
 import PIL
 
 INTER_MODE = {'NEAREST': cv2.INTER_NEAREST, 'BILINEAR': cv2.INTER_LINEAR, 'BICUBIC': cv2.INTER_CUBIC}
