@@ -5,7 +5,7 @@ Most functions in transforms is reimplemented, except for ToPILImage, Scale and 
 Attention: The multiprocessing used in dataloader of pytorch is not friendly with lambda function in Windows as lambda function can't be pickled (https://docs.python.org/3/library/pickle.html#what-can-be-pickled-and-unpickled).
 So the Lambda in cvtransform.py may not work properly in Windows.
 
-Requirements
+# Requirements
 python packages
 pytorch>=0.4.1
 torchvision>=0.2.1
