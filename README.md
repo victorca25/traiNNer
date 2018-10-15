@@ -3,7 +3,7 @@ This is an opencv based rewriting of the "transforms" in torchvision package.
 
 As the article(https://www.kaggle.com/vfdev5/pil-vs-opencv 18) says, cv2 is three times faster than PIL.
 
-Most functions in transforms are reimplemented, except for ToPILImage, Scale and RandomSizedCrop which are deprecated in the original version.
+Most functions in transforms are reimplemented, except for ToPILImage(opencv we used :)), Scale and RandomSizedCrop which are deprecated in the original version.
 # Attention: 
 The multiprocessing used in dataloader of pytorch is not friendly with lambda function in Windows as lambda function can't be pickled (https://docs.python.org/3/library/pickle.html#what-can-be-pickled-and-unpickled).
 
