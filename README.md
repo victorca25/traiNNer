@@ -8,7 +8,7 @@ Most functions in transforms are reimplemented, except for ToPILImage(opencv we 
 
 1) Add "from cvtorchvision import cvtransforms" in your pythion file
 
-2) you can use all functions as the original version, for example:
+2) You can use all functions as the original version, for example:
 
 transform = cvtransforms.Compose(
 
