@@ -1,5 +1,7 @@
-# cvtorchvision
-This is an opencv based rewriting of the "transforms" in torchvision package.
+# opencv_torchvision_transform
+This is an opencv based rewriting of the "transforms" in torchvision package https://github.com/pytorch/vision/tree/master/torchvision/transforms. 
+
+All functions depende on only cv2 and pytorh (PIL-free).
 
 As the article(https://www.kaggle.com/vfdev5/pil-vs-opencv 18) says, cv2 is three times faster than PIL.
 
@@ -35,7 +37,7 @@ pytorch>=0.4.1
 
 torchvision>=0.2.1
 
-opencv-contrib-python-3.4.2
+opencv-contrib-python-3.4.2 (test with this version, but any version of opencv3 is ok, I think)
 
 # Postscript
 Welcome to point out and help to fix bugs !
