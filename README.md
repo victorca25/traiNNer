@@ -9,7 +9,7 @@
    
    2) The affine transform in the original one only has 5 degrees of freedom, I implement a Affine transform with 6 degress of freedom called affine6()(can be found in master/cvtorchvision/cvtransforms/cvfunctional.py). The original function(affine()) is still retained and reimplemented with opencv.
    3) My rotate function is clockwise, however the original one is  anticlockwise.
-   <font color=#DC143C>4) All the outputs of the opencv version are almost the same as the original one(test in master/cvtorchvision/cvtransforms/cvfunctional.py:  if __name__ == '__main__':...)</font>
+   4) **All the outputs of the opencv version are almost the same as the original one(test in master/cvtorchvision/cvtransforms/cvfunctional.py:  if __name__ == '__main__':...)**
 ## Support:
 * Compose, ToTensor, ToCVImage, Normalize
 
