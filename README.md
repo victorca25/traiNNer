@@ -8,6 +8,20 @@
    1) ToPILImage(opencv we used :)), Scale and RandomSizedCrop which are deprecated in the original version are ignored .
    
    2) The affine transform in the original one only has 5 degrees of freedom, I implement a Affine transform with 6 degress of freedom called affine6()(can be found in master/cvtorchvision/cvtransforms/cvfunctional.py). The original function(affine()) is still retained and reimplemented with opencv.
+## Support:
+   Compose, ToTensor, ToCVImage, Normalize
+
+   Resize, CenterCrop, Pad
+
+   Lambda(doesn't work well in multiprocess in wihdows)
+
+   RandomApply, RandomOrder, RandomChoice, RandomCrop,
+
+   RandomHorizontalFlip, RandomVerticalFlip, RandomResizedCrop,
+
+   FiveCrop, TenCrop, LinearTransformation, ColorJitter,
+
+   RandomRotation, RandomAffine, Grayscale, RandomGrayscale
 # How to use:
 1) git clone https://github.com/YU-Zhiyang/opencv_torchvision_transforms.git 
 
