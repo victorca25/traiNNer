@@ -63,3 +63,5 @@ opencv-contrib-python-3.4.2 (test with this version, but any version of opencv3 
 Welcome to point out and help to fix bugs !
 
 Watches, Stars and Forks won’t be rejected :)
+
+Thanks HongChu who helps a lot.
