@@ -1,11 +1,14 @@
 # opencv_torchvision_transform
-This is an opencv based rewriting of the "transforms" in torchvision package https://github.com/pytorch/vision/tree/master/torchvision/transforms. 
+1) This is an opencv based rewriting of the "transforms" in torchvision package https://github.com/pytorch/vision/tree/master/torchvision/transforms. 
 
-### All functions depende on only cv2 and pytorh (PIL-free).
+2) All functions depende on only cv2 and pytorh (PIL-free). As the article(https://www.kaggle.com/vfdev5/pil-vs-opencv 18) says, cv2 is three times faster than PIL.
 
-As the article(https://www.kaggle.com/vfdev5/pil-vs-opencv 18) says, cv2 is three times faster than PIL.
+3) Most functions in transforms are reimplemented, except that:
 
-Most functions in transforms are reimplemented, except for ToPILImage(opencv we used :)), Scale and RandomSizedCrop which are deprecated in the original version.
+       1) ToPILImage(opencv we used :)), Scale and RandomSizedCrop which are deprecated in the original version.
+       2) The affine transform in the original one only has 5 degrees of freedom, I implement a Affine transform with 6 degress of freedom called affine6()(can be found in https://github.com/YU-Zhiyang/opencv_torchvision_transforms/blob/master/cvtorchvision/cvtransforms/cvfunctional.py).
+       
+       the original function(affine()) is still retained and reimplemented with opencv.
 # How to use:
 1) git clone https://github.com/YU-Zhiyang/opencv_torchvision_transforms.git 
 
