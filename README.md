@@ -10,12 +10,17 @@ Most functions in transforms are reimplemented, except for ToPILImage(opencv we 
 
 2) You can use all functions as the original version, for example:
 
-transform = cvtransforms.Compose([
-        cvtransforms.RandomAffine(degrees=10, translate=(0.1, 0.1), scale=(0.9, 1.1), shear=(-10, 0),
-        cvtransforms.Resize(size=(350, 350), interpolation='BILINEAR'),
-        cvtransforms.ToTensor(),
-        cvtransforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
-        ])
+       transform = cvtransforms.Compose([
+        
+                cvtransforms.RandomAffine(degrees=10, translate=(0.1, 0.1), scale=(0.9, 1.1), shear=(-10, 0),
+        
+                cvtransforms.Resize(size=(350, 350), interpolation='BILINEAR'),
+        
+                cvtransforms.ToTensor(),
+        
+                cvtransforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+                ])
+
 more details can be found in the examples of official tutorials(https://pytorch.org/tutorials/beginner/transfer_learning_tutorial.html) 
 # Attention: 
 The multiprocessing used in dataloader of pytorch is not friendly with lambda function in Windows as lambda function can't be pickled (https://docs.python.org/3/library/pickle.html#what-can-be-pickled-and-unpickled).
