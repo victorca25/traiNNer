@@ -11,19 +11,19 @@
    3) My rotate function is clockwise, however the original one is  anticlockwise.
    4) `All the outputs of the opencv version are almost the same as the original one(test in master/cvtorchvision/cvtransforms/cvfunctional.py:  if __name__ == '__main__':...)`
 ## Support:
-      *Compose, ToTensor, ToCVImage, Normalize
+      * Compose, ToTensor, ToCVImage, Normalize
 
-      *Resize, CenterCrop, Pad
+      * Resize, CenterCrop, Pad
 
-      *Lambda(doesn't work well in multiprocess in wihdows)
+      * Lambda(doesn't work well in multiprocess in wihdows)
 
-      *RandomApply, RandomOrder, RandomChoice, RandomCrop,
+      * RandomApply, RandomOrder, RandomChoice, RandomCrop,
 
-      *RandomHorizontalFlip, RandomVerticalFlip, RandomResizedCrop,
+      * RandomHorizontalFlip, RandomVerticalFlip, RandomResizedCrop,
 
-      *FiveCrop, TenCrop, LinearTransformation, ColorJitter,
+      * FiveCrop, TenCrop, LinearTransformation, ColorJitter,
 
-      *RandomRotation, RandomAffine, Grayscale, RandomGrayscale
+      * RandomRotation, RandomAffine, Grayscale, RandomGrayscale
 # How to use:
 1) git clone https://github.com/YU-Zhiyang/opencv_torchvision_transforms.git 
 
