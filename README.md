@@ -17,3 +17,6 @@ pytorch>=0.4.1
 torchvision>=0.2.1
 
 opencv-contrib-python-3.4.2
+# Postscript
+Welcome to point out and help to fix bugs !
+Watches, Stars and Forks won’t be rejected :)
