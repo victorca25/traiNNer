@@ -5,10 +5,11 @@ As the article(https://www.kaggle.com/vfdev5/pil-vs-opencv 18) says, cv2 is thre
 
 Most functions in transforms are reimplemented, except for ToPILImage(opencv we used :)), Scale and RandomSizedCrop which are deprecated in the original version.
 # How to use:
+1) git clone https://github.com/YU-Zhiyang/opencv_torchvision_transforms.git Add to your python path
 
-1) Add "from cvtorchvision import cvtransforms" in your pythion file
+2) Add "from cvtorchvision import cvtransforms" in your pythion file
 
-2) You can use all functions as the original version, for example:
+3) You can use all functions as the original version, for example:
 
        transform = cvtransforms.Compose([
         
