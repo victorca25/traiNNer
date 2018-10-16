@@ -11,7 +11,7 @@
    3) My rotate function is clockwise, however the original one is  anticlockwise.
    4) `All the outputs of the opencv version are almost the same as the original one(test in master/cvtorchvision/cvtransforms/cvfunctional.py:  if __name__ == '__main__':...)`
 ## Support:
-      * Compose, ToTensor, ToCVImage, Normalize
+* Compose, ToTensor, ToCVImage, Normalize
 
       * Resize, CenterCrop, Pad
 
