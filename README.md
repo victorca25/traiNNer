@@ -7,11 +7,7 @@
 
    1) ToPILImage(opencv we used :)), Scale and RandomSizedCrop which are deprecated in the original version are ignored .
    
-   2) The affine transform in the original one only has 5 degrees of freedom, I implement a Affine transform with 6 degress of freedom called affine6()
-   
-   (can be found in master/cvtorchvision/cvtransforms/cvfunctional.py).
-   
-   the original function(affine()) is still retained and reimplemented with opencv.
+   2) The affine transform in the original one only has 5 degrees of freedom, I implement a Affine transform with 6 degress of freedom called affine6()(can be found in master/cvtorchvision/cvtransforms/cvfunctional.py). the original function(affine()) is still retained and reimplemented with opencv.
 # How to use:
 1) git clone https://github.com/YU-Zhiyang/opencv_torchvision_transforms.git 
 
