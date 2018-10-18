@@ -596,11 +596,12 @@ def rotate(img, angle, resample='BILINEAR', expand=False, center=None):
     return dst.astype(imgtype)
 
 
-def affine6(img, angle, translate, scale, resample='BILINEAR', fillcolor=(0,0,0)):
+def affine6(img, anglez=0, sheer=0, translate=(0, 0), scale=(1, 1), resample='BILINEAR', fillcolor=(0, 0, 0)):
     """Apply affine transformation on the image keeping image center invariant
     Args:
         img (np.ndarray): PIL Image to be rotated.
-        angle (list or tuple): rotation angle in degrees between -180 and 180, clockwise direction.
+        anglez (float): rotation angle in degrees around Z between -180 and 180, clockwise direction.
+        sheer (float): rotation angle in degrees around Z between -180 and 180, clockwise direction.
         translate (list or tuple of integers): horizontal and vertical translations (post-rotation translation)
         scale (float, or tuple): overall scale
         resample ({NEAREST, BILINEAR, BICUBIC}, optional):
@@ -610,11 +611,11 @@ def affine6(img, angle, translate, scale, resample='BILINEAR', fillcolor=(0,0,0)
         fillcolor (int or tuple): Optional fill color for the area outside the transform in the output image. (Pillow>=5.0.0)
     """
     rows, cols, _ = img.shape
-    centery = rows * 0/5
+    centery = rows * 0.5
     centerx = cols * 0.5
 
-    alpha = math.radians(angle[0])
-    beta = math.radians(angle[1])
+    alpha = math.radians(sheer)
+    beta = math.radians(anglez)
 
     lambda1 = scale[0]
     lambda2 = scale[1]
@@ -677,6 +678,85 @@ def affine(img, angle=0, translate=(0, 0), scale=1, shear=0, resample='BILINEAR'
     dst_img = cv2.warpAffine(img, affine_matrix, (cols, rows), flags=INTER_MODE[resample],
                              borderMode=cv2.BORDER_CONSTANT, borderValue=fillcolor)
     return dst_img
+
+
+def perspective(img, fov=45, anglex=0, angley=0, anglez=0, shear=0,
+                translate=(0, 0), scale=(1, 1), resample='BILINEAR', fillcolor=(0, 0, 0)):
+
+    imgtype = img.dtype
+    h, w, _ = img.shape
+    centery = h * 0.5
+    centerx = w * 0.5
+
+    alpha = math.radians(shear)
+    beta = math.radians(anglez)
+
+    lambda1 = scale[0]
+    lambda2 = scale[1]
+
+    tx = translate[0]
+    ty = translate[1]
+
+    sina = math.sin(alpha)
+    cosa = math.cos(alpha)
+    sinb = math.sin(beta)
+    cosb = math.cos(beta)
+
+    M00 = cosb * (lambda1 * cosa ** 2 + lambda2 * sina ** 2) - sinb * (lambda2 - lambda1) * sina * cosa
+    M01 = - sinb * (lambda1 * sina ** 2 + lambda2 * cosa ** 2) + cosb * (lambda2 - lambda1) * sina * cosa
+
+    M10 = sinb * (lambda1 * cosa ** 2 + lambda2 * sina ** 2) + cosb * (lambda2 - lambda1) * sina * cosa
+    M11 = + cosb * (lambda1 * sina ** 2 + lambda2 * cosa ** 2) + sinb * (lambda2 - lambda1) * sina * cosa
+    M02 = centerx - M00 * centerx - M01 * centery + tx
+    M12 = centery - M10 * centerx - M11 * centery + ty
+    affine_matrix = np.array([[M00, M01, M02], [M10, M11, M12], [0, 0, 1]], dtype=np.float32)
+    # -------------------------------------------------------------------------------
+    z = np.sqrt(w ** 2 + h ** 2) / 2 / np.tan(math.radians(fov / 2))
+
+    radx = math.radians(anglex)
+    rady = math.radians(angley)
+
+    sinx = math.sin(radx)
+    cosx = math.cos(radx)
+    siny = math.sin(rady)
+    cosy = math.cos(rady)
+
+    r = np.array([[cosy, 0, -siny, 0],
+                  [-siny * sinx, cosx, -sinx * cosy, 0],
+                  [cosx * siny, sinx, cosx * cosy, 0],
+                  [0, 0, 0, 1]])
+
+    pcenter = np.array([centerx, centery, 0, 0], np.float32)
+
+    p1 = np.array([0, 0, 0, 0], np.float32) - pcenter
+    p2 = np.array([w, 0, 0, 0], np.float32) - pcenter
+    p3 = np.array([0, h, 0, 0], np.float32) - pcenter
+    p4 = np.array([w, h, 0, 0], np.float32) - pcenter
+
+    dst1 = r.dot(p1)
+    dst2 = r.dot(p2)
+    dst3 = r.dot(p3)
+    dst4 = r.dot(p4)
+
+    list_dst = [dst1, dst2, dst3, dst4]
+
+    org = np.array([[0, 0],
+                    [w, 0],
+                    [0, h],
+                    [w, h]], np.float32)
+
+    dst = np.zeros((4, 2), np.float32)
+
+    for i in range(4):
+        dst[i, 0] = list_dst[i][0] * z / (z - list_dst[i][2]) + pcenter[0]
+        dst[i, 1] = list_dst[i][1] * z / (z - list_dst[i][2]) + pcenter[1]
+
+    perspective_matrix = cv2.getPerspectiveTransform(org, dst)
+    total_matrix = perspective_matrix @ affine_matrix
+
+    result_img = cv2.warpPerspective(img, total_matrix, (w, h), flags=INTER_MODE[resample],
+                                     borderMode=cv2.BORDER_CONSTANT, borderValue=fillcolor)
+    return result_img.astype(imgtype)
 
 
 def cv_transform(img):
