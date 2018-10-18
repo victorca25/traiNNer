@@ -16,7 +16,8 @@ __all__ = ["Compose", "ToTensor", "ToCVImage",
            "Lambda", "RandomApply", "RandomOrder", "RandomChoice", "RandomCrop",
            "RandomHorizontalFlip", "RandomVerticalFlip", "RandomResizedCrop",
            "FiveCrop", "TenCrop", "LinearTransformation", "ColorJitter",
-           "RandomRotation", "RandomAffine", "Grayscale", "RandomGrayscale"]
+           "RandomRotation", "RandomAffine", "RandomPerspective",
+           "Grayscale", "RandomGrayscale"]
 
 
 class Compose(object):
@@ -974,4 +975,115 @@ class RandomGrayscale(object):
 
     def __repr__(self):
         return self.__class__.__name__ + '(p={0})'.format(self.p)
+
+
+class RandomPerspective(object):
+    """Random perspective transformation of the image keeping center invariant
+        Args:
+            fov(float): range of wide angle = 90+-fov
+            anglex (sequence or float or int): Range of degrees rote around X axis to select from.
+                If degrees is a number instead of sequence like (min, max), the range of degrees
+                will be (-degrees, +degrees). Set to 0 to desactivate rotations.
+            angley (sequence or float or int): Range of degrees rote around Y axis to select from.
+                If degrees is a number instead of sequence like (min, max), the range of degrees
+                will be (-degrees, +degrees). Set to 0 to desactivate rotations.
+            anglez (sequence or float or int): Range of degrees rote around Z axis to select from.
+                If degrees is a number instead of sequence like (min, max), the range of degrees
+                will be (-degrees, +degrees). Set to 0 to desactivate rotations.
+
+            shear (sequence or float or int): Range of degrees for shear rote around axis to select from.
+                If degrees is a number instead of sequence like (min, max), the range of degrees
+                will be (-degrees, +degrees). Set to 0 to desactivate rotations.
+            translate (tuple, optional): tuple of maximum absolute fraction for horizontal
+                and vertical translations. For example translate=(a, b), then horizontal shift
+                is randomly sampled in the range -img_width * a < dx < img_width * a and vertical shift is
+                randomly sampled in the range -img_height * b < dy < img_height * b. Will not translate by default.
+            scale (tuple, optional): scaling factor interval, e.g (a, b), then scale is
+                randomly sampled from the range a <= scale <= b. Will keep original scale by default.
+            resample ({NEAREST, BILINEAR, BICUBIC}, optional): An optional resampling filter.
+            fillcolor (int): Optional fill color for the area outside the transform in the output image. (Pillow>=5.0.0)
+        """
+
+    def __init__(self, fov=0, anglex=0, angley=0, anglez=0, shear=0,
+                 translate=(0, 0), scale=(1, 1), resample='BILINEAR', fillcolor=(0, 0, 0)):
+
+        assert all([isinstance(anglex, (tuple, list)) or anglex >= 0,
+                    isinstance(angley, (tuple, list)) or angley >= 0,
+                    isinstance(anglez, (tuple, list)) or anglez >= 0,
+                    isinstance(shear, (tuple, list)) or shear >= 0]), \
+            'All angles must be positive or tuple or list'
+        assert 80 >= fov >= 0, 'fov should be in (0, 80)'
+        self.fov = fov
+
+        self.anglex = (-anglex, anglex) if isinstance(anglex, numbers.Number) else anglex
+        self.angley = (-angley, angley) if isinstance(angley, numbers.Number) else angley
+        self.anglez = (-anglez, anglez) if isinstance(anglez, numbers.Number) else anglez
+        self.shear = (-shear, shear) if isinstance(shear, numbers.Number) else shear
+
+        assert isinstance(translate, (tuple, list)) and len(translate) == 2, \
+            "translate should be a list or tuple and it must be of length 2."
+        assert all([0.0 <= i <= 1.0 for i in translate]), "translation values should be between 0 and 1"
+        self.translate = translate
+
+        if scale is not None:
+            assert isinstance(scale, (tuple, list)) and len(scale) == 2, \
+                "scale should be a list or tuple and it must be of length 2."
+            assert all([s > 0 for s in scale]), "scale values should be positive"
+        self.scale = scale
+
+        self.resample = resample
+        self.fillcolor = fillcolor
+
+    @staticmethod
+    def get_params(fov_range, anglex_ranges, angley_ranges, anglez_ranges, shear_ranges,
+                   translate, scale_ranges,  img_size):
+        """Get parameters for perspective transformation
+
+        Returns:
+            sequence: params to be passed to the perspective transformation
+        """
+        fov = 90 + random.uniform(-fov_range, fov_range)
+        anglex = random.uniform(anglex_ranges[0], anglex_ranges[1])
+        angley = random.uniform(angley_ranges[0], angley_ranges[1])
+        anglez = random.uniform(anglez_ranges[0], anglez_ranges[1])
+        shear = random.uniform(shear_ranges[0], shear_ranges[1])
+
+        max_dx = translate[0] * img_size[1]
+        max_dy = translate[1] * img_size[0]
+        translations = (np.round(random.uniform(-max_dx, max_dx)),
+                        np.round(random.uniform(-max_dy, max_dy)))
+
+        scale = (random.uniform(1 / scale_ranges[0], scale_ranges[0]),
+                 random.uniform(1 / scale_ranges[1], scale_ranges[1]))
+
+        return fov, anglex, angley, anglez, shear, translations, scale
+
+    def __call__(self, img):
+        """
+            img (np.ndarray): Image to be transformed.
+
+        Returns:
+            np.ndarray: Affine transformed image.
+        """
+        ret = self.get_params(self.fov, self.anglex, self.angley, self.anglez, self.shear,
+                              self.translate, self.scale, img.shape)
+        return F.perspective(img, *ret, resample=self.resample, fillcolor=self.fillcolor)
+
+    def __repr__(self):
+        s = '{name}(degrees={degrees}'
+        if self.translate is not None:
+            s += ', translate={translate}'
+        if self.scale is not None:
+            s += ', scale={scale}'
+        if self.shear is not None:
+            s += ', shear={shear}'
+        if self.resample > 0:
+            s += ', resample={resample}'
+        if self.fillcolor != 0:
+            s += ', fillcolor={fillcolor}'
+        s += ')'
+        d = dict(self.__dict__)
+        d['resample'] = d['resample']
+        return s.format(name=self.__class__.__name__, **d)
+
 
