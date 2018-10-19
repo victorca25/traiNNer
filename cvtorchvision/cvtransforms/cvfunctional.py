@@ -596,7 +596,7 @@ def rotate(img, angle, resample='BILINEAR', expand=False, center=None):
     return dst.astype(imgtype)
 
 
-def affine6(img, anglez=0, sheer=0, translate=(0, 0), scale=(1, 1), resample='BILINEAR', fillcolor=(0, 0, 0)):
+def affine6(img, anglez=0, shear=0, translate=(0, 0), scale=(1, 1), resample='BILINEAR', fillcolor=(0, 0, 0)):
     """Apply affine transformation on the image keeping image center invariant
     Args:
         img (np.ndarray): PIL Image to be rotated.
@@ -614,7 +614,7 @@ def affine6(img, anglez=0, sheer=0, translate=(0, 0), scale=(1, 1), resample='BI
     centery = rows * 0.5
     centerx = cols * 0.5
 
-    alpha = math.radians(sheer)
+    alpha = math.radians(shear)
     beta = math.radians(anglez)
 
     lambda1 = scale[0]
@@ -682,6 +682,11 @@ def affine(img, angle=0, translate=(0, 0), scale=1, shear=0, resample='BILINEAR'
 
 def perspective(img, fov=45, anglex=0, angley=0, anglez=0, shear=0,
                 translate=(0, 0), scale=(1, 1), resample='BILINEAR', fillcolor=(0, 0, 0)):
+    """
+
+    This function is partly referred to https://blog.csdn.net/dcrmg/article/details/80273818
+
+    """
 
     imgtype = img.dtype
     h, w, _ = img.shape
