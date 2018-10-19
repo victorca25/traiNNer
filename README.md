@@ -27,11 +27,11 @@
 # How to use:
 1) git clone https://github.com/YU-Zhiyang/opencv_torchvision_transforms.git 
 
-Add cvtorchvision to your python path
+2) Add cvtorchvision to your python path
 
-2) Add "from cvtorchvision import cvtransforms" in your pythion file
+3) Add "from cvtorchvision import cvtransforms" in your pythion file
 
-3) You can use all functions as the original version, for example:
+4) You can use all functions as the original version, for example:
 
        transform = cvtransforms.Compose([
         
@@ -44,7 +44,9 @@ Add cvtorchvision to your python path
                 cvtransforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
                 ])
 
-more details can be found in the examples of official tutorials(https://pytorch.org/tutorials/beginner/transfer_learning_tutorial.html) 
+more details can be found in the examples of official tutorials
+
+(https://pytorch.org/tutorials/beginner/transfer_learning_tutorial.html) 
 # Attention: 
 The multiprocessing used in dataloader of pytorch is not friendly with lambda function in Windows as lambda function can't be pickled (https://docs.python.org/3/library/pickle.html#what-can-be-pickled-and-unpickled).
 
