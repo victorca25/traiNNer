@@ -68,4 +68,4 @@ Welcome to point out and help to fix bugs !
 
 Watches, Stars and Forks won’t be rejected :)
 
-Thanks HongChu who helps a lot.
+Thanks [HongChu](https://github.com/hongchu098) who helps a lot.
