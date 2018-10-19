@@ -16,7 +16,7 @@ __all__ = ["Compose", "ToTensor", "ToCVImage",
            "Lambda", "RandomApply", "RandomOrder", "RandomChoice", "RandomCrop",
            "RandomHorizontalFlip", "RandomVerticalFlip", "RandomResizedCrop",
            "FiveCrop", "TenCrop", "LinearTransformation", "ColorJitter",
-           "RandomRotation", "RandomAffine", "RandomPerspective",
+           "RandomRotation", "RandomAffine", "RandomAffine6", "RandomPerspective",
            "Grayscale", "RandomGrayscale"]
 
 
@@ -1087,3 +1087,108 @@ class RandomPerspective(object):
         return s.format(name=self.__class__.__name__, **d)
 
 
+class RandomAffine6(object):
+    """Random affine transformation of the image keeping center invariant
+
+    Args:
+        anglez (sequence or float or int): Range of rotate to select from.
+            If degrees is a number instead of sequence like (min, max), the range of degrees
+            will be (-anglez, +anglez). Set to 0 to desactivate rotations.
+        shear (sequence or float or int): Range of shear to select from.
+            If degrees is a number instead of sequence like (min, max), the range of degrees
+            will be (-shear, +shear). Set to 0 to desactivate shear.
+        translate (tuple, optional): tuple of maximum absolute fraction for horizontal
+            and vertical translations. For example translate=(a, b), then horizontal shift
+            is randomly sampled in the range -img_width * a < dx < img_width * a and vertical shift is
+            randomly sampled in the range -img_height * b < dy < img_height * b. Will not translate by default.
+        scale (tuple, optional): scaling factor interval, e.g (a, b), then scale is
+            randomly sampled from the range a <= scale <= b. Will keep original scale by default.
+        resample ({NEAREST, BILINEAR, BICUBIC}, optional): An optional resampling filter.
+        fillcolor (int): Optional fill color for the area outside the transform in the output image. (Pillow>=5.0.0)
+    """
+
+    def __init__(self, anglez=0, shear=0, translate=(0, 0), scale=(1, 1),
+                 resample='BILINEAR', fillcolor=(0, 0, 0)):
+        if isinstance(anglez, numbers.Number):
+            if anglez < 0:
+                raise ValueError("If anglez is a single number, it must be positive.")
+            self.anglez = (-anglez, anglez)
+        else:
+            assert isinstance(anglez, (tuple, list)) and len(anglez) == 2, \
+                "anglez should be a list or tuple and it must be of length 2."
+            self.anglez = anglez
+
+        if isinstance(shear, numbers.Number):
+            if shear < 0:
+                raise ValueError("If shear is a single number, it must be positive.")
+            self.shear = (-shear, shear)
+        else:
+            assert isinstance(shear, (tuple, list)) and len(shear) == 2, \
+                "shear should be a list or tuple and it must be of length 2."
+            self.shear = shear
+
+        if translate is not None:
+            assert isinstance(translate, (tuple, list)) and len(translate) == 2, \
+                "translate should be a list or tuple and it must be of length 2."
+            for t in translate:
+                if not (0.0 <= t <= 1.0):
+                    raise ValueError("translation values should be between 0 and 1")
+        self.translate = translate
+
+        if scale is not None:
+            assert isinstance(scale, (tuple, list)) and len(scale) == 2, \
+                "scale should be a list or tuple and it must be of length 2."
+            for s in scale:
+                if s <= 0:
+                    raise ValueError("scale values should be positive")
+        self.scale = scale
+        self.resample = resample
+        self.fillcolor = fillcolor
+
+    @staticmethod
+    def get_params(img_size, anglez_range=(0, 0), shear_range=(0, 0),
+                   translate=(0, 0), scale_ranges=(1, 1)):
+        """Get parameters for affine transformation
+
+        Returns:
+            sequence: params to be passed to the affine transformation
+        """
+        angle = random.uniform(anglez_range[0], anglez_range[1])
+        shear = random.uniform(shear_range[0], shear_range[1])
+
+        max_dx = translate[0] * img_size[1]
+        max_dy = translate[1] * img_size[0]
+        translations = (np.round(random.uniform(-max_dx, max_dx)),
+                        np.round(random.uniform(-max_dy, max_dy)))
+
+        scale = (random.uniform(1 / scale_ranges[0], scale_ranges[0]),
+                 random.uniform(1 / scale_ranges[1], scale_ranges[1]))
+
+        return angle, shear, translations, scale
+
+    def __call__(self, img):
+        """
+            img (np.ndarray): Image to be transformed.
+
+        Returns:
+            np.ndarray: Affine transformed image.
+        """
+        ret = self.get_params(img.shape, self.anglez, self.shear, self.translate, self.scale)
+        return F.affine6(img, *ret, resample=self.resample, fillcolor=self.fillcolor)
+
+    def __repr__(self):
+        s = '{name}(degrees={degrees}'
+        if self.translate is not None:
+            s += ', translate={translate}'
+        if self.scale is not None:
+            s += ', scale={scale}'
+        if self.shear is not None:
+            s += ', shear={shear}'
+        if self.resample > 0:
+            s += ', resample={resample}'
+        if self.fillcolor != 0:
+            s += ', fillcolor={fillcolor}'
+        s += ')'
+        d = dict(self.__dict__)
+        d['resample'] = d['resample']
+        return s.format(name=self.__class__.__name__, **d)
