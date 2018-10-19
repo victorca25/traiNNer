@@ -764,6 +764,35 @@ def perspective(img, fov=45, anglex=0, angley=0, anglez=0, shear=0,
     return result_img.astype(imgtype)
 
 
+def gaussion_noise(img: np.ndarray, mean=0.0, std=0.1):
+    imgtype = img.dtype
+    gauss = np.random.normal(mean, std, img.shape).astype(np.float32)
+    noisy = np.clip((1 + gauss) * img.astype(np.float32), 0, 255)
+    return noisy.astype(imgtype)
+
+
+def poisson_noise(img):
+    imgtype = img.dtype
+    img = img.astype(np.float32)/255.0
+    vals = len(np.unique(img))
+    vals = 2 ** np.ceil(np.log2(vals))
+    noisy = 255 * np.clip(np.random.poisson(img.astype(np.float32) * vals) / float(vals), 0, 1)
+    return noisy.astype(imgtype)
+
+
+def salt_and_pepper(img, prob=0.01):
+    '''
+    Adds "Salt & Pepper" noise to an image.
+        gb: should be one-channel image with pixels in [0, 1] range
+        prob: probability (threshold) that controls level of noise'''
+    imgtype = img.dtype
+    rnd = np.random.rand(img.shape[0], img.shape[1])
+    noisy = img.copy()
+    noisy[rnd < prob/2] = 0.0
+    noisy[rnd > 1 - prob/2] = 255.0
+    return noisy.astype(imgtype)
+
+
 def cv_transform(img):
     # img = resize(img, size=(100, 300))
     # img = to_tensor(img)
@@ -783,7 +812,10 @@ def cv_transform(img):
     # img = adjust_gamma(img, gamma=3, gain=0.1)
     # img = rotate(img, 10, resample='BILINEAR', expand=True, center=None)
     # img = to_grayscale(img, 3)
-    img = affine(img, 10, (0, 0), 1, 0, resample='BICUBIC', fillcolor=(255,255,0))
+    # img = affine(img, 10, (0, 0), 1, 0, resample='BICUBIC', fillcolor=(255,255,0))
+    # img = gaussion_noise(img)
+    # img = poisson_noise(img)
+    img = salt_and_pepper(img)
     return to_tensor(img)
 
 
@@ -806,7 +838,7 @@ def pil_transform(img):
     # img = functional.adjust_gamma(img, gamma=3, gain=0.1)
     # img = functional.rotate(img, 10, resample=PIL.Image.BILINEAR, expand=True, center=None)
     # img = functional.to_grayscale(img, 3)
-    img = functional.affine(img, 10, (0, 0), 1, 0, resample=PIL.Image.BICUBIC, fillcolor=(255,255,0))
+    # img = functional.affine(img, 10, (0, 0), 1, 0, resample=PIL.Image.BICUBIC, fillcolor=(255,255,0))
 
     return functional.to_tensor(img)
 
@@ -821,8 +853,8 @@ if __name__ == '__main__':
     pilimage = Image.open(image_path).convert('RGB')
     pilimage = pil_transform(pilimage)
 
-    # sub = abs(cvimage - pilimage)
+    sub = abs(cvimage - pilimage)
 
-    # imshow((cvimage, pilimage, sub), ('CV', 'PIL', 'sub'))
-    imshow((cvimage, pilimage), ('CV', 'PIL'))
+    imshow((cvimage, pilimage, sub), ('CV', 'PIL', 'sub'))
+    # imshow((cvimage, pilimage), ('CV', 'PIL'))
     # imshow([pilimage], ('PIL'))
