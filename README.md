@@ -1,7 +1,7 @@
 # opencv_torchvision_transform
 1) This is an opencv based rewriting of the "transforms" in torchvision package https://github.com/pytorch/vision/tree/master/torchvision/transforms. 
 
-2) All functions depend on only cv2 and pytorh (PIL-free). As the article(https://www.kaggle.com/vfdev5/pil-vs-opencv 18) says, cv2 is three times faster than PIL.
+2) All functions depend on only cv2 and pytorch (PIL-free). As the article(https://www.kaggle.com/vfdev5/pil-vs-opencv 18) says, cv2 is three times faster than PIL.
 
 3) Most functions in transforms are reimplemented, except that:
 
@@ -27,7 +27,7 @@
 # How to use:
 1) git clone https://github.com/YU-Zhiyang/opencv_torchvision_transforms.git 
 
-Add to your python path
+Add cvtorchvision to your python path
 
 2) Add "from cvtorchvision import cvtransforms" in your pythion file
 
