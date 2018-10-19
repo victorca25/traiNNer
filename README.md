@@ -1,7 +1,7 @@
 # opencv_torchvision_transform
-1) This is an opencv based rewriting of the "transforms" in torchvision package https://github.com/pytorch/vision/tree/master/torchvision/transforms. 
+1) This is an opencv based rewriting of the "transforms" in torchvision [package](https://github.com/pytorch/vision/tree/master/torchvision/transforms). 
 
-2) All functions depend on only cv2 and pytorch (PIL-free). As the article(https://www.kaggle.com/vfdev5/pil-vs-opencv) says, cv2 is three times faster than PIL.
+2) All functions depend on only cv2 and pytorch (PIL-free). As the [article](https://www.kaggle.com/vfdev5/pil-vs-opencv) says, cv2 is three times faster than PIL.
 
 3) Most functions in transforms are reimplemented, except that:
 
@@ -44,9 +44,8 @@
                 cvtransforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
                 ])
 
-more details can be found in the examples of official tutorials.
-
-(https://pytorch.org/tutorials/beginner/transfer_learning_tutorial.html) 
+more details can be found in the examples of official [tutorials](https://pytorch.org/tutorials/beginner/transfer_learning_tutorial.html).
+ 
 # Attention: 
 The multiprocessing used in dataloader of pytorch is not friendly with lambda function in Windows as lambda function can't be pickled (https://docs.python.org/3/library/pickle.html#what-can-be-pickled-and-unpickled).
 
