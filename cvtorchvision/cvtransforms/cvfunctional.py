@@ -781,10 +781,12 @@ def poisson_noise(img):
 
 
 def salt_and_pepper(img, prob=0.01):
-    '''
-    Adds "Salt & Pepper" noise to an image.
+
+    ''' Adds "Salt & Pepper" noise to an image.
         gb: should be one-channel image with pixels in [0, 1] range
-        prob: probability (threshold) that controls level of noise'''
+        prob: probability (threshold) that controls level of noise
+    '''
+
     imgtype = img.dtype
     rnd = np.random.rand(img.shape[0], img.shape[1])
     noisy = img.copy()
