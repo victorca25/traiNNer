@@ -7,9 +7,10 @@
 
    1) ToPILImage(opencv we used :)), Scale and RandomSizedCrop which are deprecated in the original version are ignored.
    
-   2) The affine transform in the original one only has 5 degrees of freedom, I implement a Affine transform with 6 degress of freedom called affine6()(can be found in master/cvtorchvision/cvtransforms/cvfunctional.py). The original function(affine()) is still retained and reimplemented with opencv.
+   2) The affine transform in the original one only has 5 degrees of freedom, I implement an Affine transform with 6 degress of freedom called RandomAffine6(can be found in master/cvtorchvision/cvtransforms/cvtransforms.py). The original method(RandomAffine) is still retained and reimplemented with opencv.
    3) My rotate function is clockwise, however the original one is  anticlockwise.
- 4) **All the outputs of the opencv version are almost the same as the original one's(test in master/cvtorchvision/cvtransforms/cvfunctional.py:  if __name__ == '__main__':...)**.
+   4) Adding some new methods which can found in **Support**(the bolded ones).
+   4) **All the outputs of the opencv version are almost the same as the original one's(test in master/cvtorchvision/cvtransforms/cvfunctional.py:  if __name__ == '__main__':...)**.
 ## Support:
 * Compose, ToTensor, ToCVImage, Normalize
 
@@ -23,7 +24,9 @@
 
 * FiveCrop, TenCrop, LinearTransformation, ColorJitter,
 
-* RandomRotation, RandomAffine, Grayscale, RandomGrayscale
+* RandomRotation, RandomAffine, **RandomAffine6**, **RandomPerspective**
+
+* Grayscale, RandomGrayscale
 # How to use:
 1) git clone https://github.com/YU-Zhiyang/opencv_torchvision_transforms.git .
 
