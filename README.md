@@ -1,15 +1,16 @@
 # opencv_torchvision_transform
-1) This is an opencv based rewriting of the "transforms" in torchvision package https://github.com/pytorch/vision/tree/master/torchvision/transforms. 
+1) This is an opencv based rewriting of the "transforms" in torchvision [package](https://github.com/pytorch/vision/tree/master/torchvision/transforms). 
 
-2) All functions depend on only cv2 and pytorh (PIL-free). As the article(https://www.kaggle.com/vfdev5/pil-vs-opencv 18) says, cv2 is three times faster than PIL.
+2) All functions depend on only cv2 and pytorch (PIL-free). As the [article](https://www.kaggle.com/vfdev5/pil-vs-opencv) says, cv2 is three times faster than PIL.
 
 3) Most functions in transforms are reimplemented, except that:
 
    1) ToPILImage(opencv we used :)), Scale and RandomSizedCrop which are deprecated in the original version are ignored.
    
-   2) The affine transform in the original one only has 5 degrees of freedom, I implement a Affine transform with 6 degress of freedom called affine6()(can be found in master/cvtorchvision/cvtransforms/cvfunctional.py). The original function(affine()) is still retained and reimplemented with opencv.
+   2) The affine transform in the original one only has 5 degrees of freedom, I implement an Affine transform with 6 degress of freedom called RandomAffine6(can be found in master/cvtorchvision/cvtransforms/cvtransforms.py). The original method(RandomAffine) is still retained and reimplemented with opencv.
    3) My rotate function is clockwise, however the original one is  anticlockwise.
- 4) **All the outputs of the opencv version are almost the same as the original one's(test in master/cvtorchvision/cvtransforms/cvfunctional.py:  if __name__ == '__main__':...)**
+   4) Adding some new methods which can found in **Support**(the bolded ones).
+   4) **All the outputs of the opencv version are almost the same as the original one's(test in master/cvtorchvision/cvtransforms/cvfunctional.py:  if __name__ == '__main__':...)**.
 ## Support:
 * Compose, ToTensor, ToCVImage, Normalize
 
@@ -23,15 +24,17 @@
 
 * FiveCrop, TenCrop, LinearTransformation, ColorJitter,
 
-* RandomRotation, RandomAffine, Grayscale, RandomGrayscale
+* RandomRotation, RandomAffine, **RandomAffine6**, **RandomPerspective**
+
+* Grayscale, RandomGrayscale
 # How to use:
-1) git clone https://github.com/YU-Zhiyang/opencv_torchvision_transforms.git 
+1) git clone https://github.com/YU-Zhiyang/opencv_torchvision_transforms.git .
 
-Add to your python path
+2) Add cvtorchvision to your python path.
 
-2) Add "from cvtorchvision import cvtransforms" in your pythion file
+3) Add "from cvtorchvision import cvtransforms" in your pythion file.
 
-3) You can use all functions as the original version, for example:
+4) You can use all functions as the original version, for example:
 
        transform = cvtransforms.Compose([
         
@@ -44,14 +47,17 @@ Add to your python path
                 cvtransforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
                 ])
 
-more details can be found in the examples of official tutorials(https://pytorch.org/tutorials/beginner/transfer_learning_tutorial.html) 
+more details can be found in the examples of official [tutorials](https://pytorch.org/tutorials/beginner/transfer_learning_tutorial.html).
+ 
 # Attention: 
 The multiprocessing used in dataloader of pytorch is not friendly with lambda function in Windows as lambda function can't be pickled (https://docs.python.org/3/library/pickle.html#what-can-be-pickled-and-unpickled).
 
 So the Lambda in cvtransform.py may not work properly in Windows.
 
 # Requirements
-python packages
+python >=3.5.2
+
+numpy >=1.10 ('@' operator may not be overloaded before this version)
 
 pytorch>=0.4.1
 
@@ -64,4 +70,4 @@ Welcome to point out and help to fix bugs !
 
 Watches, Stars and Forks won’t be rejected :)
 
-Thanks HongChu who helps a lot.
+Thanks [HongChu](https://github.com/hongchu098) who helps a lot.
