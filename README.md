@@ -53,7 +53,7 @@ So the Lambda in cvtransform.py may not work properly in Windows.
 # Requirements
 python >=3.5.2
 
-numpy 1.10 ('@' operator may not be overloaded before this version)
+numpy >=1.10 ('@' operator may not be overloaded before this version)
 
 pytorch>=0.4.1
 
