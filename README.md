@@ -9,7 +9,7 @@
    
    2) The affine transform in the original one only has 5 degrees of freedom, I implement an Affine transform with 6 degress of freedom called RandomAffine6(can be found in master/cvtorchvision/cvtransforms/cvtransforms.py). The original method(RandomAffine) is still retained and reimplemented with opencv.
    3) My rotate function is clockwise, however the original one is  anticlockwise.
-   4) Adding some new methods which can found in **Support**(the bolded ones).
+   4) Adding some new methods which can be found in **Support**(the bolded ones).
    4) **All the outputs of the opencv version are almost the same as the original one's(test in master/cvtorchvision/cvtransforms/cvfunctional.py:  if __name__ == '__main__':...)**.
 ## Support:
 * Compose, ToTensor, ToCVImage, Normalize
@@ -68,6 +68,6 @@ opencv-contrib-python-3.4.2 (test with this version, but any version of opencv3 
 # Postscript
 Welcome to point out and help to fix bugs !
 
-Watches, Stars and Forks won’t be rejected :)
+Watches, Stars and Forks won’t be rejected :smile:
 
 Thanks [HongChu](https://github.com/hongchu098) who helps a lot.
