@@ -26,6 +26,8 @@
 
 * RandomRotation, RandomAffine, **RandomAffine6**, **RandomPerspective**
 
+**RandomGaussianNoise"**, **"RandomPoissonNoise"**, **"RandomSPNoise**
+
 * Grayscale, RandomGrayscale
 # How to use:
 1) git clone https://github.com/YU-Zhiyang/opencv_torchvision_transforms.git .
