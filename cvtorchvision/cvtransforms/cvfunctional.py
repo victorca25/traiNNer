@@ -601,13 +601,10 @@ def affine6(img, anglez=0, shear=0, translate=(0, 0), scale=(1, 1), resample='BI
     Args:
         img (np.ndarray): PIL Image to be rotated.
         anglez (float): rotation angle in degrees around Z between -180 and 180, clockwise direction.
-        sheer (float): rotation angle in degrees around Z between -180 and 180, clockwise direction.
+        shear (float): rotation angle in degrees around Z between -180 and 180, clockwise direction.
         translate (list or tuple of integers): horizontal and vertical translations (post-rotation translation)
         scale (float, or tuple): overall scale
         resample ({NEAREST, BILINEAR, BICUBIC}, optional):
-            An optional resampling filter.
-            See http://pillow.readthedocs.io/en/3.4.x/handbook/concepts.html#filters
-            If omitted, or if the image has mode "1" or "P", it is set to PIL.Image.NEAREST.
         fillcolor (int or tuple): Optional fill color for the area outside the transform in the output image. (Pillow>=5.0.0)
     """
     rows, cols, _ = img.shape
@@ -783,7 +780,6 @@ def poisson_noise(img):
 def salt_and_pepper(img, prob=0.01):
 
     ''' Adds "Salt & Pepper" noise to an image.
-        gb: should be one-channel image with pixels in [0, 1] range
         prob: probability (threshold) that controls level of noise
     '''
 
