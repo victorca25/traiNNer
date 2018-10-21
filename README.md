@@ -26,7 +26,7 @@
 
 * RandomRotation, RandomAffine, **RandomAffine6**, **RandomPerspective**
 
-**RandomGaussianNoise"**, **"RandomPoissonNoise"**, **"RandomSPNoise**
+* **RandomGaussianNoise"**, **"RandomPoissonNoise"**, **"RandomSPNoise**
 
 * Grayscale, RandomGrayscale
 # How to use:
