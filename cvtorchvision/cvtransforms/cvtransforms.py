@@ -17,7 +17,8 @@ __all__ = ["Compose", "ToTensor", "ToCVImage",
            "RandomHorizontalFlip", "RandomVerticalFlip", "RandomResizedCrop",
            "FiveCrop", "TenCrop", "LinearTransformation", "ColorJitter",
            "RandomRotation", "RandomAffine", "RandomAffine6", "RandomPerspective",
-           "Grayscale", "RandomGrayscale"]
+           "Grayscale", "RandomGrayscale",
+           "RandomGaussianNoise", "RandomPoissonNoise", "RandomSPNoise"]
 
 
 class Compose(object):
@@ -1192,3 +1193,102 @@ class RandomAffine6(object):
         d = dict(self.__dict__)
         d['resample'] = d['resample']
         return s.format(name=self.__class__.__name__, **d)
+
+
+class RandomGaussianNoise(object):
+    """Applying gaussian noise on the given CV Image randomly with a given probability.
+
+        Args:
+            p (float): probability of the image being noised. Default value is 0.5
+        """
+
+    def __init__(self, p=0.5, mean=0, std=0.1):
+        assert isinstance(mean, numbers.Number) and mean >= 0, 'mean should be a positive value'
+        assert isinstance(std, numbers.Number) and std >= 0, 'std should be a positive value'
+        assert isinstance(p, numbers.Number) and p >= 0, 'p should be a positive value'
+        self.p = p
+        self.mean = mean
+        self.std = std
+
+    @staticmethod
+    def get_params(mean, std):
+        """Get parameters for gaussian noise
+
+        Returns:
+            sequence: params to be passed to the affine transformation
+        """
+        mean = random.uniform(-mean, mean)
+        std = random.uniform(-std, std)
+
+        return mean, std
+
+    def __call__(self, img):
+        """
+        Args:
+            img (np.ndarray): Image to be noised.
+
+        Returns:
+            np.ndarray: Randomly noised image.
+        """
+        if random.random() < self.p:
+            return F.gaussian_noise(img, mean=self.mean, std=self.std)
+        return img
+
+    def __repr__(self):
+        return self.__class__.__name__ + '(p={})'.format(self.p)
+
+
+class RandomPoissonNoise(object):
+    """Applying Poisson noise on the given CV Image randomly with a given probability.
+
+        Args:
+            p (float): probability of the image being noised. Default value is 0.5
+        """
+
+    def __init__(self, p=0.5):
+        assert isinstance(p, numbers.Number) and p >= 0, 'p should be a positive value'
+        self.p = p
+
+    def __call__(self, img):
+        """
+        Args:
+            img (np.ndarray): Image to be noised.
+
+        Returns:
+            np.ndarray: Randomly noised image.
+        """
+        if random.random() < self.p:
+            return F.poisson_noise(img)
+        return img
+
+    def __repr__(self):
+        return self.__class__.__name__ + '(p={})'.format(self.p)
+
+
+class RandomSPNoise(object):
+    """Applying salt and pepper noise on the given CV Image randomly with a given probability.
+
+        Args:
+            p (float): probability of the image being noised. Default value is 0.5
+        """
+
+    def __init__(self, p=0.5, prob=0.1):
+        assert isinstance(p, numbers.Number) and p >= 0, 'p should be a positive value'
+        assert isinstance(prob, numbers.Number) and prob >= 0, 'p should be a positive value'
+        self.p = p
+        self.prob = prob
+
+    def __call__(self, img):
+        """
+        Args:
+            img (np.ndarray): Image to be noised.
+
+        Returns:
+            np.ndarray: Randomly noised image.
+        """
+        if random.random() < self.p:
+            return F.salt_and_pepper(img, self.prob)
+        return img
+
+    def __repr__(self):
+        return self.__class__.__name__ + '(p={})'.format(self.p)
