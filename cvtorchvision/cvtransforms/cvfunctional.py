@@ -764,7 +764,7 @@ def perspective(img, fov=45, anglex=0, angley=0, anglez=0, shear=0,
     return result_img.astype(imgtype)
 
 
-def gaussion_noise(img: np.ndarray, mean=0.0, std=0.1):
+def gaussian_noise(img: np.ndarray, mean, std):
     imgtype = img.dtype
     gauss = np.random.normal(mean, std, img.shape).astype(np.float32)
     noisy = np.clip((1 + gauss) * img.astype(np.float32), 0, 255)
