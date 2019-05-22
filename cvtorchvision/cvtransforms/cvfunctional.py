@@ -160,6 +160,27 @@ def resize(img, size, interpolation='BILINEAR'):
         return cv2.resize(img, dsize=(int(ow), int(oh)), interpolation=INTER_MODE[interpolation])
 
 
+def to_rgb_bgr(pic):
+    """Converts a color image stored in BGR sequence to RGB (BGR to RGB)
+    or stored in RGB sequence to BGR (RGB to BGR).
+
+    Args:
+        pic (np.ndarray, torch.Tensor): Image to be converted, (H x W x 3).
+
+    Returns:
+        Tensor: Converted image.
+    """
+
+    if _is_numpy_image(pic) or _is_tensor_image(pic):
+        img = pic[:,:,[2, 1, 0]]
+        return img
+    else:
+        try:
+            return to_RGB_BGR(np.array(pic))
+        except Exception:
+            raise TypeError('pic should be numpy.ndarray or torch.Tensor. Got {}'.format(type(pic)))
+
+
 def pad(img, padding, fill=(0, 0, 0), padding_mode='constant'):
     """Pad the given CV Image on all sides with speficified padding mode and fill value.
     Args:
