@@ -179,7 +179,7 @@ def to_rgb_bgr(pic):
         return img
     else:
         try:
-            return to_RGB_BGR(np.array(pic))
+            return to_rgb_bgr(np.array(pic))
         except Exception:
             raise TypeError('pic should be numpy.ndarray or torch.Tensor. Got {}'.format(type(pic)))
 
