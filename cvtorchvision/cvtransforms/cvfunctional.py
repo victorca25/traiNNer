@@ -74,16 +74,17 @@ def to_tensor(pic):
 
 
 def to_cv_image(pic, mode=None):
-    """Convert a tensor or an ndarray to PIL Image.
+    """Convert a tensor to an ndarray.
 
-    Args:
-        pic (Tensor or numpy.ndarray): Image to be converted to PIL Image.
-        mode (str): color space and pixel depth of input data (optional).
+        Args:
+            pic (Tensor or numpy.ndarray): Image to be converted to PIL Image.
+            mode (str): color space and pixel depth of input data (optional)
+                        for example: cv2.COLOR_RGB2BGR.
 
-    Returns:
-        np.array: Image converted to PIL Image.
-    """
-    if not(_is_numpy_image(pic) or _is_tensor_image(pic)):
+        Returns:
+            np.array: Image converted to PIL Image.
+        """
+    if not (_is_numpy_image(pic) or _is_tensor_image(pic)):
         raise TypeError('pic should be Tensor or ndarray. Got {}.'.format(type(pic)))
 
     npimg = pic
@@ -96,8 +97,10 @@ def to_cv_image(pic, mode=None):
         raise TypeError('Input pic must be a torch.Tensor or NumPy ndarray, ' +
                         'not {}'.format(type(npimg)))
     if mode is None:
-        raise TypeError('Input type {} is not supported'.format(npimg.dtype))
-    return cv2.cvtColor(npimg, mode)
+        return npimg
+
+    else:
+        return cv2.cvtColor(npimg, mode)
 
 
 def normalize(tensor, mean, std):
@@ -172,7 +175,7 @@ def to_rgb_bgr(pic):
     """
 
     if _is_numpy_image(pic) or _is_tensor_image(pic):
-        img = pic[:,:,[2, 1, 0]]
+        img = pic[:, :, [2, 1, 0]]
         return img
     else:
         try:
@@ -234,6 +237,8 @@ def pad(img, padding, fill=(0, 0, 0), padding_mode='constant'):
 
     if isinstance(fill, numbers.Number):
         fill = fill,
+    if isinstance(fill, numbers.Number) and len(img.shape) == 3:
+        fill = (fill,) * 3
     if padding_mode == 'constant':
         assert (len(fill) == 3 and len(img.shape) == 3) or (len(fill) == 1 and len(img.shape) == 2), \
             'channel of image is {} but length of fill is {}'.format(img.shape[-1], len(fill))
