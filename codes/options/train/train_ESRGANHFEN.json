@@ -69,7 +69,7 @@
     , "feature_criterion": "l1"
     , "feature_weight": 1
     , "hfen_criterion": "l2" //hfen: "l1" | "l2"
-    , "hfen_weight": 1e-3
+    , "hfen_weight": 1e-6
     , "tv_type": "normal"
     , "tv_weight": 0
     , "gan_type": "vanilla"
