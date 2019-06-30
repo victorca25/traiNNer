@@ -1,0 +1,90 @@
+{
+  "name": "001_HFEN" //  please remove "debug_" during training
+  , "use_tb_logger": true
+  , "model":"srragan_hfen"
+  , "scale": 4
+  , "gpu_ids": [0]
+
+  , "datasets": {
+    "train": {
+      "name": "DIV2K"
+      , "mode": "LRHR"
+      , "dataroot_HR": "../datasets/train/hr"
+      , "dataroot_LR": "../datasets/train/lr"
+      , "subset_file": null
+      , "use_shuffle": true
+      , "n_workers": 8
+      , "batch_size": 16
+      , "HR_size": 128
+      , "use_flip": true
+      , "use_rot": true
+    }
+    , "val": {
+      "name": "val_set14_part"
+      , "mode": "LRHR"
+      , "dataroot_HR": "../datasets/val/hr"
+      , "dataroot_LR": "../datasets/val/lr"
+    }
+  }
+
+  , "path": {
+    "root": "D:/Code/Notebooks/BasicSR-master"
+    // , "resume_state": "../experiments/debug_002_RRDB_ESRGAN_x4_DIV2K/training_state/16.state"
+    , "pretrain_model_G": "../experiments/pretrained_models/RRDB_PSNR_x4.pth"
+  }
+
+  , "network_G": {
+    "which_model_G": "RRDB_net" // RRDB_net | sr_resnet
+    , "norm_type": null
+    , "mode": "CNA"
+    , "nf": 64
+    , "nb": 23
+    , "in_nc": 3
+    , "out_nc": 3
+    , "gc": 32
+    , "group": 1
+  }
+  , "network_D": {
+    "which_model_D": "discriminator_vgg_128"
+    , "norm_type": "batch"
+    , "act_type": "leakyrelu"
+    , "mode": "CNA"
+    , "nf": 64
+    , "in_nc": 3
+  }
+
+  , "train": {
+    "lr_G": 1e-4
+    , "weight_decay_G": 0
+    , "beta1_G": 0.9
+    , "lr_D": 1e-4
+    , "weight_decay_D": 0
+    , "beta1_D": 0.9
+    , "lr_scheme": "MultiStepLR"
+    , "lr_steps": [50000, 100000, 200000, 300000]
+    , "lr_gamma": 0.5
+
+    , "pixel_criterion": "l1"
+    , "pixel_weight": 1e-2
+    , "feature_criterion": "l1"
+    , "feature_weight": 1
+    , "hfen_criterion": "l2" //hfen: "l1" | "l2"
+    , "hfen_weight": 1e-3
+    , "gan_type": "vanilla"
+    , "gan_weight": 5e-3
+
+    //for wgan-gp
+    // , "D_update_ratio": 1
+    // , "D_init_iters": 0
+    // , "gp_weigth": 10
+
+    , "manual_seed": 0
+    , "niter": 5e5
+    , "val_freq": 5e3
+  }
+
+  , "logger": {
+    "print_freq": 200
+    , "save_checkpoint_freq": 5e3
+  }
+}
