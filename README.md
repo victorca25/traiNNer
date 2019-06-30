@@ -65,7 +65,7 @@ An image super-resolution toolkit flexible for development. It now provides:
 # Codes
 [`./codes`](https://github.com/victorca25/BasicSR/tree/master/codes). We provide a detailed explaination of the **code framework** in [`./codes`](https://github.com/victorca25/BasicSR/tree/master/codes).
 <p align="center">
-   <img src="https://github.com/victorca25/public_figures/blob/master/BasicSR/code_framework.png" height="300">
+   <img src="https://github.com/xinntao/public_figures/blob/master/BasicSR/code_framework.png" height="300">
 </p>
 
 We also provides:
