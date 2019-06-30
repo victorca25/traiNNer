@@ -5,7 +5,7 @@
 - [ ] Test TV loss/regularization (balance loss weight).
 - [ ] Test HFEN loss (balance loss weight).
 - [ ] Add on the fly augmentations (gaussian noise, blur, JPEG compression).
-- [ ] Test Partial Convolution based Padding (PartialConv2D) to prevent edge padding issues (May be able to test inpainting and denoising).
+- [ ] Test [Partial Convolution based Padding](https://github.com/NVIDIA/partialconv) (PartialConv2D) to prevent edge padding issues (May be able to test inpainting and denoising).
 - [ ] Add automatic model scale change (preserve conv layers, estimate upscale layers).
 - [ ] Add automatic loading of old models and new ESRGAN models.
 - [ ] Downscale images before and/or after inference. Helps in cleaning up some noise or bring images back to the original scale.
