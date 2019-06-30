@@ -95,10 +95,10 @@ We provide **pretrained models** in [Pretrained models](#pretrained-models).
 
 ## How to Train
 ### Train ESRGAN (SRGAN) models
-We use a PSNR-oriented pretrained SR model to initialize the parameters for better quality.
+We use a PSNR-oriented pretrained SR model to initialize the parameters for better quality. According to the author's paper and some testing, this will also stabilize the GAN training and allows for faster convergence. 
 
-1. Prepare datasets, usually the DIV2K dataset. More details are in [`codes/data`](https://github.com/victorca25/BasicSR/tree/master/codes/data) and [wiki (Faster IO speed)](https://github.com/xinntao/BasicSR/wiki/Faster-IO-speed). 
-1. Prerapre the PSNR-oriented pretrained model. You can use the `RRDB_PSNR_x4.pth` as the pretrained model. 
+1. Prepare datasets, usually the DIV2K dataset. More details are in [`codes/data`](https://github.com/victorca25/BasicSR/tree/master/codes/data) and [wiki (Faster IO speed)](https://github.com/victorca25/BasicSR/wiki/Faster-IO-speed). 
+1. Optional: If the intention is to replicate the original paper here you would prerapre the PSNR-oriented pretrained model. You can also use the original `RRDB_PSNR_x4.pth` as the pretrained model for that purpose, otherwise *any* existing model will work as pretrained.
 1. Modify the configuration file  `options/train/train_esrgan.json`
 1. Run command: `python train.py -opt options/train/train_esrgan.json`
 
@@ -211,11 +211,13 @@ Several common SR datasets are list below.
 # Pretrained models
 The most recent community pretrained models can be found at https://github.com/alsa64/AI-wiki/wiki/Model-Database
 
-You can put the downloaded models in the `experiments/pretrained_models` folder.
+You can put the downloaded models in the default `experiments/pretrained_models` folder.
 
-More details about the pretrained models, please see [`experiments/pretrained_models`](https://github.com/victorca25/BasicSR/tree/master/experiments/pretrained_models).
+Models that were trained using the same pretrained model or are derivates of the same pretrained model are able to be interpolated to combine the properties of both. The original author demostrated this by interpolating the PSNR pretrained model (which is not perceptually good, but results in smooth images) with the ESRGAN resulting models that have more details but sometimes is excessive to control a balance in the resulting images, instead of interpolating the resulting images from both models, giving much better results.
 
-Original pretrained models:
+The authors continued exploring the capabilities of interpolating models in their new work "DNI" (CVPR19): [Deep Network Interpolation for Continuous Imagery Effect Transition](https://xinntao.github.io/projects/DNI) with very interesting results and examples. The script for interpolation can be found in the [net_interp.py](https://github.com/victorca25/BasicSR/blob/master/codes/scripts/net_interp.py) file, but a new version with more options will be commited at a later time.
+
+Following are the original pretrained models that the authors made available:
 <table>
   <tr>
     <th>Name</th>
@@ -272,6 +274,9 @@ Original pretrained models:
     <td><a href="">Baidu Drive</a></td>
   </tr>
 </table>
+
+For more details about the original pretrained models, please see [`experiments/pretrained_models`](https://github.com/victorca25/BasicSR/tree/master/experiments/pretrained_models).
+
 ---
 
 ## Additional Help 
