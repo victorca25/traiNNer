@@ -2,11 +2,13 @@
 
 :black_square_button: TODO
 
-- [ ] Use *yaml* instead of *json* for configurations
-- [ ] Support distributed training
-- [ ] Simplify the network structure file
-- [ ] Provide new pre-trained models
-- [ ] Update the creating lmdb script to add image one by one
+- [ ] Test TV loss/regularization (balance loss weight).
+- [ ] Test HFEN loss (balance loss weight).
+- [ ] Add on the fly augmentations (gaussian noise, blur, JPEG compression).
+- [ ] Test Partial Convolution based Padding (PartialConv2D) to prevent edge padding issues (May be able to test inpainting and denoising).
+- [ ] Add automatic model scale change (preserve conv layers, estimate upscale layers).
+- [ ] Add automatic loading of old models and new ESRGAN models.
+- [ ] Downscale images before and/or after inference. Helps in cleaning up some noise or bring images back to the original scale.
 
 :triangular_flag_on_post: <small>Add saving and loading training state. When resuming training, just pass a option with the name `resume_state`, like , `"resume_state": "../experiments/debug_001_RRDB_PSNR_x4_DIV2K/training_state/200.state"`. </small>
 
@@ -23,7 +25,7 @@ An image super-resolution toolkit flexible for development. It now provides:
   <img height="350" src="https://github.com/xinntao/ESRGAN/blob/master/figures/baboon.jpg">
 </p>
 
-3. [**SFTGAN**](https://github.com/xinntao/CVPR18-SFTGAN) model. It adopts Spatial Feature Transform (SFT) to effectively incorporate other conditions/priors, like semantic prior for image SR, representing by segmentation probability maps. For more details, please refer to [Papaer](https://arxiv.org/abs/1804.02815), [SFTGAN repo](https://github.com/xinntao/CVPR18-SFTGAN).
+3. [**SFTGAN**](https://github.com/xinntao/CVPR18-SFTGAN) model. It adopts Spatial Feature Transform (SFT) to effectively incorporate other conditions/priors, like semantic prior for image SR, representing by segmentation probability maps. For more details, please refer to [Paper](https://arxiv.org/abs/1804.02815), [SFTGAN repo](https://github.com/xinntao/CVPR18-SFTGAN).
 <p align="center">
   <img height="220" src="https://github.com/xinntao/SFTGAN/blob/master/figures/network_structure.png">
 </p>
@@ -61,20 +63,20 @@ An image super-resolution toolkit flexible for development. It now provides:
 - [option] Python packages: [`pip install tensorboardX`](https://github.com/lanpa/tensorboardX), for visualizing curves.
 
 # Codes
-[`./codes`](https://github.com/xinntao/BasicSR/tree/master/codes). We provide a detailed explaination of the **code framework** in [`./codes`](https://github.com/xinntao/BasicSR/tree/master/codes).
+[`./codes`](https://github.com/victorca25/BasicSR/tree/master/codes). We provide a detailed explaination of the **code framework** in [`./codes`](https://github.com/victorca25/BasicSR/tree/master/codes).
 <p align="center">
-   <img src="https://github.com/xinntao/public_figures/blob/master/BasicSR/code_framework.png" height="300">
+   <img src="https://github.com/victorca25/public_figures/blob/master/BasicSR/code_framework.png" height="300">
 </p>
 
 We also provides:
 
-1. Some useful scripts. More details in [`./codes/scripts`](https://github.com/xinntao/BasicSR/tree/master/codes/scripts). 
-1. [Evaluation codes](https://github.com/xinntao/BasicSR/tree/master/metrics), e.g., PSNR/SSIM metric.
-1. [Wiki](https://github.com/xinntao/BasicSR/wiki), e.g., How to make high quality gif with full (true) color, Matlab bicubic imresize and etc.
+1. Some useful scripts. More details in [`./codes/scripts`](https://github.com/victorca25/BasicSR/tree/master/codes/scripts). 
+1. [Evaluation codes](https://github.com/victorca25/BasicSR/tree/master/metrics), e.g., PSNR/SSIM metric.
+1. [Wiki](https://github.com/victorca25/BasicSR/wiki), e.g., How to make high quality gif with full (true) color, Matlab bicubic imresize and etc.
 
 # Usage
 ### Data and model preparation
-The common **SR datasets** can be found in [Datasets](#datasets). Detailed data preparation can be seen in [`codes/data`](https://github.com/xinntao/BasicSR/tree/master/codes/data).
+The common **SR datasets** can be found in [Datasets](#datasets). Detailed data preparation can be seen in [`codes/data`](https://github.com/victorca25/BasicSR/tree/master/codes/data).
 
 We provide **pretrained models** in [Pretrained models](#pretrained-models).
 
@@ -95,24 +97,24 @@ We provide **pretrained models** in [Pretrained models](#pretrained-models).
 ### Train ESRGAN (SRGAN) models
 We use a PSNR-oriented pretrained SR model to initialize the parameters for better quality.
 
-1. Prepare datasets, usually the DIV2K dataset. More details are in [`codes/data`](https://github.com/xinntao/BasicSR/tree/master/codes/data) and [wiki (Faster IO speed)](https://github.com/xinntao/BasicSR/wiki/Faster-IO-speed). 
+1. Prepare datasets, usually the DIV2K dataset. More details are in [`codes/data`](https://github.com/victorca25/BasicSR/tree/master/codes/data) and [wiki (Faster IO speed)](https://github.com/xinntao/BasicSR/wiki/Faster-IO-speed). 
 1. Prerapre the PSNR-oriented pretrained model. You can use the `RRDB_PSNR_x4.pth` as the pretrained model. 
 1. Modify the configuration file  `options/train/train_esrgan.json`
 1. Run command: `python train.py -opt options/train/train_esrgan.json`
 
 ### Train SR models
-1. Prepare datasets, usually the DIV2K dataset. More details are in [`codes/data`](https://github.com/xinntao/BasicSR/tree/master/codes/data). 
+1. Prepare datasets, usually the DIV2K dataset. More details are in [`codes/data`](https://github.com/victorca25/BasicSR/tree/master/codes/data). 
 1. Modify the configuration file `options/train/train_sr.json`
 1. Run command: `python train.py -opt options/train/train_sr.json`
 
 ### Train SFTGAN models 
 *Pretraining is also important*. We use a PSNR-oriented pretrained SR model (trained on DIV2K) to initialize the SFTGAN model.
 
-1. First prepare the segmentation probability maps for training data: run [`test_seg.py`](https://github.com/xinntao/BasicSR/blob/master/codes/test_seg.py). We provide a pretrained segmentation model for 7 outdoor categories in [Pretrained models](#pretrained-models). We use [Xiaoxiao Li's codes](https://github.com/lxx1991/caffe_mpi) to train our segmentation model and transfer it to a PyTorch model.
-1. Put the images and segmentation probability maps in a folder as described in [`codes/data`](https://github.com/xinntao/BasicSR/tree/master/codes/data).
+1. First prepare the segmentation probability maps for training data: run [`test_seg.py`](https://github.com/victorca25/BasicSR/blob/master/codes/test_seg.py). We provide a pretrained segmentation model for 7 outdoor categories in [Pretrained models](#pretrained-models). We use [Xiaoxiao Li's codes](https://github.com/lxx1991/caffe_mpi) to train our segmentation model and transfer it to a PyTorch model.
+1. Put the images and segmentation probability maps in a folder as described in [`codes/data`](https://github.com/victorca25/BasicSR/tree/master/codes/data).
 1. Transfer the pretrained model parameters to the SFTGAN model. 
     1. First train with `debug` mode and obtain a saved model.
-    1. Run [`transfer_params_sft.py`](https://github.com/xinntao/BasicSR/blob/master/codes/scripts/transfer_params_sft.py) to initialize the model.
+    1. Run [`transfer_params_sft.py`](https://github.com/victorca25/BasicSR/blob/master/codes/scripts/transfer_params_sft.py) to initialize the model.
     1. We provide an initialized model named `sft_net_ini.pth` in [Pretrained models](#pretrained-models)
 1. Modify the configuration file in `options/train/train_sftgan.json`
 1. Run command: `python train.py -opt options/train/train_sftgan.json`
@@ -211,7 +213,7 @@ The most recent community pretrained models can be found at https://github.com/a
 
 You can put the downloaded models in the `experiments/pretrained_models` folder.
 
-More details about the pretrained models, please see [`experiments/pretrained_models`](https://github.com/xinntao/BasicSR/tree/master/experiments/pretrained_models).
+More details about the pretrained models, please see [`experiments/pretrained_models`](https://github.com/victorca25/BasicSR/tree/master/experiments/pretrained_models).
 
 Original pretrained models:
 <table>
@@ -274,7 +276,7 @@ Original pretrained models:
 
 ## Additional Help 
 
-If you have any questions, we have a [discord server](https://discord.gg/SxvYsgE) where you can ask them and a [Wiki](https://github.com/alsa64/AI-wiki) with more information.
+If you have any questions, we have a [discord server](https://discord.gg/SxvYsgE) where you can ask them and a [Wiki](https://github.com/alsa64/AI-wiki/wiki) with more information.
 
 ---
 
