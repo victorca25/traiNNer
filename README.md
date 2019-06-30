@@ -209,7 +209,7 @@ Several common SR datasets are list below.
 </table>
 
 # Pretrained models
-The most recent community pretrained models can be found at https://github.com/alsa64/AI-wiki/wiki/Model-Database
+The most recent community pretrained models can be found in the [Wiki](https://github.com/alsa64/AI-wiki/wiki/Model-Database).
 
 You can put the downloaded models in the default `experiments/pretrained_models` folder.
 
