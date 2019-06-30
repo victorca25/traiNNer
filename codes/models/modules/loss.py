@@ -155,3 +155,20 @@ class HFENL2Loss(nn.Module):
         target_smooth = smoothing(target_smooth)
 
         return torch.sum(torch.pow((LoG(input_smooth-target_smooth)), 2))
+
+class TVLoss(nn.Module):
+    def __init__(self, tvloss_weight=0.1, p=1):
+        super(TVLoss, self).__init__()
+        self.tvloss_weight = tvloss_weight
+        assert p in [1, 2]
+        self.p = p
+
+    def forward(self, x):
+    
+        if self.p == 1:
+            loss = torch.sum(torch.abs(x[:,:,:-1,:] - x[:,:,1:,:])) + torch.sum(torch.abs(x[:,:,:,:-1] - x[:,:,:,1:]))
+        else:
+            loss = torch.sum(torch.sqrt((x[:,:,:-1,:] - x[:,:,1:,:])**2) + torch.sum((x[:,:,:,:-1] - x[:,:,:,1:])**2))
+            
+        loss = loss / x.size(0) / (x.size(2)-1) / (x.size(3)-1)
+        return self.tvloss_weight * 2 *loss
