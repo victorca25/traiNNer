@@ -8,7 +8,7 @@ from torch.optim import lr_scheduler
 
 import models.networks as networks
 from .base_model import BaseModel
-from models.modules.loss import GANLoss, GradientPenaltyLoss, HFENL1Loss, HFENL2Loss
+from models.modules.loss import GANLoss, GradientPenaltyLoss, HFENL1Loss, HFENL2Loss, TVLoss
 logger = logging.getLogger('base')
 
 
@@ -70,12 +70,22 @@ class SRRaGANModel(BaseModel):
                     self.cri_hfen = RelativeHFENL2Loss().to(self.device)
                 else:
                     raise NotImplementedError('Loss type [{:s}] not recognized.'.format(l_hfen_type))
-                #in the first version had to compensate with 10000 was getting values of order 1e-7 when changed from the original HFEN calculation to this, validate if I can also change the denominator in the calculation to use what's available in pytorch instead. VGG Feature loss is in the order of 1 and pixel loss is in the order of 1e-4
-                #maybe test with nn.MSELoss(reduction = 'sum') and nn.L1Loss(reduction = 'sum') to prevent it to divide by the number of elements in the output. # https://pytorch.org/docs/stable/_modules/torch/nn/modules/loss.html
-                self.l_hfen_w = train_opt['hfen_weight'] #* 10000  #check and update! 
+                self.l_hfen_w = train_opt['hfen_weight']
             else:
                 logger.info('Remove HFEN loss.')
                 self.cri_hfen = None
+                
+            #TV loss
+            if train_opt['tv_weight'] > 0:
+                self.l_tv_w = train_opt['tv_weight']
+                l_tv_type = train_opt['tv_type']
+                if l_tv_type == 'normal':
+                    self.cri_tv = TVLoss(self.l_tv_w).to(self.device) 
+                elif l_tv_type == '4D':
+                    self.cri_tv = TVLoss4D(self.l_tv_w).to(self.device) #Total Variation regularization in 4 directions
+            else:
+                logger.info('Remove TV loss.')
+                self.cri_tv = None
 
             # GD gan loss
             self.cri_gan = GANLoss(train_opt['gan_type'], 1.0, 0.0).to(self.device)
@@ -152,6 +162,9 @@ class SRRaGANModel(BaseModel):
             if self.cri_hfen:  # HFEN loss 
                 l_g_HFEN = self.l_hfen_w * self.cri_hfen(self.fake_H, self.var_H)
                 l_g_total += l_g_HFEN
+            if self.cri_tv: #TV loss
+                l_g_tv = self.cri_tv(self.fake_H) #note: the weight is already multiplied inside the function, doesn't need to be here
+                l_g_total += l_g_tv
             # G gan + cls loss
             pred_g_fake = self.netD(self.fake_H)
             pred_d_real = self.netD(self.var_ref).detach()
