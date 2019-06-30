@@ -1,6 +1,70 @@
 import torch
 import torch.nn as nn
+import math
+import numbers
+from torch.nn import functional as F
+import numpy as np
 
+def LoG(imgHF):
+    
+    weight = [
+        [0, 0, 1, 0, 0],
+        [0, 1, 2, 1, 0],
+        [1, 2, -16, 2, 1],
+        [0, 1, 2, 1, 0],
+        [0, 0, 1, 0, 0]
+    ]
+    weight = np.array(weight)
+
+    weight_np = np.zeros((1, 1, 5, 5))
+    weight_np[0, 0, :, :] = weight
+    weight_np = np.repeat(weight_np, imgHF.shape[1], axis=1)
+    weight_np = np.repeat(weight_np, imgHF.shape[0], axis=0)
+
+    weight = torch.from_numpy(weight_np).type(torch.FloatTensor).to('cuda:0')
+    
+    return nn.functional.conv2d(imgHF, weight, padding=1)
+
+class GaussianSmoothing(nn.Module):
+    def __init__(self, channels, kernel_size=15, sigma=3, dim=2):
+        super(GaussianSmoothing, self).__init__()
+        if isinstance(kernel_size, numbers.Number):
+            kernel_size = [kernel_size] * dim
+        if isinstance(sigma, numbers.Number):
+            sigma = [sigma] * dim
+
+        kernel = 1
+        meshgrids = torch.meshgrid(
+            [
+                torch.arange(size, dtype=torch.float32)
+                for size in kernel_size
+            ]
+        )
+        for size, std, mgrid in zip(kernel_size, sigma, meshgrids):
+            mean = (size - 1) / 2
+            kernel *= 1 / (std * math.sqrt(2 * math.pi)) * \
+                      torch.exp(-((mgrid - mean) / std) ** 2 / 2)
+
+        kernel = kernel / torch.sum(kernel)
+        kernel = kernel.view(1, 1, *kernel.size())
+        kernel = kernel.repeat(channels, *[1] * (kernel.dim() - 1))
+
+        self.register_buffer('weight', kernel)
+        self.groups = channels
+
+        if dim == 1:
+            self.conv = F.conv1d
+        elif dim == 2:
+            self.conv = F.conv2d
+        elif dim == 3:
+            self.conv = F.conv3d
+        else:
+            raise RuntimeError(
+                'Only 1, 2 and 3 dimensions are supported. Received {}.'.format(dim)
+            )
+
+    def forward(self, input):
+        return self.conv(input, weight=self.weight, groups=self.groups)
 
 # Define GAN loss: [vanilla | lsgan | wgan-gp]
 class GANLoss(nn.Module):
@@ -58,3 +122,36 @@ class GradientPenaltyLoss(nn.Module):
 
         loss = ((grad_interp_norm - 1)**2).mean()
         return loss
+
+    
+class HFENL1Loss(nn.Module):
+    def __init__(self): 
+        super(HFENL1Loss, self).__init__()
+
+    def forward(self, input, target):
+        smoothing = GaussianSmoothing(3, 5, 1)
+        smoothing = smoothing.to('cuda:0')
+        input_smooth = nn.functional.pad(input, (2, 2, 2, 2), mode='reflect')
+        target_smooth = nn.functional.pad(target, (2, 2, 2, 2), mode='reflect')
+        
+        input_smooth = smoothing(input_smooth)
+        target_smooth = smoothing(target_smooth)
+
+        return torch.abs(LoG(input_smooth-target_smooth)).sum()
+    
+    
+class HFENL2Loss(nn.Module):
+    def __init__(self): 
+        super(HFENL2Loss, self).__init__()
+
+    def forward(self, input, target):
+        
+        smoothing = GaussianSmoothing(3, 5, 1)
+        smoothing = smoothing.to('cuda:0') 
+        input_smooth = nn.functional.pad(input, (2, 2, 2, 2), mode='reflect')
+        target_smooth = nn.functional.pad(target, (2, 2, 2, 2), mode='reflect')
+        
+        input_smooth = smoothing(input_smooth)
+        target_smooth = smoothing(target_smooth)
+
+        return torch.sum(torch.pow((LoG(input_smooth-target_smooth)), 2))
