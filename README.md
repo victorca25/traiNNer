@@ -207,11 +207,13 @@ Several common SR datasets are list below.
 </table>
 
 # Pretrained models
-We provide some pretrained models. More details about the pretrained models, please see [`experiments/pretrained_models`](https://github.com/xinntao/BasicSR/tree/master/experiments/pretrained_models).
+The most recent community pretrained models can be found at https://github.com/alsa64/AI-wiki/wiki/Model-Database
 
 You can put the downloaded models in the `experiments/pretrained_models` folder.
 
+More details about the pretrained models, please see [`experiments/pretrained_models`](https://github.com/xinntao/BasicSR/tree/master/experiments/pretrained_models).
 
+Original pretrained models:
 <table>
   <tr>
     <th>Name</th>
@@ -268,16 +270,13 @@ You can put the downloaded models in the `experiments/pretrained_models` folder.
     <td><a href="">Baidu Drive</a></td>
   </tr>
 </table>
-
-
-
----
-## :satisfied: Image Viewer - [HandyViewer](https://github.com/xinntao/HandyViewer)
-May try [HandyViewer](https://github.com/xinntao/HandyViewer) - an image viewer that you can switch image with a fixed zoom ratio, easy for comparing image details.
-
 ---
 
+## Additional Help 
 
+If you have any questions, we have a [discord server](https://discord.gg/SxvYsgE) where you can ask them and a [Wiki](https://github.com/alsa64/AI-wiki) with more information.
+
+---
 
 ## Acknowledgement
 
