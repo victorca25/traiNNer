@@ -12,7 +12,7 @@ from . import spectral_norm as SN
 
 class SRResNet(nn.Module):
     def __init__(self, in_nc, out_nc, nf, nb, upscale=4, norm_type='batch', act_type='relu', \
-            mode='NAC', res_scale=1, upsample_mode='upconv'):
+            mode='NAC', res_scale=1, upsample_mode='upconv', convtype='Conv2D'):
         super(SRResNet, self).__init__()
         n_upscale = int(math.log(upscale, 2))
         if upscale == 3:
@@ -20,7 +20,7 @@ class SRResNet(nn.Module):
 
         fea_conv = B.conv_block(in_nc, nf, kernel_size=3, norm_type=None, act_type=None)
         resnet_blocks = [B.ResNetBlock(nf, nf, nf, norm_type=norm_type, act_type=act_type,\
-            mode=mode, res_scale=res_scale) for _ in range(nb)]
+            mode=mode, res_scale=res_scale, convtype=convtype) for _ in range(nb)]
         LR_conv = B.conv_block(nf, nf, kernel_size=3, norm_type=norm_type, act_type=None, mode=mode)
 
         if upsample_mode == 'upconv':
@@ -46,7 +46,7 @@ class SRResNet(nn.Module):
 
 class RRDBNet(nn.Module):
     def __init__(self, in_nc, out_nc, nf, nb, gc=32, upscale=4, norm_type=None, \
-            act_type='leakyrelu', mode='CNA', upsample_mode='upconv'):
+            act_type='leakyrelu', mode='CNA', upsample_mode='upconv', convtype='Conv2D'):
         super(RRDBNet, self).__init__()
         n_upscale = int(math.log(upscale, 2))
         if upscale == 3:
@@ -54,7 +54,7 @@ class RRDBNet(nn.Module):
 
         fea_conv = B.conv_block(in_nc, nf, kernel_size=3, norm_type=None, act_type=None)
         rb_blocks = [B.RRDB(nf, kernel_size=3, gc=32, stride=1, bias=True, pad_type='zero', \
-            norm_type=norm_type, act_type=act_type, mode='CNA') for _ in range(nb)]
+            norm_type=norm_type, act_type=act_type, mode='CNA', convtype=convtype) for _ in range(nb)]
         LR_conv = B.conv_block(nf, nf, kernel_size=3, norm_type=norm_type, act_type=None, mode=mode)
 
         if upsample_mode == 'upconv':
@@ -85,7 +85,7 @@ class RRDBNet(nn.Module):
 
 # VGG style Discriminator with input size 128*128
 class Discriminator_VGG_128(nn.Module):
-    def __init__(self, in_nc, base_nf, norm_type='batch', act_type='leakyrelu', mode='CNA'):
+    def __init__(self, in_nc, base_nf, norm_type='batch', act_type='leakyrelu', mode='CNA', convtype='Conv2D'):
         super(Discriminator_VGG_128, self).__init__()
         # features
         # hxw, c
@@ -176,7 +176,7 @@ class Discriminator_VGG_128_SN(nn.Module):
 
 
 class Discriminator_VGG_96(nn.Module):
-    def __init__(self, in_nc, base_nf, norm_type='batch', act_type='leakyrelu', mode='CNA'):
+    def __init__(self, in_nc, base_nf, norm_type='batch', act_type='leakyrelu', mode='CNA', convtype='Conv2D'):
         super(Discriminator_VGG_96, self).__init__()
         # features
         # hxw, c
@@ -221,7 +221,7 @@ class Discriminator_VGG_96(nn.Module):
 
 
 class Discriminator_VGG_192(nn.Module):
-    def __init__(self, in_nc, base_nf, norm_type='batch', act_type='leakyrelu', mode='CNA'):
+    def __init__(self, in_nc, base_nf, norm_type='batch', act_type='leakyrelu', mode='CNA', convtype='Conv2D'):
         super(Discriminator_VGG_192, self).__init__()
         # features
         # hxw, c
