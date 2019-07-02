@@ -2,17 +2,13 @@
 
 :black_square_button: TODO
 
-- [ ] Test TV loss/regularization (balance loss weight).
-- [ ] Test HFEN loss (balance loss weight).
+- [ ] Test TV loss/regularization (needs to balance loss weight with other losses). Useful for denoising tasks, reduces Total Variation. 
+- [ ] Test HFEN loss (needs to balance loss weight with other losses). Useful to keep high frequency information. Used Gaussian filter to reduce the effect of noise.
+- [ ] Test [Partial Convolution based Padding](https://github.com/NVIDIA/partialconv) (PartialConv2D). It should help prevent edge padding issues. Zero padding is the default and typically has best performance, PartialConv2D has better performance and converges faster for segmentation and classification (https://arxiv.org/pdf/1811.11718.pdf). Code has been added, but the switch makes pretained models using Conv2D incompatible. Training new models for testing. (May be able to test inpainting and denoising)
 - [ ] Add on the fly augmentations (gaussian noise, blur, JPEG compression).
-- [ ] Test [Partial Convolution based Padding](https://github.com/NVIDIA/partialconv) (PartialConv2D) to prevent edge padding issues (May be able to test inpainting and denoising).
 - [ ] Add automatic model scale change (preserve conv layers, estimate upscale layers).
 - [ ] Add automatic loading of old models and new ESRGAN models.
 - [ ] Downscale images before and/or after inference. Helps in cleaning up some noise or bring images back to the original scale.
-
-:triangular_flag_on_post: <small>Add saving and loading training state. When resuming training, just pass a option with the name `resume_state`, like , `"resume_state": "../experiments/debug_001_RRDB_PSNR_x4_DIV2K/training_state/200.state"`. </small>
-
-:triangular_flag_on_post: <small>Use Python logging, and support PyTorch 1.0</small>
 
 An image super-resolution toolkit flexible for development. It now provides:
 
@@ -30,22 +26,6 @@ An image super-resolution toolkit flexible for development. It now provides:
   <img height="220" src="https://github.com/xinntao/SFTGAN/blob/master/figures/network_structure.png">
 </p>
 
-### BibTex
-
-    @InProceedings{wang2018esrgan,
-        author = {Wang, Xintao and Yu, Ke and Wu, Shixiang and Gu, Jinjin and Liu, Yihao and Dong, Chao and Qiao, Yu and Loy, Chen Change},
-        title = {ESRGAN: Enhanced super-resolution generative adversarial networks},
-        booktitle = {The European Conference on Computer Vision Workshops (ECCVW)},
-        month = {September},
-        year = {2018}
-    }
-    @InProceedings{wang2018sftgan,
-        author = {Wang, Xintao and Yu, Ke and Dong, Chao and Loy, Chen Change},
-        title = {Recovering realistic texture in image super-resolution by deep spatial feature transform},
-        booktitle = {The IEEE Conference on Computer Vision and Pattern Recognition (CVPR)},
-        month = {June},
-        year = {2018}
-    }
     
 ## Table of Contents
 1. [Dependencies](#dependencies)
@@ -68,7 +48,7 @@ An image super-resolution toolkit flexible for development. It now provides:
    <img src="https://github.com/xinntao/public_figures/blob/master/BasicSR/code_framework.png" height="300">
 </p>
 
-We also provides:
+We also provide:
 
 1. Some useful scripts. More details in [`./codes/scripts`](https://github.com/victorca25/BasicSR/tree/master/codes/scripts). 
 1. [Evaluation codes](https://github.com/victorca25/BasicSR/tree/master/metrics), e.g., PSNR/SSIM metric.
@@ -119,6 +99,10 @@ We use a PSNR-oriented pretrained SR model to initialize the parameters for bett
     1. We provide an initialized model named `sft_net_ini.pth` in [Pretrained models](#pretrained-models)
 1. Modify the configuration file in `options/train/train_sftgan.json`
 1. Run command: `python train.py -opt options/train/train_sftgan.json`
+
+### Resuming Training 
+When resuming training, just pass a option with the name `resume_state`, like , <small>`"resume_state": "../experiments/debug_001_RRDB_PSNR_x4_DIV2K/training_state/200.state"`. </small>
+
 
 # Datasets
 Several common SR datasets are list below. 
@@ -290,3 +274,20 @@ If you have any questions, we have a [discord server](https://discord.gg/SxvYsgE
 
 - Code architecture is inspired by [pytorch-cyclegan](https://github.com/junyanz/pytorch-CycleGAN-and-pix2pix).
 - Thanks to *Wai Ho Kwok*, who contributes to the initial version.
+
+### BibTex
+
+    @InProceedings{wang2018esrgan,
+        author = {Wang, Xintao and Yu, Ke and Wu, Shixiang and Gu, Jinjin and Liu, Yihao and Dong, Chao and Qiao, Yu and Loy, Chen Change},
+        title = {ESRGAN: Enhanced super-resolution generative adversarial networks},
+        booktitle = {The European Conference on Computer Vision Workshops (ECCVW)},
+        month = {September},
+        year = {2018}
+    }
+    @InProceedings{wang2018sftgan,
+        author = {Wang, Xintao and Yu, Ke and Dong, Chao and Loy, Chen Change},
+        title = {Recovering realistic texture in image super-resolution by deep spatial feature transform},
+        booktitle = {The IEEE Conference on Computer Vision and Pattern Recognition (CVPR)},
+        month = {June},
+        year = {2018}
+    }
