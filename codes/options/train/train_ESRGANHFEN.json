@@ -43,6 +43,7 @@
     , "out_nc": 3
     , "gc": 32
     , "group": 1
+    , "convtype": "PartialConv2D" //"Conv2D" | "PartialConv2D"
   }
   , "network_D": {
     "which_model_D": "discriminator_vgg_128"
