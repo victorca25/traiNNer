@@ -8,7 +8,7 @@
   , "datasets": {
     "train": {
       "name": "DIV2K"
-      , "mode": "LRHR"
+      , "mode": "LRHROTF"
       , "dataroot_HR": "../datasets/train/hr"
       , "dataroot_LR": "../datasets/train/lr"
       , "subset_file": null
