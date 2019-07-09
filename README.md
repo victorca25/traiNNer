@@ -4,11 +4,17 @@
 
 - [ ] Test TV loss/regularization (needs to balance loss weight with other losses). Useful for denoising tasks, reduces Total Variation. 
 - [ ] Test HFEN loss (needs to balance loss weight with other losses). Useful to keep high frequency information. Used Gaussian filter to reduce the effect of noise.
-- [ ] Test [Partial Convolution based Padding](https://github.com/NVIDIA/partialconv) (PartialConv2D). It should help prevent edge padding issues. Zero padding is the default and typically has best performance, PartialConv2D has better performance and converges faster for segmentation and classification (https://arxiv.org/pdf/1811.11718.pdf). Code has been added, but the switch makes pretained models using Conv2D incompatible. Training new models for testing. (May be able to test inpainting and denoising)
-- [ ] Add on the fly augmentations (gaussian noise, blur, JPEG compression).
+- [ ] Test [Partial Convolution based Padding](https://github.com/NVIDIA/partialconv) (PartialConv2D).
+- [ ] Test PartialConv2D with random masks.
 - [ ] Add automatic model scale change (preserve conv layers, estimate upscale layers).
 - [ ] Add automatic loading of old models and new ESRGAN models.
 - [ ] Downscale images before and/or after inference. Helps in cleaning up some noise or bring images back to the original scale.
+
+Done
+- [:white_check_mark:] Add on the fly augmentations (gaussian noise, blur, JPEG compression).
+- [:white_check_mark:] Add TV loss/regularization options
+- [:white_check_mark:] Add HFEN loss
+- [:white_check_mark:] Add [Partial Convolution based Padding](https://github.com/NVIDIA/partialconv) (PartialConv2D). It should help prevent edge padding issues. Zero padding is the default and typically has best performance, PartialConv2D has better performance and converges faster for segmentation and classification (https://arxiv.org/pdf/1811.11718.pdf). Code has been added, but the switch makes pretained models using Conv2D incompatible. Training new models for testing. (May be able to test inpainting and denoising)
 
 An image super-resolution toolkit flexible for development. It now provides:
 
@@ -193,6 +199,9 @@ Several common SR datasets are list below.
   </tr>
 </table>
 
+Any dataset can be augmented to expose the model to information that might not be available in the images, such a noise and blur. For this reason, [Data Augmentation](https://github.com/victorca25/BasicSR/wiki/Dataset-Augmentation) has been added to the options in this repository and it can be extended to include other types of augmentations.
+
+
 # Pretrained models
 The most recent community pretrained models can be found in the [Wiki](https://github.com/alsa64/AI-wiki/wiki/Model-Database).
 
@@ -205,7 +214,7 @@ The authors continued exploring the capabilities of linearly interpolating model
    <img src="https://camo.githubusercontent.com/913baa366ba395595a9638ab6282a9cbb088ab98/68747470733a2f2f78696e6e74616f2e6769746875622e696f2f70726f6a656374732f444e495f7372632f7465617365722e6a7067" height="300">
 </p>
 
-
+More details and explanations of interpolation can be found [here](https://github.com/victorca25/BasicSR/wiki/Interpolation) in the Wiki.
 
 Following are the original pretrained models that the authors made available:
 <table>
