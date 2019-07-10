@@ -8,7 +8,7 @@ from torch.optim import lr_scheduler
 
 import models.networks as networks
 from .base_model import BaseModel
-from models.modules.loss import GANLoss, GradientPenaltyLoss, HFENL1Loss, HFENL2Loss, TVLoss
+from models.modules.loss import GANLoss, GradientPenaltyLoss, HFENL1Loss, HFENL2Loss, TVLoss, CharbonnierLoss
 logger = logging.getLogger('base')
 
 
