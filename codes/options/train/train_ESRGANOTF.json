@@ -85,9 +85,9 @@
     , "lr_steps": [50000, 100000, 200000, 300000]
     , "lr_gamma": 0.5
 
-    , "pixel_criterion": "l1"
+    , "pixel_criterion": "l1" // "l1" | "l2" | "cb"
     , "pixel_weight": 1e-2
-    , "feature_criterion": "l1"
+    , "feature_criterion": "l1" // "l1" | "l2"
     , "feature_weight": 1
     , "hfen_criterion": "l2" //hfen: "l1" | "l2"
     , "hfen_weight": 1e-6
