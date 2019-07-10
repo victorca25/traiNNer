@@ -210,6 +210,10 @@ class SRRaGANModel(BaseModel):
                 self.log_dict['l_g_pix'] = l_g_pix.item()
             if self.cri_fea:
                 self.log_dict['l_g_fea'] = l_g_fea.item()
+            if self.cri_hfen:
+                self.log_dict['l_g_HFEN'] = l_g_HFEN.item()
+            if self.cri_tv:
+                self.log_dict['l_g_tv'] = l_g_tv.item()
             self.log_dict['l_g_gan'] = l_g_gan.item()
         # D
         self.log_dict['l_d_real'] = l_d_real.item()
