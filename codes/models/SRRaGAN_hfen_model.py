@@ -34,6 +34,8 @@ class SRRaGANModel(BaseModel):
                     self.cri_pix = nn.L1Loss().to(self.device)
                 elif l_pix_type == 'l2':
                     self.cri_pix = nn.MSELoss().to(self.device)
+                elif loss_type == 'cb':
+                    self.cri_pix = CharbonnierLoss().to(self.device)
                 else:
                     raise NotImplementedError('Loss type [{:s}] not recognized.'.format(l_pix_type))
                 self.l_pix_w = train_opt['pixel_weight']
