@@ -52,16 +52,16 @@ class LRHRDataset(data.Dataset):
                 len(self.paths_LR), len(self.paths_HR)) 
         
         #v parse on the fly options
-        if opt['lr_noise']: #v variable to activate adding noise to LR image
-            self.LR_noise = True 
-            self.noise_types = opt['lr_noise_types']
-            print("LR_noise enabled")
-            print(self.noise_types)
-        if opt['lr_noise2']: #vvariable to activate adding a secondary noise to LR image
-            self.LR_noise2 = True 
-            self.noise_types2 = opt['lr_noise_types2']
-            print("LR_noise enabled")
-            print(self.noise_types)
+        if opt['hr_crop']: #v variable to activate automatic crop of HR image to correct size and generate LR
+            self.HR_crop = True
+            print("Automatic crop of HR images enabled")
+        else: 
+            self.HR_crop = False 
+        if opt['hr_rrot']: #v variable to activate automatic rotate HR image and generate LR
+            self.HR_rrot = True
+            print("HR random rotation enabled")
+        else: 
+            self.HR_rrot = False
         if opt['hr_noise']: #v  variable to activate adding noise to HR image
             self.HR_noise = True 
             self.hr_noise_types = opt['hr_noise_types']
@@ -77,9 +77,16 @@ class LRHRDataset(data.Dataset):
             self.blur_algos = opt['lr_blur_types']
             print("LR_blur enabled")
             print(self.blur_algos)
-        if opt['hr_crop']: #v variable to activate automatic crop of HR image to correct size and generate LR
-            self.HR_crop = True
-            print("Automatic crop of HR images enabled")
+        if opt['lr_noise']: #v variable to activate adding noise to LR image
+            self.LR_noise = True 
+            self.noise_types = opt['lr_noise_types']
+            print("LR_noise enabled")
+            print(self.noise_types)
+        if opt['lr_noise2']: #vvariable to activate adding a secondary noise to LR image
+            self.LR_noise2 = True 
+            self.noise_types2 = opt['lr_noise_types2']
+            print("LR_noise enabled")
+            print(self.noise_types)
         if opt['lr_cutout']: #v variable to activate random cutout 
             self.LR_cutout = True
             print("LR cutout enabled")
@@ -126,9 +133,17 @@ class LRHRDataset(data.Dataset):
             img_HR = util.channel_convert(img_HR.shape[2], self.opt['color'], [img_HR])[0]
         
         #v
-        if self.HR_crop:
+        if self.HR_crop and (self.HR_rrot != True):
             crop_size = (HR_size, HR_size)
             img_HR, _ = augmentations.random_resize_img(img_HR, crop_size)
+        elif self.HR_rrot and (self.HR_crop != True):
+            img_HR, _ = augmentations.random_rotate(img_HR)
+        elif self.HR_crop and self.HR_rrot:
+            if np.random.rand() > 0.5:
+                crop_size = (HR_size, HR_size)
+                img_HR, _ = augmentations.random_resize_img(img_HR, crop_size)
+            else:
+                img_HR, _ = augmentations.random_rotate(img_HR)
         #v
             
         #v
@@ -138,7 +153,7 @@ class LRHRDataset(data.Dataset):
 
         # get LR image
         if self.paths_LR:
-            if self.HR_crop: #v
+            if self.HR_crop or self.HR_rrot: #v
                 img_LR = img_HR
             else:
                 if LRHRchance < (1- flip_chance):
