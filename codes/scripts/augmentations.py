@@ -8,6 +8,7 @@
 # https://www.kumilog.net/entry/numpy-data-augmentation
 # https://github.com/QunixZ/Image_Dithering_Implements/blob/master/HW1.py
 # https://docs.opencv.org/3.1.0/d4/d86/group__imgproc__filter.html
+#https://github.com/jrosebr1/imutils
 
 import random
 import argparse
@@ -124,13 +125,15 @@ def random_erasing(image_origin, p=0.5, s=(0.02, 0.4), r=(0.3, 3), modes=[0,1,2]
     return image
 
 # scale image
-def scale_img(img_LR, scale):
+def scale_img(img_LR, scale, algo=None):
     h,w,c = img_LR.shape
     newdim = (int(w/scale), int(h/scale))
     
-    scale_algos = [cv2.INTER_NEAREST, cv2.INTER_LINEAR, cv2.INTER_CUBIC, cv2.INTER_AREA, cv2.INTER_LANCZOS4, cv2.INTER_LINEAR_EXACT] #scaling interpolation options
-    interpol = random.choice(scale_algos)
-    
+    if algo is None:
+        scale_algos = [cv2.INTER_NEAREST, cv2.INTER_LINEAR, cv2.INTER_CUBIC, cv2.INTER_AREA, cv2.INTER_LANCZOS4, cv2.INTER_LINEAR_EXACT] #scaling interpolation options
+        interpol = random.choice(scale_algos)
+    else:
+        interpol = algo
     resized = cv2.resize(img_LR, newdim, interpolation = interpol)
     
     img_LR = np.clip(resized, 0, 1)
@@ -149,15 +152,38 @@ def resize_img(img_LR, crop_size=(128, 128)):
     
     return img_LR, interpol
 
-def random_resize_img(img_LR, crop_size=(128, 128)):
+def random_resize_img(img_LR, crop_size=(128, 128), new_scale=0, algo=None):
     mu, sigma = 0, 0.3
-    random_resize = np.random.uniform(-0.5, 0.) #resize randomly from 0 to 2x
+    if new_scale == 0:
+        new_scale = np.random.uniform(-0.5, 0.) #resize randomly from 0 to 2x
+        scale = 1+new_scale
+    else:
+        scale = new_scale
     
-    img_LR, interpol = scale_img(img_LR, 1+random_resize) 
-    
+    img_LR, interpol = scale_img(img_LR, scale, algo) 
     img_LR = random_crop(img_LR, crop_size)
     
     return img_LR, interpol
+
+def rotate(image, angle, center=None, scale=1.0):
+    (h, w) = image.shape[:2]
+    if center is None:
+        center = (w // 2, h // 2)
+    M = cv2.getRotationMatrix2D(center, angle, scale)
+    rotated = cv2.warpAffine(image, M, (w, h))
+    return rotated
+
+def random_rotate(img_LR, angle=0, center=None, scale=1.0):    
+    if angle == 0:
+        angle = int(np.random.uniform(-45, 45))
+    
+    h,w,c = img_LR.shape
+    img_LR, _ = scale_img(img_LR, 1/4, cv2.INTER_LANCZOS4) #upscaling 4x like HD Mode7 to reduce jaggy lines after rotating, more accurate underlying "sub-pixel" data 
+    img_LR = rotate(img_LR, angle) #will change image shape 
+    # img_LR = rotate_bound(img_LR, angle) #will not change image shape 
+    img_LR, _ = scale_img(img_LR, 3, cv2.INTER_LANCZOS4) #reducing scale. Using 3x to reduce chance of blank spaces in the corners
+    img_LR = random_crop(img_LR, crop_size=(h, w)) #crop back to the original size
+    return img_LR, angle 
 
 def blur_img(img_LR, blur_algos=['clean'], kernel_size = 0):
     h,w,c = img_LR.shape
@@ -529,6 +555,13 @@ def random_img(img_dir, save_path, crop_size=(128, 128), scale=1, blur_algos=['c
     #"""
     #cv2.imwrite(save_path+'/noise2_'+str(noise_algo2)+'_.png',img_noise2*255) 
     #"""
+    
+    img_rrot, angle = random_rotate(img)
+    print(img_rrot.shape)
+    #"""
+    cv2.imwrite(save_path+'/rrot_'+str(angle)+'_.png',img_rrot*255) 
+    #"""
+    
     print('Finished')
     
 
@@ -592,6 +625,13 @@ def single_image(img_path, save_path, crop_size=(128, 128), scale=1, blur_algos=
     #"""
     cv2.imwrite(save_path+'/noise2_'+str(noise_algo2)+'_.png',img_noise2*255) 
     #"""
+    
+    img_rrot, angle = random_rotate(img)
+    print(img_rrot.shape)
+    #"""
+    cv2.imwrite(save_path+'/rrot_'+str(angle)+'_.png',img_rrot*255) 
+    #"""
+    
     print('Finished')
 
     
@@ -660,6 +700,12 @@ def apply_dir(img_path, save_path, crop_size=(128, 128), scale=1, blur_algos=['c
         print(img_noise2.shape)
         #"""
         cv2.imwrite(save_path+'/'+rann+'noise2_'+str(noise_algo2)+'_.png',img_noise2*255) 
+        #"""
+        
+        img_rrot, angle = random_rotate(img)
+        print(img_rrot.shape)
+        #"""
+        cv2.imwrite(save_path+'/'+rann+'rrot_'+str(angle)+'_.png',img_rrot*255) 
         #"""
 
     print('Finished')
