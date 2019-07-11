@@ -25,7 +25,7 @@ class LRHRDataset(data.Dataset):
         self.paths_HR = None
         self.LR_env = None  # environment for lmdb
         self.HR_env = None
-       self.HR_crop = None #v
+        self.HR_crop = None #v
         self.HR_rrot = None #v
         self.LR_scale = None #v
         self.LR_blur = None #v
