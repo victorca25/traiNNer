@@ -25,12 +25,13 @@ class LRHRDataset(data.Dataset):
         self.paths_HR = None
         self.LR_env = None  # environment for lmdb
         self.HR_env = None
-        self.LR_noise = None #v
-        self.LR_noise2 = None #v
-        self.HR_noise = None #v
+       self.HR_crop = None #v
+        self.HR_rrot = None #v
         self.LR_scale = None #v
         self.LR_blur = None #v
-        self.HR_crop = None #v
+        self.HR_noise = None #v
+        self.LR_noise = None #v
+        self.LR_noise2 = None #v
         self.LR_cutout = None #v
         self.LR_erasing = None #v
 
@@ -55,13 +56,9 @@ class LRHRDataset(data.Dataset):
         if opt['hr_crop']: #v variable to activate automatic crop of HR image to correct size and generate LR
             self.HR_crop = True
             print("Automatic crop of HR images enabled")
-        else: 
-            self.HR_crop = False 
         if opt['hr_rrot']: #v variable to activate automatic rotate HR image and generate LR
             self.HR_rrot = True
             print("HR random rotation enabled")
-        else: 
-            self.HR_rrot = False
         if opt['hr_noise']: #v  variable to activate adding noise to HR image
             self.HR_noise = True 
             self.hr_noise_types = opt['hr_noise_types']
