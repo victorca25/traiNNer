@@ -74,9 +74,10 @@ class CharbonnierLoss(nn.Module):
         self.eps = eps
 
     def forward(self, x, y):
+        b, c, h, w = target.size()
         diff = x - y
         loss = torch.sum(torch.sqrt(diff * diff + self.eps))
-        return loss
+        return loss/(c*b*h*w)
     
 # Define GAN loss: [vanilla | lsgan | wgan-gp]
 class GANLoss(nn.Module):
@@ -184,3 +185,19 @@ class TVLoss(nn.Module):
             
         loss = loss / x.size(0) / (x.size(2)-1) / (x.size(3)-1)
         return self.tvloss_weight * 2 *loss
+    
+ class ElasticLoss(nn.Module):
+    def __init__(self, a=0.2): #a=0.5 default
+        super(ElasticLoss, self).__init__()
+        self.alpha = torch.FloatTensor([a, 1 - a]).to('cuda:0')
+
+    def forward(self, input, target):
+         if not isinstance(input, tuple):
+            input = (input,)
+
+        for i in range(len(input)):
+            l2 = nn.functional.mse_loss(input[i].squeeze(), target.squeeze()).mul(self.alpha[0])
+            l1 = nn.functional.l1_loss(input[i].squeeze(), target.squeeze()).mul(self.alpha[1])
+            loss += l1 + l2
+
+        return loss
