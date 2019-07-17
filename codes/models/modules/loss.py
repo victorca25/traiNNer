@@ -186,13 +186,13 @@ class TVLoss(nn.Module):
         loss = loss / x.size(0) / (x.size(2)-1) / (x.size(3)-1)
         return self.tvloss_weight * 2 *loss
     
- class ElasticLoss(nn.Module):
+class ElasticLoss(nn.Module):
     def __init__(self, a=0.2): #a=0.5 default
         super(ElasticLoss, self).__init__()
         self.alpha = torch.FloatTensor([a, 1 - a]).to('cuda:0')
 
     def forward(self, input, target):
-         if not isinstance(input, tuple):
+        if not isinstance(input, tuple):
             input = (input,)
 
         for i in range(len(input)):
