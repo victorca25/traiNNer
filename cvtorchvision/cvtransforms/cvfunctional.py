@@ -226,7 +226,6 @@ def pad(img, padding, fill=(0, 0, 0), padding_mode='constant'):
     assert padding_mode in ['constant', 'edge', 'reflect', 'symmetric'], \
         'Padding mode should be either constant, edge, reflect or symmetric'
 
-
     if isinstance(padding, int):
         pad_left = pad_right = pad_top = pad_bottom = padding
     if isinstance(padding, collections.Sequence) and len(padding) == 2:
@@ -236,9 +235,8 @@ def pad(img, padding, fill=(0, 0, 0), padding_mode='constant'):
         pad_left, pad_top, pad_right, pad_bottom = padding
 
     if isinstance(fill, numbers.Number):
-        fill = fill,
-    if isinstance(fill, numbers.Number) and len(img.shape) == 3:
-        fill = (fill,) * 3
+        fill = (fill,) * (2 * len(img.shape) - 3)
+
     if padding_mode == 'constant':
         assert (len(fill) == 3 and len(img.shape) == 3) or (len(fill) == 1 and len(img.shape) == 2), \
             'channel of image is {} but length of fill is {}'.format(img.shape[-1], len(fill))
