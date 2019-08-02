@@ -2,18 +2,21 @@
 
 :black_square_button: TODO
 
-- [ ] Test TV loss/regularization (needs to balance loss weight with other losses). Useful for denoising tasks, reduces Total Variation. 
-- [ ] Test HFEN loss (needs to balance loss weight with other losses). Useful to keep high frequency information. Used Gaussian filter to reduce the effect of noise.
+- [ ] Test TV loss/regularization (needs to balance loss weight with other losses). 
+- [ ] Test HFEN loss (needs to balance loss weight with other losses). 
 - [ ] Test [Partial Convolution based Padding](https://github.com/NVIDIA/partialconv) (PartialConv2D).
 - [ ] Test PartialConv2D with random masks.
 - [ ] Add automatic model scale change (preserve conv layers, estimate upscale layers).
 - [ ] Add automatic loading of old models and new ESRGAN models.
 - [ ] Downscale images before and/or after inference. Helps in cleaning up some noise or bring images back to the original scale.
+- [ ] Adopt SRPGAN's extraction of features from the discriminator to test if it reduces compute usage
+- [ ] Import GMFN's recurrent network and add the feature loss to their MSE model, should have better MSE results with SRGAN's features/textures (Needs testing)
+- [ ] Import PPON's inference network to train using BasicSR's framework. They use dilated convolutions to increase receptive field and compare against ESRGAN with perceptually good results
 
 Done
 - [:white_check_mark:] Add on the fly augmentations (gaussian noise, blur, JPEG compression).
-- [:white_check_mark:] Add TV loss/regularization options
-- [:white_check_mark:] Add HFEN loss
+- [:white_check_mark:] Add TV loss/regularization options. Useful for denoising tasks, reduces Total Variation.
+- [:white_check_mark:] Add HFEN loss. Useful to keep high frequency information. Used Gaussian filter to reduce the effect of noise.
 - [:white_check_mark:] Add [Partial Convolution based Padding](https://github.com/NVIDIA/partialconv) (PartialConv2D). It should help prevent edge padding issues. Zero padding is the default and typically has best performance, PartialConv2D has better performance and converges faster for segmentation and classification (https://arxiv.org/pdf/1811.11718.pdf). Code has been added, but the switch makes pretained models using Conv2D incompatible. Training new models for testing. (May be able to test inpainting and denoising)
 
 An image super-resolution toolkit flexible for development. It now provides:
