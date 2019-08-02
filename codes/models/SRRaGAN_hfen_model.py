@@ -8,7 +8,7 @@ from torch.optim import lr_scheduler
 
 import models.networks as networks
 from .base_model import BaseModel
-from models.modules.loss import GANLoss, GradientPenaltyLoss, HFENL1Loss, HFENL2Loss, TVLoss, CharbonnierLoss
+from models.modules.loss import GANLoss, GradientPenaltyLoss, HFENL1Loss, HFENL2Loss, TVLoss, CharbonnierLoss, ElasticLoss
 logger = logging.getLogger('base')
 
 
@@ -36,6 +36,8 @@ class SRRaGANModel(BaseModel):
                     self.cri_pix = nn.MSELoss().to(self.device)
                 elif l_pix_type == 'cb':
                     self.cri_pix = CharbonnierLoss().to(self.device)
+                elif l_pix_type == 'elastic':
+                    self.cri_pix = ElasticLoss().to(self.device)
                 else:
                     raise NotImplementedError('Loss type [{:s}] not recognized.'.format(l_pix_type))
                 self.l_pix_w = train_opt['pixel_weight']
@@ -52,6 +54,8 @@ class SRRaGANModel(BaseModel):
                     self.cri_fea = nn.MSELoss().to(self.device)
                 elif l_fea_type == 'cb':
                     self.cri_fea = CharbonnierLoss().to(self.device)
+                elif l_fea_type == 'elastic':
+                    self.cri_fea = ElasticLoss().to(self.device)
                 else:
                     raise NotImplementedError('Loss type [{:s}] not recognized.'.format(l_fea_type))
                 self.l_fea_w = train_opt['feature_weight']
