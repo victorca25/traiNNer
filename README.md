@@ -90,12 +90,12 @@ We provide **pretrained models** in [Pretrained models](#pretrained-models).
 1. Obtain the segmentation probability maps: `python test_seg.py`
 1. Run command: `python test_sftgan.py`
 
-### Test ESRGAN (SRGAN) models
+### Test PPON models
 1. Modify the configuration file `options/test/test_ppon.json` 
 1. Run command: `python test_ppon.py -opt options/test/test_ppon.json`
 
 ## How to Train
-### Train PPON models
+### Train ESRGAN (SRGAN) models
 We use a PSNR-oriented pretrained SR model to initialize the parameters for better quality. According to the author's paper and some testing, this will also stabilize the GAN training and allows for faster convergence. 
 
 1. Prepare datasets, usually the DIV2K dataset. More details are in [`codes/data`](https://github.com/victorca25/BasicSR/tree/master/codes/data) and [
