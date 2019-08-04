@@ -18,6 +18,8 @@ Done
 - [:white_check_mark:] Add TV loss/regularization options. Useful for denoising tasks, reduces Total Variation.
 - [:white_check_mark:] Add HFEN loss. Useful to keep high frequency information. Used Gaussian filter to reduce the effect of noise.
 - [:white_check_mark:] Add [Partial Convolution based Padding](https://github.com/NVIDIA/partialconv) (PartialConv2D). It should help prevent edge padding issues. Zero padding is the default and typically has best performance, PartialConv2D has better performance and converges faster for segmentation and classification (https://arxiv.org/pdf/1811.11718.pdf). Code has been added, but the switch makes pretained models using Conv2D incompatible. Training new models for testing. (May be able to test inpainting and denoising)
+- [:white_check_mark:] Added SSIM and MS-SSIM loss functions.
+
 
 An image super-resolution toolkit flexible for development. It now provides:
 
@@ -219,11 +221,11 @@ The authors continued exploring the capabilities of linearly interpolating model
 
 More details and explanations of interpolation can be found [here](https://github.com/victorca25/BasicSR/wiki/Interpolation) in the Wiki.
 
-Following are the original pretrained models that the authors made available:
+Following are the original pretrained models that the authors made available for ESRGAN and SFTGAN:
 <table>
   <tr>
     <th>Name</th>
-    <th>Modeds</th>
+    <th>Models</th>
     <th>Short Description</th>
     <th>Google Drive</th>
     <th>Baidu Drive</th>
