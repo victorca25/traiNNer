@@ -79,11 +79,11 @@ class LRHRDataset(data.Dataset):
             self.noise_types = opt['lr_noise_types']
             print("LR_noise enabled")
             print(self.noise_types)
-        if opt['lr_noise2']: #vvariable to activate adding a secondary noise to LR image
+        if opt['lr_noise2']: #v variable to activate adding a secondary noise to LR image
             self.LR_noise2 = True 
             self.noise_types2 = opt['lr_noise_types2']
-            print("LR_noise enabled")
-            print(self.noise_types)
+            print("LR_noise 2 enabled")
+            print(self.noise_types2)
         if opt['lr_cutout']: #v variable to activate random cutout 
             self.LR_cutout = True
             print("LR cutout enabled")
@@ -261,4 +261,3 @@ class LRHRDataset(data.Dataset):
 
     def __len__(self):
         return len(self.paths_HR)
-        
