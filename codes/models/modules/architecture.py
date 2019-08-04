@@ -78,6 +78,74 @@ class RRDBNet(nn.Module):
         return x
 
 
+
+
+
+####################
+# PPON
+####################
+
+'''
+Progressive Perception-Oriented Network for Single Image Super-Resolution
+https://arxiv.org/pdf/1907.10399.pdf
+'''
+
+class PPON(nn.Module):
+    def __init__(self, in_nc, nf, nb, out_nc, upscale=4, act_type='lrelu'):
+        super(PPON, self).__init__()
+        n_upscale = int(math.log(upscale, 2))
+        if upscale == 3:
+            n_upscale = 1
+
+        fea_conv = B.conv_layer(in_nc, nf, kernel_size=3)  # common
+        rb_blocks = [B.RRBlock_32() for _ in range(nb)]  # L1
+        LR_conv = B.conv_layer(nf, nf, kernel_size=3)
+
+        ssim_branch = [B.RRBlock_32() for _ in range(2)]  # SSIM
+        gan_branch = [B.RRBlock_32() for _ in range(2)]  # Gan
+
+        #upsample_block = B.upconv_block #original
+        upsample_block = B.upconv_blcok #using BasicSR code
+
+        if upscale == 3:
+            upsampler = upsample_block(nf, nf, 3, act_type=act_type)
+            upsampler_ssim = upsample_block(nf, nf, 3, act_type=act_type)
+            upsampler_gan = upsample_block(nf, nf, 3, act_type=act_type)
+        else:
+            upsampler = [upsample_block(nf, nf, act_type=act_type) for _ in range(n_upscale)]
+            upsampler_ssim = [upsample_block(nf, nf, act_type=act_type) for _ in range(n_upscale)]
+            upsampler_gan = [upsample_block(nf, nf, act_type=act_type) for _ in range(n_upscale)]
+
+        HR_conv0 = B.conv_block(nf, nf, kernel_size=3, norm_type=None, act_type=act_type)
+        HR_conv1 = B.conv_block(nf, out_nc, kernel_size=3, norm_type=None, act_type=None)
+
+        HR_conv0_S = B.conv_block(nf, nf, kernel_size=3, norm_type=None, act_type=act_type)
+        HR_conv1_S = B.conv_block(nf, out_nc, kernel_size=3, norm_type=None, act_type=None)
+
+        HR_conv0_P = B.conv_block(nf, nf, kernel_size=3, norm_type=None, act_type=act_type)
+        HR_conv1_P = B.conv_block(nf, out_nc, kernel_size=3, norm_type=None, act_type=None)
+
+        self.CFEM = B.sequential(fea_conv, B.ShortcutBlock(B.sequential(*rb_blocks, LR_conv))) #Content Feature Extraction Module (CFEM)
+        self.SFEM = B.sequential(*ssim_branch) #Structural Feature Extraction Module (SFEM)
+        self.PFEM = B.sequential(*gan_branch) #Perceptual Feature Extraction Module (PFEM)
+
+        self.CRM = B.sequential(*upsampler, HR_conv0, HR_conv1)  # recon l1 #content reconstruction module (CRM)
+        self.SRM = B.sequential(*upsampler_ssim, HR_conv0_S, HR_conv1_S)  # recon ssim #structure reconstruction module (SRM)
+        self.PRM = B.sequential(*upsampler_gan, HR_conv0_P, HR_conv1_P)  # recon gan #photo-realism reconstruction module (PRM)
+
+    def forward(self, x):
+        out_CFEM = self.CFEM(x)
+        out_c = self.CRM(out_CFEM)
+
+        out_SFEM = self.SFEM(out_CFEM)
+        out_s = self.SRM(out_SFEM) + out_c
+
+        out_PFEM = self.PFEM(out_SFEM)
+        out_p = self.PRM(out_PFEM) + out_s
+
+        return out_c, out_s, out_p
+
+
 ####################
 # Discriminator
 ####################
@@ -220,48 +288,52 @@ class Discriminator_VGG_96(nn.Module):
         return x
 
 
-class Discriminator_VGG_192(nn.Module):
-    def __init__(self, in_nc, base_nf, norm_type='batch', act_type='leakyrelu', mode='CNA', convtype='Conv2D'):
+class Discriminator_VGG_192(nn.Module): #vic in PPON is called Discriminator_192 
+    def __init__(self, in_nc, base_nf, norm_type='batch', act_type='leakyrelu', mode='CNA', convtype='Conv2D', arch='ESRGAN'):
         super(Discriminator_VGG_192, self).__init__()
         # features
         # hxw, c
         # 192, 64
         conv0 = B.conv_block(in_nc, base_nf, kernel_size=3, norm_type=None, act_type=act_type, \
-            mode=mode)
+            mode=mode) # 3-->64
         conv1 = B.conv_block(base_nf, base_nf, kernel_size=4, stride=2, norm_type=norm_type, \
-            act_type=act_type, mode=mode)
+            act_type=act_type, mode=mode) # 64-->64, 96*96
         # 96, 64
         conv2 = B.conv_block(base_nf, base_nf*2, kernel_size=3, stride=1, norm_type=norm_type, \
-            act_type=act_type, mode=mode)
+            act_type=act_type, mode=mode) # 64-->128
         conv3 = B.conv_block(base_nf*2, base_nf*2, kernel_size=4, stride=2, norm_type=norm_type, \
-            act_type=act_type, mode=mode)
+            act_type=act_type, mode=mode) # 128-->128, 48*48
         # 48, 128
         conv4 = B.conv_block(base_nf*2, base_nf*4, kernel_size=3, stride=1, norm_type=norm_type, \
-            act_type=act_type, mode=mode)
+            act_type=act_type, mode=mode) # 128-->256
         conv5 = B.conv_block(base_nf*4, base_nf*4, kernel_size=4, stride=2, norm_type=norm_type, \
-            act_type=act_type, mode=mode)
+            act_type=act_type, mode=mode) # 256-->256, 24*24
         # 24, 256
         conv6 = B.conv_block(base_nf*4, base_nf*8, kernel_size=3, stride=1, norm_type=norm_type, \
-            act_type=act_type, mode=mode)
+            act_type=act_type, mode=mode) # 256-->512
         conv7 = B.conv_block(base_nf*8, base_nf*8, kernel_size=4, stride=2, norm_type=norm_type, \
-            act_type=act_type, mode=mode)
+            act_type=act_type, mode=mode) # 512-->512 12*12
         # 12, 512
         conv8 = B.conv_block(base_nf*8, base_nf*8, kernel_size=3, stride=1, norm_type=norm_type, \
-            act_type=act_type, mode=mode)
+            act_type=act_type, mode=mode) # 512-->512
         conv9 = B.conv_block(base_nf*8, base_nf*8, kernel_size=4, stride=2, norm_type=norm_type, \
-            act_type=act_type, mode=mode)
+            act_type=act_type, mode=mode) # 512-->512 6*6
         # 6, 512
         conv10 = B.conv_block(base_nf*8, base_nf*8, kernel_size=3, stride=1, norm_type=norm_type, \
             act_type=act_type, mode=mode)
         conv11 = B.conv_block(base_nf*8, base_nf*8, kernel_size=4, stride=2, norm_type=norm_type, \
-            act_type=act_type, mode=mode)
+            act_type=act_type, mode=mode) # 3*3
         # 3, 512
         self.features = B.sequential(conv0, conv1, conv2, conv3, conv4, conv5, conv6, conv7, conv8,\
             conv9, conv10, conv11)
 
         # classifier
-        self.classifier = nn.Sequential(
-            nn.Linear(512 * 3 * 3, 100), nn.LeakyReLU(0.2, True), nn.Linear(100, 1))
+        if arch=='PPON':
+            self.classifier = nn.Sequential(
+                nn.Linear(512 * 3 * 3, 128), nn.LeakyReLU(0.2, True), nn.Linear(128, 1)) #vic PPON uses 128 and 128 instead of 100
+        else: #arch='ESRGAN':
+            self.classifier = nn.Sequential(
+                nn.Linear(512 * 3 * 3, 100), nn.LeakyReLU(0.2, True), nn.Linear(100, 1))
 
     def forward(self, x):
         x = self.features(x)
@@ -281,7 +353,7 @@ class VGGFeatureExtractor(nn.Module):
                  feature_layer=34,
                  use_bn=False,
                  use_input_norm=True,
-                 device=torch.device('cpu')):
+                 device=torch.device('cpu')): #vic PPON uses cuda instead of CPU
         super(VGGFeatureExtractor, self).__init__()
         if use_bn:
             model = torchvision.models.vgg19_bn(pretrained=True)
@@ -289,9 +361,9 @@ class VGGFeatureExtractor(nn.Module):
             model = torchvision.models.vgg19(pretrained=True)
         self.use_input_norm = use_input_norm
         if self.use_input_norm:
-            mean = torch.Tensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1).to(device)
+            mean = torch.Tensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1).to(device) #vic PPON uses .cuda() instead of .to(device)
             # [0.485-1, 0.456-1, 0.406-1] if input in range [-1,1]
-            std = torch.Tensor([0.229, 0.224, 0.225]).view(1, 3, 1, 1).to(device)
+            std = torch.Tensor([0.229, 0.224, 0.225]).view(1, 3, 1, 1).to(device) #vic PPON uses .cuda() instead of .to(device)
             # [0.229*2, 0.224*2, 0.225*2] if input in range [-1,1]
             self.register_buffer('mean', mean)
             self.register_buffer('std', std)
@@ -305,7 +377,6 @@ class VGGFeatureExtractor(nn.Module):
             x = (x - self.mean) / self.std
         output = self.features(x)
         return output
-
 
 # Assume input range is [0, 1]
 class ResNet101FeatureExtractor(nn.Module):
