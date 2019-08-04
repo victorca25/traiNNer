@@ -88,15 +88,16 @@ def define_G(opt):
     if which_model == 'sr_resnet':  # SRResNet
         netG = arch.SRResNet(in_nc=opt_net['in_nc'], out_nc=opt_net['out_nc'], nf=opt_net['nf'], \
             nb=opt_net['nb'], upscale=opt_net['scale'], norm_type=opt_net['norm_type'], \
-            act_type='relu', mode=opt_net['mode'], upsample_mode='pixelshuffle', convtype=opt_net['convtype']) #vic partialconv
-
+            act_type='relu', mode=opt_net['mode'], upsample_mode='pixelshuffle', convtype=opt_net['convtype'])
     elif which_model == 'sft_arch':  # SFT-GAN
         netG = sft_arch.SFT_Net()
-
     elif which_model == 'RRDB_net':  # RRDB
         netG = arch.RRDBNet(in_nc=opt_net['in_nc'], out_nc=opt_net['out_nc'], nf=opt_net['nf'],
             nb=opt_net['nb'], gc=opt_net['gc'], upscale=opt_net['scale'], norm_type=opt_net['norm_type'],
-            act_type='leakyrelu', mode=opt_net['mode'], upsample_mode='upconv', convtype=opt_net['convtype']) #vic partialconv
+            act_type='leakyrelu', mode=opt_net['mode'], upsample_mode='upconv', convtype=opt_net['convtype'])
+    elif which_model == 'ppon':
+        netG = arch.PPON(in_nc=opt_net['in_nc'], nf=opt_net['nf'], nb=opt_net['nb'], out_nc=opt_net['out_nc'], 
+            upscale=opt_net['scale'], act_type='leakyrelu') #(in_nc=3, nf=64, nb=24, out_nc=3)
     else:
         raise NotImplementedError('Generator model [{:s}] not recognized'.format(which_model))
 
@@ -113,20 +114,24 @@ def define_D(opt):
     gpu_ids = opt['gpu_ids']
     opt_net = opt['network_D']
     which_model = opt_net['which_model_D']
+    which_model_G = opt_net['which_model_G']
+    
+    if which_model_G == 'ppon':
+        model_G = 'PPON'
+    else:
+        model_G = 'ESRGAN'
 
     if which_model == 'discriminator_vgg_128':
         netD = arch.Discriminator_VGG_128(in_nc=opt_net['in_nc'], base_nf=opt_net['nf'], \
             norm_type=opt_net['norm_type'], mode=opt_net['mode'], act_type=opt_net['act_type'], convtype=opt_net['convtype'])
-
     elif which_model == 'dis_acd':  # sft-gan, Auxiliary Classifier Discriminator
         netD = sft_arch.ACD_VGG_BN_96()
-
     elif which_model == 'discriminator_vgg_96':
         netD = arch.Discriminator_VGG_96(in_nc=opt_net['in_nc'], base_nf=opt_net['nf'], \
             norm_type=opt_net['norm_type'], mode=opt_net['mode'], act_type=opt_net['act_type'], convtype=opt_net['convtype'])
-    elif which_model == 'discriminator_vgg_192':
+    elif which_model == 'discriminator_vgg_192' or which_model == 'discriminator_192':
         netD = arch.Discriminator_VGG_192(in_nc=opt_net['in_nc'], base_nf=opt_net['nf'], \
-            norm_type=opt_net['norm_type'], mode=opt_net['mode'], act_type=opt_net['act_type'], convtype=opt_net['convtype'])
+            norm_type=opt_net['norm_type'], mode=opt_net['mode'], act_type=opt_net['act_type'], convtype=opt_net['convtype'], arch=model_G)
     elif which_model == 'discriminator_vgg_128_SN':
         netD = arch.Discriminator_VGG_128_SN()
     else:
