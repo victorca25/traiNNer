@@ -15,7 +15,7 @@ def act(act_type, inplace=True, neg_slope=0.2, n_prelu=1):
     act_type = act_type.lower()
     if act_type == 'relu':
         layer = nn.ReLU(inplace)
-    elif act_type == 'leakyrelu':
+    elif act_type == 'leakyrelu' or act_type == 'lrelu':
         layer = nn.LeakyReLU(neg_slope, inplace)
     elif act_type == 'prelu':
         layer = nn.PReLU(num_parameters=n_prelu, init=neg_slope)
@@ -237,6 +237,62 @@ class RRDB(nn.Module):
         return out.mul(0.2) + x
 
 
+
+#PPON
+class _ResBlock_32(nn.Module):
+    def __init__(self, nc=64):
+        super(_ResBlock_32, self).__init__()
+        self.c1 = conv_layer(nc, nc, 3, 1, 1)
+        self.d1 = conv_layer(nc, nc//2, 3, 1, 1)  # rate=1
+        self.d2 = conv_layer(nc, nc//2, 3, 1, 2)  # rate=2
+        self.d3 = conv_layer(nc, nc//2, 3, 1, 3)  # rate=3
+        self.d4 = conv_layer(nc, nc//2, 3, 1, 4)  # rate=4
+        self.d5 = conv_layer(nc, nc//2, 3, 1, 5)  # rate=5
+        self.d6 = conv_layer(nc, nc//2, 3, 1, 6)  # rate=6
+        self.d7 = conv_layer(nc, nc//2, 3, 1, 7)  # rate=7
+        self.d8 = conv_layer(nc, nc//2, 3, 1, 8)  # rate=8
+        self.act = act('lrelu')
+        self.c2 = conv_layer(nc * 4, nc, 1, 1, 1)  # 256-->64
+
+    def forward(self, input):
+        output1 = self.act(self.c1(input))
+        d1 = self.d1(output1)
+        d2 = self.d2(output1)
+        d3 = self.d3(output1)
+        d4 = self.d4(output1)
+        d5 = self.d5(output1)
+        d6 = self.d6(output1)
+        d7 = self.d7(output1)
+        d8 = self.d8(output1)
+
+        add1 = d1 + d2
+        add2 = add1 + d3
+        add3 = add2 + d4
+        add4 = add3 + d5
+        add5 = add4 + d6
+        add6 = add5 + d7
+        add7 = add6 + d8
+
+        combine = torch.cat([d1, add1, add2, add3, add4, add5, add6, add7], 1)
+        output2 = self.c2(self.act(combine))
+        output = input + output2.mul(0.2)
+
+        return output
+
+class RRBlock_32(nn.Module):
+    def __init__(self):
+        super(RRBlock_32, self).__init__()
+        self.RB1 = _ResBlock_32()
+        self.RB2 = _ResBlock_32()
+        self.RB3 = _ResBlock_32()
+
+    def forward(self, input):
+        out = self.RB1(input)
+        out = self.RB2(out)
+        out = self.RB3(out)
+        return out.mul(0.2) + input
+
+
 ####################
 # Upsampler
 ####################
@@ -257,12 +313,17 @@ def pixelshuffle_block(in_nc, out_nc, upscale_factor=2, kernel_size=3, stride=1,
     a = act(act_type) if act_type else None
     return sequential(conv, pixel_shuffle, n, a)
 
-
 def upconv_blcok(in_nc, out_nc, upscale_factor=2, kernel_size=3, stride=1, bias=True, \
                 pad_type='zero', norm_type=None, act_type='relu', mode='nearest', convtype='Conv2D'):
     # Up conv
     # described in https://distill.pub/2016/deconv-checkerboard/
     upsample = nn.Upsample(scale_factor=upscale_factor, mode=mode)
+    #upsample = torch.nn.functional.interpolate(scale_factor=upscale_factor, mode=mode) #Update to prevent the "Warning" https://discuss.pytorch.org/t/using-nn-function-interpolate-inside-nn-sequential/23588/2?u=ptrblck
     conv = conv_block(in_nc, out_nc, kernel_size, stride, bias=bias, \
                         pad_type=pad_type, norm_type=norm_type, act_type=act_type, convtype=convtype)
     return sequential(upsample, conv)
+
+#PPON
+def conv_layer(in_channels, out_channels, kernel_size, stride=1, dilation=1, groups=1):
+    padding = int((kernel_size - 1) / 2) * dilation
+    return nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding=padding, bias=True, dilation=dilation, groups=groups)
