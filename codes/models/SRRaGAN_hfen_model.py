@@ -9,6 +9,7 @@ from torch.optim import lr_scheduler
 import models.networks as networks
 from .base_model import BaseModel
 from models.modules.loss import GANLoss, GradientPenaltyLoss, HFENL1Loss, HFENL2Loss, TVLoss, CharbonnierLoss, ElasticLoss
+from models.modules.ssim2 import SSIM, MS_SSIM
 logger = logging.getLogger('base')
 
 
@@ -91,9 +92,23 @@ class SRRaGANModel(BaseModel):
                     self.cri_tv = TVLoss(self.l_tv_w).to(self.device) 
                 elif l_tv_type == '4D':
                     self.cri_tv = TVLoss4D(self.l_tv_w).to(self.device) #Total Variation regularization in 4 directions
+                else:
+                    raise NotImplementedError('Loss type [{:s}] not recognized.'.format(l_tv_type))
             else:
                 logger.info('Remove TV loss.')
                 self.cri_tv = None
+                
+            #SSIM loss
+            if train_opt['ssim_weight'] > 0:
+                self.l_ssim_w = train_opt['ssim_weight']
+                l_ssim_type = train_opt['ssim_type']
+                if l_ssim_type == 'ssim':
+                    self.cri_ssim = SSIM(win_size=11, win_sigma=1.5, size_average=True, data_range=1., channel=3).to(self.device)
+                elif l_ssim_type == 'ms-ssim':
+                    self.cri_ssim = MS_SSIM(win_size=7, win_sigma=1.5, size_average=True, data_range=1., channel=3).to(self.device)
+            else:
+                logger.info('Remove SSIM loss.')
+                self.cri_ssim = None
 
             # GD gan loss
             self.cri_gan = GANLoss(train_opt['gan_type'], 1.0, 0.0).to(self.device)
@@ -135,7 +150,6 @@ class SRRaGANModel(BaseModel):
                 raise NotImplementedError('MultiStepLR learning rate scheme is enough.')
 
             self.log_dict = OrderedDict()
-        # print network
         self.print_network()
 
     def feed_data(self, data, need_HR=True):
@@ -162,6 +176,12 @@ class SRRaGANModel(BaseModel):
             if self.cri_pix:  # pixel loss
                 l_g_pix = self.l_pix_w * self.cri_pix(self.fake_H, self.var_H)
                 l_g_total += l_g_pix
+            if self.cri_ssim: # structural loss
+                l_g_ssim = 1.-(self.l_ssim_w *self.cri_ssim(self.fake_H, self.var_H)) #using ssim2.py
+                if torch.isnan(l_g_ssim).any():
+                    l_g_total = l_g_total
+                else:
+                    l_g_total += l_g_ssim
             if self.cri_fea:  # feature loss
                 real_fea = self.netF(self.var_H).detach()
                 fake_fea = self.netF(self.fake_H)
@@ -222,6 +242,8 @@ class SRRaGANModel(BaseModel):
                 self.log_dict['l_g_HFEN'] = l_g_HFEN.item()
             if self.cri_tv:
                 self.log_dict['l_g_tv'] = l_g_tv.item()
+            if self.cri_ssim:
+                self.log_dict['l_g_ssim'] = l_g_ssim.item()
             self.log_dict['l_g_gan'] = l_g_gan.item()
         # D
         self.log_dict['l_d_real'] = l_d_real.item()
