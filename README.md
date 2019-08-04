@@ -11,13 +11,16 @@
 - [ ] Downscale images before and/or after inference. Helps in cleaning up some noise or bring images back to the original scale.
 - [ ] Adopt SRPGAN's extraction of features from the discriminator to test if it reduces compute usage
 - [ ] Import GMFN's recurrent network and add the feature loss to their MSE model, should have better MSE results with SRGAN's features/textures (Needs testing)
-- [ ] Import PPON's inference network to train using BasicSR's framework. They use dilated convolutions to increase receptive field and compare against ESRGAN with perceptually good results
 
 Done
 - [:white_check_mark:] Add on the fly augmentations (gaussian noise, blur, JPEG compression).
 - [:white_check_mark:] Add TV loss/regularization options. Useful for denoising tasks, reduces Total Variation.
 - [:white_check_mark:] Add HFEN loss. Useful to keep high frequency information. Used Gaussian filter to reduce the effect of noise.
 - [:white_check_mark:] Add [Partial Convolution based Padding](https://github.com/NVIDIA/partialconv) (PartialConv2D). It should help prevent edge padding issues. Zero padding is the default and typically has best performance, PartialConv2D has better performance and converges faster for segmentation and classification (https://arxiv.org/pdf/1811.11718.pdf). Code has been added, but the switch makes pretained models using Conv2D incompatible. Training new models for testing. (May be able to test inpainting and denoising)
+- [:white_check_mark:] Added SSIM and MS-SSIM loss functions. Originally needed to replicate the PPON training code, it can also be used on ESRGAN models
+- [:white_check_mark:] Import PPON's inference network to train using BasicSR's framework. They use dilated convolutions to increase receptive field and compare against ESRGAN with perceptually good results
+- [:round_pushpin:] partial implementation of the PPON training, based on the original paper. It's still missing some things like: Multiscale L1 in phase 2 (currently it only does the L1 calculation at full scale) and modifying the learning strategy (currently, it's still using ESRGAN's, but will need to change the scheduler to StepLR). Additionally, added TV Loss to phase 1 (Content Reconstruction), HFEN to phase 2 (Structure Reconstruction) and left phase 3 (Perceptual Reconstruction) with the same GAN and VGG_Feature loss as the original.
+
 
 An image super-resolution toolkit flexible for development. It now provides:
 
@@ -33,6 +36,11 @@ An image super-resolution toolkit flexible for development. It now provides:
 3. [**SFTGAN**](https://github.com/xinntao/CVPR18-SFTGAN) model. It adopts Spatial Feature Transform (SFT) to effectively incorporate other conditions/priors, like semantic prior for image SR, representing by segmentation probability maps. For more details, please refer to [Paper](https://arxiv.org/abs/1804.02815), [SFTGAN repo](https://github.com/xinntao/CVPR18-SFTGAN).
 <p align="center">
   <img height="220" src="https://github.com/xinntao/SFTGAN/blob/master/figures/network_structure.png">
+</p>
+
+4. [**PPON**](https://github.com/Zheng222/PPON) model. The model for "Progressive Perception-Oriented Network for Single Image Super-Resolution", which the authors compare favorably against ESRGAN. Training is done progressively, by freezing and unfreezing layers in phases, which are: Content Reconstruction, Structure Reconstruction and Perceptual Reconstruction. For more details, please refer to [Paper](https://arxiv.org/abs/1907.10399), [PPON repo](https://github.com/Zheng222/PPON). The pretrained model for download can also be found in the original repo.
+<p align="center">
+   <img height="220" src="https://github.com/Zheng222/PPON/raw/master/figures/Structure.png">
 </p>
 
     
@@ -82,8 +90,12 @@ We provide **pretrained models** in [Pretrained models](#pretrained-models).
 1. Obtain the segmentation probability maps: `python test_seg.py`
 1. Run command: `python test_sftgan.py`
 
+### Test ESRGAN (SRGAN) models
+1. Modify the configuration file `options/test/test_ppon.json` 
+1. Run command: `python test_ppon.py -opt options/test/test_ppon.json`
+
 ## How to Train
-### Train ESRGAN (SRGAN) models
+### Train PPON models
 We use a PSNR-oriented pretrained SR model to initialize the parameters for better quality. According to the author's paper and some testing, this will also stabilize the GAN training and allows for faster convergence. 
 
 1. Prepare datasets, usually the DIV2K dataset. More details are in [`codes/data`](https://github.com/victorca25/BasicSR/tree/master/codes/data) and [
@@ -108,6 +120,11 @@ We use a PSNR-oriented pretrained SR model to initialize the parameters for bett
     1. We provide an initialized model named `sft_net_ini.pth` in [Pretrained models](#pretrained-models)
 1. Modify the configuration file in `options/train/train_sftgan.json`
 1. Run command: `python train.py -opt options/train/train_sftgan.json`
+
+### Train PPON models 
+1. Prepare datasets, usually the DIV2K dataset. More details are in [`codes/data`](https://github.com/victorca25/BasicSR/tree/master/codes/data). 
+1. Modify the configuration file `options/train/train_PPON.json`
+1. Run command: `python train_ppon.py -opt options/train/train_PPON.json`
 
 ### Resuming Training 
 When resuming training, just pass a option with the name `resume_state`, like , <small>`"resume_state": "../experiments/debug_001_RRDB_PSNR_x4_DIV2K/training_state/200.state"`. </small>
@@ -219,11 +236,11 @@ The authors continued exploring the capabilities of linearly interpolating model
 
 More details and explanations of interpolation can be found [here](https://github.com/victorca25/BasicSR/wiki/Interpolation) in the Wiki.
 
-Following are the original pretrained models that the authors made available:
+Following are the original pretrained models that the authors made available for ESRGAN, SFTGAN and PPON:
 <table>
   <tr>
     <th>Name</th>
-    <th>Modeds</th>
+    <th>Models</th>
     <th>Short Description</th>
     <th>Google Drive</th>
     <th>Baidu Drive</th>
@@ -275,6 +292,14 @@ Following are the original pretrained models that the authors made available:
     <td><a href="https://drive.google.com/drive/folders/1WR2X4_gwiQ9REb5fHfNnBfXOdeuDS8BA?usp=sharing">Google Drive</a></td>
     <td><a href="">Baidu Drive</a></td>
   </tr>
+  
+  <tr>
+    <td >PPON<sup>*2</sup></td>
+    <td>PPON.pth</td>
+     <td><sub>PPON model presented in the paper</sub></td>
+    <td><a href="https://github.com/Zheng222/PPON">Original Repo</a></td>
+    <td><a href=""></a></td>
+  </tr>
 </table>
 
 For more details about the original pretrained models, please see [`experiments/pretrained_models`](https://github.com/victorca25/BasicSR/tree/master/experiments/pretrained_models).
@@ -307,4 +332,10 @@ If you have any questions, we have a [discord server](https://discord.gg/SxvYsgE
         booktitle = {The IEEE Conference on Computer Vision and Pattern Recognition (CVPR)},
         month = {June},
         year = {2018}
+    }
+    @article{Hui-PPON-2019,
+        title={Progressive Perception-Oriented Network for Single Image Super-Resolution},
+        author={Hui, Zheng and Li, Jie and Gao, Xinbo and Wang, Xiumei},
+        booktitle={arXiv:1907.10399v1},
+        year={2019}
     }
