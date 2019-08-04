@@ -74,7 +74,7 @@ class CharbonnierLoss(nn.Module):
         self.eps = eps
 
     def forward(self, x, y):
-        b, c, h, w = target.size()
+        b, c, h, w = y.size()
         diff = x - y
         loss = torch.sum(torch.sqrt(diff * diff + self.eps))
         return loss/(c*b*h*w)
@@ -142,7 +142,8 @@ class HFENL1Loss(nn.Module):
         super(HFENL1Loss, self).__init__()
 
     def forward(self, input, target):
-        smoothing = GaussianSmoothing(3, 5, 1)
+        c = input.shape[1]
+        smoothing = GaussianSmoothing(c, 5, 1)
         smoothing = smoothing.to('cuda:0')
         input_smooth = nn.functional.pad(input, (2, 2, 2, 2), mode='reflect')
         target_smooth = nn.functional.pad(target, (2, 2, 2, 2), mode='reflect')
@@ -158,8 +159,8 @@ class HFENL2Loss(nn.Module):
         super(HFENL2Loss, self).__init__()
 
     def forward(self, input, target):
-        
-        smoothing = GaussianSmoothing(3, 5, 1)
+        c = input.shape[1]
+        smoothing = GaussianSmoothing(c, 5, 1)
         smoothing = smoothing.to('cuda:0') 
         input_smooth = nn.functional.pad(input, (2, 2, 2, 2), mode='reflect')
         target_smooth = nn.functional.pad(target, (2, 2, 2, 2), mode='reflect')
@@ -198,6 +199,6 @@ class ElasticLoss(nn.Module):
         for i in range(len(input)):
             l2 = nn.functional.mse_loss(input[i].squeeze(), target.squeeze()).mul(self.alpha[0])
             l1 = nn.functional.l1_loss(input[i].squeeze(), target.squeeze()).mul(self.alpha[1])
-            loss += l1 + l2
+            loss = l1 + l2
 
         return loss
