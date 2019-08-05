@@ -103,7 +103,8 @@
     // , "D_update_ratio": 1
     // , "D_init_iters": 0
     // , "gp_weigth": 10
-    
+
+    , "start_p1": 0
     , "phase1_s": 138000
     , "phase2_s": 172500
     , "phase3_s": 207000
