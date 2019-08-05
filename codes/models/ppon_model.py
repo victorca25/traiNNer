@@ -34,6 +34,7 @@ class PPONModel(BaseModel):
                 self.netD = networks.define_D(opt).to(self.device)  # D
                 self.netD.train()
             #PPON
+            self.start_p1 = train_opt['start_p1'] if train_opt['start_p1'] else 0
             self.phase1_s = train_opt['phase1_s'] if train_opt['phase1_s'] else 138000
             self.phase2_s = train_opt['phase2_s'] if train_opt['phase2_s'] else 138000+34500
             self.phase3_s = train_opt['phase3_s'] if train_opt['phase3_s'] else 138000+34500+34500
@@ -195,9 +196,9 @@ class PPONModel(BaseModel):
                 
         ### PPON freeze and unfreeze the components at each phase (Content, Structure, Perceptual)
         #Phase 1
-        if step > 0 and step <= self.phase1_s:
+        if step > self.start_p1 and step <= self.phase1_s:
             #Freeze/Unfreeze layers
-            if step == 1:
+            if step == self.start_p1 + 1:
                 print('Starting phase 1')
                 self.phase = 1
                 #Freeze all layers
@@ -243,7 +244,7 @@ class PPONModel(BaseModel):
         #Phase 2
         elif step > self.phase1_s and step <= self.phase2_s:
             #Freeze/Unfreeze layers
-            if step == self.phase1_s:
+            if step == self.phase1_s + 1:
                 print('Starting phase 2')
                 self.phase = 2
                 #Freeze the Content Layers, CFEM and CRM
@@ -299,7 +300,7 @@ class PPONModel(BaseModel):
         #Phase 3
         elif step > self.phase2_s and step <= self.phase3_s:
             #Freeze/Unfreeze layers
-            if step == self.phase2_s:
+            if step == self.phase2_s + 1:
                 print('Starting phase 3')
                 self.phase = 3
                 #Freeze the Structure Layers, SFEM and SRM
@@ -395,7 +396,7 @@ class PPONModel(BaseModel):
                     self.log_dict['D_fake'] = torch.mean(pred_d_fake.detach())
         
         else:
-            if step == self.phase3_s:
+            if step == self.phase3_s + 1:
                 print('Starting phase 4')
                 self.phase = 4
                 #Unfreeze all layers (?) # Need to think about this, if the phases don't coincide with the total number of iterations
