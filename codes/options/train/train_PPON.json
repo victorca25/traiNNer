@@ -82,8 +82,10 @@
     , "lr_D": 1e-4
     , "weight_decay_D": 0
     , "beta1_D": 0.9
-    , "lr_scheme": "MultiStepLR"
-    , "lr_steps": [50000, 100000, 200000, 300000]
+    , "lr_scheme": "MultiStepLR_Restart" // "MultiStepLR" | MultiStepLR_Restart | "StepLR" | (StepLR_Restart doens't yet work)
+    , "lr_steps": [34500, 69000, 103500, 155250, 189750, 241500]
+    , "restarts": [138000, 172500, 207000] //For "MultiStepLR_Restart", "StepLR_Restart" and "CosineAnnealingLR_Restart"
+    , "restart_weights": [0.5, 0.5]
     , "lr_gamma": 0.5
 
     , "pixel_criterion": "cb" //"l1" | "l2" | "cb" | "elastic"
@@ -95,7 +97,7 @@
     , "tv_type": "normal"
     , "tv_weight": 1e-6
     , "ssim_type": "ms-ssim" //"ssim" | "ms-ssim"
-	  , "ssim_weight": 1
+    , "ssim_weight": 1
     , "gan_type": "vanilla"
     , "gan_weight": 5e-3
 
@@ -104,10 +106,10 @@
     // , "D_init_iters": 0
     // , "gp_weigth": 10
 
-    , "start_p1": 0
-    , "phase1_s": 138000
-    , "phase2_s": 172500
-    , "phase3_s": 207000
+    , "train_phase": 1 //Training starting phase, can skip the first phases
+    , "phase1_s": 138000 //set to "-1" to skip. Need to coordinate with the LR steps.
+    , "phase2_s": 172500 //set to "-1" to skip. Need to coordinate with the LR steps.
+    , "phase3_s": 207000 //set to "-1" to skip. Need to coordinate with the LR steps.
 
     , "manual_seed": 0
     , "niter": 5e5
