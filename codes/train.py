@@ -102,7 +102,7 @@ def main():
             if current_step > total_iters:
                 break
             # update learning rate
-            model.update_learning_rate()
+            model.update_learning_rate(current_step-1)
 
             # training
             model.feed_data(train_data)
