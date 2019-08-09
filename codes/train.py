@@ -114,7 +114,7 @@ def main():
                 message = '<epoch:{:3d}, iter:{:8,d}, lr:{:.3e}> '.format(
                     epoch, current_step, model.get_current_learning_rate())
                 for k, v in logs.items():
-                    message += '{:s}: {:.4e} '.format(k, v)
+                    message += '{:s}:{: .4e} '.format(k, v)
                     # tensorboard logger
                     if opt['use_tb_logger'] and 'debug' not in opt['name']:
                         tb_logger.add_scalar(k, v, current_step)
@@ -159,9 +159,9 @@ def main():
                 avg_psnr = avg_psnr / idx
 
                 # log
-                logger.info('# Validation # PSNR: {:.4e}'.format(avg_psnr))
+                logger.info('# Validation # PSNR: {:.5g}'.format(avg_psnr))
                 logger_val = logging.getLogger('val')  # validation logger
-                logger_val.info('<epoch:{:3d}, iter:{:8,d}> psnr: {:.4e}'.format(
+                logger_val.info('<epoch:{:3d}, iter:{:8,d}> psnr: {:.5g}'.format(
                     epoch, current_step, avg_psnr))
                 # tensorboard logger
                 if opt['use_tb_logger'] and 'debug' not in opt['name']:
