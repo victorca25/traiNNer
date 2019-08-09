@@ -105,7 +105,7 @@ class SRRaGANModel(BaseModel):
                 if l_ssim_type == 'ssim':
                     self.cri_ssim = SSIM(win_size=11, win_sigma=1.5, size_average=True, data_range=1., channel=3).to(self.device)
                 elif l_ssim_type == 'ms-ssim':
-                    self.cri_ssim = MS_SSIM(win_size=7, win_sigma=1.5, size_average=True, data_range=1., channel=3).to(self.device)
+                    self.cri_ssim = MS_SSIM(win_size=11, win_sigma=1.5, size_average=True, data_range=1., channel=3).to(self.device)
             else:
                 logger.info('Remove SSIM loss.')
                 self.cri_ssim = None
