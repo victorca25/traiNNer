@@ -93,7 +93,11 @@ class BaseModel():
                     self.schedulers[i].milestones=old_milestones
                     self.schedulers[i].gamma=old_gamma
                 self.schedulers[i].last_epoch = s['last_epoch']
-            elif opt['train']['lr_scheme'] in {'StepLR', 'StepLR_Restart'}:
+            elif opt['train']['lr_scheme'] == 'StepLR_Restart':
+                self.schedulers[i].last_epoch = s['last_epoch']
+                self.schedulers[i].weight = s['weight']
+                self.schedulers[i].epoch_offset = s['epoch_offset']
+            elif opt['train']['lr_scheme'] == 'StepLR':
                 self.schedulers[i].last_epoch = s['last_epoch']
             else:
                 self.schedulers[i].load_state_dict(s)
