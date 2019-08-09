@@ -11,6 +11,7 @@
 - [ ] Downscale images before and/or after inference. Helps in cleaning up some noise or bring images back to the original scale.
 - [ ] Adopt SRPGAN's extraction of features from the discriminator to test if it reduces compute usage
 - [ ] Import GMFN's recurrent network and add the feature loss to their MSE model, should have better MSE results with SRGAN's features/textures (Needs testing)
+- [ ] Test PPON training code. Inference is the same as the PPON repo.
 
 Done
 - [:white_check_mark:] Add on the fly augmentations (gaussian noise, blur, JPEG compression).
@@ -19,7 +20,7 @@ Done
 - [:white_check_mark:] Add [Partial Convolution based Padding](https://github.com/NVIDIA/partialconv) (PartialConv2D). It should help prevent edge padding issues. Zero padding is the default and typically has best performance, PartialConv2D has better performance and converges faster for segmentation and classification (https://arxiv.org/pdf/1811.11718.pdf). Code has been added, but the switch makes pretained models using Conv2D incompatible. Training new models for testing. (May be able to test inpainting and denoising)
 - [:white_check_mark:] Added SSIM and MS-SSIM loss functions. Originally needed to replicate the PPON training code, it can also be used on ESRGAN models
 - [:white_check_mark:] Import PPON's inference network to train using BasicSR's framework. They use dilated convolutions to increase receptive field and compare against ESRGAN with perceptually good results
-- [:round_pushpin:] partial implementation of the PPON training, based on the original paper. It's still missing some things like: Multiscale L1 in phase 2 (currently it only does the L1 calculation at full scale) and modifying the learning strategy (currently, it's still using ESRGAN's, but will need to change the scheduler to StepLR). Additionally, added TV Loss to phase 1 (Content Reconstruction), HFEN to phase 2 (Structure Reconstruction) and left phase 3 (Perceptual Reconstruction) with the same GAN and VGG_Feature loss as the original.
+- [:round_pushpin:] partial implementation of the PPON training, based on the original paper. It's still missing some things like: Multiscale L1 in phase 2 (currently it only does the L1 calculation at full scale) and modifying the learning strategy (currently, its using MultiStepLR_Restart, but to make it exactly as described in the paper, it will probably need a StepLR_Restart scheduler). Additionally, added TV Loss to phase 1 (Content Reconstruction), HFEN to phase 2 (Structure Reconstruction) and left phase 3 (Perceptual Reconstruction) with the same GAN and VGG_Feature loss as the original. Training doesn't currently stop after finishing phase 3, but it should to be the same as in the paper (can make "niter" = 207000).
 
 
 An image super-resolution toolkit flexible for development. It now provides:
