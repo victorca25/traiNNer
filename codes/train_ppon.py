@@ -103,7 +103,7 @@ def main():
     # training
     logger.info('Start training from epoch: {:d}, iter: {:d}'.format(start_epoch, current_step))
     for epoch in range(start_epoch, total_epochs):
-        for _, train_data in enumerate(train_loader):
+        for n, train_data in enumerate(train_loader, 1):
             current_step += 1
             if current_step > total_iters:
                 break
@@ -129,7 +129,7 @@ def main():
             # save models and training states (changed to save models before validation)
             if current_step % opt['logger']['save_checkpoint_freq'] == 0:
                 model.save(current_step)
-                model.save_training_state(epoch, current_step)
+                model.save_training_state(epoch + (n >= len(train_loader)), current_step)
                 logger.info('Models and training states saved.')
             
             # validation
