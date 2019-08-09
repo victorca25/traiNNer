@@ -200,6 +200,19 @@ def ms_ssim(X, Y, win_size=11, win_sigma=1.5, win=None, data_range=255, size_ave
     levels = weights.shape[0]
     mcs = []
     for _ in range(levels):
+        #Control: Gaussian filter size can't be larger than height or width of images for convolution.
+        _, _, H_s, W_s = X.size()
+        if win_size > H_s or win_size > W_s:
+            size_s = min(win_size, H_s, W_s)
+            if not (size_s % 2 == 1): #kernel win_size has to be odd and smaller than the image W and H
+                size_s = size_s - 1
+            # Control: Scale down sigma if a smaller filter size is used.
+            win_sigma = size_s * win_sigma / win_size if win_size else 0
+            win_size = size_s
+            #Update the window before calling the _ssim function
+            win = _fspecial_gauss_1d(win_size, win_sigma)
+            win = win.repeat(X.shape[1], 1, 1, 1)
+            
         ssim_val, cs = _ssim(X, Y,
                              win=win,
                              data_range=data_range,
