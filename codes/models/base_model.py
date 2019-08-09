@@ -1,6 +1,7 @@
 import os
 import torch
 import torch.nn as nn
+from collections import Counter
 
 
 class BaseModel():
@@ -82,4 +83,17 @@ class BaseModel():
         for i, o in enumerate(resume_optimizers):
             self.optimizers[i].load_state_dict(o)
         for i, s in enumerate(resume_schedulers):
-            self.schedulers[i].load_state_dict(s)
+            if opt['train']['lr_scheme'] in {'MultiStepLR', 'MultiStepLR_Restart'}:
+                if isinstance(self.schedulers[i].milestones, Counter) and self.schedulers[i].base_lrs[0] != s['base_lrs'][0]:
+                    old_milestones=self.schedulers[i].milestones
+                    old_gamma=self.schedulers[i].gamma
+                    self.schedulers[i].milestones=Counter([10])
+                    self.schedulers[i].gamma=self.schedulers[i].base_lrs[0]/s['base_lrs'][0]
+                    self.schedulers[i].step(10)
+                    self.schedulers[i].milestones=old_milestones
+                    self.schedulers[i].gamma=old_gamma
+                self.schedulers[i].last_epoch = s['last_epoch']
+            elif opt['train']['lr_scheme'] in {'StepLR', 'StepLR_Restart'}:
+                self.schedulers[i].last_epoch = s['last_epoch']
+            else:
+                self.schedulers[i].load_state_dict(s)
