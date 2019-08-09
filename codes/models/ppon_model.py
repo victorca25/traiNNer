@@ -193,7 +193,7 @@ class PPONModel(BaseModel):
             elif train_opt['lr_scheme'] == 'StepLR_Restart': #Note: This one is not working well at the moment
                 for optimizer in self.optimizers:
                     self.schedulers.append(
-                        lr_schedulerR.MultiStepLR_Restart(optimizer, train_opt['lr_step_sizes'],
+                        lr_schedulerR.StepLR_Restart(optimizer, train_opt['lr_step_sizes'],
                                                          restarts=train_opt['restarts'],
                                                          weights=train_opt['restart_weights'],
                                                          gamma=train_opt['lr_gamma'],
