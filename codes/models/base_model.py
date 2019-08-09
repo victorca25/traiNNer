@@ -32,9 +32,9 @@ class BaseModel():
     def load(self):
         pass
 
-    def update_learning_rate(self):
+    def update_learning_rate(self, epoch):
         for scheduler in self.schedulers:
-            scheduler.step()
+            scheduler.step(epoch)
 
     def get_current_learning_rate(self):
         return self.schedulers[0].get_lr()[0]
