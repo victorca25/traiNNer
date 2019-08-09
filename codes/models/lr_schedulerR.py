@@ -38,17 +38,20 @@ class StepLR_Restart(_LRScheduler):
         self.clear_state = clear_state
         self.restarts = restarts if restarts else [0]
         self.restart_weights = weights if weights else [1]
+        self.weight = 1.0
+        self.epoch_offset = 0        
         super(StepLR_Restart, self).__init__(optimizer, last_epoch)
 
     def get_lr(self):
         if self.last_epoch in self.restarts:
             if self.clear_state:
                 self.optimizer.state = defaultdict(dict)
-            weight = self.restart_weights[self.restarts.index(self.last_epoch)]
-            self.step_size = self.step_sizes[self.restarts.index(self.last_epoch)]
-            return [group['initial_lr'] * weight for group in self.optimizer.param_groups]
-        return [base_lr * self.gamma ** (self.last_epoch // self.step_size)
-                for group in self.optimizer.param_groups] #for base_lr in self.base_lrs]
+            self.weight = self.restart_weights[self.restarts.index(self.last_epoch)]
+            self.step_size = self.step_sizes[self.restarts.index(self.last_epoch) + 1]
+            self.epoch_offset = self.last_epoch
+            return [base_lr * self.weight for base_lr in self.base_lrs]
+        return [base_lr * self.weight * self.gamma ** ((self.last_epoch - self.epoch_offset) // self.step_size)
+                for base_lr in self.base_lrs]
 
 class CosineAnnealingLR_Restart(_LRScheduler):
     def __init__(self, optimizer, T_period, restarts=None, weights=None, eta_min=0, last_epoch=-1):
