@@ -7,6 +7,7 @@ from torchvision.utils import make_grid
 import random
 import torch
 import logging
+import re
 
 ####################
 # miscellaneous
@@ -61,6 +62,12 @@ def setup_logger(logger_name, root, phase, level=logging.INFO, screen=False):
         sh = logging.StreamHandler()
         sh.setFormatter(formatter)
         l.addHandler(sh)
+
+
+def sorted_nicely( l ):
+    convert = lambda text: int(text) if text.isdigit() else text
+    alphanum_key = lambda key: [convert(c) for c in re.split('([0-9]+)', key)]
+    return sorted(l, key = alphanum_key)
 
 
 ####################
