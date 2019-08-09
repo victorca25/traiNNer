@@ -52,6 +52,7 @@
   , "path": {
     "root": "D:/Code/Notebooks/BasicSR-master"
     , "pretrain_model_G": "../experiments/pretrained_models/PPON/PPON_G.pth"
+    //, "pretrain_model_D": "../experiments/pretrained_models/PPON/PPON_D.pth"
   }
 
   , "network_G": {
@@ -82,11 +83,21 @@
     , "lr_D": 1e-4
     , "weight_decay_D": 0
     , "beta1_D": 0.9
-    , "lr_scheme": "MultiStepLR_Restart" // "MultiStepLR" | MultiStepLR_Restart | "StepLR" | (StepLR_Restart doens't yet work)
-    , "lr_steps": [34500, 69000, 103500, 155250, 189750, 241500]
-    , "restarts": [138000, 172500, 207000] //For "MultiStepLR_Restart", "StepLR_Restart" and "CosineAnnealingLR_Restart"
-    , "restart_weights": [0.5, 0.5]
-    , "lr_gamma": 0.5
+    , "lr_gamma": 0.5 //lr change at every step (multiplied by)
+    
+    //For StepLR_Restart:
+    , "lr_scheme": "StepLR_Restart" // "MultiStepLR" | MultiStepLR_Restart | "StepLR" | StepLR_Restart | CosineAnnealingLR_Restart
+    , "lr_step_sizes": [1000, 250, 250] //Steps for each restart for "StepLR_Restart"
+    , "restarts": [138000, 172500] //Restart iterations for "MultiStepLR_Restart", "StepLR_Restart" and "CosineAnnealingLR_Restart"
+    , "restart_weights": [0.5, 0.5] //lr_() * each weight in "restart_weights" for each restart in "restarts"    
+    //, "clear_state": true
+    
+    //For MultiStepLR_Restart:
+    //, "lr_scheme": "MultiStepLR_Restart" // "MultiStepLR" | MultiStepLR_Restart | "StepLR" | "StepLR_Restart" | CosineAnnealingLR_Restart
+    //, "lr_steps": [34500, 69000, 103500, 155250, 189750, 241500] //For "MultiStepLR" and "MultiStepLR_Restart"
+    //, "restarts": [138000, 172500] //Restart iterations for "MultiStepLR_Restart", "StepLR_Restart" and "CosineAnnealingLR_Restart"
+    //, "restart_weights": [0.5, 0.5] //lr_() * each weight in "restart_weights" for each restart in "restarts"
+    //, "clear_state": true
 
     , "pixel_criterion": "cb" //"l1" | "l2" | "cb" | "elastic"
     , "pixel_weight": 1e-2
@@ -109,10 +120,10 @@
     , "train_phase": 1 //Training starting phase, can skip the first phases
     , "phase1_s": 138000 //set to "-1" to skip. Need to coordinate with the LR steps.
     , "phase2_s": 172500 //set to "-1" to skip. Need to coordinate with the LR steps.
-    , "phase3_s": 207000 //set to "-1" to skip. Need to coordinate with the LR steps.
+    , "phase3_s": 210000 //set to "-1" to skip. Need to coordinate with the LR steps.
 
     , "manual_seed": 0
-    , "niter": 5e5
+    , "niter": 210000 //207000 originally in the PPON paper, rounded up to 210000
     , "val_freq": 5e3
   }
 
