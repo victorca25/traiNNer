@@ -46,6 +46,7 @@ class PPONModel(BaseModel):
             if self.phase3_s is None:
                 self.phase3_s = 138000+34500+34500
             self.train_phase = train_opt['train_phase']-1 #change to start from 0 (Phase 1: from 0 to 1, Phase 1: from 1 to 2, etc)
+            self.restarts = train_opt['restarts']
             
         self.load()  # load G and D if needed
 
@@ -228,7 +229,7 @@ class PPONModel(BaseModel):
                 
         ### PPON freeze and unfreeze the components at each phase (Content, Structure, Perceptual)
         #Phase 1
-        if step > 0 and step <= self.phase1_s and self.phase1_s > 0:
+        if step >= 0 and step < self.phase1_s and self.phase1_s > 0:
             #Freeze/Unfreeze layers
             if self.train_phase == 0:
                 print('Starting phase 1')
@@ -275,7 +276,7 @@ class PPONModel(BaseModel):
             #    self.log_dict['l_g_ssim'] = l_g_ssim.item()
         
         #Phase 2
-        elif step > self.phase1_s and step <= self.phase2_s and self.phase2_s > 0:
+        elif step >= self.phase1_s and step < self.phase2_s and self.phase2_s > 0:
             #Freeze/Unfreeze layers
             if self.train_phase == 1:
                 print('Starting phase 2')
@@ -327,7 +328,7 @@ class PPONModel(BaseModel):
                 self.log_dict['l_g_ssim'] = l_g_ssim.item()
         
         #Phase 3
-        elif step > self.phase2_s and step <= self.phase3_s and self.phase3_s > 0:
+        elif step >= self.phase2_s and step < self.phase3_s and self.phase3_s > 0:
             #Freeze/Unfreeze layers
             if self.train_phase == 2:
                 print('Starting phase 3')
@@ -419,8 +420,9 @@ class PPONModel(BaseModel):
                     # D outputs
                     self.log_dict['D_real'] = torch.mean(pred_d_real.detach())
                     self.log_dict['D_fake'] = torch.mean(pred_d_fake.detach())
-                    
-        else: 
+        
+        #Potential additional phase, can be disabled
+        elif step >= self.phase3_s and self.train_phase >= 3:
             if self.train_phase == 3:
                 print('Starting phase 4')
                 self.train_phase = 4
@@ -471,7 +473,13 @@ class PPONModel(BaseModel):
                 self.log_dict['l_g_tv'] = l_g_tv.item()
             if self.cri_ssim:
                 self.log_dict['l_g_ssim'] = l_g_ssim.item()
-
+        
+        # Prevent the new lr after a restart from being used by the previous phase between phase changes
+        if step in self.restarts:
+            #Freeze all layers
+            for p in self.netG.parameters():
+                p.requires_grad = False
+                
     def test(self):
         self.netG.eval()
         with torch.no_grad():
@@ -530,12 +538,13 @@ class PPONModel(BaseModel):
         if load_path_G is not None:
             logger.info('Loading pretrained model for G [{:s}] ...'.format(load_path_G))
             self.load_network(load_path_G, self.netG)
-        load_path_D = self.opt['path']['pretrain_model_D']
-        if self.opt['is_train'] and load_path_D is not None:
-            logger.info('Loading pretrained model for D [{:s}] ...'.format(load_path_D))
-            self.load_network(load_path_D, self.netD)
+        if self.opt['is_train'] and self.opt['train']['gan_weight'] > 0:        
+            load_path_D = self.opt['path']['pretrain_model_D']
+            if self.opt['is_train'] and load_path_D is not None:
+                logger.info('Loading pretrained model for D [{:s}] ...'.format(load_path_D))
+                self.load_network(load_path_D, self.netD)
 
     def save(self, iter_step):
         self.save_network(self.netG, 'G', iter_step)
-        if self.cri_gan and self.phase ==3:
+        if self.cri_gan and self.train_phase >= 3:
             self.save_network(self.netD, 'D', iter_step)
