@@ -85,7 +85,7 @@ class RRDBNet(nn.Module):
 
 # VGG style Discriminator with input size 128*128
 class Discriminator_VGG_128(nn.Module):
-    def __init__(self, in_nc, base_nf, norm_type='batch', act_type='leakyrelu', mode='CNA', convtype='Conv2D'):
+    def __init__(self, in_nc, base_nf, norm_type='batch', act_type='leakyrelu', mode='CNA', convtype='Conv2D', arch='ESRGAN'):
         super(Discriminator_VGG_128, self).__init__()
         # features
         # hxw, c
@@ -117,10 +117,14 @@ class Discriminator_VGG_128(nn.Module):
         # 4, 512
         self.features = B.sequential(conv0, conv1, conv2, conv3, conv4, conv5, conv6, conv7, conv8,\
             conv9)
-
+            
         # classifier
-        self.classifier = nn.Sequential(
-            nn.Linear(512 * 4 * 4, 100), nn.LeakyReLU(0.2, True), nn.Linear(100, 1))
+        if arch=='PPON':
+            self.classifier = nn.Sequential(
+                nn.Linear(512 * 4 * 4, 128), nn.LeakyReLU(0.2, True), nn.Linear(128, 1))
+        else: #arch='ESRGAN':
+            self.classifier = nn.Sequential(
+                nn.Linear(512 * 4 * 4, 100), nn.LeakyReLU(0.2, True), nn.Linear(100, 1))
 
     def forward(self, x):
         x = self.features(x)
@@ -174,9 +178,9 @@ class Discriminator_VGG_128_SN(nn.Module):
         x = self.linear1(x)
         return x
 
-
+# VGG style Discriminator with input size 96*96
 class Discriminator_VGG_96(nn.Module):
-    def __init__(self, in_nc, base_nf, norm_type='batch', act_type='leakyrelu', mode='CNA', convtype='Conv2D'):
+    def __init__(self, in_nc, base_nf, norm_type='batch', act_type='leakyrelu', mode='CNA', convtype='Conv2D', arch='ESRGAN'):
         super(Discriminator_VGG_96, self).__init__()
         # features
         # hxw, c
@@ -208,10 +212,14 @@ class Discriminator_VGG_96(nn.Module):
         # 3, 512
         self.features = B.sequential(conv0, conv1, conv2, conv3, conv4, conv5, conv6, conv7, conv8,\
             conv9)
-
+        
         # classifier
-        self.classifier = nn.Sequential(
-            nn.Linear(512 * 3 * 3, 100), nn.LeakyReLU(0.2, True), nn.Linear(100, 1))
+        if arch=='PPON':
+            self.classifier = nn.Sequential(
+                nn.Linear(512 * 3 * 3, 128), nn.LeakyReLU(0.2, True), nn.Linear(128, 1))
+        else: #arch='ESRGAN':
+            self.classifier = nn.Sequential(
+                nn.Linear(512 * 3 * 3, 100), nn.LeakyReLU(0.2, True), nn.Linear(100, 1))
 
     def forward(self, x):
         x = self.features(x)
@@ -219,7 +227,7 @@ class Discriminator_VGG_96(nn.Module):
         x = self.classifier(x)
         return x
 
-
+# VGG style Discriminator with input size 192*192
 class Discriminator_VGG_192(nn.Module):
     def __init__(self, in_nc, base_nf, norm_type='batch', act_type='leakyrelu', mode='CNA', convtype='Conv2D'):
         super(Discriminator_VGG_192, self).__init__()
@@ -269,6 +277,59 @@ class Discriminator_VGG_192(nn.Module):
         x = self.classifier(x)
         return x
 
+# VGG style Discriminator with input size 256*256
+class Discriminator_VGG_256(nn.Module):
+    def __init__(self, in_nc, base_nf, norm_type='batch', act_type='leakyrelu', mode='CNA', convtype='Conv2D', arch='ESRGAN'):
+        super(Discriminator_VGG_256, self).__init__()
+        # features
+        # hxw, c
+        # 256, 64
+        conv0 = B.conv_block(in_nc, base_nf, kernel_size=3, norm_type=None, act_type=act_type, \
+            mode=mode)
+        conv1 = B.conv_block(base_nf, base_nf, kernel_size=4, stride=2, norm_type=norm_type, \
+            act_type=act_type, mode=mode)
+        # 128, 64
+        conv2 = B.conv_block(base_nf, base_nf*2, kernel_size=3, stride=1, norm_type=norm_type, \
+            act_type=act_type, mode=mode)
+        conv3 = B.conv_block(base_nf*2, base_nf*2, kernel_size=4, stride=2, norm_type=norm_type, \
+            act_type=act_type, mode=mode)
+        # 64, 128
+        conv4 = B.conv_block(base_nf*2, base_nf*4, kernel_size=3, stride=1, norm_type=norm_type, \
+            act_type=act_type, mode=mode)
+        conv5 = B.conv_block(base_nf*4, base_nf*4, kernel_size=4, stride=2, norm_type=norm_type, \
+            act_type=act_type, mode=mode)
+        # 32, 256
+        conv6 = B.conv_block(base_nf*4, base_nf*8, kernel_size=3, stride=1, norm_type=norm_type, \
+            act_type=act_type, mode=mode)
+        conv7 = B.conv_block(base_nf*8, base_nf*8, kernel_size=4, stride=2, norm_type=norm_type, \
+            act_type=act_type, mode=mode)
+        # 16, 512
+        conv8 = B.conv_block(base_nf*8, base_nf*8, kernel_size=3, stride=1, norm_type=norm_type, \
+            act_type=act_type, mode=mode)
+        conv9 = B.conv_block(base_nf*8, base_nf*8, kernel_size=4, stride=2, norm_type=norm_type, \
+            act_type=act_type, mode=mode)
+        # 8, 512
+        conv10 = B.conv_block(base_nf*8, base_nf*8, kernel_size=3, stride=1, norm_type=norm_type, \
+            act_type=act_type, mode=mode)
+        conv11 = B.conv_block(base_nf*8, base_nf*8, kernel_size=4, stride=2, norm_type=norm_type, \
+            act_type=act_type, mode=mode) # 3*3
+        # 4, 512
+        self.features = B.sequential(conv0, conv1, conv2, conv3, conv4, conv5, conv6, conv7, conv8,\
+            conv9, conv10, conv11)
+
+        # classifier
+        if arch=='PPON':
+            self.classifier = nn.Sequential(
+                nn.Linear(512 * 4 * 4, 128), nn.LeakyReLU(0.2, True), nn.Linear(128, 1))
+        else: #arch='ESRGAN':
+            self.classifier = nn.Sequential(
+                nn.Linear(512 * 4 * 4, 100), nn.LeakyReLU(0.2, True), nn.Linear(100, 1))
+
+    def forward(self, x):
+        x = self.features(x)
+        x = x.view(x.size(0), -1)
+        x = self.classifier(x)
+        return x
 
 ####################
 # Perceptual Network
