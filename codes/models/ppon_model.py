@@ -191,10 +191,10 @@ class PPONModel(BaseModel):
                 for optimizer in self.optimizers:
                     self.schedulers.append(lr_scheduler.StepLR(optimizer, \
                         train_opt['lr_step_size'], train_opt['lr_gamma']))
-            elif train_opt['lr_scheme'] == 'StepLR_Restart': #Note: This one is not working well at the moment
+            elif train_opt['lr_scheme'] == 'StepLR_Restart': 
                 for optimizer in self.optimizers:
                     self.schedulers.append(
-                        lr_schedulerR.StepLR_Restart(optimizer, train_opt['lr_step_sizes'],
+                        lr_schedulerR.StepLR_Restart(optimizer, step_sizes=train_opt['lr_step_sizes'],
                                                          restarts=train_opt['restarts'],
                                                          weights=train_opt['restart_weights'],
                                                          gamma=train_opt['lr_gamma'],
@@ -223,15 +223,23 @@ class PPONModel(BaseModel):
 
     def optimize_parameters(self, step):
         # G
+        # Freeze Discriminator during the Generator training
         if self.cri_gan:
             for p in self.netD.parameters():
+                p.requires_grad = False
+        
+        self.optimizer_G.zero_grad()
+        
+        if step in self.restarts:
+            #Freeze all layers
+            for p in self.netG.parameters():
                 p.requires_grad = False
                 
         ### PPON freeze and unfreeze the components at each phase (Content, Structure, Perceptual)
         #Phase 1
         if step >= 0 and step < self.phase1_s and self.phase1_s > 0:
             #Freeze/Unfreeze layers
-            if self.train_phase == 0:
+            if self.train_phase == 0 or (step in self.restarts):
                 print('Starting phase 1')
                 self.train_phase = 1
                 #Freeze all layers
@@ -259,8 +267,11 @@ class PPONModel(BaseModel):
                 l_g_tv = self.cri_tv(self.fake_H) #note: the weight is already multiplied inside the function, doesn't need to be here
                 l_g_total += l_g_tv
             
-            l_g_total.backward()
-            self.optimizer_G.step()
+            try: # Prevent error if there are no parameter for autograd during phase change
+                l_g_total.backward()
+                self.optimizer_G.step()
+            except:
+                print("skipping iteration", step)
             
             # set log
             # G
@@ -278,7 +289,7 @@ class PPONModel(BaseModel):
         #Phase 2
         elif step >= self.phase1_s and step < self.phase2_s and self.phase2_s > 0:
             #Freeze/Unfreeze layers
-            if self.train_phase == 1:
+            if self.train_phase == 1 or (step in self.restarts):
                 print('Starting phase 2')
                 self.train_phase = 2
                 #Freeze all layers
@@ -311,8 +322,11 @@ class PPONModel(BaseModel):
                 l_g_HFEN = self.l_hfen_w * self.cri_hfen(self.fake_H, self.var_H)
                 l_g_total += l_g_HFEN
                 
-            l_g_total.backward()
-            self.optimizer_G.step()
+            try: # Prevent error if there are no parameter for autograd during phase change
+                l_g_total.backward()
+                self.optimizer_G.step()
+            except:
+                print("skipping iteration", step)
             
             # set log
             # G
@@ -330,7 +344,7 @@ class PPONModel(BaseModel):
         #Phase 3
         elif step >= self.phase2_s and step < self.phase3_s and self.phase3_s > 0:
             #Freeze/Unfreeze layers
-            if self.train_phase == 2:
+            if self.train_phase == 2 or (step in self.restarts):
                 print('Starting phase 3')
                 self.train_phase = 3
                 #Freeze all layers
@@ -364,8 +378,11 @@ class PPONModel(BaseModel):
                                               self.cri_gan(pred_g_fake - torch.mean(pred_d_real), True)) / 2
                     l_g_total += l_g_gan
                     
-            l_g_total.backward()
-            self.optimizer_G.step()
+            try: # Prevent error if there are no parameter for autograd during phase change
+                l_g_total.backward() 
+                self.optimizer_G.step()
+            except:
+                print("skipping iteration", step)
             
             # D
             if self.cri_gan:
@@ -392,8 +409,11 @@ class PPONModel(BaseModel):
                     l_d_gp = self.l_gp_w * self.cri_gp(interp, interp_crit)
                     l_d_total += l_d_gp
 
-                l_d_total.backward()
-                self.optimizer_D.step()
+                try: # Prevent error if there are no parameter for autograd during phase change
+                    l_d_total.backward()
+                    self.optimizer_D.step()
+                except:
+                    print("skipping iteration", step)
                 
                 # set log
                 if self.cri_gan:
@@ -423,7 +443,7 @@ class PPONModel(BaseModel):
         
         #Potential additional phase, can be disabled
         elif step >= self.phase3_s and self.train_phase >= 3:
-            if self.train_phase == 3:
+            if self.train_phase == 3 or (step in self.restarts):
                 print('Starting phase 4')
                 self.train_phase = 4
                 #Unfreeze all layers (?) # Need to think about this, if the phases don't coincide with the total number of iterations
@@ -458,8 +478,11 @@ class PPONModel(BaseModel):
                 l_g_tv = self.cri_tv(self.fake_H) #note: the weight is already multiplied inside the function, doesn't need to be here
                 l_g_total += l_g_tv
             
-            l_g_total.backward()
-            self.optimizer_G.step()
+            try: # Prevent error if there are no parameter for autograd during phase change
+                l_g_total.backward()
+                self.optimizer_G.step()
+            except:
+                print("skipping iteration", step)
             
             # set log
             # G
