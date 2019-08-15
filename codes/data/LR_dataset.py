@@ -32,6 +32,8 @@ class LRDataset(data.Dataset):
         # BGR to RGB, HWC to CHW, numpy to tensor
         if img_LR.shape[2] == 3:
             img_LR = img_LR[:, :, [2, 1, 0]]
+        elif img_LR.shape[2] == 4:
+            img_LR = img_LR[:, :, [2, 1, 0, 3]]
         img_LR = torch.from_numpy(np.ascontiguousarray(np.transpose(img_LR, (2, 0, 1)))).float()
 
         return {'LR': img_LR, 'LR_path': LR_path}
