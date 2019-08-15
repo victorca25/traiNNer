@@ -83,7 +83,7 @@ def read_img(env, path, out_nc=3):
     if img.shape[2] > out_nc: # remove extra channels
         img = img[:, :, :out_nc]
     elif img.shape[2] == 3 and out_nc == 4: # pad with solid alpha channel
-        np.dstack((img, np.full(img.shape[:-1], 1., dtype=np.float32)))
+        img = np.dstack((img, np.full(img.shape[:-1], 1., dtype=np.float32)))
     return img
 
 
