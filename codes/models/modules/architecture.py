@@ -6,9 +6,8 @@ from . import block as B
 from . import spectral_norm as SN
 
 ####################
-# Generator
+# ESRGAN Generator
 ####################
-
 
 class SRResNet(nn.Module):
     def __init__(self, in_nc, out_nc, nf, nb, upscale=4, norm_type='batch', act_type='relu', \
@@ -77,10 +76,6 @@ class RRDBNet(nn.Module):
         x = self.model(x)
         return x
 
-
-
-
-
 ####################
 # PPON
 ####################
@@ -147,7 +142,7 @@ class PPON(nn.Module):
 
 
 ####################
-# Discriminator
+# VGG Discriminator
 ####################
 
 
@@ -403,10 +398,176 @@ class Discriminator_VGG_256(nn.Module):
         x = self.classifier(x)
         return x
 
-####################
-# Perceptual Network
-####################
+########################################
+# SRPGAN-like Discriminator/Feature Extractor
+########################################
+#####SRPGAN
+###Originally based on PatchGAN from pix2pix. Conditional GANs need to take both input and output images, need to modify to make it more similar
+class TDiscriminator(nn.Module):
+    def __init__(self, input_shape=(128,128), in_nc=3, base_nf=64, norm_type='batch', act_type='leakyrelu', mode='CNA', convtype='Conv2D', arch='ESRGAN'):
+        """Construct a (PatchGAN) discriminator
+        Parameters:
+            in_nc (int)  -- the number of channels in input images
+            base_nf (int)       -- the number of filters in the last conv layer
+        """
+        super(TDiscriminator, self).__init__()
+        self.block1 = B.conv_block(in_nc, base_nf, kernel_size=4, stride=2, dilation=1, norm_type=None, act_type=act_type, mode=mode)
+        self.block2 = B.conv_block(base_nf, base_nf*2, kernel_size=4, stride=2, dilation=1, norm_type=None, act_type=act_type, mode=mode)
+        self.block3 = B.conv_block(base_nf*2, base_nf*4, kernel_size=4, stride=2, dilation=1, norm_type=None, act_type=act_type, mode=mode)
+        self.block4 = B.conv_block(base_nf*4, base_nf*8, kernel_size=4, stride=2, dilation=1, norm_type=None, act_type=act_type, mode=mode)
+        self.block5 = B.conv_block(base_nf*8, base_nf*16, kernel_size=4, stride=2, dilation=1, norm_type=None, act_type=act_type, mode=mode)
+        self.block6 = B.conv_block(base_nf*16, base_nf*32, kernel_size=4, stride=2, dilation=1, norm_type=None, act_type=act_type, mode=mode)
+        self.block7 = nn.Sequential(
+            nn.Conv2d(base_nf*32, base_nf*16, kernel_size=(1, 1), stride=1, padding=1),
+            nn.LeakyReLU(0.2),
+        )
+        self.block8 = nn.Conv2d(base_nf*16, base_nf*8, kernel_size=(1, 1), stride=1, padding=1)
+        self.block9 = nn.Sequential(
+            nn.Conv2d(base_nf*8, base_nf*2, kernel_size=(1, 1), stride=1, padding=1),
+            nn.LeakyReLU(0.2),
+        )
+        self.block10 = nn.Sequential(
+            nn.Conv2d(base_nf*2, base_nf*2, kernel_size=(3, 3), stride=1, padding=0),
+            nn.LeakyReLU(0.2)
+        )
+        self.block11 = B.conv_block(base_nf*2, base_nf*8, kernel_size=3, stride=1, dilation=1, norm_type=None, act_type=None, mode=mode)
+        in_size = self.infer_lin_size(input_shape)
 
+        self.out_block = nn.Sequential(
+            B.Flatten(),
+            nn.Linear(in_size, 1),
+            nn.Sigmoid(),
+        )
+
+    def infer_lin_size(self, shape):
+        bs = 1
+        input = torch.rand(bs, *shape)
+        model = B.sequential(
+            self.block1,
+            self.block2,
+            self.block3,
+            self.block4,
+            self.block5,
+            self.block6,
+            self.block7,
+            self.block8,
+            self.block9,
+            self.block10,
+            self.block11,
+        )
+        size = model(input).data.view(bs, -1).size(1)
+        return size
+
+    def forward(self, x):
+        feature_maps = []
+        
+        x = self.block1(x)
+        feature_maps.append(x)
+
+        x = self.block2(x)
+        feature_maps.append(x)
+
+        x = self.block3(x)
+        feature_maps.append(x)
+
+        x = self.block4(x)
+        feature_maps.append(x)
+
+        x = self.block5(x)
+        feature_maps.append(x)
+
+        x = self.block6(x)
+        feature_maps.append(x)
+
+        x = self.block7(x)
+        feature_maps.append(x)
+
+        block8 = self.block8(x)
+
+        x = self.block9(block8)
+        feature_maps.append(x)
+
+        x = self.block10(x)
+        feature_maps.append(x)
+
+        block11 = self.block11(x)
+
+        final_block = nn.functional.leaky_relu(block8 + block11, 0.2)
+        feature_maps.append(final_block)
+
+        out = self.out_block(final_block)
+        
+        return out, feature_maps
+
+
+class SRPGANDiscriminator(nn.Module):
+    def __init__(self, input_shape=(128,128), in_nc=3, base_nf=64, norm_type='batch', act_type='leakyrelu', mode='CNA', convtype='Conv2D', arch='ESRGAN'):
+        """Construct a (PatchGAN) discriminator
+        Parameters:
+            in_nc (int)  -- the number of channels in input images
+            base_nf (int)       -- the number of filters in the last conv layer
+        """
+        super(SRPGANDiscriminator, self).__init__()
+        self.block1 = B.conv_block(in_nc, base_nf, kernel_size=4, stride=2, dilation=1, norm_type=None, act_type=act_type, mode=mode)
+        self.block2 = B.conv_block(base_nf, base_nf*2, kernel_size=4, stride=2, dilation=1, norm_type=None, act_type=act_type, mode=mode)
+        self.block3 = B.conv_block(base_nf*2, base_nf*4, kernel_size=4, stride=2, dilation=1, norm_type=None, act_type=act_type, mode=mode)
+        self.block4 = B.conv_block(base_nf*4, base_nf*8, kernel_size=4, stride=2, dilation=1, norm_type=None, act_type=act_type, mode=mode)
+        self.block5 = B.conv_block(base_nf*8, base_nf*8, kernel_size=3, stride=1, dilation=1, norm_type=None, act_type=None, mode=mode)
+        self.block6 = B.conv_block(base_nf*8, base_nf*8, kernel_size=3, stride=1, dilation=1, norm_type=None, act_type=None, mode=mode)
+
+        in_size = self.infer_lin_size(input_shape)
+
+        self.out_block = nn.Sequential(
+            B.Flatten(),
+            nn.Linear(in_size, 1),
+            nn.Sigmoid(),
+        )
+
+    def infer_lin_size(self, shape):
+        bs = 1
+        input = torch.rand(bs, *shape)
+        model = B.sequential(
+            self.block1,
+            self.block2,
+            self.block3,
+            self.block4,
+            self.block5,
+            self.block6,
+        )
+        size = model(input).data.view(bs, -1).size(1)
+        return size
+
+    def forward(self, x):
+        feature_maps = []
+
+        x = self.block1(x)
+        feature_maps.append(x)
+
+        x = self.block2(x)
+        feature_maps.append(x)
+
+        x = self.block3(x)
+        feature_maps.append(x)
+
+        x = self.block4(x)
+        feature_maps.append(x)
+
+        block5 = self.block5(x)
+        block6 = self.block6(x)
+        
+        final_block = nn.functional.leaky_relu(block5 + block6, 0.2)
+        feature_maps.append(final_block)
+
+        out = self.out_block(final_block)
+        
+        return out, feature_maps
+
+#####SRPGAN
+
+
+####################
+# ESRGAN Perceptual Network
+####################
 
 # Assume input range is [0, 1]
 class VGGFeatureExtractor(nn.Module):
