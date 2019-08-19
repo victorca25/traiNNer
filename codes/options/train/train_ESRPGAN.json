@@ -1,0 +1,127 @@
+{
+  "name": "001_esrpgan"
+  , "use_tb_logger": true
+  , "model": "esrpgan"
+  , "scale": 4
+  , "gpu_ids": [0]
+
+  , "datasets": {
+    "train": {
+      "name": "train"
+      , "mode": "LRHROTF"
+      , "dataroot_HR": "D:/Code/Notebooks/BasicSR-master/training/pixel/train/hr" //real full images 
+      , "dataroot_LR": "D:/Code/Notebooks/BasicSR-master/training/pixel/train/lr"
+      , "subset_file": null
+      , "use_shuffle": true
+      , "n_workers": 8
+      , "batch_size": 8
+      , "HR_size": 128
+      , "use_flip": true
+      , "use_rot": true 
+      //, "color": "y" //remove for no conversion (RGB) | "y" for Y in YCbCr | "gray" to convert RGB to grayscale | "RGB" to convert gray to RGB
+      , "rand_flip_LR_HR": false //true //flip LR and HR during training. Will only work if "lr_downscale" is also true
+      , "flip_chance": 0.05 // 5% chance of LR and HR flipping during training. Will only work if "lr_downscale" is also true
+	  
+      , "hr_crop": false //for now will only work if generating LR on the fly, can adapt to make the same changes to LR later 
+      , "hr_rrot": false //for now will only work if generating LR on the fly, can adapt to make the same changes to LR later 
+      , "lr_downscale": true
+      , "lr_downscale_types": [0,1,2,4] //[0,1,2,3,4,5] //["cv2.INTER_NEAREST", "cv2.INTER_LINEAR", "cv2.INTER_CUBIC", "cv2.INTER_AREA", "cv2.INTER_LANCZOS4", "cv2.INTER_LINEAR_EXACT"] //scale_algos //scaling interpolation options
+      , "lr_blur": false
+      , "lr_blur_types": ["gaussian", "clean", "clean", "clean"] //#blur options #median and motion aren't working yet
+      , "lr_noise": false
+      , "lr_noise_types": ["quantize", "quantize", "clean", "clean", "clean"]
+      , "lr_noise2": false
+      , "lr_noise_types2": ["JPEG", "clean", "clean"]
+      , "hr_noise": false
+      , "hr_noise_types": ["gaussian", "clean", "clean", "clean", "clean"]
+      , "lr_cutout": false
+      , "lr_erasing": false 
+    }
+    , "val": {
+      "name": "val"
+      , "mode": "LRHROTF"
+      , "dataroot_HR": "D:/Code/Notebooks/BasicSR-master/training/pixel/valid/hr"
+      , "dataroot_LR": "D:/Code/Notebooks/BasicSR-master/training/pixel/valid/lr"
+      //, "color": "y" //remove for no conversion (RGB) | "y" for Y in YCbCr | "gray" to convert RGB to grayscale | "RGB" to convert gray to RGB
+		  
+      , "lr_downscale": false
+      , "lr_downscale_types": [0,1,2,3,4,5] //["cv2.INTER_NEAREST", "cv2.INTER_LINEAR", "cv2.INTER_CUBIC", "cv2.INTER_AREA", "cv2.INTER_LANCZOS4", "cv2.INTER_LINEAR_EXACT"] //scale_algos //scaling interpolation options
+      , "lr_blur": false
+      , "lr_blur_types": ["average", "box", "gaussian", "bilateral", "clean"] //#blur options #median and motion aren't working yet
+      , "lr_noise": false
+      , "lr_noise_types": ["JPEG", "JPEG", "clean", "clean", "clean"]
+      , "hr_noise": false
+      , "hr_noise_types": ["gaussian", "gaussian", "gaussian", "gaussian", "poisson", "JPEG", "JPEG", "quantize", "quantize", "s&p", "speckle", "dither"]
+      , "lr_cutout": false
+      , "lr_erasing": false 
+    }
+  }
+
+  , "path": {
+    "root": "D:/Code/Notebooks/BasicSR-master"
+    , "pretrain_model_G": "../experiments/001_esrpgan/models/13000_G.pth"
+    //, "pretrain_model_D": "../experiments/001_esrpgan/models/13000_D.pth"
+    //, "resume_state": "../experiments/001_esrpgan/training_state/8000.state"
+  }
+
+  , "network_G": {
+    "which_model_G": "RRDB_net" // RRDB_net | sr_resnet
+    , "norm_type": null
+    , "mode": "CNA" //"NAC"
+    , "nf": 64
+    , "nb": 23
+    , "in_nc": 3
+    , "out_nc": 3
+    , "gc": 32
+    , "group": 1
+    , "convtype": "Conv2D" //"Conv2D" | "PartialConv2D"
+  }
+  , "network_D": {
+    "which_model_D": "discriminator_srpgan" //discriminator_srpgan | discriminator_t
+    //, "norm_type": "batch"
+    //, "act_type": "leakyrelu"
+    //, "mode": "CNA" //"NAC"
+    //, "nf": 64
+    , "in_nc": 3
+  }
+
+  , "train": {
+    "lr_G": 1e-4
+    , "weight_decay_G": 0
+    , "beta1_G": 0.9
+    , "lr_D": 1e-4
+    , "weight_decay_D": 0
+    , "beta1_D": 0.9
+    , "lr_scheme": "MultiStepLR"
+    , "lr_steps": [50000, 100000, 200000, 300000]
+    , "lr_gamma": 0.5
+
+    , "pixel_criterion": "cb" //"l1" | "l2" | "cb" | "elastic"
+    , "pixel_weight": 8e-1
+    , "feature_criterion": "elastic" //"l1" | "l2" | "cb" | "elastic"
+    , "feature_weight": 1 //1e-1
+    //, "elastic_alpha": 0.2 //not used
+    , "hfen_criterion": "l1" //hfen: "l1", "l2", "rel_l1", "rel_l2"
+    , "hfen_weight": 1e-6
+	  , "tv_type": "normal" //TV: "normal", "4D"
+	  , "tv_weight": 0 //1e-6
+    , "ssim_type": "ms-ssim" //ssim: "ssim", "ms-ssim"
+	  , "ssim_weight": 0 //1
+    , "gan_type": "vanilla"
+    , "gan_weight": 4e-3
+
+    //for wgan-gp
+    // , "D_update_ratio": 1
+    // , "D_init_iters": 0
+    // , "gp_weigth": 10
+
+    , "manual_seed": 0
+    , "niter": 5e5
+    , "val_freq": 1e3
+  }
+
+  , "logger": {
+    "print_freq": 200
+    , "save_checkpoint_freq": 5e3
+  }
+}
