@@ -50,13 +50,6 @@ def pad(pad_type, padding):
         raise NotImplementedError('padding layer [{:s}] is not implemented'.format(pad_type))
     return layer
 
-
-def get_valid_padding(kernel_size, dilation):
-    kernel_size = kernel_size + (kernel_size - 1) * (dilation - 1)
-    padding = (kernel_size - 1) // 2
-    return padding
-
-
 class ConcatBlock(nn.Module):
     # Concat the output of a submodule to its input
     def __init__(self, submodule):
@@ -327,3 +320,25 @@ def upconv_blcok(in_nc, out_nc, upscale_factor=2, kernel_size=3, stride=1, bias=
 def conv_layer(in_channels, out_channels, kernel_size, stride=1, dilation=1, groups=1):
     padding = int((kernel_size - 1) / 2) * dilation
     return nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding=padding, bias=True, dilation=dilation, groups=groups)
+
+
+################
+# helper funcs
+################
+
+#ESRGAN
+def get_valid_padding(kernel_size, dilation):
+    """
+    Padding value to remain feature size.
+    """
+    kernel_size = kernel_size + (kernel_size - 1) * (dilation - 1)
+    padding = (kernel_size - 1) // 2
+    return padding
+
+#####SRPGAN    
+class Flatten(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, x):
+        return x.view(x.size(0), -1)
