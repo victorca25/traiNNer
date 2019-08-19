@@ -137,6 +137,10 @@ def define_D(opt):
             norm_type=opt_net['norm_type'], mode=opt_net['mode'], act_type=opt_net['act_type'], convtype=opt_net['convtype'], arch=model_G)
     elif which_model == 'discriminator_vgg_128_SN':
         netD = arch.Discriminator_VGG_128_SN()
+    elif which_model == 'discriminator_srpgan':
+        netD = arch.SRPGANDiscriminator((opt_net['in_nc'], 128, 128)) #temporally hardcoded to 128x128 patch size
+    elif which_model == 'discriminator_t':
+        netD = arch.TDiscriminator((opt_net['in_nc'], 128, 128)) #temporally hardcoded to 128x128 patch size
     else:
         raise NotImplementedError('Discriminator model [{:s}] not recognized'.format(which_model))
 
