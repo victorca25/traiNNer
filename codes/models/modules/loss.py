@@ -202,3 +202,44 @@ class ElasticLoss(nn.Module):
             loss = l1 + l2
 
         return loss
+
+###SRPGAN
+class SRPFeaLoss(nn.Module):
+    """Feature loss extraction from discriminator (SRPGAN)"""
+
+    def __init__(self, eps=1e-8):
+        super(SRPFeaLoss, self).__init__()
+        self.loss = CharbonnierLoss(eps)
+
+    def forward(self, d_hr_feat_maps, d_sr_feat_maps):
+        perceptual_loss = 0
+        for hr_feat_map, sr_feat_map in zip(d_hr_feat_maps, d_sr_feat_maps):
+            perceptual_loss = self.loss(sr_feat_map, hr_feat_map)
+        
+        return perceptual_loss
+
+class SRPGANLoss(nn.Module):
+    """Generator GAN loss (SRPGAN)"""
+
+    def __init__(self):
+        super(SRPGANLoss, self).__init__()
+
+    def forward(self, d_sr_out):
+        return F.binary_cross_entropy(d_sr_out, torch.ones_like(d_sr_out))
+
+class SRPGANDiscriminatorLoss(nn.Module):
+    """
+    The Discriminator loss
+    """
+    def __init__(self):
+        super(SRPGANDiscriminatorLoss, self).__init__()
+
+    def forward(self, d_hr_out, d_sr_out):
+        # Labels smoothing
+        real_labels = np.random.uniform(0.7, 1.2, size=d_hr_out.size())
+        real_labels = torch.FloatTensor(real_labels).to(d_hr_out.get_device())
+
+        d_hr_loss = F.binary_cross_entropy(d_hr_out, real_labels)
+        d_sr_loss = F.binary_cross_entropy(d_sr_out, torch.zeros_like(d_sr_out))
+
+        return d_hr_loss + d_sr_loss
