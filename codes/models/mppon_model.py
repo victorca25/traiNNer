@@ -364,13 +364,13 @@ class MPPONModel(BaseModel):
             self.optimizer_G.zero_grad()
             
             if self.cri_gan:
-                self.fake_H = self.netG(self.var_L)
+                self.fake_Hc, self.fake_Hs, self.fake_Hp = self.netG(self.var_L)
 
                 d_hr_out, d_hr_feat_maps = self.netD(self.var_H)  # Sigmoid output #pred_d_real
-                d_sr_out, d_sr_feat_maps = self.netD(self.fake_H.detach())  # detach to avoid BP to G  # Sigmoid output #pred_d_fake
+                d_sr_out, d_sr_feat_maps = self.netD(self.fake_Hp.detach())  # detach to avoid BP to G  # Sigmoid output #pred_d_fake
                 
                 d_hr_out, d_hr_feat_maps = self.netD(self.var_H)  # Sigmoid output #pred_d_real
-                d_sr_out, d_sr_feat_maps = self.netD(self.fake_H.detach())  # detach to avoid BP to G  # Sigmoid output #pred_d_fake
+                d_sr_out, d_sr_feat_maps = self.netD(self.fake_Hp.detach())  # detach to avoid BP to G  # Sigmoid output #pred_d_fake
 
                 self.optimizer_D.zero_grad()
                 l_d_total = 0
