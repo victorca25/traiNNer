@@ -83,3 +83,64 @@ class BaseModel():
             self.optimizers[i].load_state_dict(o)
         for i, s in enumerate(resume_schedulers):
             self.schedulers[i].load_state_dict(s)
+
+    def update_schedulers(self, train_opt):
+        '''Update scheduler parameters if they are changed in the JSON configuration'''
+        if train_opt['lr_scheme'] == 'StepLR':
+            for i, s in enumerate(self.schedulers):
+                if self.schedulers[i].step_size != train_opt['lr_step_size']:
+                    print("Updating step_size from ",self.schedulers[i].step_size ," to", train_opt['lr_step_size'])
+                    self.schedulers[i].step_size = train_opt['lr_step_size']
+                #common
+                if self.schedulers[i].gamma !=train_opt['lr_gamma']:
+                    print("Updating lr_gamma from ",self.schedulers[i].gamma," to", train_opt['lr_gamma'])
+                    self.schedulers[i].gamma =train_opt['lr_gamma']
+        if train_opt['lr_scheme'] == 'StepLR_Restart':
+            for i, s in enumerate(self.schedulers):
+                if self.schedulers[i].step_sizes != train_opt['lr_step_sizes']:
+                    print("Updating step_sizes from ",self.schedulers[i].step_sizes," to", train_opt['lr_step_sizes'])
+                    self.schedulers[i].step_sizes = train_opt['lr_step_sizes']
+                if self.schedulers[i].restarts != train_opt['restarts']:
+                    print("Updating restarts from ",self.schedulers[i].restarts," to", train_opt['restarts'])
+                    self.schedulers[i].restarts = train_opt['restarts']
+                if self.schedulers[i].restart_weights != train_opt['restart_weights']:
+                    print("Updating restart_weights from ",self.schedulers[i].restart_weights," to", train_opt['restart_weights'])
+                    self.schedulers[i].restart_weights = train_opt['restart_weights']
+                if self.schedulers[i].clear_state != train_opt['clear_state']:
+                    print("Updating clear_state from ",self.schedulers[i].clear_state," to", train_opt['clear_state'])
+                    self.schedulers[i].clear_state = train_opt['clear_state']
+                #common
+                if self.schedulers[i].gamma !=train_opt['lr_gamma']:
+                    print("Updating lr_gamma from ",self.schedulers[i].gamma," to", train_opt['lr_gamma'])
+                    self.schedulers[i].gamma =train_opt['lr_gamma']
+        if train_opt['lr_scheme'] == 'MultiStepLR':
+            for i, s in enumerate(self.schedulers):
+                if self.schedulers[i].milestones != train_opt['lr_steps']:
+                    if not list(train_opt['lr_steps']) == sorted(train_opt['lr_steps']):
+                        raise ValueError('lr_steps should be a list of'
+                             ' increasing integers. Got {}', train_opt['lr_steps'])
+                    print("Updating lr_steps from ",self.schedulers[i].milestones ," to", train_opt['lr_steps'])
+                    self.schedulers[i].milestones = train_opt['lr_steps']
+                #common
+                if self.schedulers[i].gamma !=train_opt['lr_gamma']:
+                    print("Updating lr_gamma from ",self.schedulers[i].gamma," to", train_opt['lr_gamma'])
+                    self.schedulers[i].gamma =train_opt['lr_gamma']
+        if train_opt['lr_scheme'] == 'MultiStepLR_Restart':
+            for i, s in enumerate(self.schedulers):
+                if self.schedulers[i].milestones != train_opt['lr_steps']:
+                    if not list(train_opt['lr_steps']) == sorted(train_opt['lr_steps']):
+                        raise ValueError('lr_steps should be a list of'
+                             ' increasing integers. Got {}', train_opt['lr_steps'])
+                if self.schedulers[i].restarts != train_opt['restarts']:
+                    print("Updating restarts from ",self.schedulers[i].restarts," to", train_opt['restarts'])
+                    self.schedulers[i].restarts = train_opt['restarts']
+                if self.schedulers[i].restart_weights != train_opt['restart_weights']:
+                    print("Updating restart_weights from ",self.schedulers[i].restart_weights," to", train_opt['restart_weights'])
+                    self.schedulers[i].restart_weights = train_opt['restart_weights']
+                if self.schedulers[i].clear_state != train_opt['clear_state']:
+                    print("Updating clear_state from ",self.schedulers[i].clear_state," to", train_opt['clear_state'])
+                    self.schedulers[i].clear_state = train_opt['clear_state']
+                #common
+                if self.schedulers[i].gamma !=train_opt['lr_gamma']:
+                    print("Updating lr_gamma from ",self.schedulers[i].gamma," to", train_opt['lr_gamma'])
+                    self.schedulers[i].gamma =train_opt['lr_gamma']
