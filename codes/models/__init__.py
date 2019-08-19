@@ -21,6 +21,8 @@ def create_model(opt):
         from .ESPCN_model import ESPCNModel as M
     elif model == 'ppon':
         from .ppon_model import PPONModel as M
+    elif model == 'mppon':
+        from .mppon_model import MPPONModel as M
     elif model == 'esrpgan':
         from .esrpgan_model import ESRPGANModel as M
     else:
