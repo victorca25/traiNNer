@@ -47,6 +47,7 @@ class PPONModel(BaseModel):
                 self.phase3_s = 138000+34500+34500
             self.train_phase = train_opt['train_phase']-1 #change to start from 0 (Phase 1: from 0 to 1, Phase 1: from 1 to 2, etc)
             self.restarts = train_opt['restarts']
+            self.update_schedulers_bool = 1
             
         self.load()  # load G and D if needed
 
@@ -222,6 +223,11 @@ class PPONModel(BaseModel):
             self.var_ref = input_ref.to(self.device)
 
     def optimize_parameters(self, step):
+        # Check if schedulers need to be updated from the JSON after resuming training
+        if step > 0 and self.update_schedulers_bool == 1:
+            self.update_schedulers(self.opt['train'])
+            self.update_schedulers_bool = 0
+        
         # G
         # Freeze Discriminator during the Generator training
         if self.cri_gan:
