@@ -386,9 +386,9 @@ class MPPONModel(BaseModel):
                 if self.cri_fea:  # G feature loss
                     l_g_fea = self.l_fea_w * self.cri_fea(d_hr_feat_maps, d_sr_feat_maps)
                     l_g_total += l_g_fea
-                # if self.cri_pix:  # pixel loss
-                    # l_g_pix = (self.l_pix_w/2) * self.cri_pix(self.fake_H, self.var_H)
-                    # l_g_total += l_g_pix
+                if self.cri_pix:  # pixel loss
+                    l_g_pix = (self.l_pix_w/2) * self.cri_pix(self.fake_H, self.var_H)
+                    l_g_total += l_g_pix
                 # if self.cri_ssim: # structural loss
                     # l_g_ssim = 1.-(self.l_ssim_w *self.cri_ssim(self.fake_H, self.var_H))
                     # if torch.isnan(l_g_ssim).any(): #at random, l_g_ssim is returning NaN for ms-ssim, which breaks the model. Temporary hack, until I find out what's going on.
@@ -425,8 +425,8 @@ class MPPONModel(BaseModel):
                 if self.cri_fea:
                     self.log_dict['l_g_fea'] = l_g_fea.item()
                 self.log_dict['l_g_gan'] = l_g_gan.item()
-                # if self.cri_pix:
-                    # self.log_dict['l_g_pix'] = l_g_pix.item()
+                if self.cri_pix:
+                    self.log_dict['l_g_pix'] = l_g_pix.item()
                 # if self.cri_hfen:
                     # self.log_dict['l_g_HFEN'] = l_g_HFEN.item()
                 #if self.cri_tv:
