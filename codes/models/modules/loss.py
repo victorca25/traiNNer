@@ -214,8 +214,7 @@ class SRPFeaLoss(nn.Module):
     def forward(self, d_hr_feat_maps, d_sr_feat_maps):
         perceptual_loss = 0
         for hr_feat_map, sr_feat_map in zip(d_hr_feat_maps, d_sr_feat_maps):
-            perceptual_loss = self.loss(sr_feat_map, hr_feat_map)
-        
+            perceptual_loss += self.loss(sr_feat_map, hr_feat_map)
         return perceptual_loss
 
 class SRPGANLoss(nn.Module):
