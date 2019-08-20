@@ -201,7 +201,7 @@ class ESRPGANModel(BaseModel):
             self.fake_H = self.netG(self.var_L)
             
             d_hr_out, d_hr_feat_maps = self.netD(self.var_H)  # Sigmoid output #pred_d_real
-            d_sr_out, d_sr_feat_maps = self.netD(self.fake_H.detach())  # detach to avoid BP to G  # Sigmoid output #pred_d_fake
+            d_sr_out, d_sr_feat_maps = self.netD(self.fake_H)  # Sigmoid output #pred_d_fake
             
             # D
             #for p in self.netD.parameters():
