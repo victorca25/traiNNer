@@ -212,7 +212,6 @@ class MPPONModel(BaseModel):
             #self.var_ref = input_ref.to(self.device)
 
     def optimize_parameters(self, step):
-        
         # Check if schedulers need to be updated from the JSON after resuming training
         if step > 0 and self.update_schedulers_bool == 1: #(update_schedulers_bool could be a parameter on the JSON to update at any point)
             self.update_schedulers(self.opt['train'])
@@ -234,21 +233,21 @@ class MPPONModel(BaseModel):
 
             self.optimizer_G.zero_grad()
 
-            #Freeze/Unfreeze layers
+            #Freeze/Unfreeze Generator layers
             if self.train_phase == 0 or (step in self.restarts):
                 print('Starting phase 1')
                 self.train_phase = 1
-                #Freeze all layers
-                for p in self.netG.parameters():
-                    #print(p)
-                    p.requires_grad = False
-                #Unfreeze the Content Layers, CFEM and CRM
-                CFEM_param = self.netG.module.CFEM.parameters()
-                for p in CFEM_param:
-                    p.requires_grad = True
-                CRM_param = self.netG.module.CRM.parameters()
-                for p in CRM_param:
-                    p.requires_grad = True
+            #Freeze all layers
+            for p in self.netG.parameters():
+                #print(p)
+                p.requires_grad = False
+            #Unfreeze the Content Layers, CFEM and CRM
+            CFEM_param = self.netG.module.CFEM.parameters()
+            for p in CFEM_param:
+                p.requires_grad = True
+            CRM_param = self.netG.module.CRM.parameters()
+            for p in CRM_param:
+                p.requires_grad = True
             self.optimizer_G.zero_grad()
             
             self.fake_Hc, self.fake_Hs, self.fake_Hp = self.netG(self.var_L)
@@ -292,20 +291,20 @@ class MPPONModel(BaseModel):
 
             self.optimizer_G.zero_grad()
           
-            #Freeze/Unfreeze layers
+            #Freeze/Unfreeze Generator layers
             if self.train_phase == 1 or (step in self.restarts):
                 print('Starting phase 2')
                 self.train_phase = 2
-                #Freeze all layers
-                for p in self.netG.parameters():
-                    p.requires_grad = False
-                #Unfreeze the Structure Layers, SFEM and SRM
-                SFEM_param = self.netG.module.SFEM.parameters()
-                for p in SFEM_param:
-                    p.requires_grad = True
-                SRM_param = self.netG.module.SRM.parameters()
-                for p in SRM_param:
-                    p.requires_grad = True
+            #Freeze all layers
+            for p in self.netG.parameters():
+                p.requires_grad = False
+            #Unfreeze the Structure Layers, SFEM and SRM
+            SFEM_param = self.netG.module.SFEM.parameters()
+            for p in SFEM_param:
+                p.requires_grad = True
+            SRM_param = self.netG.module.SRM.parameters()
+            for p in SRM_param:
+                p.requires_grad = True
             self.optimizer_G.zero_grad()
             
             self.fake_Hc, self.fake_Hs, self.fake_Hp = self.netG(self.var_L)
@@ -347,11 +346,22 @@ class MPPONModel(BaseModel):
         
         #Phase 3
         elif step >= self.phase2_s and step < self.phase3_s and self.phase3_s > 0:
-            #Freeze/Unfreeze layers
+            # D
+            # Freeze Discriminator
+            for p in self.netD.parameters():
+                p.requires_grad = False
+            
             if self.train_phase == 2 or (step in self.restarts):
                 print('Starting phase 3')
                 self.train_phase = 3
-                #Freeze all layers
+            
+            if self.cri_gan:            
+                # D
+                # Unfreeze Discriminator
+                for p in self.netD.parameters():
+                    p.requires_grad = True
+                # G
+                # Freeze all Generator layers
                 for p in self.netG.parameters():
                     p.requires_grad = False
                 #Unfreeze the Perceptual Layers, PFEM and PRM
@@ -361,50 +371,68 @@ class MPPONModel(BaseModel):
                 PRM_param = self.netG.module.PRM.parameters()
                 for p in PRM_param:
                     p.requires_grad = True
-            self.optimizer_G.zero_grad()
-            
-            if self.cri_gan:
+                
                 self.fake_Hc, self.fake_Hs, self.fake_Hp = self.netG(self.var_L)
-
-                d_hr_out, d_hr_feat_maps = self.netD(self.var_H)  # Sigmoid output #pred_d_real
-                d_sr_out, d_sr_feat_maps = self.netD(self.fake_Hp.detach())  # detach to avoid BP to G  # Sigmoid output #pred_d_fake
+                self.fake_H = self.fake_Hp
                 
                 d_hr_out, d_hr_feat_maps = self.netD(self.var_H)  # Sigmoid output #pred_d_real
-                d_sr_out, d_sr_feat_maps = self.netD(self.fake_Hp.detach())  # detach to avoid BP to G  # Sigmoid output #pred_d_fake
-
-                self.optimizer_D.zero_grad()
-                l_d_total = 0
+                d_sr_out, d_sr_feat_maps = self.netD(self.fake_H)  # Sigmoid output #pred_d_fake ## .detach() detach would avoid BackPropagation from working to G
+                
+                # Generator loss
+                l_g_total = 0
+                # G gan + cls loss
+                l_g_gan = self.cri_gan(d_sr_out)
+                l_g_total += l_g_gan
+                if self.cri_fea:  # G feature loss
+                    l_g_fea = self.l_fea_w * self.cri_fea(d_hr_feat_maps, d_sr_feat_maps)
+                    l_g_total += l_g_fea
+                # if self.cri_pix:  # pixel loss
+                    # l_g_pix = (self.l_pix_w/2) * self.cri_pix(self.fake_H, self.var_H)
+                    # l_g_total += l_g_pix
+                # if self.cri_ssim: # structural loss
+                    # l_g_ssim = 1.-(self.l_ssim_w *self.cri_ssim(self.fake_H, self.var_H))
+                    # if torch.isnan(l_g_ssim).any(): #at random, l_g_ssim is returning NaN for ms-ssim, which breaks the model. Temporary hack, until I find out what's going on.
+                        # l_g_total = l_g_total
+                    # else:
+                        # l_g_total += l_g_ssim
+                # if self.cri_hfen:  # HFEN loss 
+                    # l_g_HFEN = self.l_hfen_w * self.cri_hfen(self.fake_H, self.var_H)
+                    # l_g_total += l_g_HFEN
+                # if self.cri_tv: #TV loss
+                    # l_g_tv = self.cri_tv(self.fake_H) #note: the weight is already multiplied inside the function, doesn't need to be here
+                    # l_g_total += l_g_tv
+                    
+                # Discriminator loss
+                l_d_total = 0 
                 l_d_total = self.cri_gan_d(d_hr_out, d_sr_out)
-
+                
+                self.optimizer_D.zero_grad() # Clear Discriminator grad
                 try: # Prevent error if there are no parameter for autograd during phase change
                     l_d_total.backward(retain_graph=True)
                     self.optimizer_D.step()
                 except:
-                    print("skipping iteration", step)
+                    print("skipping iteration for D", step)
                 
-                self.optimizer_G.zero_grad()
-
-                l_g_total = 0
-
-                if self.cri_fea:  # G feature loss
-                    l_g_fea = self.l_fea_w * self.cri_fea(d_hr_feat_maps, d_sr_feat_maps)
-                    l_g_total += l_g_fea
-
-                # G gan + cls loss
-                l_g_gan = self.cri_gan(d_sr_out)
-                l_g_total += l_g_gan
-                
+                self.optimizer_G.zero_grad() # Clear Generator grad
                 try: # Prevent error if there are no parameter for autograd during phase change
-                    l_g_total.backward() 
+                    l_g_total.backward()
                     self.optimizer_G.step()
                 except:
-                    print("skipping iteration", step)
+                    print("skipping iteration for G", step)
                 
                 # set log
                 # G
                 if self.cri_fea:
                     self.log_dict['l_g_fea'] = l_g_fea.item()
                 self.log_dict['l_g_gan'] = l_g_gan.item()
+                # if self.cri_pix:
+                    # self.log_dict['l_g_pix'] = l_g_pix.item()
+                # if self.cri_hfen:
+                    # self.log_dict['l_g_HFEN'] = l_g_HFEN.item()
+                #if self.cri_tv:
+                #    self.log_dict['l_g_tv'] = l_g_tv.item()
+                # if self.cri_ssim:
+                    # self.log_dict['l_g_ssim'] = l_g_ssim.item()
 
                 # D outputs
                 self.log_dict['l_d_total'] = l_d_total.item()
