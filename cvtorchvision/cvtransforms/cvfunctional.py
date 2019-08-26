@@ -631,6 +631,12 @@ def affine6(img, anglez=0, shear=0, translate=(0, 0), scale=(1, 1), resample='BI
         resample ({NEAREST, BILINEAR, BICUBIC}, optional):
         fillcolor (int or tuple): Optional fill color for the area outside the transform in the output image. (Pillow>=5.0.0)
     """
+    imgtype = img.dtype
+    gray_scale = False
+
+    if len(img.shape) == 2:
+        gray_scale = True
+        img = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
     rows, cols, _ = img.shape
     centery = rows * 0.5
     centerx = cols * 0.5
@@ -660,7 +666,9 @@ def affine6(img, anglez=0, shear=0, translate=(0, 0), scale=(1, 1), resample='BI
 
     dst_img = cv2.warpAffine(img, affine_matrix, (cols, rows), flags=INTER_MODE[resample],
                              borderMode=cv2.BORDER_CONSTANT, borderValue=fillcolor)
-    return dst_img
+    if gray_scale:
+        dst_img = cv2.cvtColor(dst_img, cv2.COLOR_RGB2GRAY)
+    return dst_img.astype(imgtype)
 
 
 def affine(img, angle=0, translate=(0, 0), scale=1, shear=0, resample='BILINEAR', fillcolor=(0,0,0)):
@@ -677,6 +685,7 @@ def affine(img, angle=0, translate=(0, 0), scale=1, shear=0, resample='BILINEAR'
             If omitted, or if the image has mode "1" or "P", it is set to PIL.Image.NEAREST.
         fillcolor (int or tuple): Optional fill color for the area outside the transform in the output image. (Pillow>=5.0.0)
     """
+    imgtype = img.dtype
     if not _is_numpy_image(img):
         raise TypeError('img should be CV Image. Got {}'.format(type(img)))
 
@@ -684,6 +693,11 @@ def affine(img, angle=0, translate=(0, 0), scale=1, shear=0, resample='BILINEAR'
         "Argument translate should be a list or tuple of length 2"
 
     assert scale > 0.0, "Argument scale should be positive"
+    gray_scale = False
+
+    if len(img.shape) == 2:
+        gray_scale = True
+        img = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
 
     rows, cols, _ = img.shape
     center = (cols * 0.5, rows * 0.5)
@@ -698,7 +712,9 @@ def affine(img, angle=0, translate=(0, 0), scale=1, shear=0, resample='BILINEAR'
     affine_matrix = np.array([[M00, M01, M02], [M10, M11, M12]], dtype=np.float32)
     dst_img = cv2.warpAffine(img, affine_matrix, (cols, rows), flags=INTER_MODE[resample],
                              borderMode=cv2.BORDER_CONSTANT, borderValue=fillcolor)
-    return dst_img
+    if gray_scale:
+        dst_img = cv2.cvtColor(dst_img, cv2.COLOR_RGB2GRAY)
+    return dst_img.astype(imgtype)
 
 
 def perspective(img, fov=45, anglex=0, angley=0, anglez=0, shear=0,
@@ -710,6 +726,12 @@ def perspective(img, fov=45, anglex=0, angley=0, anglez=0, shear=0,
     """
 
     imgtype = img.dtype
+    gray_scale = False
+
+    if len(img.shape) == 2:
+        gray_scale = True
+        img = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
+
     h, w, _ = img.shape
     centery = h * 0.5
     centerx = w * 0.5
@@ -782,6 +804,8 @@ def perspective(img, fov=45, anglex=0, angley=0, anglez=0, shear=0,
 
     result_img = cv2.warpPerspective(img, total_matrix, (w, h), flags=INTER_MODE[resample],
                                      borderMode=cv2.BORDER_CONSTANT, borderValue=fillcolor)
+    if gray_scale:
+        result_img = cv2.cvtColor(result_img, cv2.COLOR_RGB2GRAY)
     return result_img.astype(imgtype)
 
 
