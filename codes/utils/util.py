@@ -7,7 +7,9 @@ from torchvision.utils import make_grid
 import random
 import torch
 import logging
+
 import re
+
 
 ####################
 # miscellaneous
@@ -69,7 +71,6 @@ def sorted_nicely( l ):
     alphanum_key = lambda key: [convert(c) for c in re.split('([0-9]+)', key)]
     return sorted(l, key = alphanum_key)
 
-
 ####################
 # image convert
 ####################
@@ -87,16 +88,16 @@ def tensor2img(tensor, out_type=np.uint8, min_max=(0, 1)):
     if n_dim == 4:
         n_img = len(tensor)
         img_np = make_grid(tensor, nrow=int(math.sqrt(n_img)), normalize=False).numpy()
-        if img_np.shape[0] == 3:
+        if img_np.shape[0] == 3: #RGB
             img_np = img_np[[2, 1, 0], :, :]
-        elif img_np.shape[0] == 4:
+        elif img_np.shape[0] == 4: #RGBA
             img_np = img_np[[2, 1, 0, 3], :, :]
         img_np = np.transpose(img_np, (1, 2, 0))  # HWC, BGR
     elif n_dim == 3:
         img_np = tensor.numpy()
-        if img_np.shape[0] == 3:
+        if img_np.shape[0] == 3: #RGB
             img_np = img_np[[2, 1, 0], :, :]
-        elif img_np.shape[0] == 4:
+        elif img_np.shape[0] == 4: #RGBA
             img_np = img_np[[2, 1, 0, 3], :, :]
         img_np = np.transpose(img_np, (1, 2, 0))  # HWC, BGR
     elif n_dim == 2:
