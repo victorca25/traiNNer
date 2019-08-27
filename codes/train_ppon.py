@@ -29,10 +29,6 @@ def main():
     logger = logging.getLogger('base')
     
     # train from scratch OR resume training
-    """
-    if opt['path']['resume_state']:  # resuming training
-        resume_state = torch.load(opt['path']['resume_state'])
-    """
     if opt['path']['resume_state']:
         if os.path.isdir(opt['path']['resume_state']):
             import glob
@@ -162,12 +158,6 @@ def main():
                     gt_img = util.tensor2img(visuals['HR'])  # uint8
 
                     # Save SR images for reference
-                    """
-                    save_img_path = os.path.join(img_dir, '{:s}_{:d}.png'.format(\
-                        img_name, current_step))
-                    util.save_img(sr_img, save_img_path)
-                    """
-                    
                     save_c_img_path = os.path.join(img_dir, '{:s}_{:d}_c.png'.format(img_name, current_step))
                     save_s_img_path = os.path.join(img_dir, '{:s}_{:d}_s.png'.format(img_name, current_step))
                     save_p_img_path = os.path.join(img_dir, '{:s}_{:d}_d.png'.format(img_name, current_step))
@@ -179,7 +169,6 @@ def main():
                     # calculate PSNR
                     crop_size = opt['scale']
                     gt_img = gt_img / 255.
-                    #sr_img = sr_img / 255. #ESRGAN 
                     #PPON
                     #C
                     sr_img_c = img_c / 255.
