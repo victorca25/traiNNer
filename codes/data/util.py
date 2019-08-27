@@ -69,8 +69,9 @@ def _read_lmdb_img(env, path):
     return img
 
 
-def read_img(env, path):
+def read_img(env, path, out_nc=3):
     # read image by cv2 or from lmdb
+    # out_nc: Desired number of channels
     # return: Numpy float32, HWC, BGR, [0,1]
     if env is None:  # img
         img = cv2.imread(path, cv2.IMREAD_UNCHANGED)
@@ -78,10 +79,11 @@ def read_img(env, path):
         img = _read_lmdb_img(env, path)
     img = img.astype(np.float32) / 255.
     if img.ndim == 2:
-        img = np.expand_dims(img, axis=2)
-    # some images have 4 channels
-    if img.shape[2] > 3:
-        img = img[:, :, :3]
+        img = np.tile(np.expand_dims(img, axis=2), (1, 1, 3))
+    if img.shape[2] > out_nc: # remove extra channels
+        img = img[:, :, :out_nc]
+    elif img.shape[2] == 3 and out_nc == 4: # pad with solid alpha channel
+        img = np.dstack((img, np.full(img.shape[:-1], 1., dtype=np.float32)))
     return img
 
 

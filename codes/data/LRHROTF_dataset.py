@@ -252,6 +252,9 @@ class LRHRDataset(data.Dataset):
         if img_HR.shape[2] == 3:
             img_HR = img_HR[:, :, [2, 1, 0]]
             img_LR = img_LR[:, :, [2, 1, 0]]
+        elif img_LR.shape[2] == 4:
+            img_HR = img_HR[:, :, [2, 1, 0, 3]]
+            img_LR = img_LR[:, :, [2, 1, 0, 3]]
         img_HR = torch.from_numpy(np.ascontiguousarray(np.transpose(img_HR, (2, 0, 1)))).float()
         img_LR = torch.from_numpy(np.ascontiguousarray(np.transpose(img_LR, (2, 0, 1)))).float()
 

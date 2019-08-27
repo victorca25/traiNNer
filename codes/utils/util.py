@@ -7,6 +7,7 @@ from torchvision.utils import make_grid
 import random
 import torch
 import logging
+import re
 
 ####################
 # miscellaneous
@@ -63,6 +64,12 @@ def setup_logger(logger_name, root, phase, level=logging.INFO, screen=False):
         l.addHandler(sh)
 
 
+def sorted_nicely( l ):
+    convert = lambda text: int(text) if text.isdigit() else text
+    alphanum_key = lambda key: [convert(c) for c in re.split('([0-9]+)', key)]
+    return sorted(l, key = alphanum_key)
+
+
 ####################
 # image convert
 ####################
@@ -80,10 +87,18 @@ def tensor2img(tensor, out_type=np.uint8, min_max=(0, 1)):
     if n_dim == 4:
         n_img = len(tensor)
         img_np = make_grid(tensor, nrow=int(math.sqrt(n_img)), normalize=False).numpy()
-        img_np = np.transpose(img_np[[2, 1, 0], :, :], (1, 2, 0))  # HWC, BGR
+        if img_np.shape[0] == 3:
+            img_np = img_np[[2, 1, 0], :, :]
+        elif img_np.shape[0] == 4:
+            img_np = img_np[[2, 1, 0, 3], :, :]
+        img_np = np.transpose(img_np, (1, 2, 0))  # HWC, BGR
     elif n_dim == 3:
         img_np = tensor.numpy()
-        img_np = np.transpose(img_np[[2, 1, 0], :, :], (1, 2, 0))  # HWC, BGR
+        if img_np.shape[0] == 3:
+            img_np = img_np[[2, 1, 0], :, :]
+        elif img_np.shape[0] == 4:
+            img_np = img_np[[2, 1, 0, 3], :, :]
+        img_np = np.transpose(img_np, (1, 2, 0))  # HWC, BGR
     elif n_dim == 2:
         img_np = tensor.numpy()
     else:
