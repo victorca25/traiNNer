@@ -7,7 +7,6 @@ import random
 import numpy as np
 from collections import OrderedDict
 import logging
-import glob
 
 import torch
 
@@ -24,24 +23,28 @@ def main():
     opt = option.parse(parser.parse_args().opt, is_train=True)
     opt = option.dict_to_nonedict(opt)  # Convert to NoneDict, which return None for missing key.
 
-    # training from scratch
-    if not opt['path']['resume_state']:
-        resume_state = None
-        util.mkdir_and_rename(opt['path']['experiments_root'])  # rename old folder if exists
-        util.mkdirs((path for key, path in opt['path'].items() if not key == 'experiments_root'
-                     and 'pretrain_model' not in key and 'resume' not in key))
-
     # config loggers. Before it, the log will not work
     util.setup_logger(None, opt['path']['log'], 'train', level=logging.INFO, screen=True)
     util.setup_logger('val', opt['path']['log'], 'val', level=logging.INFO)
     logger = logging.getLogger('base')
-
-    # resume training
+    
+    # train from scratch OR resume training
+    """
+    if opt['path']['resume_state']:  # resuming training
+        resume_state = torch.load(opt['path']['resume_state'])
+    """
     if opt['path']['resume_state']:
         if os.path.isdir(opt['path']['resume_state']):
+            import glob
             opt['path']['resume_state'] = util.sorted_nicely(glob.glob(os.path.normpath(opt['path']['resume_state']) + '/*.state'))[-1]
             logger.info('Set [resume_state] to ' + opt['path']['resume_state'])
-        resume_state = torch.load(opt['path']['resume_state'])
+        resume_state_path = opt['path']['resume_state']
+        resume_state = torch.load(resume_state_path)
+    else:  # training from scratch
+        resume_state = None
+        util.mkdir_and_rename(opt['path']['experiments_root'])  # rename old folder if exists
+        util.mkdirs((path for key, path in opt['path'].items() if not key == 'experiments_root'
+                     and 'pretrain_model' not in key and 'resume' not in key))
 
     if resume_state:
         logger.info('Resuming training from epoch: {}, iter: {}.'.format(
