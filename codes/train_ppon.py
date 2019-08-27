@@ -148,9 +148,6 @@ def main():
                     model.test()
 
                     visuals = model.get_current_visuals()
-                    """
-                    sr_img = util.tensor2img(visuals['SR'])  # uint8
-                    """
                     img_c = util.tensor2img(visuals['img_c'])  # uint8
                     img_s = util.tensor2img(visuals['img_s'])  # uint8
                     img_p = util.tensor2img(visuals['img_p'])  # uint8
