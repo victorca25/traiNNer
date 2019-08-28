@@ -7,6 +7,7 @@ import random
 import numpy as np
 from collections import OrderedDict
 import logging
+import glob
 
 import torch
 
@@ -36,15 +37,8 @@ def main():
     opt = option.dict_to_nonedict(opt)  # Convert to NoneDict, which return None for missing key.
     pytorch_ver = get_pytorch_ver()
     
-    # train from scratch OR resume training
-    if opt['path']['resume_state']:
-        if os.path.isdir(opt['path']['resume_state']):
-            import glob
-            resume_state_path = util.sorted_nicely(glob.glob(os.path.normpath(opt['path']['resume_state']) + '/*.state'))[-1]
-        else:
-            resume_state_path = opt['path']['resume_state']
-        resume_state = torch.load(resume_state_path)
-    else:  # training from scratch
+    # training from scratch
+    if not opt['path']['resume_state']:
         resume_state = None
         util.mkdir_and_rename(opt['path']['experiments_root'])  # rename old folder if exists
         util.mkdirs((path for key, path in opt['path'].items() if not key == 'experiments_root'
@@ -55,8 +49,14 @@ def main():
     util.setup_logger('val', opt['path']['log'], 'val', level=logging.INFO)
     logger = logging.getLogger('base')
     
+    # resume training
+    if opt['path']['resume_state']:
+        if os.path.isdir(opt['path']['resume_state']):
+            opt['path']['resume_state'] = util.sorted_nicely(glob.glob(os.path.normpath(opt['path']['resume_state']) + '/*.state'))[-1]
+            logger.info('Set [resume_state] to ' + opt['path']['resume_state'])
+        resume_state = torch.load(opt['path']['resume_state'])
+
     if resume_state:
-        logger.info('Set [resume_state] to ' + resume_state_path)
         logger.info('Resuming training from epoch: {}, iter: {}.'.format(
             resume_state['epoch'], resume_state['iter']))
         option.check_resume(opt)  # check resume options
@@ -144,7 +144,7 @@ def main():
                 message = '<epoch:{:3d}, iter:{:8,d}, lr:{:.3e}> '.format(
                     epoch, current_step, model.get_current_learning_rate())
                 for k, v in logs.items():
-                    message += '{:s}: {:.4e} '.format(k, v)
+                    message += '{:s}:{: .4e} '.format(k, v)
                     # tensorboard logger
                     if opt['use_tb_logger'] and 'debug' not in opt['name']:
                         tb_logger.add_scalar(k, v, current_step)
@@ -190,12 +190,11 @@ def main():
                     # calculate PSNR
                     crop_size = opt['scale']
                     gt_img = gt_img / 255.
-                    #sr_img = sr_img / 255. #ESRGAN 
+                    cropped_gt_img = gt_img[crop_size:-crop_size, crop_size:-crop_size, :]
                     #PPON
                     #C
                     sr_img_c = img_c / 255.
                     cropped_sr_img_c = sr_img_c[crop_size:-crop_size, crop_size:-crop_size, :]
-                    cropped_gt_img = gt_img[crop_size:-crop_size, crop_size:-crop_size, :]
                     avg_psnr_c += util.calculate_psnr(cropped_sr_img_c * 255, cropped_gt_img * 255)
                     #S
                     sr_img_s = img_s / 255.
