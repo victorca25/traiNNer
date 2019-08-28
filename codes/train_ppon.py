@@ -134,7 +134,9 @@ def main():
             
             # validation
             if current_step % opt['train']['val_freq'] == 0:
-                avg_psnr = 0.0
+                avg_psnr_c = 0.0
+                avg_psnr_s = 0.0
+                avg_psnr_p = 0.0
                 idx = 0
                 for val_data in val_loader:
                     idx += 1
@@ -165,21 +167,37 @@ def main():
                     # calculate PSNR
                     crop_size = opt['scale']
                     gt_img = gt_img / 255.
-                    sr_img = img_c / 255. 
-                    cropped_sr_img = sr_img[crop_size:-crop_size, crop_size:-crop_size, :]
                     cropped_gt_img = gt_img[crop_size:-crop_size, crop_size:-crop_size, :]
-                    avg_psnr += util.calculate_psnr(cropped_sr_img * 255, cropped_gt_img * 255)
+                    #PPON
+                    #C
+                    sr_img_c = img_c / 255.
+                    cropped_sr_img_c = sr_img_c[crop_size:-crop_size, crop_size:-crop_size, :]
+                    avg_psnr_c += util.calculate_psnr(cropped_sr_img_c * 255, cropped_gt_img * 255)
+                    #S
+                    sr_img_s = img_s / 255.
+                    cropped_sr_img_s = sr_img_s[crop_size:-crop_size, crop_size:-crop_size, :]
+                    avg_psnr_s += util.calculate_psnr(cropped_sr_img_s * 255, cropped_gt_img * 255)
+                    #D
+                    sr_img_p = img_p / 255.
+                    cropped_sr_img_p = sr_img_p[crop_size:-crop_size, crop_size:-crop_size, :]
+                    avg_psnr_p += util.calculate_psnr(cropped_sr_img_p * 255, cropped_gt_img * 255)
 
-                avg_psnr = avg_psnr / idx
+                avg_psnr_c = avg_psnr_c / idx
+                avg_psnr_s = avg_psnr_s / idx
+                avg_psnr_p = avg_psnr_p / idx
 
                 # log
-                logger.info('# Validation # PSNR: {:.5g}'.format(avg_psnr))
+                logger.info('# Validation # PSNR_c: {:.5g}'.format(avg_psnr_c))
+                logger.info('# Validation # PSNR_s: {:.5g}'.format(avg_psnr_s))
+                logger.info('# Validation # PSNR_p: {:.5g}'.format(avg_psnr_p))
                 logger_val = logging.getLogger('val')  # validation logger
-                logger_val.info('<epoch:{:3d}, iter:{:8,d}> psnr: {:.5g}'.format(
-                    epoch, current_step, avg_psnr))
+                logger_val.info('<epoch:{:3d}, iter:{:8,d}> psnr_c: {:.5g}, psnr_s: {:.5g}, psnr_p: {:.5g}'.format(
+                    epoch, current_step, avg_psnr_c, avg_psnr_s, avg_psnr_p))
                 # tensorboard logger
                 if opt['use_tb_logger'] and 'debug' not in opt['name']:
-                    tb_logger.add_scalar('psnr', avg_psnr, current_step)
+                    tb_logger.add_scalar('psnr_c', avg_psnr_c, current_step)
+                    tb_logger.add_scalar('psnr_s', avg_psnr_s, current_step)
+                    tb_logger.add_scalar('psnr_p', avg_psnr_p, current_step)
 
 
     logger.info('Saving the final model.')
