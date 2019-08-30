@@ -1,6 +1,6 @@
 import os
 import logging
-from collections import OrderedDict
+from utils.util import OrderedDefaultDict
 
 import torch
 import torch.nn as nn
@@ -54,7 +54,7 @@ class SRModel(BaseModel):
             else:
                 raise NotImplementedError('MultiStepLR learning rate scheme is enough.')
 
-            self.log_dict = OrderedDict()
+            self.log_dict = OrderedDefaultDict()
         # print network
         self.print_network()
 
@@ -63,15 +63,18 @@ class SRModel(BaseModel):
         if need_HR:
             self.real_H = data['HR'].to(self.device)  # HR
 
-    def optimize_parameters(self, step):
+    def optimize_parameters(self, gen, step):
+        self.log_dict.clear()
         self.optimizer_G.zero_grad()
-        self.fake_H = self.netG(self.var_L)
-        l_pix = self.l_pix_w * self.cri_pix(self.fake_H, self.real_H)
-        l_pix.backward()
-        self.optimizer_G.step()
 
-        # set log
-        self.log_dict['l_pix'] = l_pix.item()
+        bm = self.opt['batch_multiplier']
+        for _ in range(bm):
+            self.feed_data(next(gen))
+            self.fake_H = self.netG(self.var_L)
+            l_pix = self.l_pix_w * self.cri_pix(self.fake_H, self.real_H) / bm
+            l_pix.backward()
+            self.log_dict['l_pix'] += l_pix.item()
+        self.optimizer_G.step()
 
     def test(self):
         self.netG.eval()
