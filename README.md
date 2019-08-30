@@ -57,8 +57,12 @@ An image super-resolution toolkit flexible for development. It now provides:
 - Python 3 (Recommend to use [Anaconda](https://www.anaconda.com/download/#linux))
 - [PyTorch >= 0.4.0](https://pytorch.org/)
 - NVIDIA GPU + [CUDA](https://developer.nvidia.com/cuda-downloads)
-- Python packages: `pip install numpy opencv-python lmdb`
-- [option] Python packages: [`pip install tensorboardX`](https://github.com/lanpa/tensorboardX), for visualizing curves.
+- Python packages: `pip install numpy opencv-python`
+
+#### Optional Dependencies
+
+- Python package: [`pip install tensorboardX`](https://github.com/lanpa/tensorboardX), for visualizing curves.
+- Python package: [`pip install lmdb`](https://github.com/jnwatson/py-lmdb), for lmdb database support.
 
 # Codes
 [`./codes`](https://github.com/victorca25/BasicSR/tree/master/codes). We provide a detailed explaination of the **code framework** in [`./codes`](https://github.com/victorca25/BasicSR/tree/master/codes).
