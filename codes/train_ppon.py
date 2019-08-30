@@ -91,6 +91,12 @@ def main():
     # create model
     model = create_model(opt)
 
+    # circumvent pytorch warning
+    # we pass in the iteration count to scheduler.step(), so the warning doesn't apply
+    for scheduler in model.schedulers:
+        if hasattr(scheduler, '_step_count'):
+            scheduler._step_count = 0
+
     # resume training
     if resume_state:
         start_epoch = resume_state['epoch']
