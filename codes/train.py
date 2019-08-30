@@ -16,6 +16,11 @@ from utils import util
 from data import create_dataloader, create_dataset
 from models import create_model
 
+def cycle(dataloader):
+    while True:
+        for x in iter(dataloader):
+            yield x
+
 def main():
     # options
     parser = argparse.ArgumentParser()
@@ -70,14 +75,14 @@ def main():
     for phase, dataset_opt in opt['datasets'].items():
         if phase == 'train':
             train_set = create_dataset(dataset_opt)
-            train_size = int(math.ceil(len(train_set) / dataset_opt['batch_size']))
+            train_loader = create_dataloader(train_set, dataset_opt)
+            train_size = int(len(train_loader) / opt['batch_multiplier'])
             logger.info('Number of train images: {:,d}, iters: {:,d}'.format(
                 len(train_set), train_size))
             total_iters = int(opt['train']['niter'])
             total_epochs = int(math.ceil(total_iters / train_size))
             logger.info('Total epochs needed: {:d} for iters {:,d}'.format(
                 total_epochs, total_iters))
-            train_loader = create_dataloader(train_set, dataset_opt)
         elif phase == 'val':
             val_set = create_dataset(dataset_opt)
             val_loader = create_dataloader(val_set, dataset_opt)
@@ -86,6 +91,7 @@ def main():
         else:
             raise NotImplementedError('Phase [{:s}] is not recognized.'.format(phase))
     assert train_loader is not None
+    train_gen = cycle(train_loader)
 
     # create model
     model = create_model(opt)
@@ -110,7 +116,7 @@ def main():
     logger.info('Start training from epoch: {:d}, iter: {:d}'.format(start_epoch, current_step))
     epoch = start_epoch
     while current_step <= total_iters:
-        for n, train_data in enumerate(train_loader,start=1):
+        for n in range(1, train_size+1):
             current_step += 1
             if current_step > total_iters:
                 break
@@ -118,8 +124,7 @@ def main():
             model.update_learning_rate(current_step-1)
 
             # training
-            model.feed_data(train_data)
-            model.optimize_parameters(current_step)
+            model.optimize_parameters(train_gen, current_step)
 
             # log
             if current_step % opt['logger']['print_freq'] == 0:
@@ -136,7 +141,7 @@ def main():
             # save models and training states (changed to save models before validation)
             if current_step % opt['logger']['save_checkpoint_freq'] == 0:
                 model.save(current_step)
-                model.save_training_state(epoch + (n >= len(train_loader)), current_step)
+                model.save_training_state(epoch + (n >= train_size), current_step)
                 logger.info('Models and training states saved.')
             
             # validation
