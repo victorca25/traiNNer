@@ -251,8 +251,16 @@ class LRHRDataset(data.Dataset):
             
             # Final checks
             # if the resulting HR image size so far is too large or too small, resize HR to the correct size and downscale to generate a new LR on the fly
-            if img_HR.shape[0] < HR_size or img_HR.shape[1] < HR_size or img_HR.shape[0] > HR_size or img_HR.shape[1] > HR_size:
+            if img_HR.shape[0] is not HR_size or img_HR.shape[1] is not HR_size:
                 print("Image: ", HR_path, " size does not match HR size: (", HR_size,"). The image size is: ", img_HR.shape)
+                # rescale HR image to the HR_size 
+                img_HR, _ = augmentations.resize_img(np.copy(img_HR), crop_size=(HR_size,HR_size), algo=cv2.INTER_LINEAR)
+                if self.scale_algos: # if manually provided and scale algorithms are provided, then:
+                    ds_algo = self.scale_algos
+                else:
+                    ## using matlab imresize to generate LR pair
+                    ds_algo = 777
+                img_LR, _ = augmentations.scale_img(img_HR, scale, algo=ds_algo)
             
             # Final checks
             # if the resulting LR so far does not have the correct dimensions, also generate a new HR- LR image pair on the fly
