@@ -1,15 +1,3 @@
-# References
-# https://github.com/zhunzhong07/Random-Erasing/blob/master/transforms.py
-# https://github.com/scikit-image/scikit-image/blob/master/skimage/util/noise.py
-# https://github.com/mdbloice/Augmentor/blob/bbdf0113f76da93ea000e989b0ecfd6ad5d25b0a/Augmentor/Operations.py
-# https://github.com/pytorch/vision/blob/3483342733673c3182bd5f8a4de3723a74ce5845/torchvision/transforms/functional.py#L352
-# https://github.com/qijiezhao/s3d.pytorch/blob/master/transforms.py
-# https://github.com/4uiiurz1/pytorch-ricap/blob/master/train.py
-# https://www.kumilog.net/entry/numpy-data-augmentation
-# https://github.com/QunixZ/Image_Dithering_Implements/blob/master/HW1.py
-# https://docs.opencv.org/3.1.0/d4/d86/group__imgproc__filter.html
-#https://github.com/jrosebr1/imutils
-
 import random
 import argparse
 
@@ -61,8 +49,25 @@ def random_crop(image, crop_size=(224, 224)):
 
         image = image[top:bottom, left:right, :]
     else:
-        image, _ = resize_img(image, crop_size)
+        image, _ = resize_img(image, crop_size, algo=[4])
+    
     return image
+    
+def random_crop_pairs(img_HR, img_LR, HR_size, scale):
+    H, W, C = img_LR.shape
+    
+    LR_size = int(HR_size/scale)
+    
+    # randomly crop
+    rnd_h = random.randint(0, max(0, H - LR_size))
+    rnd_w = random.randint(0, max(0, W - LR_size))
+    #print ("LR rnd: ",rnd_h, rnd_w)
+    img_LR = img_LR[rnd_h:rnd_h + LR_size, rnd_w:rnd_w + LR_size, :]
+    rnd_h_HR, rnd_w_HR = int(rnd_h * scale), int(rnd_w * scale)
+    #print ("HR rnd: ",rnd_h_HR, rnd_w_HR)
+    img_HR = img_HR[rnd_h_HR:rnd_h_HR + HR_size, rnd_w_HR:rnd_w_HR + HR_size, :]
+    
+    return img_HR, img_LR
 
 def cutout(image_origin, mask_size, p=0.5):
     if np.random.rand() > p:
@@ -125,32 +130,59 @@ def random_erasing(image_origin, p=0.5, s=(0.02, 0.4), r=(0.3, 3), modes=[0,1,2]
     return image
 
 # scale image
-def scale_img(img_LR, scale, algo=None):
-    h,w,c = img_LR.shape
+def scale_img(image, scale, algo=None):
+    h,w,c = image.shape
     newdim = (int(w/scale), int(h/scale))
+    
+    # randomly use OpenCV2 algorithms if none are provided
+    if algo is None:
+        scale_algos = [cv2.INTER_NEAREST, cv2.INTER_LINEAR, cv2.INTER_CUBIC, cv2.INTER_AREA, cv2.INTER_LANCZOS4, cv2.INTER_LINEAR_EXACT] #scaling interpolation options
+        interpol = random.choice(scale_algos)
+        resized = cv2.resize(image, newdim, interpolation = interpol)
+    # using matlab imresize
+    else:
+        if isinstance(algo, list):
+            interpol = random.choice(algo)
+        elif isinstance(algo, int):
+            interpol = algo
+        
+    if interpol == 777: #'matlab_bicubic'
+        resized = util.imresize_np(image, 1 / scale, True)
+        # force to 3 channels
+        # if resized.ndim == 2:
+            # resized = np.expand_dims(resized, axis=2)
+    else:
+        # use the provided OpenCV2 algorithms
+        resized = cv2.resize(image, newdim, interpolation = interpol)
+    
+    image = np.clip(resized, 0, 1)
+    return image, interpol
+
+# resize image to a defined size 
+def resize_img(image, crop_size=(128, 128), algo=None):
+    w = crop_size[0]
+    h = crop_size[1]
+    newdim = (w, h)
     
     if algo is None:
         scale_algos = [cv2.INTER_NEAREST, cv2.INTER_LINEAR, cv2.INTER_CUBIC, cv2.INTER_AREA, cv2.INTER_LANCZOS4, cv2.INTER_LINEAR_EXACT] #scaling interpolation options
         interpol = random.choice(scale_algos)
     else:
-        interpol = algo
-    resized = cv2.resize(img_LR, newdim, interpolation = interpol)
+        if isinstance(algo, list):
+            interpol = random.choice(algo)
+        elif isinstance(algo, int):
+            interpol = algo
+            
+    if interpol == 777: #'matlab_bicubic'
+        resized = util.imresize_np(image, 1 / scale, True)
+        # force to 3 channels
+        # if resized.ndim == 2:
+            # resized = np.expand_dims(resized, axis=2)
+    else:
+        # use the provided OpenCV2 algorithms
+        resized = cv2.resize(image, newdim, interpolation = interpol)
     
-    img_LR = np.clip(resized, 0, 1)
-    return img_LR, interpol
-
-# resize image to a defined size 
-def resize_img(img_LR, crop_size=(128, 128)):
-    w = crop_size[0]
-    h = crop_size[1]
-    newdim = (w, h)
-    
-    scale_algos = [cv2.INTER_NEAREST, cv2.INTER_LINEAR, cv2.INTER_CUBIC, cv2.INTER_AREA, cv2.INTER_LANCZOS4, cv2.INTER_LINEAR_EXACT] #scaling interpolation options
-    interpol = random.choice(scale_algos)
-     
-    img_LR = cv2.resize(img_LR, newdim, interpolation = interpol)
-    
-    return img_LR, interpol
+    return resized, interpol
 
 def random_resize_img(img_LR, crop_size=(128, 128), new_scale=0, algo=None):
     mu, sigma = 0, 0.3
@@ -160,7 +192,13 @@ def random_resize_img(img_LR, crop_size=(128, 128), new_scale=0, algo=None):
     else:
         scale = new_scale
     
-    img_LR, interpol = scale_img(img_LR, scale, algo) 
+    if algo is None:
+        scale_algos = [cv2.INTER_NEAREST, cv2.INTER_LINEAR, cv2.INTER_CUBIC, cv2.INTER_AREA, cv2.INTER_LANCZOS4, cv2.INTER_LINEAR_EXACT] #scaling interpolation options
+        interpol = random.choice(scale_algos)
+    else:
+        interpol = random.choice(algo)
+    
+    img_LR, interpol = scale_img(img_LR, scale, interpol) 
     img_LR = random_crop(img_LR, crop_size)
     
     return img_LR, interpol
@@ -171,19 +209,32 @@ def rotate(image, angle, center=None, scale=1.0):
         center = (w // 2, h // 2)
     M = cv2.getRotationMatrix2D(center, angle, scale)
     rotated = cv2.warpAffine(image, M, (w, h))
+    
     return rotated
 
-def random_rotate(img_LR, angle=0, center=None, scale=1.0):    
+def random_rotate(image, angle=0, center=None, scale=1.0):    
     if angle == 0:
         angle = int(np.random.uniform(-45, 45))
     
-    h,w,c = img_LR.shape
-    img_LR, _ = scale_img(img_LR, 1/4, cv2.INTER_LANCZOS4) #upscaling 4x like HD Mode7 to reduce jaggy lines after rotating, more accurate underlying "sub-pixel" data 
+    h,w,c = image.shape
+    image, _ = scale_img(image, 1/2, cv2.INTER_LANCZOS4) #upscaling 2x like HD Mode7 to reduce jaggy lines after rotating, more accurate underlying "sub-pixel" data 
+    
+    image = rotate(image, angle) #will change image shape 
+    image = random_crop(image, crop_size=(w, h)) #crop back to the original size
+    return image, angle 
+
+def random_rotate_pairs(img_HR, img_LR, HR_size, scale, angle=0, center=0):
+    if angle == 0:
+        angle = int(np.random.uniform(-45, 45))
+    
+    img_HR, _ = scale_img(img_HR, 1/2, cv2.INTER_CUBIC) #upscaling 2x like HD Mode7 to reduce jaggy lines after rotating, more accurate underlying "sub-pixel" data. cv2.INTER_LANCZOS4?
+    img_HR = rotate(img_HR, angle) #will change image shape 
+    
+    img_LR, _ = scale_img(img_LR, 1/2, cv2.INTER_CUBIC) #upscaling 2x like HD Mode7 to reduce jaggy lines after rotating, more accurate underlying "sub-pixel" data cv2.INTER_LANCZOS4?
     img_LR = rotate(img_LR, angle) #will change image shape 
-    # img_LR = rotate_bound(img_LR, angle) #will not change image shape 
-    img_LR, _ = scale_img(img_LR, 3, cv2.INTER_LANCZOS4) #reducing scale. Using 3x to reduce chance of blank spaces in the corners
-    img_LR = random_crop(img_LR, crop_size=(h, w)) #crop back to the original size
-    return img_LR, angle 
+    
+    img_HR, img_LR = random_crop_pairs(img_HR, img_LR, HR_size, scale) #crop back to the original size
+    return img_HR, img_LR
 
 def blur_img(img_LR, blur_algos=['clean'], kernel_size = 0):
     h,w,c = img_LR.shape
