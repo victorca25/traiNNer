@@ -3,6 +3,7 @@
   , "use_tb_logger": false
   , "model": "sftgan"
   , "scale": 4
+  , "batch_multiplier": 1
   , "gpu_ids": [0]
 
   , "datasets": {
