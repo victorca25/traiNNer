@@ -187,7 +187,7 @@ class SRGANModel(BaseModel):
         return self.log_dict
 
     def get_current_visuals(self, need_HR=True):
-        out_dict = OrderedDict()
+        out_dict = {}
         out_dict['LR'] = self.var_L.detach()[0].float().cpu()
         out_dict['SR'] = self.fake_H.detach()[0].float().cpu()
         if need_HR:
