@@ -15,24 +15,18 @@ from utils import util
 from data import create_dataloader, create_dataset
 from models import create_model
 
-def get_pytorch_ver():
-    #print(torch.__version__)
-    pytorch_ver = torch.__version__
-    if pytorch_ver == "0.4.0":
-        return "pre"
-    elif pytorch_ver == "0.4.1":
-        return "pre"
-    elif pytorch_ver == "1.0.0":
-        return "pre"
-    else: #"1.1.0", "1.1.1", "1.2.0", "1.2.1" and beyond
-        
+
+def cycle(dataloader):
+    while True:
+        for x in iter(dataloader):
+            yield x
+
 def main():
     # options
     parser = argparse.ArgumentParser()
     parser.add_argument('-opt', type=str, required=True, help='Path to option JSON file.')
     opt = option.parse(parser.parse_args().opt, is_train=True)
     opt = option.dict_to_nonedict(opt)  # Convert to NoneDict, which return None for missing key.
-    pytorch_ver = get_pytorch_ver()
     
     # train from scratch OR resume training
     if opt['path']['resume_state']:
@@ -81,14 +75,14 @@ def main():
     for phase, dataset_opt in opt['datasets'].items():
         if phase == 'train':
             train_set = create_dataset(dataset_opt)
-            train_size = int(math.ceil(len(train_set) / dataset_opt['batch_size']))
+            train_loader = create_dataloader(train_set, dataset_opt)
+            train_size = int(len(train_loader) / opt['batch_multiplier'])
             logger.info('Number of train images: {:,d}, iters: {:,d}'.format(
                 len(train_set), train_size))
             total_iters = int(opt['train']['niter'])
             total_epochs = int(math.ceil(total_iters / train_size))
             logger.info('Total epochs needed: {:d} for iters {:,d}'.format(
                 total_epochs, total_iters))
-            train_loader = create_dataloader(train_set, dataset_opt)
         elif phase == 'val':
             val_set = create_dataset(dataset_opt)
             val_loader = create_dataloader(val_set, dataset_opt)
@@ -97,9 +91,16 @@ def main():
         else:
             raise NotImplementedError('Phase [{:s}] is not recognized.'.format(phase))
     assert train_loader is not None
+    train_gen = cycle(train_loader)
 
     # create model
     model = create_model(opt)
+
+    # circumvent pytorch warning
+    # we pass in the iteration count to scheduler.step(), so the warning doesn't apply
+    for scheduler in model.schedulers:
+        if hasattr(scheduler, '_step_count'):
+            scheduler._step_count = 0
 
     # resume training
     if resume_state:
@@ -113,27 +114,17 @@ def main():
 
     # training
     logger.info('Start training from epoch: {:d}, iter: {:d}'.format(start_epoch, current_step))
-    for epoch in range(start_epoch, total_epochs):
-        for n, train_data in enumerate(train_loader, 1):
+    epoch = start_epoch
+    while current_step <= total_iters:
+        for n in range(1, train_size+1):
             current_step += 1
             if current_step > total_iters:
                 break
-            
-            if pytorch_ver=="pre": #Order for PyTorch ver < 1.1.0
-                # update learning rate
-                model.update_learning_rate(current_step-1)
-                # training
-                model.feed_data(train_data)
-                model.optimize_parameters(current_step)
-            elif pytorch_ver=="post": #Order for PyTorch ver > 1.1.0
-                # training
-                model.feed_data(train_data)
-                model.optimize_parameters(current_step)
-                # update learning rate
-                model.update_learning_rate(current_step-1)
-            else:
-                print('Error identifying PyTorch version. ', torch.__version__)
-                break
+            # update learning rate
+            model.update_learning_rate(current_step-1)
+
+            # training
+            model.optimize_parameters(train_gen, current_step)
 
             # log
             if current_step % opt['logger']['print_freq'] == 0:
@@ -150,7 +141,7 @@ def main():
             # save models and training states (changed to save models before validation)
             if current_step % opt['logger']['save_checkpoint_freq'] == 0:
                 model.save(current_step)
-                model.save_training_state(epoch + (n >= len(train_loader)), current_step)
+                model.save_training_state(epoch + (n >= train_size), current_step)
                 logger.info('Models and training states saved.')
             
             # validation
@@ -193,6 +184,7 @@ def main():
                 # tensorboard logger
                 if opt['use_tb_logger'] and 'debug' not in opt['name']:
                     tb_logger.add_scalar('psnr', avg_psnr, current_step)
+        epoch += 1
 
     logger.info('Saving the final model.')
     model.save('latest')
