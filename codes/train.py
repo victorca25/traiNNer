@@ -25,7 +25,8 @@ def get_pytorch_ver():
     elif pytorch_ver == "1.0.0":
         return "pre"
     else: #"1.1.0", "1.1.1", "1.2.0", "1.2.1" and beyond
-        
+        return "post"
+
 def main():
     # options
     parser = argparse.ArgumentParser()
