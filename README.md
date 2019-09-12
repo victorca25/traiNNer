@@ -52,7 +52,7 @@
 more details can be found in the examples of official [tutorials](https://pytorch.org/tutorials/beginner/transfer_learning_tutorial.html).
 
 # Good News:
-You can install this package via pip install opencv-torchvision-transforms-yuzhiyang
+You can install this package via pip install opencv-torchvision-transforms-yuzhiyang (old version)
  
 # Attention: 
 The multiprocessing used in dataloader of pytorch is not friendly with lambda function in Windows as lambda function can't be pickled (https://docs.python.org/3/library/pickle.html#what-can-be-pickled-and-unpickled).
