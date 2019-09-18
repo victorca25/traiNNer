@@ -73,6 +73,4 @@ opencv-contrib-python-3.4.2 (test with this version, but any version of opencv3 
 # Postscript
 Welcome to point out and help to fix bugs !
 
-Watches, Stars and Forks won’t be rejected :smile:
-
 Thanks [HongChu](https://github.com/hongchu098) who helps a lot.
