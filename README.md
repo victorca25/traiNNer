@@ -9,12 +9,11 @@
     ignored.
    
    2) The affine transform in the original one only has 5 degrees of freedom, I implement an Affine transform with 6
-    degress of freedom called `RandomAffine6` (can be found in [master/cvtorchvision/cvtransforms/cvtransforms.py](cvtorchvision/cvtransforms/cvtransforms.py)). The
+    degress of freedom called `RandomAffine6` (can be found in [cvtransforms.py](cvtorchvision/cvtransforms/cvtransforms.py)). The
      original method `RandomAffine` is still retained and reimplemented with opencv.
    3) My rotate function is clockwise, however the original one is  anticlockwise.
    4) Adding some new methods which can be found in **Support** (the bolded ones).
-   4) **All the outputs of the opencv version are almost the same as the original one's (test in [cvtorchvision
-   /cvtransforms/cvfunctional.py](opencv_transforms_torchvision/blob/master/cvtorchvision/cvtransforms/cvfunctional.py#L892-L906))**.
+   4) **All the outputs of the opencv version are almost the same as the original one's (test in [cvfunctional.py](/cvtorchvision/cvtransforms/cvfunctional.py#L892-L906))**.
 ## Support:
 * `Compose`, `ToTensor`, `ToCVImage`, `Normalize`
 
@@ -61,7 +60,7 @@ You can install this package via `pip install opencv-torchvision-transforms-yuzh
 # Attention: 
 The multiprocessing used in dataloader of pytorch is not friendly with lambda function in Windows as lambda function can't be pickled (https://docs.python.org/3/library/pickle.html#what-can-be-pickled-and-unpickled).
 
-So the Lambda in cvtransform.py may not work properly in Windows.
+So the Lambda in [cvtransforms.py](cvtorchvision/cvtransforms/cvtransforms.py) may not work properly in Windows.
 
 # Requirements
 python >=3.5.2
@@ -75,6 +74,6 @@ torchvision>=0.2.1
 opencv-contrib-python-3.4.2 (test with this version, but any version of opencv3 is ok, I think)
 
 # Postscript
-Welcome to point out and help to fix bugs!
+Welcome to point out and help fixing bugs!
 
 Thanks [HongChu](https://github.com/hongchu098) who helps a lot.
