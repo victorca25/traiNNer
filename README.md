@@ -5,36 +5,39 @@
 
 3) Most functions in transforms are reimplemented, except that:
 
-   1) ToPILImage(opencv we used :)), Scale and RandomSizedCrop which are deprecated in the original version are ignored.
+   1) ToPILImage (opencv we used :)), Scale and RandomSizedCrop which are deprecated in the original version are
+    ignored.
    
-   2) The affine transform in the original one only has 5 degrees of freedom, I implement an Affine transform with 6 degress of freedom called RandomAffine6(can be found in master/cvtorchvision/cvtransforms/cvtransforms.py). The original method(RandomAffine) is still retained and reimplemented with opencv.
+   2) The affine transform in the original one only has 5 degrees of freedom, I implement an Affine transform with 6
+    degress of freedom called `RandomAffine6` (can be found in [cvtransforms.py](cvtorchvision/cvtransforms/cvtransforms.py)). The
+     original method `RandomAffine` is still retained and reimplemented with opencv.
    3) My rotate function is clockwise, however the original one is  anticlockwise.
-   4) Adding some new methods which can be found in **Support**(the bolded ones).
-   4) **All the outputs of the opencv version are almost the same as the original one's(test in master/cvtorchvision/cvtransforms/cvfunctional.py:  if __name__ == '__main__':...)**.
+   4) Adding some new methods which can be found in **Support** (the bolded ones).
+   4) **All the outputs of the opencv version are almost the same as the original one's (test in [cvfunctional.py](/cvtorchvision/cvtransforms/cvfunctional.py#L892-L906))**.
 ## Support:
-* Compose, ToTensor, ToCVImage, Normalize
+* `Compose`, `ToTensor`, `ToCVImage`, `Normalize`
 
-* Resize, CenterCrop, Pad
+* `Resize`, `CenterCrop`, `Pad`
 
-* Lambda(doesn't work well in multiprocess in wihdows)
+* `Lambda` (doesn't work well in multiprocess in Windows)
 
-* RandomApply, RandomOrder, RandomChoice, RandomCrop,
+* `RandomApply`, `RandomOrder`, `RandomChoice`, `RandomCrop`,
 
-* RandomHorizontalFlip, RandomVerticalFlip, RandomResizedCrop,
+* `RandomHorizontalFlip`, `RandomVerticalFlip`, `RandomResizedCrop`,
 
-* FiveCrop, TenCrop, LinearTransformation, ColorJitter,
+* `FiveCrop`, `TenCrop`, `LinearTransformation`, `ColorJitter`,
 
-* RandomRotation, RandomAffine, **RandomAffine6**, **RandomPerspective**
+* `RandomRotation`, `RandomAffine`, **RandomAffine6**, **RandomPerspective**
 
-* **RandomGaussianNoise"**, **"RandomPoissonNoise"**, **"RandomSPNoise**
+* **RandomGaussianNoise**, **RandomPoissonNoise**, **RandomSPNoise**
 
-* Grayscale, RandomGrayscale
+* `Grayscale`, `RandomGrayscale`
 # How to use:
 1) git clone https://github.com/YU-Zhiyang/opencv_torchvision_transforms.git .
 
-2) Add cvtorchvision to your python path.
+2) Add `cvtorchvision` to your python path.
 
-3) Add "from cvtorchvision import cvtransforms" in your pythion file.
+3) Add `from cvtorchvision import cvtransforms` in your python file.
 
 4) You can use all functions as the original version, for example:
 
@@ -52,12 +55,12 @@
 more details can be found in the examples of official [tutorials](https://pytorch.org/tutorials/beginner/transfer_learning_tutorial.html).
 
 # Good News:
-You can install this package via pip install opencv-torchvision-transforms-yuzhiyang (Old version only)
+You can install this package via `pip install opencv-torchvision-transforms-yuzhiyang` (Old version only)
  
 # Attention: 
 The multiprocessing used in dataloader of pytorch is not friendly with lambda function in Windows as lambda function can't be pickled (https://docs.python.org/3/library/pickle.html#what-can-be-pickled-and-unpickled).
 
-So the Lambda in cvtransform.py may not work properly in Windows.
+So the Lambda in [cvtransforms.py](cvtorchvision/cvtransforms/cvtransforms.py) may not work properly in Windows.
 
 # Requirements
 python >=3.5.2
@@ -71,6 +74,6 @@ torchvision>=0.2.1
 opencv-contrib-python-3.4.2 (test with this version, but any version of opencv3 is ok, I think)
 
 # Postscript
-Welcome to point out and help to fix bugs !
+Welcome to point out and help fixing bugs!
 
 Thanks [HongChu](https://github.com/hongchu098) who helps a lot.
