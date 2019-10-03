@@ -27,9 +27,9 @@
 
 * `FiveCrop`, `TenCrop`, `LinearTransformation`, `ColorJitter`,
 
-* `RandomRotation`, `RandomAffine`, **RandomAffine6**, **RandomPerspective**
+* `RandomRotation`, `RandomAffine`, `**RandomAffine6**`, `**RandomPerspective**`
 
-* **RandomGaussianNoise**, **RandomPoissonNoise**, **RandomSPNoise**
+* `**RandomGaussianNoise**`, `**RandomPoissonNoise**`, `**RandomSPNoise**`
 
 * `Grayscale`, `RandomGrayscale`
 # How to use:
