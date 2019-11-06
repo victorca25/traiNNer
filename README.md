@@ -344,3 +344,10 @@ If you have any questions, we have a [discord server](https://discord.gg/SxvYsgE
         booktitle={arXiv:1907.10399v1},
         year={2019}
     }
+    @InProceedings{Liu2019abpn,
+        author = {Liu, Zhi-Song and Wang, Li-Wen and Li, Chu-Tak and Siu, Wan-Chi},
+        title = {Image Super-Resolution via Attention based Back Projection Networks},
+        booktitle = {IEEE International Conference on Computer Vision Workshop(ICCVW)},
+        month = {October},
+        year = {2019}
+    }
