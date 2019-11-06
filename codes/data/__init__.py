@@ -2,7 +2,6 @@
 import logging
 import torch.utils.data
 
-
 def create_dataloader(dataset, dataset_opt):
     '''create dataloader '''
     phase = dataset_opt['phase']
@@ -37,3 +36,4 @@ def create_dataset(dataset_opt):
     logger.info('Dataset [{:s} - {:s}] is created.'.format(dataset.__class__.__name__,
                                                            dataset_opt['name']))
     return dataset
+

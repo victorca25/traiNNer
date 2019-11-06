@@ -24,15 +24,37 @@ def parse(opt_path, is_train=True):
         dataset['scale'] = scale
         is_lmdb = False
         if 'dataroot_HR' in dataset and dataset['dataroot_HR'] is not None:
-            dataset['dataroot_HR'] = os.path.expanduser(dataset['dataroot_HR'])
-            if dataset['dataroot_HR'].endswith('lmdb'):
-                is_lmdb = True
+            HR_images_paths = dataset['dataroot_HR']        
+            if type(HR_images_paths) is list:
+                dataset['dataroot_HR'] = []
+                for path in HR_images_paths:
+                    dataset['dataroot_HR'].append(os.path.expanduser(path))
+                    # if dataset['dataroot_HR'].endswith('lmdb'): #missing, how to check for lmdb with a list?
+                        # is_lmdb = True
+            elif type(HR_images_paths) is str:
+                dataset['dataroot_HR'] = os.path.expanduser(HR_images_paths)
+                if dataset['dataroot_HR'].endswith('lmdb'):
+                    is_lmdb = True
         if 'dataroot_HR_bg' in dataset and dataset['dataroot_HR_bg'] is not None:
-            dataset['dataroot_HR_bg'] = os.path.expanduser(dataset['dataroot_HR_bg'])
+            HR_images_paths = dataset['dataroot_HR_bg']        
+            if type(HR_images_paths) is list:
+                dataset['dataroot_HR_bg'] = []
+                for path in HR_images_paths:
+                    dataset['dataroot_HR_bg'].append(os.path.expanduser(path))
+            elif type(HR_images_paths) is str:
+                dataset['dataroot_HR_bg'] = os.path.expanduser(HR_images_paths)
         if 'dataroot_LR' in dataset and dataset['dataroot_LR'] is not None:
-            dataset['dataroot_LR'] = os.path.expanduser(dataset['dataroot_LR'])
-            if dataset['dataroot_LR'].endswith('lmdb'):
-                is_lmdb = True
+            LR_images_paths = dataset['dataroot_LR']        
+            if type(LR_images_paths) is list:
+                dataset['dataroot_LR'] = []
+                for path in LR_images_paths:
+                    dataset['dataroot_LR'].append(os.path.expanduser(path))
+                    # if dataset['dataroot_HR'].endswith('lmdb'): #missing, how to check for lmdb with a list?
+                        # is_lmdb = True
+            elif type(LR_images_paths) is str:
+                dataset['dataroot_LR'] = os.path.expanduser(LR_images_paths)
+                if dataset['dataroot_LR'].endswith('lmdb'):
+                    is_lmdb = True
         dataset['data_type'] = 'lmdb' if is_lmdb else 'img'
 
         if phase == 'train' and 'subset_file' in dataset and dataset['subset_file'] is not None:

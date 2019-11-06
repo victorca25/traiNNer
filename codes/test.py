@@ -25,11 +25,15 @@ def main():
     logger.info(option.dict2str(opt))
     # Create test dataset and dataloader
     test_loaders = []
+    znorm = False
     for phase, dataset_opt in sorted(opt['datasets'].items()):
         test_set = create_dataset(dataset_opt)
         test_loader = create_dataloader(test_set, dataset_opt)
         logger.info('Number of test images in [{:s}]: {:d}'.format(dataset_opt['name'], len(test_set)))
         test_loaders.append(test_loader)
+        # Temporary, will turn znorm on for all the datasets. Will need to introduce a variable for each dataset and differentiate each one later in the loop.
+        if dataset_opt['znorm'] and znorm == False: 
+            znorm = True
 
     # Create model
     model = create_model(opt)
@@ -57,8 +61,11 @@ def main():
             model.test()  # test
             visuals = model.get_current_visuals(need_HR=need_HR)
 
-            sr_img = util.tensor2img(visuals['SR'])  # uint8
-
+            if znorm: #opt['datasets']['train']['znorm']: # If the image range is [-1,1] # In testing, each "dataset" can have a different name (not train, val or other)
+                sr_img = util.tensor2img(visuals['SR'],min_max=(-1, 1))  # uint8
+            else: # Default: Image range is [0,1]
+                sr_img = util.tensor2img(visuals['SR'])  # uint8
+            
             # save images
             suffix = opt['suffix']
             if suffix:
@@ -69,7 +76,10 @@ def main():
 
             # calculate PSNR and SSIM
             if need_HR:
-                gt_img = util.tensor2img(visuals['HR'])
+                if znorm: #opt['datasets']['train']['znorm']: # If the image range is [-1,1] # In testing, each "dataset" can have a different name (not train, val or other)
+                    gt_img = util.tensor2img(visuals['HR'],min_max=(-1, 1))  # uint8
+                else: # Default: Image range is [0,1]
+                    gt_img = util.tensor2img(visuals['HR']) # uint8
                 gt_img = gt_img / 255.
                 sr_img = sr_img / 255.
 

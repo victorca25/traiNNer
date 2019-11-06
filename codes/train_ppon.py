@@ -14,7 +14,7 @@ import options.options as option
 from utils import util
 from data import create_dataloader, create_dataset
 from models import create_model
-
+from models.modules.LPIPS import compute_dists as lpips
 
 def get_pytorch_ver():
     #print(torch.__version__)
@@ -161,7 +161,15 @@ def main():
                 avg_psnr_c = 0.0
                 avg_psnr_s = 0.0
                 avg_psnr_p = 0.0
+                
+                avg_ssim_c = 0.0
+                avg_ssim_s = 0.0
+                avg_ssim_p = 0.0
+                
                 idx = 0
+                
+                val_sr_imgs_list = []
+                val_gt_imgs_list = []
                 for val_data in val_loader:
                     idx += 1
                     img_name = os.path.splitext(os.path.basename(val_data['LR_path'][0]))[0]
@@ -172,11 +180,16 @@ def main():
                     model.test()
 
                     visuals = model.get_current_visuals()
-                    img_c = util.tensor2img(visuals['img_c'])  # uint8
-                    img_s = util.tensor2img(visuals['img_s'])  # uint8
-                    img_p = util.tensor2img(visuals['img_p'])  # uint8
-                    
-                    gt_img = util.tensor2img(visuals['HR'])  # uint8
+                    if opt['datasets']['train']['znorm']: # If the image range is [-1,1]
+                        img_c = util.tensor2img(visuals['img_c'],min_max=(-1, 1))  # uint8
+                        img_s = util.tensor2img(visuals['img_s'],min_max=(-1, 1))  # uint8
+                        img_p = util.tensor2img(visuals['img_p'],min_max=(-1, 1))  # uint8                        
+                        gt_img = util.tensor2img(visuals['HR'],min_max=(-1, 1))  # uint8
+                    else: # Default: Image range is [0,1]
+                        img_c = util.tensor2img(visuals['img_c'])  # uint8
+                        img_s = util.tensor2img(visuals['img_s'])  # uint8
+                        img_p = util.tensor2img(visuals['img_p'])  # uint8                        
+                        gt_img = util.tensor2img(visuals['HR'])  # uint8
 
                     # Save SR images for reference
                     save_c_img_path = os.path.join(img_dir, '{:s}_{:d}_c.png'.format(img_name, current_step))
@@ -187,43 +200,90 @@ def main():
                     util.save_img(img_s, save_s_img_path)
                     util.save_img(img_p, save_p_img_path)
 
-                    # calculate PSNR
+                    # calculate PSNR, SSIM and LPIPS distance
                     crop_size = opt['scale']
                     gt_img = gt_img / 255.
                     #sr_img = sr_img / 255. #ESRGAN 
                     #PPON
-                    #C
-                    sr_img_c = img_c / 255.
-                    cropped_sr_img_c = sr_img_c[crop_size:-crop_size, crop_size:-crop_size, :]
-                    cropped_gt_img = gt_img[crop_size:-crop_size, crop_size:-crop_size, :]
-                    avg_psnr_c += util.calculate_psnr(cropped_sr_img_c * 255, cropped_gt_img * 255)
-                    #S
-                    sr_img_s = img_s / 255.
-                    cropped_sr_img_s = sr_img_s[crop_size:-crop_size, crop_size:-crop_size, :]
-                    avg_psnr_s += util.calculate_psnr(cropped_sr_img_s * 255, cropped_gt_img * 255)
-                    #D
-                    sr_img_p = img_p / 255.
-                    cropped_sr_img_p = sr_img_p[crop_size:-crop_size, crop_size:-crop_size, :]
-                    avg_psnr_p += util.calculate_psnr(cropped_sr_img_p * 255, cropped_gt_img * 255)
                     
-
+                    sr_img_c = img_c / 255. #C
+                    sr_img_s = img_s / 255. #S
+                    sr_img_p = img_p / 255. #D
+                    
+                    # For training models with only one channel ndim==2, if RGB ndim==3, etc.
+                    if gt_img.ndim == 2:
+                        cropped_gt_img = gt_img[crop_size:-crop_size, crop_size:-crop_size]
+                    else: # gt_img.ndim == 3, # Default: RGB images
+                        cropped_gt_img = gt_img[crop_size:-crop_size, crop_size:-crop_size, :]
+                    # All 3 output images will have the same dimensions
+                    if sr_img_c.ndim == 2:
+                        cropped_sr_img_c = sr_img_c[crop_size:-crop_size, crop_size:-crop_size]
+                        cropped_sr_img_s = sr_img_s[crop_size:-crop_size, crop_size:-crop_size]
+                        cropped_sr_img_p = sr_img_p[crop_size:-crop_size, crop_size:-crop_size]
+                    else: #sr_img_c.ndim == 3, # Default: RGB images
+                        cropped_sr_img_c = sr_img_c[crop_size:-crop_size, crop_size:-crop_size, :]
+                        cropped_sr_img_s = sr_img_s[crop_size:-crop_size, crop_size:-crop_size, :]
+                        cropped_sr_img_p = sr_img_p[crop_size:-crop_size, crop_size:-crop_size, :]
+                    
+                    avg_psnr_c += util.calculate_psnr(cropped_sr_img_c * 255, cropped_gt_img * 255)
+                    avg_ssim_c += util.calculate_ssim(cropped_sr_img_c * 255, cropped_gt_img * 255)
+                    
+                    avg_psnr_s += util.calculate_psnr(cropped_sr_img_s * 255, cropped_gt_img * 255)
+                    avg_ssim_s += util.calculate_ssim(cropped_sr_img_s * 255, cropped_gt_img * 255)
+                    
+                    avg_psnr_p += util.calculate_psnr(cropped_sr_img_p * 255, cropped_gt_img * 255)
+                    avg_ssim_p += util.calculate_ssim(cropped_sr_img_p * 255, cropped_gt_img * 255)
+                    
+                    # LPIPS only works for RGB images
+                    # Using only the final perceptual image to calulate LPIPS
+                    if sr_img_c.ndim == 3:
+                        #avg_lpips += lpips.calculate_lpips([cropped_sr_img], [cropped_gt_img]) # If calculating for each image
+                        val_gt_imgs_list.append(cropped_gt_img) # If calculating LPIPS only once for all images
+                        val_sr_imgs_list.append(cropped_sr_img_p) # If calculating LPIPS only once for all images
+                
+                # PSNR
                 avg_psnr_c = avg_psnr_c / idx
                 avg_psnr_s = avg_psnr_s / idx
                 avg_psnr_p = avg_psnr_p / idx
+                # SSIM
+                avg_ssim_c = avg_ssim_c / idx
+                avg_ssim_s = avg_ssim_s / idx
+                avg_ssim_p = avg_ssim_p / idx
+                # LPIPS
+                #avg_lpips = avg_lpips / idx # If calculating for each image
+                avg_lpips = lpips.calculate_lpips(val_sr_imgs_list,val_gt_imgs_list) # If calculating only once for all images
 
                 # log
+                # PSNR
                 logger.info('# Validation # PSNR_c: {:.5g}'.format(avg_psnr_c))
                 logger.info('# Validation # PSNR_s: {:.5g}'.format(avg_psnr_s))
                 logger.info('# Validation # PSNR_p: {:.5g}'.format(avg_psnr_p))
+                # SSIM
+                logger.info('# Validation # SSIM_c: {:.5g}'.format(avg_ssim_c))
+                logger.info('# Validation # SSIM_s: {:.5g}'.format(avg_ssim_s))
+                logger.info('# Validation # SSIM_p: {:.5g}'.format(avg_ssim_p))
+                # LPIPS 
+                logger.info('# Validation # LPIPS: {:.5g}'.format(avg_lpips))
+                
                 logger_val = logging.getLogger('val')  # validation logger
-                logger_val.info('<epoch:{:3d}, iter:{:8,d}> psnr_c: {:.5g}, psnr_s: {:.5g}, psnr_p: {:.5g}'.format(
-                    epoch, current_step, avg_psnr_c, avg_psnr_s, avg_psnr_p))
+                # logger_val.info('<epoch:{:3d}, iter:{:8,d}> psnr_c: {:.5g}, psnr_s: {:.5g}, psnr_p: {:.5g}'.format(
+                    # epoch, current_step, avg_psnr_c, avg_psnr_s, avg_psnr_p))
+                logger_val.info('<epoch:{:3d}, iter:{:8,d}>'.format(
+                    epoch, current_step))
+                logger_val.info('psnr_c: {:.5g}, psnr_s: {:.5g}, psnr_p: {:.5g}'.format(
+                    avg_psnr_c, avg_psnr_s, avg_psnr_p))
+                logger_val.info('ssim_c: {:.5g}, ssim_s: {:.5g}, ssim_p: {:.5g}'.format(
+                    avg_ssim_c, avg_ssim_s, avg_ssim_p))
+                logger_val.info('lpips: {:.5g}'.format(avg_lpips))
                 # tensorboard logger
                 if opt['use_tb_logger'] and 'debug' not in opt['name']:
                     tb_logger.add_scalar('psnr_c', avg_psnr_c, current_step)
                     tb_logger.add_scalar('psnr_s', avg_psnr_s, current_step)
                     tb_logger.add_scalar('psnr_p', avg_psnr_p, current_step)
-
+                    tb_logger.add_scalar('ssim_c', avg_ssim_c, current_step)
+                    tb_logger.add_scalar('ssim_s', avg_ssim_s, current_step)
+                    tb_logger.add_scalar('ssim_p', avg_ssim_p, current_step)
+                    tb_logger.add_scalar('lpips', avg_lpips, current_step)
 
     logger.info('Saving the final model.')
     model.save('latest')

@@ -12,6 +12,7 @@ class LRDataset(data.Dataset):
         self.opt = opt
         self.paths_LR = None
         self.LR_env = None  # environment for lmdb
+        self.znorm = False
 
         # read image list from lmdb or image files
         self.LR_env, self.paths_LR = util.get_image_paths(opt['data_type'], opt['dataroot_LR'])
@@ -19,10 +20,14 @@ class LRDataset(data.Dataset):
 
     def __getitem__(self, index):
         LR_path = None
+        if self.opt['znorm']:
+            if self.opt['znorm'] == True:
+                self.znorm = True # Alternative: images are z-normalized to the [-1,1] range
 
         # get LR image
         LR_path = self.paths_LR[index]
-        img_LR = util.read_img(self.LR_env, LR_path)
+        #img_LR = util.read_img(self.LR_env, LR_path)
+        img_LR = util.read_img(self.LR_env, LR_path, znorm=self.znorm)
         H, W, C = img_LR.shape
 
         # change color space if necessary

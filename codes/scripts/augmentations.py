@@ -146,17 +146,17 @@ def scale_img(image, scale, algo=None):
         elif isinstance(algo, int):
             interpol = algo
         
-    if interpol == 777: #'matlab_bicubic'
-        resized = util.imresize_np(image, 1 / scale, True)
-        # force to 3 channels
-        # if resized.ndim == 2:
-            # resized = np.expand_dims(resized, axis=2)
-    else:
-        # use the provided OpenCV2 algorithms
-        resized = cv2.resize(image, newdim, interpolation = interpol)
+        if interpol == 777: #'matlab_bicubic'
+            resized = util.imresize_np(image, 1 / scale, True)
+            # force to 3 channels
+            # if resized.ndim == 2:
+                # resized = np.expand_dims(resized, axis=2)
+        else:
+            # use the provided OpenCV2 algorithms
+            resized = cv2.resize(image, newdim, interpolation = interpol)
     
-    image = np.clip(resized, 0, 1)
-    return image, interpol
+    #resized = np.clip(resized, 0, 1)
+    return resized, interpol
 
 # resize image to a defined size 
 def resize_img(image, crop_size=(128, 128), algo=None):
@@ -203,13 +203,44 @@ def random_resize_img(img_LR, crop_size=(128, 128), new_scale=0, algo=None):
     
     return img_LR, interpol
 
-def rotate(image, angle, center=None, scale=1.0):
-    (h, w) = image.shape[:2]
+def rotate(image, angle, center=None, scale=1.0, border_value=0, auto_bound=False):
+    """Rotate an image.
+    Args:
+        image (ndarray): Image to be rotated.
+        angle (float): Rotation angle in degrees, positive values mean
+            clockwise rotation.
+        center (tuple): Center of the rotation in the source image, by default
+            it is the center of the image.
+        scale (float): Isotropic scale factor.
+        border_value (int): Border value.
+        auto_bound (bool): Whether to increase the image size to contain the 
+            whole rotated image.
+    Returns:
+        ndarray: The rotated image.
+    """
+    if center is not None and auto_bound:
+        raise ValueError('`auto_bound` conflicts with `center`')
+    #(h, w) = image.shape[:2]
+    h, w = image.shape[:2]
     if center is None:
-        center = (w // 2, h // 2)
-    M = cv2.getRotationMatrix2D(center, angle, scale)
-    rotated = cv2.warpAffine(image, M, (w, h))
-    
+        #center = (w // 2, h // 2)
+        center = ((w - 1) * 0.5, (h - 1) * 0.5)
+    assert isinstance(center, tuple)
+     
+    matrix = cv2.getRotationMatrix2D(center, -angle, scale)
+    if auto_bound:
+        cos = np.abs(matrix[0, 0])
+        sin = np.abs(matrix[0, 1])
+        new_w = h * sin + w * cos
+        new_h = h * cos + w * sin
+        matrix[0, 2] += (new_w - w) * 0.5
+        matrix[1, 2] += (new_h - h) * 0.5
+        w = int(np.round(new_w))
+        h = int(np.round(new_h))
+
+    #rotated = cv2.warpAffine(image, matrix, (w, h))
+    rotated = cv2.warpAffine(image, matrix, (w, h), borderValue=border_value)
+
     return rotated
 
 def random_rotate(image, angle=0, center=None, scale=1.0):    
@@ -217,23 +248,26 @@ def random_rotate(image, angle=0, center=None, scale=1.0):
         angle = int(np.random.uniform(-45, 45))
     
     h,w,c = image.shape
-    image, _ = scale_img(image, 1/2, cv2.INTER_LANCZOS4) #upscaling 2x like HD Mode7 to reduce jaggy lines after rotating, more accurate underlying "sub-pixel" data 
     
-    image = rotate(image, angle) #will change image shape 
-    image = random_crop(image, crop_size=(w, h)) #crop back to the original size
-    return image, angle 
+    if np.random.rand() > 0.5: #randomly upscaling 2x like HD Mode7 to reduce jaggy lines after rotating, more accurate underlying "sub-pixel" data. cv2.INTER_LANCZOS4?
+        image, _ = scale_img(image, 1/2, cv2.INTER_CUBIC)
+    
+    rotated = rotate(image, angle) #will change image shape unless auto_bound is used
+    rotated = random_crop(image, crop_size=(w, h)) #crop back to the original size
+    return rotated, angle 
 
 def random_rotate_pairs(img_HR, img_LR, HR_size, scale, angle=0, center=0):
     if angle == 0:
         angle = int(np.random.uniform(-45, 45))
     
-    img_HR, _ = scale_img(img_HR, 1/2, cv2.INTER_CUBIC) #upscaling 2x like HD Mode7 to reduce jaggy lines after rotating, more accurate underlying "sub-pixel" data. cv2.INTER_LANCZOS4?
-    img_HR = rotate(img_HR, angle) #will change image shape 
+    if np.random.rand() > 0.5: #randomly upscaling 2x like HD Mode7 to reduce jaggy lines after rotating, more accurate underlying "sub-pixel" data. cv2.INTER_LANCZOS4?
+        img_HR, _ = scale_img(img_HR, 1/2, cv2.INTER_CUBIC) 
+        img_LR, _ = scale_img(img_LR, 1/2, cv2.INTER_CUBIC) 
     
-    img_LR, _ = scale_img(img_LR, 1/2, cv2.INTER_CUBIC) #upscaling 2x like HD Mode7 to reduce jaggy lines after rotating, more accurate underlying "sub-pixel" data cv2.INTER_LANCZOS4?
-    img_LR = rotate(img_LR, angle) #will change image shape 
+    img_HR = rotate(img_HR, angle) #will change image shape if auto_bound is used    
+    img_LR = rotate(img_LR, angle) #will change image shape if auto_bound is used
     
-    img_HR, img_LR = random_crop_pairs(img_HR, img_LR, HR_size, scale) #crop back to the original size
+    img_HR, img_LR = random_crop_pairs(img_HR, img_LR, HR_size, scale) #crop back to the original size if needed 
     return img_HR, img_LR
 
 def blur_img(img_LR, blur_algos=['clean'], kernel_size = 0):
@@ -296,11 +330,11 @@ def blur_img(img_LR, blur_algos=['clean'], kernel_size = 0):
     elif blur_type == 'clean': # Pass clean image, without blur
         blurred = img_LR
 
-    img_LR = np.clip(blurred, 0, 1) 
+    #img_LR = np.clip(blurred, 0, 1) 
     return img_LR, blur_type, kernel_size
 
 
-def minmax(v): #for Floyd–Steinberg dithering noise
+def minmax(v): #for Floyd-Steinberg dithering noise
     if v > 255:
         v = 255
     if v < 0:
@@ -341,7 +375,7 @@ def noise_img(img_LR, noise_types=['clean']):
         sigma = np.random.uniform(0.04, 0.2)
         noise = np.random.normal(mean, scale=sigma ** 0.5, size=(h,w,c))
         noise_img = img_LR + img_LR * noise
-        noise_img = np.clip(noise_img, 0, 1) 
+        #noise_img = np.clip(noise_img, 0, 1) 
         
     elif noise_type == 'gaussian': # Gaussian Noise
         h,w,c = img_LR.shape
@@ -537,8 +571,151 @@ def noise_img(img_LR, noise_types=['clean']):
     elif noise_type == 'clean': # Pass clean image, without noise
         noise_img = img_LR
         
-    img_LR = np.clip(noise_img, 0, 1)
+    #img_LR = np.clip(noise_img, 0, 1)
     return img_LR, noise_type
+
+
+def random_pix(size):
+    # Amount of pixels to translate
+    # Higher probability for 0 shift
+    # Caution: It can be very relevant how many pixels are shifted. 
+    #"""
+    if size <= 64:
+        return random.choice([-1,0,0,1]) #pixels_translation
+    elif size > 64 and size <= 96:
+        return random.choice([-2,-1,0,0,1,2]) #pixels_translation
+    elif size > 96:
+        return random.choice([-3,-2,-1,0,0,1,2,3]) #pixels_translation
+    #"""
+    #return random.choice([-3,-2,-1,0,0,1,2,3]) #pixels_translation
+
+# Note: the translate_chan() has limited success in fixing chromatic aberrations,
+# because the patterns are very specific. The function works for the models to
+# learn how to align fringes, but in this function the displacements are random
+# and natural aberrations are more like purple fringing, axial (longitudinal), 
+# and transverse (lateral), which are specific cases of these displacements and
+# could be modeled here. 
+def translate_chan(img_or):
+    # Independently translate image channels to create color fringes
+    rows, cols, _ = img_or.shape
+    
+    # Split the image into its BGR components
+    (blue, green, red) = cv2.split(img_or)
+    
+    """ #V1: randomly displace each channel
+    new_channels = []
+    for values, channel in zip((blue, green, red), (0,1,2)):
+        M = np.float32([[1,0,random_pix(rows)],[0,1,random_pix(cols)]])
+        dst = cv2.warpAffine(values,M,(cols,rows))
+        new_channels.append(dst)
+    
+    b_channel = new_channels[0]
+    g_channel = new_channels[1]
+    r_channel = new_channels[2]
+    #"""
+    
+    #""" V2: only displace one channel at a time
+    M = np.float32([[1,0,random_pix(rows)],[0,1,random_pix(cols)]])
+    color = random.choice(["blue","green","red"])
+    if color == "blue":
+        b_channel = cv2.warpAffine(blue,M,(cols,rows))
+        g_channel = green 
+        r_channel = red
+    elif color == "green":
+        b_channel = blue
+        g_channel = cv2.warpAffine(green,M,(cols,rows)) 
+        r_channel = red
+    else: # color == red:
+        b_channel = blue
+        g_channel = green
+        r_channel = cv2.warpAffine(red,M,(cols,rows))
+    #"""
+    
+    """ V3: only displace a random crop of one channel at a time (INCOMPLETE)
+    # randomly crop
+    rnd_h = random.randint(0, max(0, rows - rows/2))
+    rnd_w = random.randint(0, max(0, cols - cols/2))
+    img_crop = img_or[rnd_h:rnd_h + rows/2, rnd_w:rnd_w + cols/2, :]
+    
+    (blue_c, green_c, red_c) = cv2.split(img_crop)
+    rows_c, cols_c, _ = img_crop.shape
+    
+    M = np.float32([[1,0,random_pix(rows_c)],[0,1,random_pix(cols_c)]])
+    color = random.choice(["blue","green","red"])
+    if color == "blue":
+        b_channel = cv2.warpAffine(blue_c,M,(cols_c,rows_c))
+        g_channel = green_c 
+        r_channel = red_c
+    elif color == "green":
+        b_channel = blue_c
+        g_channel = cv2.warpAffine(green_c,M,(cols_c,rows_c)) 
+        r_channel = red_c
+    else: # color == red:
+        b_channel = blue_c
+        g_channel = green_c
+        r_channel = cv2.warpAffine(red_c,M,(cols_c,rows_c))
+        
+    merged_crop = cv2.merge((b_channel, g_channel, r_channel))
+    
+    image[rnd_h:rnd_h + rows/2, rnd_w:rnd_w + cols/2, :] = merged_crop
+    return image
+    #"""
+    
+    # merge the channels back together and return the image
+    return cv2.merge((b_channel, g_channel, r_channel))
+
+# https://www.pyimagesearch.com/2015/09/28/implementing-the-max-rgb-filter-in-opencv/
+def max_rgb_filter(image):
+	# split the image into its BGR components
+	(B, G, R) = cv2.split(image)
+ 
+	# find the maximum pixel intensity values for each
+	# (x, y)-coordinate,, then set all pixel values less
+	# than M to zero
+	M = np.maximum(np.maximum(R, G), B)
+	R[R < M] = 0
+	G[G < M] = 0
+	B[B < M] = 0
+ 
+	# merge the channels back together and return the image
+	return cv2.merge([B, G, R])
+
+# Simple color balance algorithm (similar to Photoshop "auto levels")
+# https://gist.github.com/DavidYKay/9dad6c4ab0d8d7dbf3dc#gistcomment-3025656
+# http://www.morethantechnical.com/2015/01/14/simplest-color-balance-with-opencv-wcode/
+# https://web.stanford.edu/~sujason/ColorBalancing/simplestcb.html
+def simplest_cb(img, percent=1, znorm=False):
+    
+    if znorm == True: # img is znorm'ed in the [-1,1] range, else img in the [0,1] range
+        img = (img + 1.0)/2.0
+    
+    # back to the OpenCV [0,255] range
+    img = (img * 255.0).round().astype(np.uint8) # need to add astype(np.uint8) so cv2.LUT doesn't fail later
+    
+    out_channels = []
+    cumstops = (
+        img.shape[0] * img.shape[1] * percent / 200.0,
+        img.shape[0] * img.shape[1] * (1 - percent / 200.0)
+    )
+    for channel in cv2.split(img):
+        cumhist = np.cumsum(cv2.calcHist([channel], [0], None, [256], (0,256)))
+        low_cut, high_cut = np.searchsorted(cumhist, cumstops)
+        lut = np.concatenate((
+            np.zeros(low_cut),
+            np.around(np.linspace(0, 255, high_cut - low_cut + 1)),
+            255 * np.ones(255 - high_cut)
+        ))
+        out_channels.append(cv2.LUT(channel, lut.astype('uint8')))
+        
+    img_out = cv2.merge(out_channels)
+    
+    # Re-normalize
+    if znorm == False: # normalize img_or back to the [0,1] range
+        img_out = img_out/255.0
+    if znorm==True: # normalize images back to range [-1, 1] 
+        img_out = (img_out - 0.5) * 2 # xi' = (xi - mu)/sigma    
+    return img_out
+
 
 
 
