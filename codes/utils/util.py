@@ -1,6 +1,5 @@
 import os
 import math
-from collections import OrderedDict
 from datetime import datetime
 import numpy as np
 import cv2
@@ -71,13 +70,6 @@ def sorted_nicely( l ):
     convert = lambda text: int(text) if text.isdigit() else text
     alphanum_key = lambda key: [convert(c) for c in re.split('([0-9]+)', key)]
     return sorted(l, key = alphanum_key)
-
-
-class OrderedDefaultDict(OrderedDict):
-    def __missing__(self, key):
-        self[key] = 0
-        return 0
-
 
 ####################
 # image convert

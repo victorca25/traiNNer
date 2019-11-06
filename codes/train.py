@@ -7,7 +7,6 @@ import random
 import numpy as np
 from collections import OrderedDict
 import logging
-import glob
 
 import torch
 
@@ -35,9 +34,17 @@ def main():
     parser.add_argument('-opt', type=str, required=True, help='Path to option JSON file.')
     opt = option.parse(parser.parse_args().opt, is_train=True)
     opt = option.dict_to_nonedict(opt)  # Convert to NoneDict, which return None for missing key.
+    pytorch_ver = get_pytorch_ver()
     
-    # training from scratch
-    if not opt['path']['resume_state']:
+    # train from scratch OR resume training
+    if opt['path']['resume_state']:
+        if os.path.isdir(opt['path']['resume_state']):
+            import glob
+            resume_state_path = util.sorted_nicely(glob.glob(os.path.normpath(opt['path']['resume_state']) + '/*.state'))[-1]
+        else:
+            resume_state_path = opt['path']['resume_state']
+        resume_state = torch.load(resume_state_path)
+    else:  # training from scratch
         resume_state = None
         util.mkdir_and_rename(opt['path']['experiments_root'])  # rename old folder if exists
         util.mkdirs((path for key, path in opt['path'].items() if not key == 'experiments_root'
@@ -48,14 +55,8 @@ def main():
     util.setup_logger('val', opt['path']['log'], 'val', level=logging.INFO)
     logger = logging.getLogger('base')
     
-    # resume training
-    if opt['path']['resume_state']:
-        if os.path.isdir(opt['path']['resume_state']):
-            opt['path']['resume_state'] = util.sorted_nicely(glob.glob(os.path.normpath(opt['path']['resume_state']) + '/*.state'))[-1]
-            logger.info('Set [resume_state] to ' + opt['path']['resume_state'])
-        resume_state = torch.load(opt['path']['resume_state'])
-
     if resume_state:
+        logger.info('Set [resume_state] to ' + resume_state_path)
         logger.info('Resuming training from epoch: {}, iter: {}.'.format(
             resume_state['epoch'], resume_state['iter']))
         option.check_resume(opt)  # check resume options
@@ -83,14 +84,14 @@ def main():
     for phase, dataset_opt in opt['datasets'].items():
         if phase == 'train':
             train_set = create_dataset(dataset_opt)
-            train_loader = create_dataloader(train_set, dataset_opt)
-            train_size = int(len(train_loader) / opt['batch_multiplier'])
+            train_size = int(math.ceil(len(train_set) / dataset_opt['batch_size']))
             logger.info('Number of train images: {:,d}, iters: {:,d}'.format(
                 len(train_set), train_size))
             total_iters = int(opt['train']['niter'])
             total_epochs = int(math.ceil(total_iters / train_size))
             logger.info('Total epochs needed: {:d} for iters {:,d}'.format(
                 total_epochs, total_iters))
+            train_loader = create_dataloader(train_set, dataset_opt)
         elif phase == 'val':
             val_set = create_dataset(dataset_opt)
             val_loader = create_dataloader(val_set, dataset_opt)
@@ -99,16 +100,9 @@ def main():
         else:
             raise NotImplementedError('Phase [{:s}] is not recognized.'.format(phase))
     assert train_loader is not None
-    train_gen = cycle(train_loader)
 
     # create model
     model = create_model(opt)
-
-    # circumvent pytorch warning
-    # we pass in the iteration count to scheduler.step(), so the warning doesn't apply
-    for scheduler in model.schedulers:
-        if hasattr(scheduler, '_step_count'):
-            scheduler._step_count = 0
 
     # resume training
     if resume_state:
@@ -122,17 +116,27 @@ def main():
 
     # training
     logger.info('Start training from epoch: {:d}, iter: {:d}'.format(start_epoch, current_step))
-    epoch = start_epoch
-    while current_step <= total_iters:
-        for n in range(1, train_size+1):
+    for epoch in range(start_epoch, total_epochs):
+        for n, train_data in enumerate(train_loader,start=1):
             current_step += 1
             if current_step > total_iters:
                 break
-            # update learning rate
-            model.update_learning_rate(current_step-1)
-
-            # training
-            model.optimize_parameters(train_gen, current_step)
+            
+            if pytorch_ver=="pre": #Order for PyTorch ver < 1.1.0
+                # update learning rate
+                model.update_learning_rate(current_step-1)
+                # training
+                model.feed_data(train_data)
+                model.optimize_parameters(current_step)
+            elif pytorch_ver=="post": #Order for PyTorch ver > 1.1.0
+                # training
+                model.feed_data(train_data)
+                model.optimize_parameters(current_step)
+                # update learning rate
+                model.update_learning_rate(current_step-1)
+            else:
+                print('Error identifying PyTorch version. ', torch.__version__)
+                break
 
             # log
             if current_step % opt['logger']['print_freq'] == 0:
@@ -140,7 +144,7 @@ def main():
                 message = '<epoch:{:3d}, iter:{:8,d}, lr:{:.3e}> '.format(
                     epoch, current_step, model.get_current_learning_rate())
                 for k, v in logs.items():
-                    message += '{:s}:{: .4e} '.format(k, v)
+                    message += '{:s}: {:.4e} '.format(k, v)
                     # tensorboard logger
                     if opt['use_tb_logger'] and 'debug' not in opt['name']:
                         tb_logger.add_scalar(k, v, current_step)
@@ -149,7 +153,7 @@ def main():
             # save models and training states (changed to save models before validation)
             if current_step % opt['logger']['save_checkpoint_freq'] == 0:
                 model.save(current_step)
-                model.save_training_state(epoch + (n >= train_size), current_step)
+                model.save_training_state(epoch + (n >= len(train_loader)), current_step)
                 logger.info('Models and training states saved.')
             
             # validation

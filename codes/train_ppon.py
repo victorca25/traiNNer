@@ -7,7 +7,6 @@ import random
 import numpy as np
 from collections import OrderedDict
 import logging
-import glob
 
 import torch
 
@@ -17,15 +16,35 @@ from data import create_dataloader, create_dataset
 from models import create_model
 from models.modules.LPIPS import compute_dists as lpips
 
+def get_pytorch_ver():
+    #print(torch.__version__)
+    pytorch_ver = torch.__version__
+    if pytorch_ver == "0.4.0":
+        return "pre"
+    elif pytorch_ver == "0.4.1":
+        return "pre"
+    elif pytorch_ver == "1.0.0":
+        return "pre"
+    else: #"1.1.0", "1.1.1", "1.2.0", "1.2.1" and beyond
+        return "post"
+
 def main():
     # options
     parser = argparse.ArgumentParser()
     parser.add_argument('-opt', type=str, required=True, help='Path to option JSON file.')
     opt = option.parse(parser.parse_args().opt, is_train=True)
     opt = option.dict_to_nonedict(opt)  # Convert to NoneDict, which return None for missing key.
+    pytorch_ver = get_pytorch_ver()
     
-    # training from scratch
-    if not opt['path']['resume_state']:
+    # train from scratch OR resume training
+    if opt['path']['resume_state']:
+        if os.path.isdir(opt['path']['resume_state']):
+            import glob
+            resume_state_path = util.sorted_nicely(glob.glob(os.path.normpath(opt['path']['resume_state']) + '/*.state'))[-1]
+        else:
+            resume_state_path = opt['path']['resume_state']
+        resume_state = torch.load(resume_state_path)
+    else:  # training from scratch
         resume_state = None
         util.mkdir_and_rename(opt['path']['experiments_root'])  # rename old folder if exists
         util.mkdirs((path for key, path in opt['path'].items() if not key == 'experiments_root'
@@ -36,14 +55,8 @@ def main():
     util.setup_logger('val', opt['path']['log'], 'val', level=logging.INFO)
     logger = logging.getLogger('base')
     
-    # resume training
-    if opt['path']['resume_state']:
-        if os.path.isdir(opt['path']['resume_state']):
-            opt['path']['resume_state'] = util.sorted_nicely(glob.glob(os.path.normpath(opt['path']['resume_state']) + '/*.state'))[-1]
-            logger.info('Set [resume_state] to ' + opt['path']['resume_state'])
-        resume_state = torch.load(opt['path']['resume_state'])
-
     if resume_state:
+        logger.info('Set [resume_state] to ' + resume_state_path)
         logger.info('Resuming training from epoch: {}, iter: {}.'.format(
             resume_state['epoch'], resume_state['iter']))
         option.check_resume(opt)  # check resume options
@@ -91,12 +104,6 @@ def main():
     # create model
     model = create_model(opt)
 
-    # circumvent pytorch warning
-    # we pass in the iteration count to scheduler.step(), so the warning doesn't apply
-    for scheduler in model.schedulers:
-        if hasattr(scheduler, '_step_count'):
-            scheduler._step_count = 0
-
     # resume training
     if resume_state:
         start_epoch = resume_state['epoch']
@@ -109,18 +116,27 @@ def main():
 
     # training
     logger.info('Start training from epoch: {:d}, iter: {:d}'.format(start_epoch, current_step))
-    epoch = start_epoch
-    while current_step <= total_iters:
+    for epoch in range(start_epoch, total_epochs):
         for n, train_data in enumerate(train_loader,start=1):
             current_step += 1
             if current_step > total_iters:
                 break
-            # update learning rate
-            model.update_learning_rate(current_step-1)
-
-            # training
-            model.feed_data(train_data)
-            model.optimize_parameters(current_step)
+            
+            if pytorch_ver=="pre": #Order for PyTorch ver < 1.1.0
+                # update learning rate
+                model.update_learning_rate(current_step-1)
+                # training
+                model.feed_data(train_data)
+                model.optimize_parameters(current_step)
+            elif pytorch_ver=="post": #Order for PyTorch ver > 1.1.0
+                # training
+                model.feed_data(train_data)
+                model.optimize_parameters(current_step)
+                # update learning rate
+                model.update_learning_rate(current_step-1)
+            else:
+                print('Error identifying PyTorch version. ', torch.__version__)
+                break
 
             # log
             if current_step % opt['logger']['print_freq'] == 0:
@@ -128,7 +144,7 @@ def main():
                 message = '<epoch:{:3d}, iter:{:8,d}, lr:{:.3e}> '.format(
                     epoch, current_step, model.get_current_learning_rate())
                 for k, v in logs.items():
-                    message += '{:s}:{: .4e} '.format(k, v)
+                    message += '{:s}: {:.4e} '.format(k, v)
                     # tensorboard logger
                     if opt['use_tb_logger'] and 'debug' not in opt['name']:
                         tb_logger.add_scalar(k, v, current_step)
@@ -187,7 +203,7 @@ def main():
                     # calculate PSNR, SSIM and LPIPS distance
                     crop_size = opt['scale']
                     gt_img = gt_img / 255.
-                    cropped_gt_img = gt_img[crop_size:-crop_size, crop_size:-crop_size, :]
+                    #sr_img = sr_img / 255. #ESRGAN 
                     #PPON
                     
                     sr_img_c = img_c / 255. #C

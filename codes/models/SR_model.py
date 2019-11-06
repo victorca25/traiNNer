@@ -1,6 +1,6 @@
 import os
 import logging
-from utils.util import OrderedDefaultDict
+from collections import OrderedDict
 
 import torch
 import torch.nn as nn
@@ -54,7 +54,7 @@ class SRModel(BaseModel):
             else:
                 raise NotImplementedError('MultiStepLR learning rate scheme is enough.')
 
-            self.log_dict = OrderedDefaultDict()
+            self.log_dict = OrderedDict()
         # print network
         self.print_network()
 
@@ -63,18 +63,15 @@ class SRModel(BaseModel):
         if need_HR:
             self.real_H = data['HR'].to(self.device)  # HR
 
-    def optimize_parameters(self, gen, step):
-        self.log_dict.clear()
+    def optimize_parameters(self, step):
         self.optimizer_G.zero_grad()
-
-        bm = self.opt['batch_multiplier']
-        for _ in range(bm):
-            self.feed_data(next(gen))
-            self.fake_H = self.netG(self.var_L)
-            l_pix = self.l_pix_w * self.cri_pix(self.fake_H, self.real_H) / bm
-            l_pix.backward()
-            self.log_dict['l_pix'] += l_pix.item()
+        self.fake_H = self.netG(self.var_L)
+        l_pix = self.l_pix_w * self.cri_pix(self.fake_H, self.real_H)
+        l_pix.backward()
         self.optimizer_G.step()
+
+        # set log
+        self.log_dict['l_pix'] = l_pix.item()
 
     def test(self):
         self.netG.eval()
@@ -126,7 +123,7 @@ class SRModel(BaseModel):
         return self.log_dict
 
     def get_current_visuals(self, need_HR=True):
-        out_dict = {}
+        out_dict = OrderedDict()
         out_dict['LR'] = self.var_L.detach()[0].float().cpu()
         out_dict['SR'] = self.fake_H.detach()[0].float().cpu()
         if need_HR:

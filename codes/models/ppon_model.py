@@ -817,7 +817,7 @@ class PPONModel(BaseModel):
         return self.log_dict
 
     def get_current_visuals(self, need_HR=True):
-        out_dict = {}
+        out_dict = OrderedDict()
         out_dict['LR'] = self.var_L.detach()[0].float().cpu()
         out_dict['img_c'], out_dict['img_s'], out_dict['img_p'] = self.out_c.detach()[0].float().cpu(), self.out_s.detach()[0].float().cpu(), self.out_p.detach()[0].float().cpu()
         

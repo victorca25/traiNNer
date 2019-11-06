@@ -1,6 +1,6 @@
 import os
 import logging
-from utils.util import OrderedDefaultDict
+from collections import OrderedDict
 
 import torch
 import torch.nn as nn
@@ -105,7 +105,7 @@ class SFTGAN_ACD_Model(BaseModel):
             else:
                 raise NotImplementedError('MultiStepLR learning rate scheme is enough.')
 
-            self.log_dict = OrderedDefaultDict()
+            self.log_dict = OrderedDict()
         # print network
         self.print_network()
 
@@ -121,81 +121,79 @@ class SFTGAN_ACD_Model(BaseModel):
             self.var_H = data['HR'].to(self.device)
 
     def optimize_parameters(self, step):
-        self.log_dict.clear()
+        # G
         self.optimizer_G_SFT.zero_grad()
         self.optimizer_G_other.zero_grad()
-        self.optimizer_D.zero_grad()
+        self.fake_H = self.netG((self.var_L, self.var_seg))
 
-        bm = self.opt['batch_multiplier']
-        for _ in range(bm):
-            self.feed_data(next(gen))
-
-            # G
-            self.fake_H = self.netG((self.var_L, self.var_seg))
-
-            l_g_total = 0
-            if step % self.D_update_ratio == 0 and step > self.D_init_iters:
-                if self.cri_pix:  # pixel loss
-                    l_g_pix = self.l_pix_w * self.cri_pix(self.fake_H, self.var_H) / bm
-                    l_g_total += l_g_pix
-                    self.log_dict['l_g_pix'] += l_g_pix.item()
-                if self.cri_fea:  # feature loss
-                    real_fea = self.netF(self.var_H).detach()
-                    fake_fea = self.netF(self.fake_H)
-                    l_g_fea = self.l_fea_w * self.cri_fea(fake_fea, real_fea) / bm
-                    l_g_total += l_g_fea
-                    self.log_dict['l_g_fea'] += l_g_fea.item()
-                # G gan + cls loss
-                pred_g_fake, cls_g_fake = self.netD(self.fake_H)
-                l_g_gan = self.l_gan_w * self.cri_gan(pred_g_fake, True) / bm
-                l_g_cls = self.l_gan_w * self.cri_ce(cls_g_fake, self.var_cat) / bm
-                l_g_total += l_g_gan
-                l_g_total += l_g_cls
-                self.log_dict['l_g_gan'] += l_g_gan.item()
-                self.log_dict['l_g_cls'] += l_g_cls.item()
-
-                l_g_total.backward()
-
-            # D
-            l_d_total = 0
-            # real data
-            pred_d_real, cls_d_real = self.netD(self.var_H)
-            l_d_real = self.cri_gan(pred_d_real, True) /bm
-            l_d_cls_real = self.cri_ce(cls_d_real, self.var_cat) / bm
-            # fake data
-            pred_d_fake, cls_d_fake = self.netD(self.fake_H.detach())  # detach to avoid BP to G
-            l_d_fake = self.cri_gan(pred_d_fake, False) / bm
-            l_d_cls_fake = self.cri_ce(cls_d_fake, self.var_cat) / bm
-            self.log_dict['l_d_real'] += l_d_real.item()
-            self.log_dict['l_d_fake'] += l_d_fake.item()
-            self.log_dict['l_d_cls_real'] += l_d_cls_real.item()
-            self.log_dict['l_d_cls_fake'] += l_d_cls_fake.item()
-
-            l_d_total = l_d_real + l_d_cls_real + l_d_fake + l_d_cls_fake
-
-            if self.opt['train']['gan_type'] == 'wgan-gp':
-                batch_size = self.var_H.size(0)
-                if self.random_pt.size(0) != batch_size:
-                    self.random_pt.resize_(batch_size, 1, 1, 1)
-                self.random_pt.uniform_()  # Draw random interpolation points
-                interp = self.random_pt * self.fake_H.detach() + (1 - self.random_pt) * self.var_H
-                interp.requires_grad = True
-                interp_crit, _ = self.netD(interp)
-                l_d_gp = self.l_gp_w * self.cri_gp(interp, interp_crit) / bm  # maybe wrong in cls?
-                l_d_total += l_d_gp
-                self.log_dict['l_d_gp'] += l_d_gp.item()
-
-            l_d_total.backward()
-
-            # D outputs
-            self.log_dict['D_real'] += torch.mean(pred_d_real.detach()).item() / bm
-            self.log_dict['D_fake'] += torch.mean(pred_d_fake.detach()).item() / bm
-
+        l_g_total = 0
         if step % self.D_update_ratio == 0 and step > self.D_init_iters:
+            if self.cri_pix:  # pixel loss
+                l_g_pix = self.l_pix_w * self.cri_pix(self.fake_H, self.var_H)
+                l_g_total += l_g_pix
+            if self.cri_fea:  # feature loss
+                real_fea = self.netF(self.var_H).detach()
+                fake_fea = self.netF(self.fake_H)
+                l_g_fea = self.l_fea_w * self.cri_fea(fake_fea, real_fea)
+                l_g_total += l_g_fea
+            # G gan + cls loss
+            pred_g_fake, cls_g_fake = self.netD(self.fake_H)
+            l_g_gan = self.l_gan_w * self.cri_gan(pred_g_fake, True)
+            l_g_cls = self.l_gan_w * self.cri_ce(cls_g_fake, self.var_cat)
+            l_g_total += l_g_gan
+            l_g_total += l_g_cls
+
+            l_g_total.backward()
             self.optimizer_G_SFT.step()
         if step > 20000:
             self.optimizer_G_other.step()
+
+        # D
+        self.optimizer_D.zero_grad()
+        l_d_total = 0
+        # real data
+        pred_d_real, cls_d_real = self.netD(self.var_H)
+        l_d_real = self.cri_gan(pred_d_real, True)
+        l_d_cls_real = self.cri_ce(cls_d_real, self.var_cat)
+        # fake data
+        pred_d_fake, cls_d_fake = self.netD(self.fake_H.detach())  # detach to avoid BP to G
+        l_d_fake = self.cri_gan(pred_d_fake, False)
+        l_d_cls_fake = self.cri_ce(cls_d_fake, self.var_cat)
+
+        l_d_total = l_d_real + l_d_cls_real + l_d_fake + l_d_cls_fake
+
+        if self.opt['train']['gan_type'] == 'wgan-gp':
+            batch_size = self.var_H.size(0)
+            if self.random_pt.size(0) != batch_size:
+                self.random_pt.resize_(batch_size, 1, 1, 1)
+            self.random_pt.uniform_()  # Draw random interpolation points
+            interp = self.random_pt * self.fake_H.detach() + (1 - self.random_pt) * self.var_H
+            interp.requires_grad = True
+            interp_crit, _ = self.netD(interp)
+            l_d_gp = self.l_gp_w * self.cri_gp(interp, interp_crit)  # maybe wrong in cls?
+            l_d_total += l_d_gp
+
+        l_d_total.backward()
         self.optimizer_D.step()
+
+        # set log
+        if step % self.D_update_ratio == 0 and step > self.D_init_iters:
+            # G
+            if self.cri_pix:
+                self.log_dict['l_g_pix'] = l_g_pix.item()
+            if self.cri_fea:
+                self.log_dict['l_g_fea'] = l_g_fea.item()
+            self.log_dict['l_g_gan'] = l_g_gan.item()
+        # D
+        self.log_dict['l_d_real'] = l_d_real.item()
+        self.log_dict['l_d_fake'] = l_d_fake.item()
+        self.log_dict['l_d_cls_real'] = l_d_cls_real.item()
+        self.log_dict['l_d_cls_fake'] = l_d_cls_fake.item()
+        if self.opt['train']['gan_type'] == 'wgan-gp':
+            self.log_dict['l_d_gp'] = l_d_gp.item()
+        # D outputs
+        self.log_dict['D_real'] = torch.mean(pred_d_real.detach())
+        self.log_dict['D_fake'] = torch.mean(pred_d_fake.detach())
 
     def test(self):
         self.netG.eval()
@@ -207,7 +205,7 @@ class SFTGAN_ACD_Model(BaseModel):
         return self.log_dict
 
     def get_current_visuals(self, need_HR=True):
-        out_dict = {}
+        out_dict = OrderedDict()
         out_dict['LR'] = self.var_L.detach()[0].float().cpu()
         out_dict['SR'] = self.fake_H.detach()[0].float().cpu()
         if need_HR:
