@@ -86,6 +86,10 @@ def parse(opt_path, is_train=True):
     # network
     opt['network_G']['scale'] = scale
 
+    # batch multiplier
+    if not 'batch_multiplier' in opt or opt['batch_multiplier'] is None:
+        opt['batch_multiplier'] = 1
+
     # export CUDA_VISIBLE_DEVICES
     gpu_list = ','.join(str(x) for x in opt['gpu_ids'])
     os.environ['CUDA_VISIBLE_DEVICES'] = gpu_list

@@ -2,7 +2,7 @@ from __future__ import absolute_import
 
 import os
 import logging
-from collections import OrderedDict
+from utils.util import OrderedDefaultDict
 
 import torch
 import torch.nn as nn
@@ -338,7 +338,7 @@ class SRRaGANModel(BaseModel):
             else:
                 raise NotImplementedError('Learning rate scheme ("lr_scheme") not defined or not recognized.')
 
-            self.log_dict = OrderedDict()
+            self.log_dict = OrderedDefaultDict()
         # print network
         self.print_network()
 
@@ -567,7 +567,7 @@ class SRRaGANModel(BaseModel):
         return self.log_dict
 
     def get_current_visuals(self, need_HR=True):
-        out_dict = OrderedDict()
+        out_dict = {}
         out_dict['LR'] = self.var_L.detach()[0].float().cpu()
         out_dict['SR'] = self.fake_H.detach()[0].float().cpu()
         if need_HR:
