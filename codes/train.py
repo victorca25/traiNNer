@@ -14,6 +14,7 @@ import options.options as option
 from utils import util
 from data import create_dataloader, create_dataset
 from models import create_model
+from models.modules.LPIPS import compute_dists as lpips
 
 
 def cycle(dataloader):
@@ -147,7 +148,11 @@ def main():
             # validation
             if current_step % opt['train']['val_freq'] == 0:
                 avg_psnr = 0.0
+                avg_ssim = 0.0
+                avg_lpips = 0.0
                 idx = 0
+                val_sr_imgs_list = []
+                val_gt_imgs_list = []
                 for val_data in val_loader:
                     idx += 1
                     img_name = os.path.splitext(os.path.basename(val_data['LR_path'][0]))[0]
@@ -158,32 +163,62 @@ def main():
                     model.test()
 
                     visuals = model.get_current_visuals()
+                    
                     sr_img = util.tensor2img(visuals['SR'])  # uint8
                     gt_img = util.tensor2img(visuals['HR'])  # uint8
-
+                    
+                    # print("Min. SR value:",sr_img.min()) # Debug
+                    # print("Max. SR value:",sr_img.max()) # Debug
+                    
+                    # print("Min. GT value:",gt_img.min()) # Debug
+                    # print("Max. GT value:",gt_img.max()) # Debug
+                    
                     # Save SR images for reference
                     save_img_path = os.path.join(img_dir, '{:s}_{:d}.png'.format(\
                         img_name, current_step))
                     util.save_img(sr_img, save_img_path)
 
-                    # calculate PSNR
+                    # calculate PSNR, SSIM and LPIPS distance
                     crop_size = opt['scale']
                     gt_img = gt_img / 255.
                     sr_img = sr_img / 255.
-                    cropped_sr_img = sr_img[crop_size:-crop_size, crop_size:-crop_size, :]
-                    cropped_gt_img = gt_img[crop_size:-crop_size, crop_size:-crop_size, :]
+
+                    # For training models with only one channel ndim==2, if RGB ndim==3, etc.
+                    if gt_img.ndim == 2:
+                        cropped_gt_img = gt_img[crop_size:-crop_size, crop_size:-crop_size]
+                    else:
+                        cropped_gt_img = gt_img[crop_size:-crop_size, crop_size:-crop_size, :]
+                    if sr_img.ndim == 2:
+                        cropped_sr_img = sr_img[crop_size:-crop_size, crop_size:-crop_size]
+                    else: # Default: RGB images
+                        cropped_sr_img = sr_img[crop_size:-crop_size, crop_size:-crop_size, :]
+                    
+                    val_gt_imgs_list.append(cropped_gt_img) # If calculating only once for all images
+                    val_sr_imgs_list.append(cropped_sr_img) # If calculating only once for all images
+                    
+                    # LPIPS only works for RGB images
                     avg_psnr += util.calculate_psnr(cropped_sr_img * 255, cropped_gt_img * 255)
+                    avg_ssim += util.calculate_ssim(cropped_sr_img * 255, cropped_gt_img * 255)
+                    #avg_lpips += lpips.calculate_lpips([cropped_sr_img], [cropped_gt_img]) # If calculating for each image
 
                 avg_psnr = avg_psnr / idx
+                avg_ssim = avg_ssim / idx
+                #avg_lpips = avg_lpips / idx # If calculating for each image
+                avg_lpips = lpips.calculate_lpips(val_sr_imgs_list,val_gt_imgs_list) # If calculating only once for all images
 
                 # log
-                logger.info('# Validation # PSNR: {:.5g}'.format(avg_psnr))
+                # logger.info('# Validation # PSNR: {:.5g}, SSIM: {:.5g}'.format(avg_psnr, avg_ssim))
+                logger.info('# Validation # PSNR: {:.5g}, SSIM: {:.5g}, LPIPS: {:.5g}'.format(avg_psnr, avg_ssim, avg_lpips))
                 logger_val = logging.getLogger('val')  # validation logger
-                logger_val.info('<epoch:{:3d}, iter:{:8,d}> psnr: {:.5g}'.format(
-                    epoch, current_step, avg_psnr))
+                # logger_val.info('<epoch:{:3d}, iter:{:8,d}> psnr: {:.5g}, ssim: {:.5g}'.format(
+                    # epoch, current_step, avg_psnr, avg_ssim))
+                logger_val.info('<epoch:{:3d}, iter:{:8,d}> psnr: {:.5g}, ssim: {:.5g}, lpips: {:.5g}'.format(
+                    epoch, current_step, avg_psnr, avg_ssim, avg_lpips))
                 # tensorboard logger
                 if opt['use_tb_logger'] and 'debug' not in opt['name']:
                     tb_logger.add_scalar('psnr', avg_psnr, current_step)
+                    tb_logger.add_scalar('ssim', avg_ssim, current_step)
+                    tb_logger.add_scalar('lpips', avg_lpips, current_step)
         epoch += 1
 
     logger.info('Saving the final model.')

@@ -7,7 +7,7 @@ import numpy as np
 import torch
 import torchvision.utils
 
-import models.modules.seg_arch as seg_arch
+import models.modules.architectures.seg_arch as seg_arch
 from data.util import imresize, modcrop
 import utils.util as util
 

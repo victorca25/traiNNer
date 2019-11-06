@@ -58,7 +58,7 @@ def main():
             visuals = model.get_current_visuals(need_HR=need_HR)
 
             sr_img = util.tensor2img(visuals['SR'])  # uint8
-
+            
             # save images
             suffix = opt['suffix']
             if suffix:
@@ -69,7 +69,7 @@ def main():
 
             # calculate PSNR and SSIM
             if need_HR:
-                gt_img = util.tensor2img(visuals['HR'])
+                gt_img = util.tensor2img(visuals['HR']) # uint8
                 gt_img = gt_img / 255.
                 sr_img = sr_img / 255.
 

@@ -6,7 +6,14 @@ import torch.nn as nn
 class BaseModel():
     def __init__(self, opt):
         self.opt = opt
-        self.device = torch.device('cuda' if opt['gpu_ids'] is not None else 'cpu')
+        # self.device = torch.device('cuda' if opt['gpu_ids'] is not None else 'cpu')
+        if opt['gpu_ids'] is not None:
+            torch.cuda.current_device()
+            torch.cuda.empty_cache()
+            self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        else:
+            self.device = 'cpu'
+        
         self.is_train = opt['is_train']
         self.schedulers = []
         self.optimizers = []

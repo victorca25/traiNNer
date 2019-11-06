@@ -90,8 +90,16 @@ def tensor2img(tensor, out_type=np.uint8, min_max=(0, 1)):
     Input: 4D(B,(3/1),H,W), 3D(C,H,W), or 2D(H,W), any range, RGB channel order
     Output: 3D(H,W,C) or 2D(H,W), [0,255], np.uint8 (default)
     '''
+    
+    # print ("Tensor min. val pre: ", torch.min(tensor)) # Debug
+    # print ("Tensor max. val pre: ", torch.max(tensor)) # Debug
+    
     tensor = tensor.squeeze().float().cpu().clamp_(*min_max)  # clamp
     tensor = (tensor - min_max[0]) / (min_max[1] - min_max[0])  # to range [0,1]
+    
+    # print ("Tensor min. val post: ", torch.min(tensor)) # Debug
+    # print ("Tensor max. val post: ", torch.max(tensor)) # Debug
+    
     n_dim = tensor.dim()
     if n_dim == 4:
         n_img = len(tensor)
@@ -137,6 +145,12 @@ def calculate_psnr(img1, img2):
         return float('inf')
     return 20 * math.log10(255.0 / math.sqrt(mse))
 
+"""
+def calculate_psnr_torch(img1, img2):
+    SE_map = (1.*img1-img2)**2
+    cur_MSE = torch.mean(SE_map)
+    return 20*torch.log10(1./torch.sqrt(cur_MSE))
+"""
 
 def ssim(img1, img2):
     C1 = (0.01 * 255)**2

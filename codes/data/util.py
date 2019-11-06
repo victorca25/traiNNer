@@ -7,13 +7,15 @@ import torch
 import cv2
 import logging
 
+import copy
+
 
 ####################
 # Files & IO
 ####################
 
 ###################### get image path list ######################
-IMG_EXTENSIONS = ['.jpg', '.JPG', '.jpeg', '.JPEG', '.png', '.PNG', '.ppm', '.PPM', '.bmp', '.BMP']
+IMG_EXTENSIONS = ['.jpg', '.JPG', '.jpeg', '.JPEG', '.png', '.PNG', '.ppm', '.PPM', '.bmp', '.BMP', '.dng', '.DNG']
 
 def is_image_file(filename):
     return any(filename.endswith(extension) for extension in IMG_EXTENSIONS)
@@ -76,14 +78,27 @@ def _read_lmdb_img(env, path):
 
 
 def read_img(env, path, out_nc=3):
-    # read image by cv2 or from lmdb
+    # read image by cv2 (rawpy if dng) or from lmdb
+    # (alt: using PIL instead of cv2)
     # out_nc: Desired number of channels
     # return: Numpy float32, HWC, BGR, [0,1]
     if env is None:  # img
-        img = cv2.imread(path, cv2.IMREAD_UNCHANGED)
+        if(path[-3:] == 'dng'): # if image is a DNG
+            import rawpy
+            with rawpy.imread(path) as raw:
+                img = raw.postprocess()
+        else: # else, if image can be read by cv2 
+            img = cv2.imread(path, cv2.IMREAD_UNCHANGED)
+        # elif: # using PIL instead of OpenCV
+            # img = Image.open(path).convert('RGB')
+        # else: # For other images unrecognized by cv2
+            # import matplotlib.pyplot as plt
+            # img = (255*plt.imread(path)[:,:,:3]).astype('uint8')
     else:
         img = _read_lmdb_img(env, path)
     img = img.astype(np.float32) / 255.
+    # print("Min. image value:",img.min()) # Debug
+    # print("Max. image value:",img.max()) # Debug
     if img.ndim == 2:
         #img = np.expand_dims(img, axis=2)
         img = np.tile(np.expand_dims(img, axis=2), (1, 1, 3))
@@ -105,11 +120,14 @@ def augment(img_list, hflip=True, rot=True):
     hflip = hflip and random.random() < 0.5
     vflip = rot and random.random() < 0.5
     rot90 = rot and random.random() < 0.5
+    #rot90n = rot and random.random() < 0.5
 
     def _augment(img):
-        if hflip: img = img[:, ::-1, :]
-        if vflip: img = img[::-1, :, :]
-        if rot90: img = img.transpose(1, 0, 2)
+        if hflip: img = np.flip(img, axis=1) #img[:, ::-1, :]
+        if vflip: img = np.flip(img, axis=0) #img[::-1, :, :]
+        #if rot90: img = img.transpose(1, 0, 2)
+        if rot90: img = np.rot90(img, 1) #90 degrees # In PIL: img.transpose(Image.ROTATE_90)
+        #if rot90n: img = np.rot90(img, -1) #-90 degrees
         return img
 
     return [_augment(img) for img in img_list]
@@ -117,9 +135,19 @@ def augment(img_list, hflip=True, rot=True):
 
 def channel_convert(in_c, tar_type, img_list):
     # conversion among BGR, gray and y
-    if in_c == 3 and tar_type == 'gray':  # BGR to gray
+    # Note: OpenCV uses inverted channels BGR, instead of RGB.
+    #  If images are loaded with something other than OpenCV,
+    #  check that the channels are in the correct order and use
+    #  the alternative conversion functions.
+    if in_c == 4 and tar_type == 'RGB-A':  # BGRA to BGR, remove alpha channel
+        return [cv2.cvtColor(img, cv2.COLOR_BGRA2BGR) for img in img_list]
+    elif in_c == 3 and tar_type == 'gray':  # BGR to gray
         gray_list = [cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) for img in img_list]
         return [np.expand_dims(img, axis=2) for img in gray_list]
+    elif in_c == 3 and tar_type == 'RGB-LAB': #RGB to LAB
+        return [cv2.cvtColor(img, cv2.COLOR_BGR2LAB) for img in img_list]
+    elif in_c == 3 and tar_type == 'LAB-RGB': #RGB to LAB
+        return [cv2.cvtColor(img, cv2.COLOR_LAB2BGR) for img in img_list]
     elif in_c == 3 and tar_type == 'y':  # BGR to y
         y_list = [bgr2ycbcr(img, only_y=True) for img in img_list]
         return [np.expand_dims(img, axis=2) for img in y_list]
@@ -127,7 +155,6 @@ def channel_convert(in_c, tar_type, img_list):
         return [cv2.cvtColor(img, cv2.COLOR_GRAY2BGR) for img in img_list]
     else:
         return img_list
-
 
 def rgb2ycbcr(img, only_y=True):
     '''same as matlab rgb2ycbcr
@@ -211,6 +238,90 @@ def modcrop(img_in, scale):
     else:
         raise ValueError('Wrong img ndim: [{:d}].'.format(img.ndim))
     return img
+
+
+
+####################
+# Prepare Images
+####################
+# https://github.com/sunreef/BlindSR/blob/master/src/image_utils.py
+def patchify_tensor(features, patch_size, overlap=10):
+    batch_size, channels, height, width = features.size()
+
+    effective_patch_size = patch_size - overlap
+    n_patches_height = (height // effective_patch_size)
+    n_patches_width = (width // effective_patch_size)
+
+    if n_patches_height * effective_patch_size < height:
+        n_patches_height += 1
+    if n_patches_width * effective_patch_size < width:
+        n_patches_width += 1
+
+    patches = []
+    for b in range(batch_size):
+        for h in range(n_patches_height):
+            for w in range(n_patches_width):
+                patch_start_height = min(h * effective_patch_size, height - patch_size)
+                patch_start_width = min(w * effective_patch_size, width - patch_size)
+                patches.append(features[b:b+1, :,
+                               patch_start_height: patch_start_height + patch_size,
+                               patch_start_width: patch_start_width + patch_size])
+    return torch.cat(patches, 0)
+
+def recompose_tensor(patches, full_height, full_width, overlap=10):
+
+    batch_size, channels, patch_size, _ = patches.size()
+    effective_patch_size = patch_size - overlap
+    n_patches_height = (full_height // effective_patch_size)
+    n_patches_width = (full_width // effective_patch_size)
+
+    if n_patches_height * effective_patch_size < full_height:
+        n_patches_height += 1
+    if n_patches_width * effective_patch_size < full_width:
+        n_patches_width += 1
+
+    n_patches = n_patches_height * n_patches_width
+    if batch_size % n_patches != 0:
+        print("Error: The number of patches provided to the recompose function does not match the number of patches in each image.")
+    final_batch_size = batch_size // n_patches
+
+    blending_in = torch.linspace(0.1, 1.0, overlap)
+    blending_out = torch.linspace(1.0, 0.1, overlap)
+    middle_part = torch.ones(patch_size - 2 * overlap)
+    blending_profile = torch.cat([blending_in, middle_part, blending_out], 0)
+
+    horizontal_blending = blending_profile[None].repeat(patch_size, 1)
+    vertical_blending = blending_profile[:, None].repeat(1, patch_size)
+    blending_patch = horizontal_blending * vertical_blending
+
+    blending_image = torch.zeros(1, channels, full_height, full_width)
+    for h in range(n_patches_height):
+        for w in range(n_patches_width):
+            patch_start_height = min(h * effective_patch_size, full_height - patch_size)
+            patch_start_width = min(w * effective_patch_size, full_width - patch_size)
+            blending_image[0, :, patch_start_height: patch_start_height + patch_size, patch_start_width: patch_start_width + patch_size] += blending_patch[None]
+
+    recomposed_tensor = torch.zeros(final_batch_size, channels, full_height, full_width)
+    if patches.is_cuda:
+        blending_patch = blending_patch.cuda()
+        blending_image = blending_image.cuda()
+        recomposed_tensor = recomposed_tensor.cuda()
+    patch_index = 0
+    for b in range(final_batch_size):
+        for h in range(n_patches_height):
+            for w in range(n_patches_width):
+                patch_start_height = min(h * effective_patch_size, full_height - patch_size)
+                patch_start_width = min(w * effective_patch_size, full_width - patch_size)
+                recomposed_tensor[b, :, patch_start_height: patch_start_height + patch_size, patch_start_width: patch_start_width + patch_size] += patches[patch_index] * blending_patch
+                patch_index += 1
+    recomposed_tensor /= blending_image
+
+    return recomposed_tensor
+
+
+
+
+
 
 
 ####################
