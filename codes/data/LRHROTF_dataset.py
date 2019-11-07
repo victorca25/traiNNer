@@ -350,6 +350,12 @@ class LRHRDataset(data.Dataset):
                 elif self.opt['auto_levels'] == True or self.opt['auto_levels'] == 'Both':
                     img_HR = augmentations.simplest_cb(img_HR, znorm=self.znorm)
                     img_LR = augmentations.simplest_cb(img_LR, znorm=self.znorm)
+            
+            # Apply unsharpening mask to HR images
+            # img_HR1 = img_HR
+            rand_unsharp = (1 - self.opt['rand_unsharp']) if self.opt['rand_unsharp'] else 1 # Randomize for augmentation
+            if self.opt['unsharp_mask'] and np.random.rand() > rand_unsharp:
+                img_HR = augmentations.unsharp_mask(img_HR, znorm=self.znorm)
         
         # For testing and validation
         if self.opt['phase'] != 'train':
@@ -371,7 +377,8 @@ class LRHRDataset(data.Dataset):
         if self.opt['phase'] == 'train':
             if self.output_sample_imgs:
                 import os
-                LR_dir, im_name = os.path.split(LR_path)
+                # LR_dir, im_name = os.path.split(LR_path)
+                HR_dir, im_name = os.path.split(HR_path)
                 #baseHRdir, _ = os.path.split(HR_dir)
                 #debugpath = os.path.join(baseHRdir, os.sep, 'sampleOTFimgs')
                 
@@ -384,14 +391,17 @@ class LRHRDataset(data.Dataset):
                 if self.opt['znorm']: # Back from [-1,1] range to [0,1] range for OpenCV2
                     img_LRn = (img_LR + 1.0) / 2.0
                     img_HRn = (img_HR + 1.0) / 2.0
+                    # img_HRn1 = (img_HR1 + 1.0) / 2.0
                 else: # Already in the [0,1] range for OpenCV2
                     img_LRn = img_LR
                     img_HRn = img_HR
+                    # img_HRn1 = img_HR1
                 
                 import uuid
                 hex = uuid.uuid4().hex
                 cv2.imwrite(debugpath+"\\"+im_name+hex+'_LR.png',img_LRn*255) #random name to save + had to multiply by 255, else getting all black image
                 cv2.imwrite(debugpath+"\\"+im_name+hex+'_HR.png',img_HRn*255) #random name to save + had to multiply by 255, else getting all black image
+                # cv2.imwrite(debugpath+"\\"+im_name+hex+'_HR1.png',img_HRn1*255) #random name to save + had to multiply by 255, else getting all black image
             
         ######## Convert images to PyTorch Tensors ########
         

@@ -713,11 +713,57 @@ def simplest_cb(img, percent=1, znorm=False):
     if znorm == False: # normalize img_or back to the [0,1] range
         img_out = img_out/255.0
     if znorm==True: # normalize images back to range [-1, 1] 
-        img_out = (img_out - 0.5) * 2 # xi' = (xi - mu)/sigma    
+        img_out = (img_out/255.0 - 0.5) * 2 # xi' = (xi - mu)/sigma    
     return img_out
 
 
 
+#https://www.idtools.com.au/unsharp-masking-python-opencv/
+def unsharp_mask(img, blur_algo='median', kernel_size=None, strength=None, unsharp_algo='laplacian', znorm=False):
+    #h,w,c = img.shape
+    
+    if znorm == True: # img is znorm'ed in the [-1,1] range, else img in the [0,1] range
+        img = (img + 1.0)/2.0
+    # back to the OpenCV [0,255] range
+    img = (img * 255.0).round().astype(np.uint8)
+    
+    #randomize strenght from 0.5 to 0.8
+    if strength is None:
+        strength = np.random.uniform(0.3, 0.9)
+    
+    if unsharp_algo == 'DoG':
+        #If using Difference of Gauss (DoG)
+        #run a 5x5 gaussian blur then a 3x3 gaussian blr
+        blur5 = cv2.GaussianBlur(img,(5,5),0)
+        blur3 = cv2.GaussianBlur(img,(3,3),0)
+        DoGim = blur5 - blur3
+        img_out = img - strength*DoGim
+    
+    else: # 'laplacian': using LoG (actually, median blur instead of gaussian)
+        #randomize kernel_size between 1, 3 and 5
+        if kernel_size is None:
+            kernel_sizes = [1, 3, 5]
+            kernel_size = random.choice(kernel_sizes)
+        # Median filtering (could be Gaussian for proper LoG)
+        #gray_image_mf = median_filter(gray_image, 1)
+        if blur_algo == 'median':
+            smooth = cv2.medianBlur(img, kernel_size)
+        # Calculate the Laplacian (LoG, or in this case, Laplacian of Median)
+        lap = cv2.Laplacian(smooth,cv2.CV_64F)
+        # Calculate the sharpened image
+        img_out = img - strength*lap
+    
+     # Saturate the pixels in either direction
+    img_out[img_out>255] = 255
+    img_out[img_out<0] = 0
+    
+    # Re-normalize
+    if znorm == False: # normalize img_or back to the [0,1] range
+        img_out = img_out/255.0
+    if znorm==True: # normalize images back to range [-1, 1] 
+        img_out = (img_out/255.0 - 0.5) * 2 # xi' = (xi - mu)/sigma
+    
+    return img_out
 
 
 
