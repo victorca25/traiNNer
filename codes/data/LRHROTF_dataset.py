@@ -342,6 +342,11 @@ class LRHRDataset(data.Dataset):
                 elif self.opt['auto_levels'] == True or self.opt['auto_levels'] == 'Both':
                     img_HR = augmentations.simplest_cb(img_HR)
                     img_LR = augmentations.simplest_cb(img_LR)
+            
+            # Apply unsharpening mask to HR images
+            rand_unsharp = (1 - self.opt['rand_unsharp']) if self.opt['rand_unsharp'] else 1 # Randomize for augmentation
+            if self.opt['unsharp_mask'] and np.random.rand() > rand_unsharp:
+                img_HR = augmentations.unsharp_mask(img_HR)
         
         # For testing and validation
         if self.opt['phase'] != 'train':
@@ -363,7 +368,8 @@ class LRHRDataset(data.Dataset):
         if self.opt['phase'] == 'train':
             if self.output_sample_imgs:
                 import os
-                LR_dir, im_name = os.path.split(LR_path)
+                # LR_dir, im_name = os.path.split(LR_path)
+                HR_dir, im_name = os.path.split(HR_path)
                 #baseHRdir, _ = os.path.split(HR_dir)
                 #debugpath = os.path.join(baseHRdir, os.sep, 'sampleOTFimgs')
                 
