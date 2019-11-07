@@ -1,5 +1,6 @@
 {
-  "name": "debug_001_asrresnet_fatC"
+  "name": "debug_001_template" //use “debug” in the name to run a test session and check everything is working. Does validation and state saving every 8 iterations.
+  //"name": "001_template" //remove “debug” to run the real training session.
   , "use_tb_logger": true
   , "model":"srragan" //srragan | sr | srgan | ppon | asrragan
   , "scale": 4
