@@ -43,7 +43,7 @@ def main():
             resume_state_path = util.sorted_nicely(glob.glob(os.path.normpath(opt['path']['resume_state']) + '/*.state'))[-1]
         else:
             resume_state_path = opt['path']['resume_state']
-        resume_state = torch.load(resume_state_path)
+        resume_state = torch.load(resume_state_path,map_location='cpu') # use system memory instead of VRAM
     else:  # training from scratch
         resume_state = None
         util.mkdir_and_rename(opt['path']['experiments_root'])  # rename old folder if exists
