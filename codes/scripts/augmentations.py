@@ -568,10 +568,40 @@ def noise_img(img_LR, noise_types=['clean']):
                     
             noise_img = re_fs/255.0
     
+    elif noise_type == 'imdither' or noise_type == 'imquantize': # Fatality-inspired Imagemagick noise
+        from wand.image import Image
+        succeed, blobimg=cv2.imencode('.png', img_LR*255)			
+        with Image(blob=blobimg) as imgin:
+        #with Image.from_array(img_LR) as imgin: # wait for Wand fix to use
+            i=imgin.clone()
+            i.quantize(random.randint(6,32),'srgb',0,True,False)
+            if noise_type == 'imquantize':
+                #print("Quantizing...")   
+                imgin=i
+            elif noise_type == 'imdither':
+                colordith_types = ['bayer', 'other']
+                order_types     = ['o2x2','o4x4','o8x8']
+                dither_type = random.choice(colordith_types)
+                if dither_type == 'bayer':  #ordered dither
+                    #print("Ordered dithering...")
+                    imgin.ordered_dither(random.choice(order_types),'all_channels')
+                    imgin.remap(i) # remap to quantised sample
+                else :                      #other dither noise
+                    #print("Scattered dithering...")
+                    imgin.remap(i,random.choice(['floyd_steinberg','riemersma']))
+            imgin.depth=8
+            imgin.format        = 'png'
+            imgin.alpha_channel = 'remove' # discard alpha channel
+            #print("Converting to blob")
+            imgbuff=np.asarray(bytearray(imgin.make_blob('png')), dtype=np.uint8)
+        # noise_img = np.array(imgin) # wait for wand fix to implement
+        noise_img = cv2.imdecode(imgbuff, cv2.IMREAD_COLOR)
+        noise_img = noise_img.astype(np.float32) / 255.0
+	
     elif noise_type == 'clean': # Pass clean image, without noise
         noise_img = img_LR
-        
-    #img_LR = np.clip(noise_img, 0, 1)
+   
+    img_LR = np.clip(noise_img, 0, 1) #pass back noise
     return img_LR, noise_type
 
 
