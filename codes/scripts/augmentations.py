@@ -11,6 +11,12 @@ import util as util
 import numpy as np
 import cv2
 
+try :
+    from wand.image import image
+    is_wand_available = True
+except:
+    is_wand_available = False
+
 IMAGE_EXTENSIONS = ['.png', '.jpg']
 
 def is_image_file(filename):
@@ -569,7 +575,6 @@ def noise_img(img_LR, noise_types=['clean']):
             noise_img = re_fs/255.0
     
     elif noise_type == 'imdither' or noise_type == 'imquantize': # Fatality-inspired Imagemagick noise
-        from wand.image import Image
         succeed, blobimg=cv2.imencode('.png', img_LR*255)			
         with Image(blob=blobimg) as imgin:
         #with Image.from_array(img_LR) as imgin: # wait for Wand fix to use
@@ -598,7 +603,7 @@ def noise_img(img_LR, noise_types=['clean']):
         noise_img = cv2.imdecode(imgbuff, cv2.IMREAD_COLOR)
         noise_img = noise_img.astype(np.float32) / 255.0
 	
-    elif noise_type == 'clean': # Pass clean image, without noise
+    else: # Pass clean noiseless image, removed 'clean' condition so that noise_img intializes
         noise_img = img_LR
    
     img_LR = np.clip(noise_img, 0, 1) #pass back noise
@@ -1064,7 +1069,7 @@ if __name__ == '__main__':
     if args.noise:
         noise_types = [args.noise]
     else:
-        noise_types = ["gaussian", "gaussian", "JPEG", "JPEG", "quantize", "poisson", "dither", "s&p", "speckle", "clean", "clean", "clean", "clean"]
+        noise_types = ["gaussian", "JPEG", "quantize", "dither", "imquantize", "imdither", "poisson", "s&p", "speckle", "clean", "clean", "clean", "clean"]
     
     if args.noise2:
         noise_types2 = [args.noise2]
