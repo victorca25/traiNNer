@@ -12,7 +12,7 @@ import numpy as np
 import cv2
 
 try :
-    from wand.image import image
+    from wand.image import Image
     is_wand_available = True
 except:
     is_wand_available = False
