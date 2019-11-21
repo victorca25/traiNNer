@@ -572,7 +572,7 @@ def noise_img(img_LR, noise_types=['clean']):
         noise_img = img_LR
         
     #img_LR = np.clip(noise_img, 0, 1)
-    return img_LR, noise_type
+    return noise_img, noise_type
 
 
 def random_pix(size):
