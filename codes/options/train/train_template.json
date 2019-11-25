@@ -53,7 +53,7 @@
       , "lr_blur": false //true | false
       , "lr_blur_types":  ["gaussian", "clean", "clean", "clean"] //select from: ["average","box","gaussian","bilateral","clean"] //#blur options #median and motion aren't working yet
       , "lr_noise": false //true | false
-      , "lr_noise_types": ["gaussian", "clean", "clean", "clean", "clean"] //select from: ["gaussian", "JPEG", "quantize", "poisson", "dither", "s&p", "speckle", "clean"]
+      , "lr_noise_types": ["gaussian", "clean", "clean", "clean", "clean"] //select from: ["imdither","imquantize","gaussian", "JPEG", "quantize", "poisson", "dither", "s&p", "speckle", "clean"]
       , "lr_noise2": false //true | false
       , "lr_noise_types2": ["dither", "dither", "clean", "clean"] //select from: ["gaussian", "JPEG", "quantize", "poisson", "dither", "s&p", "speckle", "clean"]
       , "hr_noise": false //true | false
@@ -97,7 +97,7 @@
     //, "pretrain_model_G": "../experiments/pretrained_models/PPON_G.pth"
     // , "resume_state": "../experiments/debug_002_RRDB_ESRGAN_x4_DIV2K/training_state/16.state"
   }
-
+  ,"load2CPU":false // Change to true to loadstate using CPU if VRAM not enough
   //Generator options:
   , "network_G": {
     //ESRGAN:
