@@ -337,7 +337,7 @@ def blur_img(img_LR, blur_algos=['clean'], kernel_size = 0):
         blurred = img_LR
 
     #img_LR = np.clip(blurred, 0, 1) 
-    return img_LR, blur_type, kernel_size
+    return blurred, blur_type, kernel_size
 
 
 def minmax(v): #for Floyd-Steinberg dithering noise
@@ -605,9 +605,8 @@ def noise_img(img_LR, noise_types=['clean']):
 	
     else: # Pass clean noiseless image, removed 'clean' condition so that noise_img intializes
         noise_img = img_LR
-   
-    img_LR = np.clip(noise_img, 0, 1) #pass back noise
-    return img_LR, noise_type
+    #img_LR = np.clip(noise_img, 0, 1)
+    return noise_img, noise_type
 
 
 def random_pix(size):
