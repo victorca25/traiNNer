@@ -42,7 +42,7 @@
       
       // If manually configuring on the fly generation of LR: (else, it will automatically default to Matlab-like downscale algorithm (777) when/if required
       , "lr_downscale": true //false
-      , "lr_downscale_types": [1,2,777] //select from [0,1,2,3,4,5,777] where each number is: ["cv2.INTER_NEAREST", "cv2.INTER_LINEAR", "cv2.INTER_CUBIC", "cv2.INTER_AREA", "cv2.INTER_LANCZOS4", "cv2.INTER_LINEAR_EXACT", matlab.bicubic] //scale_algos //scaling interpolation options
+      , "lr_downscale_types": [1,2,777] //select from [0,1,2,3,4,5,420,777] where each number is: ["cv2.INTER_NEAREST", "cv2.INTER_LINEAR", "cv2.INTER_CUBIC", "cv2.INTER_AREA", "cv2.INTER_LANCZOS4", "cv2.INTER_LINEAR_EXACT","liquidscale", matlab.bicubic] //scale_algos //scaling interpolation options
       
       // Rotations augmentations:
       , "use_flip": true //flip images 
@@ -53,7 +53,7 @@
       , "lr_blur": false //true | false
       , "lr_blur_types":  ["gaussian", "clean", "clean", "clean"] //select from: ["average","box","gaussian","bilateral","clean"] //#blur options #median and motion aren't working yet
       , "lr_noise": false //true | false
-      , "lr_noise_types": ["gaussian", "clean", "clean", "clean", "clean"] //select from: ["imdither","imquantize","gaussian", "JPEG", "quantize", "poisson", "dither", "s&p", "speckle", "clean"]
+      , "lr_noise_types": ["gaussian", "clean", "clean", "clean", "clean"] //select from: ["kuwahara","imdither","imquantize","gaussian", "JPEG", "quantize", "poisson", "dither", "s&p", "speckle", "clean"]
       , "lr_noise2": false //true | false
       , "lr_noise_types2": ["dither", "dither", "clean", "clean"] //select from: ["gaussian", "JPEG", "quantize", "poisson", "dither", "s&p", "speckle", "clean"]
       , "hr_noise": false //true | false
