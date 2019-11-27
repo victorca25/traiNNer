@@ -14,10 +14,12 @@ import cv2
 try :
     from wand.image import Image
     is_wand_available = True
+    #print("wand success import")
 except:
     is_wand_available = False
 
 IMAGE_EXTENSIONS = ['.png', '.jpg']
+
 
 def is_image_file(filename):
     return any(filename.endswith(extension) for extension in IMAGE_EXTENSIONS)
@@ -135,6 +137,20 @@ def random_erasing(image_origin, p=0.5, s=(0.02, 0.4), r=(0.3, 3), modes=[0,1,2]
         image[top:bottom, left:right, :] = np.random.rand(mask_height, mask_width, image.shape[2])
     return image
 
+def blobpng(image): # convert Wand image back to NumPy 
+    image.depth=8
+    image.format        = 'png'
+    image.alpha_channel = 'remove' # discard alpha channel
+    imgbuff=np.asarray(bytearray(image.make_blob('png')), dtype=np.uint8)
+    return cv2.imdecode(imgbuff, cv2.IMREAD_COLOR)
+	
+def liquidscale(image,dim): # liquid rescale for God knows what
+    succeed, blobimg=cv2.imencode('.png', image*255)			
+    with Image(blob=blobimg) as imgin:
+        imgin.liquid_rescale(dim[0],dim[1])		
+        scaled = blobpng(imgin)
+    return scaled.astype(np.float32) / 255.0
+
 # scale image
 def scale_img(image, scale, algo=None):
     h,w,c = image.shape
@@ -145,14 +161,16 @@ def scale_img(image, scale, algo=None):
         scale_algos = [cv2.INTER_NEAREST, cv2.INTER_LINEAR, cv2.INTER_CUBIC, cv2.INTER_AREA, cv2.INTER_LANCZOS4, cv2.INTER_LINEAR_EXACT] #scaling interpolation options
         interpol = random.choice(scale_algos)
         resized = cv2.resize(image, newdim, interpolation = interpol)
+
     # using matlab imresize
     else:
         if isinstance(algo, list):
             interpol = random.choice(algo)
         elif isinstance(algo, int):
             interpol = algo
-        
-        if interpol == 777: #'matlab_bicubic'
+        if is_wand_available == True and interpol==420: #'Wand liquid rescale           
+            resized = liquidscale(image,newdim)	
+        elif interpol == 777: #'matlab_bicubic'
             resized = util.imresize_np(image, 1 / scale, True)
             # force to 3 channels
             # if resized.ndim == 2:
@@ -179,7 +197,9 @@ def resize_img(image, crop_size=(128, 128), algo=None):
         elif isinstance(algo, int):
             interpol = algo
             
-    if interpol == 777: #'matlab_bicubic'
+    if is_wand_available == True and interpol==420: #'Wand liquid rescale           
+        resized = liquidscale(image,newdim)	
+    elif interpol == 777: #'matlab_bicubic'
         resized = util.imresize_np(image, 1 / scale, True)
         # force to 3 channels
         # if resized.ndim == 2:
@@ -337,7 +357,7 @@ def blur_img(img_LR, blur_algos=['clean'], kernel_size = 0):
         blurred = img_LR
 
     #img_LR = np.clip(blurred, 0, 1) 
-    return blurred, blur_type, kernel_size
+    return img_LR, blur_type, kernel_size
 
 
 def minmax(v): #for Floyd-Steinberg dithering noise
@@ -574,7 +594,8 @@ def noise_img(img_LR, noise_types=['clean']):
                     
             noise_img = re_fs/255.0
     
-    elif noise_type == 'imdither' or noise_type == 'imquantize': # Fatality-inspired Imagemagick noise
+    elif is_wand_available == True and noise_type in ['imdither','imquantize']: # Fatality-inspired Imagemagick noise
+        #print("Doing IM noise") 
         succeed, blobimg=cv2.imencode('.png', img_LR*255)			
         with Image(blob=blobimg) as imgin:
         #with Image.from_array(img_LR) as imgin: # wait for Wand fix to use
@@ -594,19 +615,21 @@ def noise_img(img_LR, noise_types=['clean']):
                 else :                      #other dither noise
                     #print("Scattered dithering...")
                     imgin.remap(i,random.choice(['floyd_steinberg','riemersma']))
-            imgin.depth=8
-            imgin.format        = 'png'
-            imgin.alpha_channel = 'remove' # discard alpha channel
-            #print("Converting to blob")
-            imgbuff=np.asarray(bytearray(imgin.make_blob('png')), dtype=np.uint8)
-        # noise_img = np.array(imgin) # wait for wand fix to implement
-        noise_img = cv2.imdecode(imgbuff, cv2.IMREAD_COLOR)
+            noise_img = blobpng(imgin)
         noise_img = noise_img.astype(np.float32) / 255.0
-	
+
+    elif is_wand_available == True and noise_type == 'kuwahara': # inpainting training
+        succeed, blobimg=cv2.imencode('.png', img_LR*255)			
+        with Image(blob=blobimg) as imgin:
+            imgin.kuwahara(radius=2, sigma=1.5)
+            noise_img = blobpng(imgin)
+        noise_img = noise_img.astype(np.float32) / 255.0   			
+        
     else: # Pass clean noiseless image, removed 'clean' condition so that noise_img intializes
         noise_img = img_LR
+        
     #img_LR = np.clip(noise_img, 0, 1)
-    return noise_img, noise_type
+    return noise_img, noise_type 
 
 
 def random_pix(size):
@@ -702,7 +725,6 @@ def translate_chan(img_or):
 def max_rgb_filter(image):
 	# split the image into its BGR components
 	(B, G, R) = cv2.split(image)
- 
 	# find the maximum pixel intensity values for each
 	# (x, y)-coordinate,, then set all pixel values less
 	# than M to zero
@@ -710,7 +732,7 @@ def max_rgb_filter(image):
 	R[R < M] = 0
 	G[G < M] = 0
 	B[B < M] = 0
- 
+
 	# merge the channels back together and return the image
 	return cv2.merge([B, G, R])
 
@@ -876,6 +898,7 @@ def random_img(img_dir, save_path, crop_size=(128, 128), scale=1, blur_algos=['c
 def single_image(img_path, save_path, crop_size=(128, 128), scale=1, blur_algos=['clean'], noise_types=['clean'], noise_types2=['clean']):
     env = None
     img = util.read_img(env, img_path) #read image from path, opens with OpenCV, value ranges from 0 to 1
+    
     print(img.shape)
     
     img_crop = random_crop(img, crop_size)
@@ -920,7 +943,7 @@ def single_image(img_path, save_path, crop_size=(128, 128), scale=1, blur_algos=
     #"""
     cv2.imwrite(save_path+'/blur_'+str(blur_kernel_size)+'_'+str(blur_algo)+'_.png',img_blur*255) 
     #"""
-    
+
     img_noise, noise_algo = noise_img(img, noise_types)
     #img_noise, noise_algo = noise_img(img_scale, noise_types)
     print(img_noise.shape)
@@ -1068,7 +1091,7 @@ if __name__ == '__main__':
     if args.noise:
         noise_types = [args.noise]
     else:
-        noise_types = ["gaussian", "JPEG", "quantize", "dither", "imquantize", "imdither", "poisson", "s&p", "speckle", "clean", "clean", "clean", "clean"]
+        noise_types = ["gaussian", "JPEG", "poisson", "imquantize", "imdither", "s&p", "speckle", "quantize", "dither", "clean", "clean"]
     
     if args.noise2:
         noise_types2 = [args.noise2]
