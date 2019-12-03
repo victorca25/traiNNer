@@ -136,11 +136,11 @@ def random_erasing(image_origin, p=0.5, s=(0.02, 0.4), r=(0.3, 3), modes=[0,1,2]
     else: # replace with random pixel values (noise) (With the selected erasing region Ie, each pixel in Ie is assigned to a random value in [0, 1], respectively.)
         image[top:bottom, left:right, :] = np.random.rand(mask_height, mask_width, image.shape[2])
     return image
-	
+
 def liquidscale(image,dim): # liquid rescale for God knows what
-    with Image.from_array(image) as imgin:
+    with Image.from_array(image) as imgin:	
         imgin.liquid_rescale(dim[0],dim[1])		
-        return np.array(imgin).astype(np.float32) / 255
+        return np.array(imgin).astype(np.float32) / 255.0
 
 # scale image
 def scale_img(image, scale, algo=None):
@@ -354,6 +354,7 @@ def minmax(v): #for Floyd-Steinberg dithering noise
     if v < 0:
         v = 0
     return v
+
 
 def noise_img(img_LR, noise_types=['clean']):
     noise_type = random.choice(noise_types) 
@@ -584,7 +585,9 @@ def noise_img(img_LR, noise_types=['clean']):
     
     elif is_wand_available == True and noise_type in ['imdither','imquantize']: # Fatality-inspired Imagemagick noise
         #print("Doing IM noise") 
-        with Image.from_array(img_LR) as imgin:
+        #Convert to BGR because Wand loads numpy this way for some reason
+        img = cv2.cvtColor(img_LR, cv2.COLOR_BGR2RGB)
+        with Image.from_array(img) as imgin:
             i=imgin.clone()
             i.quantize(random.randint(6,32),'srgb',0,True,False)
             if noise_type == 'imquantize':  
@@ -600,12 +603,16 @@ def noise_img(img_LR, noise_types=['clean']):
                 else :             #other dither noise
                     #print("Scattered dithering...")
                     imgin.remap(i,random.choice(['floyd_steinberg','riemersma']))
-            noise_img = np.array(imgin)/255
+            noise_img = np.array(imgin).astype(np.float32) / 255.0
+        #Convert back to RGB
+        noise_img = cv2.cvtColor(noise_img, cv2.COLOR_BGR2RGB)
 
     elif is_wand_available == True and noise_type == 'kuwahara': # inpainting training
-        with Image.from_array(img_LR) as imgin:
+        img = cv2.cvtColor(img_LR, cv2.COLOR_BGR2RGB)
+        with Image.from_array(img) as imgin:
             imgin.kuwahara(radius=2, sigma=1)
-            noise_img = np.array(imgin)/255   			
+            noise_img = np.array(imgin).astype(np.float32) / 255.0			
+        noise_img = cv2.cvtColor(noise_img, cv2.COLOR_BGR2RGB)
         
     else: # Pass clean noiseless image, removed 'clean' condition so that noise_img intializes
         noise_img = img_LR
