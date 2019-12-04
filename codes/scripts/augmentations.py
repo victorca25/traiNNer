@@ -142,11 +142,18 @@ def liquidscale(image,dim): # liquid rescale for God knows what
         imgin.liquid_rescale(dim[0],dim[1])		
         return np.array(imgin).astype(np.float32) / 255.0
 
+def rgbscale(image,dim): # liquid rescale for God knows what
+    with Image.from_array(image) as imgin:
+        imgin.colorspace='rgb'	
+        imgin.resize(dim[0],dim[1])
+        imgin.colorspace='srgb'
+        return np.array(imgin).astype(np.float32) / 255.0
+		
 # scale image
 def scale_img(image, scale, algo=None):
     h,w,c = image.shape
     newdim = (int(w/scale), int(h/scale))
-    
+    resized=image
     # randomly use OpenCV2 algorithms if none are provided
     if algo is None:    	
         scale_algos = [cv2.INTER_NEAREST, cv2.INTER_LINEAR, cv2.INTER_CUBIC, cv2.INTER_AREA, cv2.INTER_LANCZOS4, cv2.INTER_LINEAR_EXACT] #scaling interpolation options
@@ -159,8 +166,11 @@ def scale_img(image, scale, algo=None):
             interpol = random.choice(algo)
         elif isinstance(algo, int):
             interpol = algo
-        if is_wand_available == True and interpol==420: #'Wand liquid rescale
-            resized = liquidscale(image,newdim)	
+        
+        if is_wand_available == True and interpol==420: #liquid rescale
+            resized = liquidscale(image,newdim) 
+        elif is_wand_available == True and interpol==123: #rgb scale
+            resized = rgbscale(image,newdim)
         elif interpol == 777: #'matlab_bicubic'
             resized = util.imresize_np(image, 1 / scale, True)
             # force to 3 channels
