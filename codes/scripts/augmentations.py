@@ -142,11 +142,11 @@ def liquidscale(image,dim): # liquid rescale for God knows what
         imgin.liquid_rescale(dim[0],dim[1])		
         return np.array(imgin).astype(np.float32) / 255.0
 
-def rgbscale(image,dim): # liquid rescale for God knows what
+def rgbscale(image,dim): # rgbscale, better clarity than 'cv2.INTER_AREA'
     with Image.from_array(image) as imgin:
-        imgin.colorspace='rgb'	
-        imgin.resize(dim[0],dim[1])
-        imgin.colorspace='srgb'
+        imgin.transform_colorspace('rgb')	
+        imgin.resize(dim[0],dim[1],filter='box')
+        imgin.transform_colorspace('srgb')
         return np.array(imgin).astype(np.float32) / 255.0
 		
 # scale image
@@ -166,7 +166,6 @@ def scale_img(image, scale, algo=None):
             interpol = random.choice(algo)
         elif isinstance(algo, int):
             interpol = algo
-        
         if is_wand_available == True and interpol==420: #liquid rescale
             resized = liquidscale(image,newdim) 
         elif is_wand_available == True and interpol==123: #rgb scale
@@ -905,7 +904,8 @@ def single_image(img_path, save_path, crop_size=(128, 128), scale=1, blur_algos=
     #"""
     cv2.imwrite(save_path+'/crop_.png',img_crop*255) 
     #"""
-    
+
+    print("Resizing")    
     img_resize, _ = resize_img(img, crop_size)
     print(img_resize.shape)
     #"""
@@ -929,12 +929,16 @@ def single_image(img_path, save_path, crop_size=(128, 128), scale=1, blur_algos=
     #"""
     cv2.imwrite(save_path+'/erasing_.png',img_erasing*255) 
     #"""
-    
+
+    scaletype=[0,1,2,3,4,5,123,420,777]
+    #scaletype=[123]
+    for which in scaletype :
+        print("Scaling - ",which)    
     #scale = 4
-    img_scale, interpol_algo = scale_img(img, scale)
-    print(img_scale.shape)    
+        img_scale, interpol_algo = scale_img(img, scale,which)
+        print(img_scale.shape)    
     #"""
-    cv2.imwrite(save_path+'/scale_'+str(scale)+'_'+str(interpol_algo)+'_.png',img_scale*255) 
+        cv2.imwrite(save_path+'/scale_'+str(scale)+'_'+str(interpol_algo)+'_.png',img_scale*255) 
     #"""
     
     img_blur, blur_algo, blur_kernel_size = blur_img(img, blur_algos)
@@ -1006,7 +1010,7 @@ def apply_dir(img_path, save_path, crop_size=(128, 128), scale=1, blur_algos=['c
         #"""
         
         #scale = 4
-        img_scale, interpol_algo = scale_img(img, scale)
+        img_scale, interpol_algo = scale_img(img, scale,which)
         print(img_scale.shape)    
         #"""
         cv2.imwrite(save_path+'/'+rann+'scale_'+str(scale)+'_'+str(interpol_algo)+'_.png',img_scale*255) 
