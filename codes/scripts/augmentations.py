@@ -145,7 +145,8 @@ def liquidscale(image,dim): # liquid rescale for God knows what
 def rgbscale(image,dim): # rgbscale, better clarity than 'cv2.INTER_AREA'
     with Image.from_array(image) as imgin:
         imgin.transform_colorspace('rgb')	
-        imgin.resize(dim[0],dim[1],filter='box')
+        #imgin.resize(dim[0],dim[1],filter='box')
+        imgin.adaptive_resize(dim[0],dim[1])
         imgin.transform_colorspace('srgb')
         return np.array(imgin).astype(np.float32) / 255.0
 		
