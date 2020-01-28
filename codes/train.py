@@ -70,7 +70,7 @@ def main():
     # random seed
     seed = opt['train']['manual_seed']
     if seed is None or seed <= -1:
-        seed = random.randint(0, (2 ^ 32)-1)  # np.random.seed must be between 0 and (2^32)-1
+        seed = random.randint(0, (2**32)-1)  # np.random.seed must be between 0 and (2^32)-1
     logger.info(f"Selected seed: {seed}")
     util.set_random_seed(seed)
 
