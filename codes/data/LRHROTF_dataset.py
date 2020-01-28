@@ -5,11 +5,11 @@ import cv2
 import torch
 import torch.utils.data as data
 import data.util as util
+import logging
 
 import sys
-sys.path.append('../codes/scripts')
-sys.path.append('../codes/data')
-import augmentations
+
+from scripts import augmentations
 
 class LRHRDataset(data.Dataset):
     '''
@@ -26,6 +26,8 @@ class LRHRDataset(data.Dataset):
         self.LR_env = None  # environment for lmdb
         self.HR_env = None
         self.output_sample_imgs = None
+    
+        logger = logging.getLogger('dataset')
 
         # read image list from subset list txt
         if opt['subset_file'] is not None and opt['phase'] == 'train':
@@ -35,82 +37,48 @@ class LRHRDataset(data.Dataset):
             if opt['dataroot_LR'] is not None:
                 raise NotImplementedError('Now subset only supports generating LR on-the-fly.')
         else:  # read image list from lmdb or image files
-            # Check if dataroot_HR is a list of directories or a single directory. Note: lmdb will not currently work with a list
-            HR_images_paths = opt['dataroot_HR']
-            if type(HR_images_paths) is list:
-                self.HR_env = []
-                self.paths_HR = []
-                for path in HR_images_paths:
-                    HR_env, paths_HR = util.get_image_paths(opt['data_type'], path)
-                    if type(HR_env) is list:
-                        for imgs in HR_env:
-                            self.HR_env.append(imgs)
-                    for imgs in paths_HR:
-                        self.paths_HR.append(imgs)
-                if self.HR_env.count(None) == len(self.HR_env):
-                    self.HR_env = None
-                else:
-                    self.HR_env = sorted(self.HR_env)
+            # Note: lmdb will not currently work
+            if type(opt['dataroot_HR']) is str:
+                opt['dataroot_HR'] = [opt['dataroot_HR']]
+            if type(opt['dataroot_LR']) is str:
+                opt['dataroot_LR'] = [opt['dataroot_LR']]
+            generated_lr_imgs = 0
+            for i, hr_path in enumerate(opt['dataroot_HR']):
+                hr_env, hr_imgs = util.get_image_paths(opt['data_type'], hr_path)
+                if type(hr_env) is list:
+                    if type(self.HR_env) is not list:
+                        self.HR_env = []
+                    self.HR_env += hr_env
+                if type(hr_imgs) is list:
+                    if type(self.paths_HR) is not list:
+                        self.paths_HR = []
+                    self.paths_HR += hr_imgs
+                    for hr_img in hr_imgs:
+                        lr_img = os.path.join(opt['dataroot_LR'][i], os.path.relpath(hr_img, hr_path))
+                        if not os.path.exists(lr_img):
+                            print(f"LR not found, generating on-the-fly: {lr_img}")
+                            self.paths_LR.append(None)
+                        else:
+                            if type(self.paths_LR) is not list:
+                                self.paths_LR = []
+                            self.paths_LR.append(lr_img)
+            logger.info(f"Missing but generated on-the-fly LR images: {self.paths_LR.count(None)}")
+            # sort images and env's if any
+            if self.HR_env:
+                self.HR_env = sorted(self.HR_env)
+            if self.LR_env:
+                self.LR_env = sorted(self.LR_env)
+            if self.paths_HR:
                 self.paths_HR = sorted(self.paths_HR)
-            elif type(HR_images_paths) is str:
-                self.HR_env, self.paths_HR = util.get_image_paths(opt['data_type'], HR_images_paths)
-            
-            # Check if dataroot_LR is a list of directories or a single directory. Note: lmdb will not currently work with a list
-            LR_images_paths = opt['dataroot_LR']
-            if type(LR_images_paths) is list:
-                self.LR_env = []
-                self.paths_LR = []
-                for path in LR_images_paths:
-                    LR_env, paths_LR = util.get_image_paths(opt['data_type'], path)
-                    if type(LR_env) is list:
-                        for imgs in LR_env:
-                            self.LR_env.append(imgs)
-                    for imgs in paths_LR:
-                        self.paths_LR.append(imgs)
-                if self.LR_env.count(None) == len(self.LR_env):
-                    self.LR_env = None
-                else:
-                    self.LR_env = sorted(self.LR_env)
+            if self.paths_LR:
                 self.paths_LR = sorted(self.paths_LR)
-            elif type(LR_images_paths) is str:
-                self.LR_env, self.paths_LR = util.get_image_paths(opt['data_type'], LR_images_paths)
 
-        assert self.paths_HR, 'Error: HR path is empty.'
-        if self.paths_LR and self.paths_HR:
-            # Modify to allow using HR and LR folders with different amount of images
-            # - If an LR image pair is not found, downscale HR on the fly, else, use the LR
-            # - If all LR are provided and 'lr_downscale' is enabled, randomize use of provided LR and OTF LR for augmentation
-            """
-            assert len(self.paths_LR) == len(self.paths_HR), \
-                'HR and LR datasets have different number of images - {}, {}.'.format(\
-                len(self.paths_LR), len(self.paths_HR))
-            """
-            """
-            assert len(self.paths_HR) >= len(self.paths_LR), \
-                'HR dataset contains less images than LR dataset  - {}, {}.'.format(\
-                len(self.paths_LR), len(self.paths_HR))
-            """
-            warned = False
-            for i in range(len(self.paths_LR)):
-                hr_name = os.path.join(opt['dataroot_HR'], os.path.relpath(self.paths_LR[i], opt['dataroot_LR']))
-                if not os.path.exists(hr_name):
-                    if not warned:
-                        warned = True
-                        print('LR dataset contains extra images. Extra images will be ignored.')
-                    print('Ignored: {}'.format(hr_name))
-            tmp = []
-            warned = False
-            for i in range(len(self.paths_HR)):
-                lr_name = os.path.join(opt['dataroot_LR'], os.path.relpath(self.paths_HR[i], opt['dataroot_HR']))
-                if not os.path.exists(lr_name):
-                    if not warned:
-                        warned = True
-                        print('LR dataset missing images from HR dataset. Will generate missing images on the fly.')
-                    print('Missing: {}'.format(lr_name))
-                    tmp.append(None)
-                else:
-                    tmp.append(lr_name)
-            self.paths_LR = tmp
+        assert self.paths_HR, 'Error: No HR images found in specified directories.'
+        assert (
+            self.paths_HR and len(self.paths_HR) >= len(self.paths_LR)
+        ), 'Error: HR dataset contains less images than LR dataset - {}, {}.'.format(
+            len(self.paths_LR), len(self.paths_HR)
+        )
         
         #self.random_scale_list = [1]
 
