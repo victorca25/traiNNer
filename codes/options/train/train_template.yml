@@ -78,7 +78,7 @@ datasets:
     ]
     hr_noise_types: [
       # options: gaussian,JPEG,quantize,poisson,dither,s&p,speckle,clean
-      "gaussian", "clean", "clean", "clean", "clean"
+      gaussian, clean, clean, clean, clean
     ]
     lr_noise_types: [
       # options: gaussian,JPEG,quantize,poisson,dither,s&p,speckle,clean
@@ -86,7 +86,7 @@ datasets:
     ]
     lr_noise_types2: [
       # options: gaussian,JPEG,quantize,poisson,dither,s&p,speckle,clean
-      "dither", "dither", "clean", "clean"
+      dither, dither, clean, clean
     ]
     lr_fringes_chance: 0.4
     rand_auto_levels: 0.7  # 1=100%, 0=0% # chance of using auto_levels on an image
@@ -211,7 +211,7 @@ train:
   spl_weight: ~  # SPL loss function [note: needs to add a cap in the generator (finalcap) or it becomes unstable], !!float 1e-3
   spl_type: ~  # spl | gpl | cpl
   # GD gan loss
-  gan_type: "vanilla"  # vanilla | basic | wgan-gp
+  gan_type: vanilla  # vanilla | basic | wgan-gp
   gan_weight: !!float 5e-3
   D_update_ratio: ~  # 1
   D_init_iters: ~    # 0
