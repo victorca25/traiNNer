@@ -104,14 +104,17 @@ class NoneDict(dict):
 
 
 # convert to NoneDict, which return None for missing key.
-def dict_to_nonedict(opt):
+def iterable_missing_hook(opt):
+    """
+    Hook Iterable to return `None` on missing-key get
+    """
     if isinstance(opt, dict):
         new_opt = dict()
         for key, sub_opt in opt.items():
-            new_opt[key] = dict_to_nonedict(sub_opt)
+            new_opt[key] = iterable_missing_hook(sub_opt)
         return NoneDict(**new_opt)
-    if isinstance(opt, list):
-        return [dict_to_nonedict(sub_opt) for sub_opt in opt]
+    elif isinstance(opt, list):
+        return [iterable_missing_hook(sub_opt) for sub_opt in opt]
     return opt
 
 
