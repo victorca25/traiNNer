@@ -1,8 +1,6 @@
 import os
 import os.path as osp
 import logging
-from collections import OrderedDict
-import json
 import yaml
 from utils.util import OrderedYaml
 Loader, Dumper = OrderedYaml()
@@ -31,11 +29,11 @@ def parse(opt_path, is_train=True):
                 dataset['dataroot_HR'] = []
                 for path in HR_images_paths:
                     dataset['dataroot_HR'].append(os.path.expanduser(path))
-                    # if dataset['dataroot_HR'].endswith('lmdb'): #missing, how to check for lmdb with a list?
-                        # is_lmdb = True
+                    if any([x for x in dataset['dataroot_HR'] if os.path.splitext(os.path.basename(x))[1].lower() == 'lmdb']):
+                        is_lmdb = True
             elif type(HR_images_paths) is str:
                 dataset['dataroot_HR'] = os.path.expanduser(HR_images_paths)
-                if dataset['dataroot_HR'].endswith('lmdb'):
+                if os.path.splitext(os.path.basename(dataset['dataroot_HR']))[1].lower() == 'lmdb':
                     is_lmdb = True
         if 'dataroot_HR_bg' in dataset and dataset['dataroot_HR_bg'] is not None:
             HR_images_paths = dataset['dataroot_HR_bg']        
@@ -51,11 +49,11 @@ def parse(opt_path, is_train=True):
                 dataset['dataroot_LR'] = []
                 for path in LR_images_paths:
                     dataset['dataroot_LR'].append(os.path.expanduser(path))
-                    # if dataset['dataroot_HR'].endswith('lmdb'): #missing, how to check for lmdb with a list?
-                        # is_lmdb = True
+                    if any([x for x in dataset['dataroot_LR'] if os.path.splitext(os.path.basename(x))[1].lower() == 'lmdb']):
+                        is_lmdb = True
             elif type(LR_images_paths) is str:
                 dataset['dataroot_LR'] = os.path.expanduser(LR_images_paths)
-                if dataset['dataroot_LR'].endswith('lmdb'):
+                if os.path.splitext(os.path.basename(dataset['dataroot_LR']))[1].lower() == 'lmdb':
                     is_lmdb = True
         dataset['data_type'] = 'lmdb' if is_lmdb else 'img'
 
@@ -108,10 +106,9 @@ def dict_to_nonedict(opt):
         for key, sub_opt in opt.items():
             new_opt[key] = dict_to_nonedict(sub_opt)
         return NoneDict(**new_opt)
-    elif isinstance(opt, list):
+    if isinstance(opt, list):
         return [dict_to_nonedict(sub_opt) for sub_opt in opt]
-    else:
-        return opt
+    return opt
 
 
 def dict2str(opt, indent_l=1):
