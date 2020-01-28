@@ -1,13 +1,12 @@
-import os.path
+import os
 import sys
 import math
 import argparse
 import time
 import random
 import numpy as np
-from collections import OrderedDict
 import logging
-
+from collections import OrderedDict
 import torch
 
 import options.options as option
@@ -19,10 +18,21 @@ from models.modules.LPIPS import compute_dists as lpips
 def main():
     # Load options YAML file
     parser = argparse.ArgumentParser(description="BasicSR")
-    parser.add_argument("-o", "-opt", type=str, required=True, help="Path to training YAML options file.")
+    parser.add_argument("-o", "--opt", type=str, required=True, help="Path to training YAML options file.")
     opt = option.iterable_missing_hook(
         option.parse(parser.parse_args().opt, is_train=True)
     )
+
+    # make sure an experiment folder exists
+    if not opt["path"]["resume_state"]:
+        util.mkdir_and_rename(opt["path"]["experiments_root"])  # rename old folder if exists
+        util.mkdirs((
+            path for key, path in opt["path"].items() if (
+                key != "experiments_root" and
+                "pretrain_model" not in key and
+                "resume" not in key
+            )
+        ))
 
     # Configure logging
     util.setup_logger(None, opt["path"]["log"], "train", level=logging.INFO, screen=True)
@@ -31,6 +41,7 @@ def main():
     logger.info(option.dict2str(opt))
 
     # check if a resume state is available
+    resume_state = None
     if opt["path"]["resume_state"]:
         resume_state_path = opt["path"]["resume_state"]
         if os.path.isdir(resume_state_path):
@@ -40,24 +51,7 @@ def main():
             )[-1]
         resume_state = torch.load(resume_state_path)
         logger.info(f"Set [resume_state] to \"{resume_state_path}\"")
-        logger.info("Resuming training from epoch: {}, iter: {}".format(
-            resume_state["epoch"], resume_state["iter"]
-        ))
         option.check_resume(opt)
-    else:
-        # start a new train state
-        resume_state = None
-        util.mkdir_and_rename(opt["path"]["experiments_root"])  # rename old folder if exists
-        util.mkdirs((
-            path for key, path in opt["path"].items() if (
-                key != "experiments_root" and
-                "pretrain_model" not in key and
-                "resume" not in key
-            )
-        ))
-        current_step = 0
-        epoch = 0
-        logger.info('Start training from epoch: {:d}, iter: {:d}'.format(epoch, current_step))
 
     # Create tensorboard log
     if opt["use_tb_logger"] and "debug" not in opt["name"]:
@@ -125,6 +119,14 @@ def main():
         current_step = resume_state["iter"]
         model.resume_training(resume_state)  # handle optimizers and schedulers
         model.update_schedulers(opt["train"]) # updated schedulers in case YAML configuration has changed
+        logger.info("Resuming training from epoch: {}, iter: {}".format(
+            resume_state["epoch"], resume_state["iter"]
+        ))
+    else:
+        # start a new train state
+        current_step = 0
+        epoch = 0
+        logger.info("Training from epoch: {:d}, iter: {:d}".format(epoch, current_step))
 
     while current_step <= total_iters:
         for n, train_data in enumerate(train_loader, start=1):

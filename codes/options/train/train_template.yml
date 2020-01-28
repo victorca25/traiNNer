@@ -46,22 +46,21 @@ datasets:
     HR_size: 128 # patch size. Default: 128. Needs to be coordinated with the patch size of the features network
 
     # on-the-fly features
-    color: ~                # ~ = no conversion (RGB), "y" for Y in YCbCr, "gray" to convert RGB to grayscale, "RGB" to convert gray to RGB
-    color_HR: ~             # same operation as color but only for HR, disable color using ~ if using this
-    color_LR: ~             # same operation as color but only for LR, disable color using ~ if using this
-    use_flip: true          # flip/mirror images
+    color_tar_HR: ~         # cv2 channel conversion for HR, "gray"=BGR2GRAY | "y"=BGR2YCbCr | "RGB"=GRAY2BGR | "LAB-RGB"=LAB2BGR | "RGB-LAB"=BGR2LAB | "RGB-A"=BGRA2BGR
+    color_tar_LR: ~         # cv2 channel conversion for LR, same operation as color_tar_HR
+    use_flip: true          # swap lr to be hr & hr to be lr
     use_rot: true           # rotate images in 90 degree angles
     hr_rrot: false          # rotate HR images in random degrees between -45 and 45
     lr_downscale: true      # downscale LR images
     lr_blur: false          # blur LR images
     hr_noise: false         # apply noise to HR images
-    lr_noise: false         # apply noise to LR images
-    lr_noise2: false        # apply another layer of noise to LR images
-    lr_fringes: false
-    auto_levels: ~          # HR | LR | Both # add auto levels to expand dynamic range. Can use with SPL loss or (MS)-SSIM.
-    unsharp_mask: false     # add an unsharpening mask to HR images. Works well with HFEN loss.
-    lr_cutout: false
-    lr_erasing: false
+    lr_noise: false         # primary noise application to LR images
+    lr_noise2: false        # secondary noise application to LR images
+    lr_fringes: false       # color fringing aka Chromatic Abberation (https://wikipedia.org/wiki/Chromatic_aberration)
+    auto_levels: ~          # HR | LR | Both # add auto levels to expand dynamic range. Can use with SPL loss or (MS)-SSIM
+    unsharp_mask: false     # add an unsharpening mask to HR images, orks well with HFEN loss
+    lr_cutout: false        # (test) mask / remove areas of the image for inpainting testing
+    lr_erasing: false       # (test) mask / remove random areas of the image for inpainting testing
     rand_flip_LR_HR: false  # randomly flip images based on chance
     aug_downscale: 0        # 1=100%, 0=0%, will override any existing LR image
 
@@ -88,9 +87,9 @@ datasets:
       # options: gaussian,JPEG,quantize,poisson,dither,s&p,speckle,clean
       dither, dither, clean, clean
     ]
-    lr_fringes_chance: 0.4
-    rand_auto_levels: 0.7  # 1=100%, 0=0% # chance of using auto_levels on an image
-    rand_unsharp: 1        # 1=100%, 0=0% # chance of using unsharp_mask on an image
+    lr_fringes_chance: 0.4  # 1=100%, 0=0% # chance of using lr_fringes on an image
+    rand_auto_levels: 0.7   # 1=100%, 0=0% # chance of using auto_levels on an image
+    rand_unsharp: 1         # 1=100%, 0=0% # chance of using unsharp_mask on an image
   val:
     name: val_set14_part
     mode: LRHROTF
