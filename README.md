@@ -104,16 +104,16 @@ We use a PSNR-oriented pretrained SR model to initialize the parameters for bett
 
 1. Prepare datasets, usually the DIV2K dataset. More details are in [`codes/data`](https://github.com/victorca25/BasicSR/tree/master/codes/data) and [
 (Faster IO speed)](https://github.com/xinntao/BasicSR/wiki/Faster-IO-speed). 
-1. Optional: If the intention is to replicate the original paper here you would prerapre the PSNR-oriented pretrained model. You can also use the original `RRDB_PSNR_x4.pth` as the pretrained model for that purpose, otherwise *any* existing model will work as pretrained.
-1. Modify the configuration file  `options/train/train_esrgan.json`
-1. Run command: `python train.py -opt options/train/train_esrgan.json`
+1. Optional: If the intention is to replicate the original paper here you would prepare the PSNR-oriented pretrained model. You can also use the original `RRDB_PSNR_x4.pth` as the pretrained model for that purpose, otherwise *any* existing model will work as pretrained.
+1. Modify the configuration file  `options/train/train_esrgan.yaml`
+1. Run command: `python train.py -o options/train/train_esrgan.yaml`
 
 ### Train SR models
 1. Prepare datasets, usually the DIV2K dataset. More details are in [`codes/data`](https://github.com/victorca25/BasicSR/tree/master/codes/data). 
-1. Modify the configuration file `options/train/train_sr.json`
-1. Run command: `python train.py -opt options/train/train_sr.json`
+1. Modify the configuration file `options/train/train_sr.yaml`
+1. Run command: `python train.py -o options/train/train_sr.yaml`
 
-### Train SFTGAN models 
+### Train SFTGAN models
 *Pretraining is also important*. We use a PSNR-oriented pretrained SR model (trained on DIV2K) to initialize the SFTGAN model.
 
 1. First prepare the segmentation probability maps for training data: run [`test_seg.py`](https://github.com/victorca25/BasicSR/blob/master/codes/test_seg.py). We provide a pretrained segmentation model for 7 outdoor categories in [Pretrained models](#pretrained-models). We use [Xiaoxiao Li's codes](https://github.com/lxx1991/caffe_mpi) to train our segmentation model and transfer it to a PyTorch model.
@@ -122,20 +122,20 @@ We use a PSNR-oriented pretrained SR model to initialize the parameters for bett
     1. First train with `debug` mode and obtain a saved model.
     1. Run [`transfer_params_sft.py`](https://github.com/victorca25/BasicSR/blob/master/codes/scripts/transfer_params_sft.py) to initialize the model.
     1. We provide an initialized model named `sft_net_ini.pth` in [Pretrained models](#pretrained-models)
-1. Modify the configuration file in `options/train/train_sftgan.json`
-1. Run command: `python train.py -opt options/train/train_sftgan.json`
+1. Modify the configuration file in `options/train/train_sftgan.yaml`
+1. Run command: `python train.py -o options/train/train_sftgan.yaml`
 
-### Train PPON models 
+### Train PPON models
 1. Prepare datasets, usually the DIV2K dataset. More details are in [`codes/data`](https://github.com/victorca25/BasicSR/tree/master/codes/data). 
-1. Modify the configuration file `options/train/train_PPON.json`
-1. Run command: `python train_ppon.py -opt options/train/train_PPON.json`
+1. Modify the configuration file `options/train/train_PPON.yaml`
+1. Run command: `python train_ppon.py -o options/train/train_PPON.yaml`
 
-### Resuming Training 
-When resuming training, just pass a option with the name `resume_state`, like , <small>`"resume_state": "../experiments/debug_001_RRDB_PSNR_x4_DIV2K/training_state/200.state"`. </small>
-
+### Resuming Training
+Simply pass the training_state folder path from the experiment folder to `resume_state` in your training yaml file.  
+If you want to resume from an earlier state than the last checkpoint, pass the specific state file from that folder.
 
 # Datasets
-Several common SR datasets are list below. 
+Several common SR datasets are listed below. 
 
 <table>
   <tr>
