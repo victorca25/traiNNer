@@ -34,9 +34,9 @@ datasets:
     # can be either a folder or a list of folders
     # if the amount of LR images does not match HR, they will be generated on-the-fly using HR
     dataroot_LR: [
-      "../datasets/train/lr1",
-      "../datasets/train/lr2",
-      "../datasets/train/lr3"
+      ../datasets/train/lr1,
+      ../datasets/train/lr2,
+      ../datasets/train/lr3
     ]
     subset_file: ~
     use_shuffle: true
