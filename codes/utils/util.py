@@ -22,8 +22,8 @@ except ImportError:
 ####################
 
 
-def OrderedYaml():
-    '''yaml orderedDict support'''
+def ordered_yaml():
+    """yaml orderedDict support"""
     _mapping_tag = yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG
 
     def dict_representer(dumper, data):
@@ -77,7 +77,7 @@ def set_random_seed(seed):
 
 
 def setup_logger(logger_name, root, phase, level=logging.INFO, screen=False):
-    '''set up logger'''
+    """set up logger"""
     l = logging.getLogger(logger_name)
     formatter = logging.Formatter(
         '%(asctime)s.%(msecs)03d - %(levelname)s: %(message)s', datefmt='%y-%m-%d %H:%M:%S')
@@ -103,11 +103,11 @@ def sorted_nicely( l ):
 
 
 def tensor2img(tensor, out_type=np.uint8, min_max=(0, 1)):
-    '''
+    """
     Converts a torch Tensor into an image Numpy array
     Input: 4D(B,(3/1),H,W), 3D(C,H,W), or 2D(H,W), any range, RGB channel order
     Output: 3D(H,W,C) or 2D(H,W), [0,255], np.uint8 (default)
-    '''
+    """
     
     # print ("Tensor min. val pre: ", torch.min(tensor)) # Debug
     # print ("Tensor max. val pre: ", torch.max(tensor)) # Debug
@@ -194,10 +194,10 @@ def ssim(img1, img2):
 
 
 def calculate_ssim(img1, img2):
-    '''calculate SSIM
+    """calculate SSIM
     the same outputs as MATLAB's
     img1, img2: [0, 255]
-    '''
+    """
     if not img1.shape == img2.shape:
         raise ValueError('Input images must have the same dimensions.')
     if img1.ndim == 2:

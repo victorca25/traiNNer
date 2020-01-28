@@ -1,0 +1,232 @@
+# Note:
+# This is a YAML file (https://yaml.org), it's like JSON but way more readable.
+# Whenever you want to disable something, use `~` as it's value instead of commenting out the line.
+# Often comments will provide the available options, in | this | format, the left-most option is the default
+# Comments starting with `(test)` means it's functions are being tested and may be buggy
+# Whenever `!!float n` is used it may be Scientific Notation which can be converted to decimal at https://bit.ly/2O0WsgD
+
+# use "debug" in the name to run a test session and check everything is working. Does validation and state saving every 8 iterations.
+name: debug_001_template
+use_tb_logger: true
+model: srragan # srragan | sr | srgan | ppon | asrragan
+scale: 4
+gpu_ids: [0]
+
+# Path options:
+path:
+  root: /home/owner/github/BasicSR
+  pretrain_model_G: ../experiments/pretrained_models/RRDB_PSNR_x4.pth
+  resume_state: ~  # put a path to a .state file or path to a folder of state files if you wish to continue from a previous checkpoint
+
+# Dataset options:
+datasets:
+  train:
+    name: DIV2K
+    mode: LRHROTF
+    # HR (High-Resolution / Ground-Truth images)
+    # can be either a folder or a list of folders
+    dataroot_HR: [
+      /mnt/8tb-hdd-1/datasets/ntsc2hd-animation/hr/train/,
+      #../datasets/train/hr2,
+      #../datasets/train/hr3
+    ]
+    # LR (Low-Resolution images)
+    # can be either a folder or a list of folders
+    # if the amount of LR images does not match HR, they will be generated on-the-fly using HR
+    dataroot_LR: [
+      /mnt/8tb-hdd-1/datasets/ntsc2hd-animation/lr/train/,
+      #../datasets/train/lr2,
+      #../datasets/train/lr3
+    ]
+    subset_file: ~
+    use_shuffle: true
+    znorm: false # true | false # To normalize images in [-1, 1] range. Default = None (range [0,1]). Can use with activation function like tanh.
+    n_workers: 4 # 0 to disable CPU multithreading, or an integrer representing CPU threads to use for dataloading
+    batch_size: 8
+    HR_size: 128 # patch size. Default: 128. Needs to be coordinated with the patch size of the features network
+
+    # on-the-fly features
+    color: ~                # ~ = no conversion (RGB), "y" for Y in YCbCr, "gray" to convert RGB to grayscale, "RGB" to convert gray to RGB
+    color_HR: ~             # same operation as color but only for HR, disable color using ~ if using this
+    color_LR: ~             # same operation as color but only for LR, disable color using ~ if using this
+    use_flip: true          # flip/mirror images
+    use_rot: true           # rotate images in 90 degree angles
+    hr_rrot: false          # rotate HR images in random degrees between -45 and 45
+    lr_downscale: true      # downscale LR images
+    lr_blur: false          # blur LR images
+    hr_noise: false         # apply noise to HR images
+    lr_noise: false         # apply noise to LR images
+    lr_noise2: false        # apply another layer of noise to LR images
+    lr_fringes: false
+    auto_levels: ~          # HR | LR | Both # add auto levels to expand dynamic range. Can use with SPL loss or (MS)-SSIM.
+    unsharp_mask: false     # add an unsharpening mask to HR images. Works well with HFEN loss.
+    lr_cutout: false
+    lr_erasing: false
+    rand_flip_LR_HR: false  # randomly flip images based on chance
+    aug_downscale: 0        # 1=100%, 0=0%, will override any existing LR image
+
+    # on-the-fly arguments
+    lr_downscale_types: [
+      # [0,1,2,3,4,5,777] where each number is a cv2 epoch then matlab bicubic value: [INTER_NEAREST,INTER_LINEAR,INTER_CUBIC,INTER_AREA,INTER_LANCZOS4,INTER_LINEAR_EXACT,matlab.bicubic]
+      1, 2, 777
+    ]
+    #flip_chance: 0.05  # 1=100%, 0=0%
+    lr_blur_types: [
+      # options: average,box,gaussian,bilateral,clean
+      # blur options #median and motion aren't working yet
+      gaussian, clean, clean, clean
+    ]
+    hr_noise_types: [
+      # options: gaussian,JPEG,quantize,poisson,dither,s&p,speckle,clean
+      gaussian, clean, clean, clean, clean
+    ]
+    lr_noise_types: [
+      # options: gaussian,JPEG,quantize,poisson,dither,s&p,speckle,clean
+      gaussian, clean, clean, clean, clean
+    ]
+    lr_noise_types2: [
+      # options: gaussian,JPEG,quantize,poisson,dither,s&p,speckle,clean
+      dither, dither, clean, clean
+    ]
+    lr_fringes_chance: 0.4
+    rand_auto_levels: 0.7  # 1=100%, 0=0% # chance of using auto_levels on an image
+    rand_unsharp: 1        # 1=100%, 0=0% # chance of using unsharp_mask on an image
+  val:
+    name: val_set14_part
+    mode: LRHROTF
+    dataroot_HR: /mnt/8tb-hdd-1/datasets/ntsc2hd-animation/hr/val/
+    dataroot_LR: /mnt/8tb-hdd-1/datasets/ntsc2hd-animation/lr/val/
+    znorm: false  # true | false # To normalize images in [-1, 1] range. Default = None (range [0,1]). Can use with activation function like tanh.
+    
+    # on-the-fly features
+    color: ~        # ~ = no conversion (RGB), "y" for Y in YCbCr, "gray" to convert RGB to grayscale, "RGB" to convert gray to RGB
+    color_HR: ~     # same operation as color but only for HR, disable color using ~ if using this
+    color_LR: ~     # same operation as color but only for LR, disable color using ~ if using this
+    hr_crop: false
+    lr_downscale: false
+
+    # on-the-fly arguments
+    lr_downscale_types: [
+      # [0,1,2,3,4,5] where each number is a cv2 epoch then matlab bicubic value: [INTER_NEAREST,INTER_LINEAR,INTER_CUBIC,INTER_AREA,INTER_LANCZOS4,INTER_LINEAR_EXACT]
+      0, 1
+    ]
+
+# Generator options:
+network_G:
+  which_model_G: RRDB_net  # ESRGAN: RRDB_net | sr_resnet
+                           # ASRGAN: asr_resnet | asr_cnn
+                           # PPON:   ppon
+                           # SRGAN:  sr_resnet
+                           # SR:     RRDB_net
+  norm_type: ~
+  mode: CNA
+  nf: 64                   # number of discrim filters in the first conv layer
+  nb: 23                   # ESRGAN, SR: 23
+                           # PPON:       24
+                           # SRGAN:      16
+  in_nc: 3                 # number of input image channels, 3 for RGB, 1 for Grayscale
+  out_nc: 3                # number of output image channels, 3 for RGB, 1 for Grayscale
+  gc: 32
+  group: 1
+  convtype: Conv2D         # ESRGAN: Conv2D | PartialConv2D
+                           # PPON:   Conv2D
+  net_act: leakyrelu       # leakyrelu | swish
+  finalact: ~              # (In Testing/BETA). Activation function to make outputs fit in [-1, 1] range. Default = None. Coordinate with znorm.
+
+# Discriminator options:
+network_D:
+  # ESRGAN or PPON: discriminator_vgg_128 | discriminator_vgg
+  # ASRGAN:         discriminator_vgg_128_fea
+  which_model_D: discriminator_vgg_128
+  norm_type: batch
+  act_type: leakyrelu
+  mode: CNA  # CNA | NAC
+  nf: 64
+  in_nc: 3
+  spectral_norm: ~   # ASRGAN Only, default: true
+  self_attention: ~  # ASRGAN Only, default: true
+  max_pool: ~        # ASRGAN Only, default: true
+  poolsize: ~        # ASRGAN Only, default: 4
+
+# Schedulers options:
+train:
+  lr_G: !!float 1e-4
+  weight_decay_G: 0
+  beta1_G: 0.9
+  lr_D: !!float 1e-4
+  weight_decay_D: 0
+  beta1_D: 0.9
+
+  # For MultiStepLR (ESRGAN, default):
+  lr_scheme: MultiStepLR
+  lr_steps: [
+    50000, 100000, 200000, 300000  # training from scratch
+    #50000, 75000, 85000, 100000   # finetuning
+  ]
+  lr_gamma: 0.5  # lr change at every step (multiplied by)
+
+  # For StepLR_Restart (PPON):
+  #lr_scheme: StepLR_Restart  # StepLR_Restart | MultiStepLR | MultiStepLR_Restart | StepLR | CosineAnnealingLR_Restart
+  #lr_gamma: 0.9
+  #lr_step_sizes: [200, 100, 250]  # Steps for each restart for StepLR_Restart
+  #restarts: [138000, 172500]  # Restart iterations for MultiStepLR_Restart/StepLR_Restart/CosineAnnealingLR_Restart
+  #restart_weights: [1, 0.5, 0.5]  # lr_() * each weight in "restart_weights" for each restart in "restarts"
+  #clear_state: true
+
+  # For MultiStepLR_Restart:
+  #lr_scheme: MultiStepLR_Restart  # MultiStepLR_Restart | MultiStepLR | StepLR | StepLR_Restart | CosineAnnealingLR_Restart
+  #lr_gamma: 0.9
+  #lr_steps: [34500, 69000, 103500, 155250, 189750, 241500]  # For MultiStepLR/MultiStepLR_Restart
+  #restarts: [138000, 172500]  # Restart iterations for MultiStepLR_Restart/StepLR_Restart/CosineAnnealingLR_Restart
+  #restart_weights: [0.5, 0.5] # lr_() * each weight in "restart_weights" for each restart in "restarts"
+  #clear_state: true
+
+  # Losses:
+  # G pixel loss:
+  pixel_criterion: l1  # l1 | l2 | cb | elastic | relativel1 | l1cosinesim
+  pixel_weight: !!float 1e-2  # !!float 1e-2 | !!float 1
+  # G feature loss
+  feature_criterion: l1 # VGG feature network, l1 | l2 | cb | elastic
+  feature_weight: 1
+  # D feature loss (Only for ASRRAGAN)
+  dis_feature_criterion: ~  # l1 | l2 | cb | elastic
+  dis_feature_weight: ~  # 1
+  # HFEN loss
+  hfen_criterion: ~  # helps in deblurring and finding edges/lines, l1 | l2 | rel_l1 | rel_l2
+  hfen_weight: ~  # !!float 1e-1
+  hfen_presmooth: false  # false | true
+  hfen_relative: false  # false | true
+  # TV loss
+  tv_type: ~  # helps denoising/reducing upscale artifacts, normal
+  tv_weight: ~  # !!float 1e-6
+  tv_norm: ~  # Change `tv_weight` so the `l_g_tv` is around !!float 1e-02, `1` for l1 | `2` for l2
+  # SSIM loss
+  ssim_type: ~  # helps to maintain luminance, contrast and covariance between LR and HR, ms-ssim | ssim
+  ssim_weight: ~  # 1
+  # LPIPS loss
+  lpips_weight: ~  # perceptual loss, 1
+  lpips_type: ~  # net-lin | net *
+  lpips_net: ~  # squeeze | vgg | alex
+  # SPL loss
+  spl_weight: ~  # SPL loss function [note: needs to add a cap in the generator (finalcap) or it becomes unstable], !!float 1e-3
+  spl_type: ~  # spl | gpl | cpl
+  # GD gan loss
+  gan_type: vanilla  # vanilla | basic | wgan-gp
+  gan_weight: !!float 5e-3
+  D_update_ratio: ~  # 1
+  D_init_iters: ~    # 0
+  gp_weight: ~       # 10
+  # for PPON:
+  train_phase: ~  # Training starting phase, can skip the first phases, 1
+  phase1_s: ~     # 100 | 5000 | 138000 | -1 to skip, Need to coordinate with the LR steps. # COBranch: lr = 2e−4, decreased by the factor of 2 for every 1000 epochs (1.38e+5 iterations) 138k
+  phase2_s: ~     # 200 | 10000 | 172500 | -1 to skip, Need to coordinate with the LR steps. # SOBranch: λ = 1e+3 (?), lr = 1e−4 and halved at every 250 epochs (3.45e+4iterations) 34.5k
+  phase3_s: ~     # 5000000 | 207000 | -1 to skip, Need to coordinate with the LR steps. # POBranch: η = 5e−3, lr = 1e−4 and halved at every 250 epochs (3.45e+4iterations) 34.5k
+  phase4_s: ~     # 100100
+  # Misc. training options
+  finalcap: ~  # (test) Cap Generator outputs to fit in: [-1,1] range ("tanh"), rescale tanh to [0,1] range ("scaletanh"), cap ("sigmoid") or clamp ("clamp") to [0,1] range. Coordinate with znorm.
+  manual_seed: ~  # ~ for a random seed. Seed must be between 0 and (2^32)-1
+  niter: !!float 5e5
+  val_freq: !!float 5e3  # test the current state against the validation images at n iterations
+logger:
+  print_freq: 200                    # print state values every n iterations
+  save_checkpoint_freq: !!float 5e3  # save models and state to files every n iterations

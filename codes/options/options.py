@@ -2,13 +2,13 @@ import os
 import os.path as osp
 import logging
 import yaml
-from utils.util import OrderedYaml
-Loader, Dumper = OrderedYaml()
+from utils.util import ordered_yaml
+YAML_LOADER, _ = ordered_yaml()
 
 
 def parse(opt_path, is_train=True):
     with open(opt_path, mode="r") as f:
-        opt = yaml.load(f, Loader=Loader)
+        opt = yaml.load(f, Loader=YAML_LOADER)
     # export CUDA_VISIBLE_DEVICES
     gpu_list = ','.join(str(x) for x in opt['gpu_ids'])
     os.environ['CUDA_VISIBLE_DEVICES'] = gpu_list
@@ -29,11 +29,13 @@ def parse(opt_path, is_train=True):
                 dataset['dataroot_HR'] = []
                 for path in HR_images_paths:
                     dataset['dataroot_HR'].append(os.path.expanduser(path))
-                    if any([x for x in dataset['dataroot_HR'] if os.path.splitext(os.path.basename(x))[1].lower() == 'lmdb']):
+                    if any(x for x in dataset['dataroot_HR'] if
+                        os.path.splitext(os.path.basename(x))[1].lower() == 'lmdb'):
                         is_lmdb = True
             elif type(HR_images_paths) is str:
                 dataset['dataroot_HR'] = os.path.expanduser(HR_images_paths)
-                if os.path.splitext(os.path.basename(dataset['dataroot_HR']))[1].lower() == 'lmdb':
+                if os.path.splitext(os.path.basename(
+                    dataset['dataroot_HR']))[1].lower() == 'lmdb':
                     is_lmdb = True
         if 'dataroot_HR_bg' in dataset and dataset['dataroot_HR_bg'] is not None:
             HR_images_paths = dataset['dataroot_HR_bg']        
@@ -49,11 +51,13 @@ def parse(opt_path, is_train=True):
                 dataset['dataroot_LR'] = []
                 for path in LR_images_paths:
                     dataset['dataroot_LR'].append(os.path.expanduser(path))
-                    if any([x for x in dataset['dataroot_LR'] if os.path.splitext(os.path.basename(x))[1].lower() == 'lmdb']):
+                    if any(x for x in dataset['dataroot_LR'] if
+                        os.path.splitext(os.path.basename(x))[1].lower() == 'lmdb'):
                         is_lmdb = True
             elif type(LR_images_paths) is str:
                 dataset['dataroot_LR'] = os.path.expanduser(LR_images_paths)
-                if os.path.splitext(os.path.basename(dataset['dataroot_LR']))[1].lower() == 'lmdb':
+                if os.path.splitext(os.path.basename(
+                    dataset['dataroot_LR']))[1].lower() == 'lmdb':
                     is_lmdb = True
         dataset['data_type'] = 'lmdb' if is_lmdb else 'img'
 
@@ -112,7 +116,7 @@ def dict_to_nonedict(opt):
 
 
 def dict2str(opt, indent_l=1):
-    '''dict to string for logger'''
+    """dict to string for logger"""
     msg = ''
     for k, v in opt.items():
         if isinstance(v, dict):
@@ -125,7 +129,7 @@ def dict2str(opt, indent_l=1):
 
 
 def check_resume(opt):
-    '''Check resume states and pretrain_model paths'''
+    """Check resume states and pretrain_model paths"""
     logger = logging.getLogger('base')
     if opt['path']['resume_state']:
         if opt['path']['pretrain_model_G'] or opt['path']['pretrain_model_D']:

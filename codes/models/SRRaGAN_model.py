@@ -124,7 +124,8 @@ class SRRaGANModel(BaseModel):
                     else:
                         relative = train_opt['hfen_relative']
                 if l_hfen_type:
-                    self.cri_hfen = HFENLoss(loss_f=l_hfen_type, device=self.device, pre_smooth=pre_smooth, relative=relative).to(self.device)
+                    self.cri_hfen = HFENLoss(loss_f=l_hfen_type, device=self.device,
+                        pre_smooth=pre_smooth, relative=relative).to(self.device)
                 else:
                     raise NotImplementedError('Loss type [{:s}] not recognized.'.format(l_hfen_type))
                 self.l_hfen_w = train_opt['hfen_weight']
@@ -148,7 +149,7 @@ class SRRaGANModel(BaseModel):
                 elif l_tv_type == '4D':
                     self.cri_tv = TVLoss4D(self.l_tv_w).to(self.device) #Total Variation regularization in 4 directions
                 else:
-                    raise NotImplementedError('Loss type [{:s}] not recognized.'.format(l_tv_type))
+                    raise NotImplementedError(f"Loss type [{l_tv_type}] not recognized.")
                 logger.info('Using TV loss.')
             else:
                 self.cri_tv = None
@@ -167,7 +168,8 @@ class SRRaGANModel(BaseModel):
                 if l_ssim_type == 'ssim':
                     self.cri_ssim = SSIM(win_size=11, win_sigma=1.5, size_average=True, data_range=1., channel=3).to(self.device)
                 elif l_ssim_type == 'ms-ssim':
-                    self.cri_ssim = MS_SSIM(win_size=11, win_sigma=1.5, size_average=True, data_range=1., channel=3).to(self.device)
+                    self.cri_ssim = MS_SSIM(win_size=11, win_sigma=1.5, size_average=True,
+                        data_range=1., channel=3).to(self.device)
                 logger.info('Using SSIM loss.')
             else:
                 self.cri_ssim = None
@@ -206,14 +208,17 @@ class SRRaGANModel(BaseModel):
                     lpips_net = 'vgg'
                 self.cri_lpips = models.PerceptualLoss(model=lpips_type, net=lpips_net, use_gpu=lpips_GPU, model_path=None, spatial=lpips_spatial) #.to(self.device) 
                 # Linearly calibrated models (LPIPS)
-                # self.cri_lpips = models.PerceptualLoss(model='net-lin', net='alex', use_gpu=lpips_GPU, model_path=None, spatial=lpips_spatial) #.to(self.device) 
-                # self.cri_lpips = models.PerceptualLoss(model='net-lin', net='vgg', use_gpu=lpips_GPU, model_path=None, spatial=lpips_spatial) #.to(self.device) 
+                #self.cri_lpips = models.PerceptualLoss(model='net-lin', net='alex', use_gpu=lpips_GPU,
+                # model_path=None, spatial=lpips_spatial) #.to(self.device) 
+                #self.cri_lpips = models.PerceptualLoss(model='net-lin', net='vgg', use_gpu=lpips_GPU,
+                # model_path=None, spatial=lpips_spatial) #.to(self.device) 
                 # Off-the-shelf uncalibrated networks
                 # Can set net = 'alex', 'squeeze' or 'vgg'
-                # self.cri_lpips = models.PerceptualLoss(model='net', net='alex', use_gpu=lpips_GPU, model_path=None, spatial=lpips_spatial)
+                #self.cri_lpips = models.PerceptualLoss(model='net', net='alex', use_gpu=lpips_GPU,
+                # model_path=None, spatial=lpips_spatial)
                 # Low-level metrics
-                # self.cri_lpips = models.PerceptualLoss(model='L2', colorspace='Lab', use_gpu=lpips_GPU)
-                # self.cri_lpips = models.PerceptualLoss(model='ssim', colorspace='RGB', use_gpu=lpips_GPU)
+                #self.cri_lpips = models.PerceptualLoss(model='L2', colorspace='Lab', use_gpu=lpips_GPU)
+                #self.cri_lpips = models.PerceptualLoss(model='ssim', colorspace='RGB', use_gpu=lpips_GPU)
                 logger.info('Using LPIPS loss.')
             else:
                 self.cri_lpips = None
@@ -263,8 +268,14 @@ class SRRaGANModel(BaseModel):
                 self.cri_gan = GANLoss(train_opt['gan_type'], 1.0, 0.0).to(self.device)
                 self.l_gan_w = train_opt['gan_weight']
                 # D_update_ratio and D_init_iters are for WGAN
-                self.D_update_ratio = train_opt['D_update_ratio'] if train_opt['D_update_ratio'] is not None else 1
-                self.D_init_iters = train_opt['D_init_iters'] if train_opt['D_init_iters'] is not None else 0
+                if train_opt['D_update_ratio'] is not None:
+                    self.D_update_ratio = train_opt['D_update_ratio']
+                else:
+                    self.D_update_ratio = 1
+                if train_opt['D_init_iters'] is not None:
+                    self.D_init_iters = train_opt['D_init_iters']
+                else:
+                    self.D_init_iters = 0
 
                 if train_opt['gan_type'] == 'wgan-gp':
                     self.random_pt = torch.Tensor(1, 1, 1, 1).to(self.device)
@@ -278,7 +289,10 @@ class SRRaGANModel(BaseModel):
             
             # optimizers
             # G
-            wd_G = train_opt['weight_decay_G'] if train_opt['weight_decay_G'] is not None else 0
+            if train_opt['weight_decay_G'] is not None:
+                wd_G = train_opt['weight_decay_G']
+            else:
+                wd_G = 0
             
             optim_params = []
             for k, v in self.netG.named_parameters():  # can optimize for a part of the model
