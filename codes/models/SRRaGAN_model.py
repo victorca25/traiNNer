@@ -55,7 +55,7 @@ class SRRaGANModel(BaseModel):
             self.outm = None
             if train_opt['finalcap']:
                 self.outm = train_opt['finalcap']
-                
+            
             # G pixel loss
             #"""
             if train_opt['pixel_weight']:
@@ -79,8 +79,8 @@ class SRRaGANModel(BaseModel):
                 else:
                     raise NotImplementedError('Loss type [{:s}] not recognized.'.format(l_pix_type))
                 self.l_pix_w = train_opt['pixel_weight']
+                logger.info('Using pixel loss.')
             else:
-                logger.info('Remove pixel loss.')
                 self.cri_pix = None
             #"""
 
@@ -103,8 +103,8 @@ class SRRaGANModel(BaseModel):
                 else:
                     raise NotImplementedError('Loss type [{:s}] not recognized.'.format(l_fea_type))
                 self.l_fea_w = train_opt['feature_weight']
+                logger.info('Using feature loss.')
             else:
-                logger.info('Remove feature loss.')
                 self.cri_fea = None
             if self.cri_fea:  # load VGG perceptual loss
                 self.netF = networks.define_F(opt, use_bn=False).to(self.device)
@@ -114,22 +114,22 @@ class SRRaGANModel(BaseModel):
             #"""
             if train_opt['hfen_weight']:
                 l_hfen_type = train_opt['hfen_criterion']
-                if train_opt['hfen_presmooth']:
+                if train_opt['hfen_presmooth'] is not None:
                     pre_smooth = train_opt['hfen_presmooth']
                 else:
-                    pre_smooth = False #train_opt['hfen_presmooth']
+                    pre_smooth = False
                 if l_hfen_type:
                     if l_hfen_type == 'rel_l1' or l_hfen_type == 'rel_l2':
                         relative = True
                     else:
-                        relative = False #True #train_opt['hfen_relative']
+                        relative = train_opt['hfen_relative']
                 if l_hfen_type:
-                    self.cri_hfen =  HFENLoss(loss_f=l_hfen_type, device=self.device, pre_smooth=pre_smooth, relative=relative).to(self.device)
+                    self.cri_hfen = HFENLoss(loss_f=l_hfen_type, device=self.device, pre_smooth=pre_smooth, relative=relative).to(self.device)
                 else:
                     raise NotImplementedError('Loss type [{:s}] not recognized.'.format(l_hfen_type))
                 self.l_hfen_w = train_opt['hfen_weight']
+                logger.info('Using HFEN loss.')
             else:
-                logger.info('Remove HFEN loss.')
                 self.cri_hfen = None
             #"""
                 
@@ -149,8 +149,8 @@ class SRRaGANModel(BaseModel):
                     self.cri_tv = TVLoss4D(self.l_tv_w).to(self.device) #Total Variation regularization in 4 directions
                 else:
                     raise NotImplementedError('Loss type [{:s}] not recognized.'.format(l_tv_type))
+                logger.info('Using TV loss.')
             else:
-                logger.info('Remove TV loss.')
                 self.cri_tv = None
             #"""
                 
@@ -168,8 +168,8 @@ class SRRaGANModel(BaseModel):
                     self.cri_ssim = SSIM(win_size=11, win_sigma=1.5, size_average=True, data_range=1., channel=3).to(self.device)
                 elif l_ssim_type == 'ms-ssim':
                     self.cri_ssim = MS_SSIM(win_size=11, win_sigma=1.5, size_average=True, data_range=1., channel=3).to(self.device)
+                logger.info('Using SSIM loss.')
             else:
-                logger.info('Remove SSIM loss.')
                 self.cri_ssim = None
             #"""
             
@@ -214,8 +214,8 @@ class SRRaGANModel(BaseModel):
                 # Low-level metrics
                 # self.cri_lpips = models.PerceptualLoss(model='L2', colorspace='Lab', use_gpu=lpips_GPU)
                 # self.cri_lpips = models.PerceptualLoss(model='ssim', colorspace='RGB', use_gpu=lpips_GPU)
+                logger.info('Using LPIPS loss.')
             else:
-                logger.info('Remove LPIPS loss.')
                 self.cri_lpips = None
             #"""
             
@@ -251,8 +251,8 @@ class SRRaGANModel(BaseModel):
                     # default is True for all
                     self.cri_cpl = spl.CPLoss(rgb=True,yuv=True,yuvgrad=True,spl_norm=self.spl_norm,yuv_norm=self.yuv_norm)
                     self.cri_gpl = None
+                logger.info('Using SPL loss.')
             else:
-                logger.info('Remove SPL loss.')
                 self.cri_gpl = None
                 self.cri_cpl = None
             #"""
@@ -263,22 +263,22 @@ class SRRaGANModel(BaseModel):
                 self.cri_gan = GANLoss(train_opt['gan_type'], 1.0, 0.0).to(self.device)
                 self.l_gan_w = train_opt['gan_weight']
                 # D_update_ratio and D_init_iters are for WGAN
-                self.D_update_ratio = train_opt['D_update_ratio'] if train_opt['D_update_ratio'] else 1
-                self.D_init_iters = train_opt['D_init_iters'] if train_opt['D_init_iters'] else 0
+                self.D_update_ratio = train_opt['D_update_ratio'] if train_opt['D_update_ratio'] is not None else 1
+                self.D_init_iters = train_opt['D_init_iters'] if train_opt['D_init_iters'] is not None else 0
 
                 if train_opt['gan_type'] == 'wgan-gp':
                     self.random_pt = torch.Tensor(1, 1, 1, 1).to(self.device)
                     # gradient penalty loss
                     self.cri_gp = GradientPenaltyLoss(device=self.device).to(self.device)
                     self.l_gp_w = train_opt['gp_weigth']
+                logger.info('Using GAN loss.')
             else:
-                logger.info('Remove GAN loss.')
                 self.cri_gan = None
             #"""
             
             # optimizers
             # G
-            wd_G = train_opt['weight_decay_G'] if train_opt['weight_decay_G'] else 0
+            wd_G = train_opt['weight_decay_G'] if train_opt['weight_decay_G'] is not None else 0
             
             optim_params = []
             for k, v in self.netG.named_parameters():  # can optimize for a part of the model

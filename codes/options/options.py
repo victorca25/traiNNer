@@ -3,16 +3,18 @@ import os.path as osp
 import logging
 from collections import OrderedDict
 import json
+import yaml
+from utils.util import OrderedYaml
+Loader, Dumper = OrderedYaml()
 
 
 def parse(opt_path, is_train=True):
-    # remove comments starting with '//'
-    json_str = ''
-    with open(opt_path, 'r') as f:
-        for line in f:
-            line = line.split('//')[0] + '\n'
-            json_str += line
-    opt = json.loads(json_str, object_pairs_hook=OrderedDict)
+    with open(opt_path, mode="r") as f:
+        opt = yaml.load(f, Loader=Loader)
+    # export CUDA_VISIBLE_DEVICES
+    gpu_list = ','.join(str(x) for x in opt['gpu_ids'])
+    os.environ['CUDA_VISIBLE_DEVICES'] = gpu_list
+    print('export CUDA_VISIBLE_DEVICES=' + gpu_list)
 
     opt['is_train'] = is_train
     scale = opt['scale']

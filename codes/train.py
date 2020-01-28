@@ -31,7 +31,7 @@ def get_pytorch_ver():
 def main():
     # options
     parser = argparse.ArgumentParser()
-    parser.add_argument('-opt', type=str, required=True, help='Path to option JSON file.')
+    parser.add_argument('-opt', type=str, required=True, help='Path to option YAML file.')
     opt = option.parse(parser.parse_args().opt, is_train=True)
     opt = option.dict_to_nonedict(opt)  # Convert to NoneDict, which return None for missing key.
     pytorch_ver = get_pytorch_ver()
@@ -65,16 +65,13 @@ def main():
     # tensorboard logger
     if opt['use_tb_logger'] and 'debug' not in opt['name']:
         from tensorboardX import SummaryWriter
-        try:
-            tb_logger = SummaryWriter(logdir='../tb_logger/' + opt['name']) #for version tensorboardX >= 1.7
-        except:
-            tb_logger = SummaryWriter(log_dir='../tb_logger/' + opt['name']) #for version tensorboardX < 1.6
+        tb_logger = SummaryWriter(f"../tb_logger/{opt['name']}")
 
     # random seed
     seed = opt['train']['manual_seed']
     if seed is None:
-        seed = random.randint(1, 10000)
-    logger.info('Random seed: {}'.format(seed))
+        seed = random.randint(-10000, 10000)
+    logger.info(f"Selected seed: {seed}")
     util.set_random_seed(seed)
 
     torch.backends.cudnn.benckmark = True
