@@ -5,7 +5,7 @@ import data.util as util
 
 
 class LRDataset(data.Dataset):
-    '''Read LR images only in the test phase.'''
+    """Read LR images only in the test phase."""
 
     def __init__(self, opt):
         super(LRDataset, self).__init__()

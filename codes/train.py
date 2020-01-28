@@ -66,23 +66,38 @@ def main():
 
     # create train and val dataloader
     for phase, dataset_opt in opt['datasets'].items():
-        if phase == 'train':
+        if phase == "train":
             train_set = create_dataset(dataset_opt)
-            train_size = int(math.ceil(len(train_set) / dataset_opt['batch_size']))
-            logger.info('Number of train images: {:,d}, iters: {:,d}'.format(
-                len(train_set), train_size))
-            total_iters = int(opt['train']['niter'])
+            train_size = int(math.ceil(len(train_set) / dataset_opt["batch_size"]))
+            logger.info("Number of train images: {:,d}, iters: {:,d}".format(
+                len(train_set), train_size
+            ))
+            total_iters = int(opt["train"]["niter"])
             total_epochs = int(math.ceil(total_iters / train_size))
-            logger.info('Total epochs needed: {:d} for iters {:,d}'.format(
-                total_epochs, total_iters))
-            train_loader = create_dataloader(train_set, dataset_opt)
-        elif phase == 'val':
+            logger.info("Total epochs needed: {:d} for iters {:,d}".format(
+                total_epochs, total_iters
+            ))
+            train_loader = create_dataloader(
+                train_set,
+                phase,
+                batch_size=dataset_opt["batch_size"],
+                shuffle=dataset_opt["use_shuffle"],
+                num_workers=dataset_opt["n_workers"]
+            )
+        elif phase == "val":
             val_set = create_dataset(dataset_opt)
-            val_loader = create_dataloader(val_set, dataset_opt)
-            logger.info('Number of val images in [{:s}]: {:d}'.format(dataset_opt['name'],
-                                                                      len(val_set)))
+            val_loader = create_dataloader(
+                val_set,
+                phase,
+                batch_size=dataset_opt["batch_size"],
+                shuffle=dataset_opt["use_shuffle"],
+                num_workers=dataset_opt["n_workers"]
+            )
+            logger.info("Number of val images in [{:s}]: {:d}".format(
+                dataset_opt["name"], len(val_set)
+            ))
         else:
-            raise NotImplementedError('Phase [{:s}] is not recognized.'.format(phase))
+            raise NotImplementedError("Phase [{:s}] is not recognized.".format(phase))
     assert train_loader is not None
 
     # create model
