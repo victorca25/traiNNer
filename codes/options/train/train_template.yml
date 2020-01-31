@@ -5,12 +5,17 @@
 # Comments starting with `(test)` means it's functions are being tested and may be buggy
 # Whenever `!!float n` is used it may be Scientific Notation which can be converted to decimal at https://bit.ly/2O0WsgD
 
-# use "debug" in the name to run a test session and check everything is working. Does validation and state saving every 8 iterations.
-name: debug_001_template
-use_tb_logger: true
-model: srragan # srragan | sr | srgan | ppon | asrragan
+name: debug_001_template  # put "debug" to enable debug mode, only do so to test the script is working, do not enable it when training
+use_tb_logger: true       # tensorboard is a web-ui to visualize metrics, can be used with `tensorboard --logdir <path_to_log_dir>`
+model: srragan            # srragan | sr | srgan | ppon | asrragan
 scale: 4
-gpu_ids: [0]
+gpu_ids: [
+  # can be a string/int or list of strings/int's.
+  # https://pytorch.org/docs/stable/tensor_attributes.html#torch.torch.device
+  #cpu:0,
+  0,
+  #cuda:1
+]
 
 # Path options:
 path:

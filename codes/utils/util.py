@@ -10,41 +10,46 @@ import logging
 
 import re
 
-from collections import OrderedDict
-import yaml
-try:
-    from yaml import CLoader as Loader, CDumper as Dumper
-except ImportError:
-    from yaml import Loader, Dumper
-
-####################
-# yaml
-####################
-
-
-def ordered_yaml():
-    """yaml orderedDict support"""
-    _mapping_tag = yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG
-
-    def dict_representer(dumper, data):
-        return dumper.represent_dict(data.items())
-
-    def dict_constructor(loader, node):
-        return OrderedDict(loader.construct_pairs(node))
-
-    Dumper.add_representer(OrderedDict, dict_representer)
-    Loader.add_constructor(_mapping_tag, dict_constructor)
-    return Loader, Dumper
-
 
 ####################
 # miscellaneous
 ####################
 
-
 def get_timestamp():
     return datetime.now().strftime('%y%m%d-%H%M%S')
 
+
+def set_seed(seed=None):
+    """
+    Applies a seed to random, np.random, torch and torch.cuda
+    Defaults to seed of 0
+    Returns the applied seed value
+    """
+    min_size = 0
+    max_size = (2**32)-1
+    if seed is None:
+        # no point in randomizing a seed if the user doesn't want reproducibility
+        seed = 0
+    if seed < min_size:
+        raise ValueError(
+            f"set_seed: Specified seed ({seed}) is too small. "
+            f"Must be between 0 and {max_size} (2^32 - 1)."
+        )
+    if seed > max_size:
+        raise ValueError(
+            f"set_seed: Specified seed ({seed}) is too large. "
+            f"Must be between 0 and {max_size} (2^32 - 1)."
+        )
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    return seed
+
+
+####################
+# directory and paths
+####################
 
 def mkdir(path):
     if not os.path.exists(path):
@@ -67,13 +72,6 @@ def mkdir_and_rename(path):
         logger.info('Path already exists. Rename it to [{:s}]'.format(new_name))
         os.rename(path, new_name)
     os.makedirs(path)
-
-
-def set_random_seed(seed):
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
 
 
 def setup_logger(logger_name, root, phase, level=logging.INFO, screen=False):
@@ -150,9 +148,8 @@ def save_img(img, img_path, mode='RGB'):
 
 
 ####################
-# metric
+# metrics
 ####################
-
 
 def calculate_psnr(img1, img2):
     # img1 and img2 have range [0, 255]
@@ -160,7 +157,7 @@ def calculate_psnr(img1, img2):
     img2 = img2.astype(np.float64)
     mse = np.mean((img1 - img2)**2)
     if mse == 0:
-        return float('inf')
+        return float("inf")
     return 20 * math.log10(255.0 / math.sqrt(mse))
 
 """

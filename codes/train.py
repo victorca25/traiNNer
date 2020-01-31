@@ -1,16 +1,12 @@
 import os
-import sys
 import math
 import argparse
-import time
-import random
-import numpy as np
 import logging
-from collections import OrderedDict
 import torch
 
 import options.options as option
-from utils import util
+from utils.util import mkdir_and_rename, mkdirs, mkdir, setup_logger, sorted_nicely,\
+    set_seed, tensor2img, save_img, calculate_psnr, calculate_ssim
 from data import create_dataloader, create_dataset
 from models import create_model
 from models.modules.LPIPS import compute_dists as lpips
@@ -19,14 +15,12 @@ def main():
     # Load options YAML file
     parser = argparse.ArgumentParser(description="BasicSR")
     parser.add_argument("-o", "--opt", type=str, required=True, help="Path to training YAML options file.")
-    opt = option.iterable_missing_hook(
-        option.parse(parser.parse_args().opt, is_train=True)
-    )
+    opt = option.parse(parser.parse_args().opt, is_train=True)
 
     # make sure an experiment folder exists
     if not opt["path"]["resume_state"]:
-        util.mkdir_and_rename(opt["path"]["experiments_root"])  # rename old folder if exists
-        util.mkdirs((
+        mkdir_and_rename(opt["path"]["experiments_root"])  # rename old folder if exists
+        mkdirs((
             path for key, path in opt["path"].items() if (
                 key != "experiments_root" and
                 "pretrain_model" not in key and
@@ -35,8 +29,8 @@ def main():
         ))
 
     # Configure logging
-    util.setup_logger(None, opt["path"]["log"], "train", level=logging.INFO, screen=True)
-    util.setup_logger("val", opt["path"]["log"], "val", level=logging.INFO)
+    setup_logger(None, opt["path"]["log"], "train", level=logging.INFO, screen=True)
+    setup_logger("val", opt["path"]["log"], "val", level=logging.INFO)
     logger = logging.getLogger("base")
     logger.info(option.dict2str(opt))
 
@@ -46,7 +40,7 @@ def main():
         resume_state_path = opt["path"]["resume_state"]
         if os.path.isdir(resume_state_path):
             import glob
-            resume_state_path = util.sorted_nicely(
+            resume_state_path = sorted_nicely(
                 glob.glob(os.path.join(os.path.normpath(resume_state_path), "*.state"))
             )[-1]
         resume_state = torch.load(resume_state_path)
@@ -58,15 +52,12 @@ def main():
         from tensorboardX import SummaryWriter
         tb_logger = SummaryWriter(f"../tb_logger/{opt['name']}")
 
-    # Generate a pseudo-random seed
-    seed = opt["train"]["manual_seed"]
-    if seed is None or seed <= -1:
-        seed = random.randint(0, (2**32)-1)  # must be between 0 and (2^32)-1
+    # Set a seed for reproducibility
+    seed = set_seed(opt["train"]["manual_seed"])
     logger.info(f"Selected seed: {seed}")
-    util.set_random_seed(seed)
 
     torch.backends.cudnn.benckmark = True
-    # torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.deterministic = seed > 0  # has performance impact, only use if manual seed was used
 
     # create train and val dataloader
     for phase, dataset_opt in opt["datasets"].items():
@@ -172,12 +163,12 @@ def main():
                     
                     if opt["datasets"]["train"]["znorm"]:
                         # If the image range is [-1,1]
-                        sr_img = util.tensor2img(visuals["SR"], min_max=(-1, 1))  # uint8
-                        gt_img = util.tensor2img(visuals["HR"], min_max=(-1, 1))  # uint8
+                        sr_img = tensor2img(visuals["SR"], min_max=(-1, 1))  # uint8
+                        gt_img = tensor2img(visuals["HR"], min_max=(-1, 1))  # uint8
                     else:
                         # Image range is [0,1]
-                        sr_img = util.tensor2img(visuals["SR"])  # uint8
-                        gt_img = util.tensor2img(visuals["HR"])  # uint8
+                        sr_img = tensor2img(visuals["SR"])  # uint8
+                        gt_img = tensor2img(visuals["HR"])  # uint8
                     
                     if "debug" in opt["name"]:
                         print(f"SR value (min / max): {sr_img.min()} / {sr_img.max()}")
@@ -186,8 +177,8 @@ def main():
                     # Save SR images for reference
                     img_name, _ = os.path.splitext(os.path.basename(val_data["LR_path"][0]))
                     img_dir = os.path.join(opt["path"]["val_images"], img_name)
-                    util.mkdir(img_dir)
-                    util.save_img(
+                    mkdir(img_dir)
+                    save_img(
                         sr_img,
                         os.path.join(img_dir, f"{img_name}_{current_step}.png")
                     )
@@ -209,8 +200,8 @@ def main():
                     val_gt.append(cropped_gt_img)
                     val_sr.append(cropped_sr_img)
                     
-                    avg_psnr += util.calculate_psnr(cropped_sr_img * 255, cropped_gt_img * 255)
-                    avg_ssim += util.calculate_ssim(cropped_sr_img * 255, cropped_gt_img * 255)
+                    avg_psnr += calculate_psnr(cropped_sr_img * 255, cropped_gt_img * 255)
+                    avg_ssim += calculate_ssim(cropped_sr_img * 255, cropped_gt_img * 255)
 
                 # calculate the average of the metric values
                 avg_psnr = avg_psnr / idx
