@@ -1,7 +1,7 @@
 import logging
 from collections import OrderedDict
 
-import models.networks as networks
+import codes.models.networks as networks
 import torch
 import torch.nn as nn
 from torch.optim import lr_scheduler

@@ -2,12 +2,8 @@ import argparse
 import os
 import os.path
 import random
-import sys
 
-sys.path.append("../data")
-sys.path.append("../")
-
-import util as util
+import codes.data.util as util
 import numpy as np
 import cv2
 

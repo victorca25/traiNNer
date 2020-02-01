@@ -5,9 +5,8 @@ from multiprocessing import Pool
 
 import cv2
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from data.util import bgr2ycbcr
-from utils.progress_bar import ProgressBar
+from codes.data.util import bgr2ycbcr
+from codes.utils.progress_bar import ProgressBar
 
 
 def main():

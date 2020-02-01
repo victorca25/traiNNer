@@ -1,10 +1,10 @@
 import logging
 from collections import OrderedDict
 
-import models.networks as networks
+import codes.models.networks as networks
 import torch
 import torch.nn as nn
-from models.modules.loss import GANLoss, GradientPenaltyLoss
+from codes.models.modules.loss import GANLoss, GradientPenaltyLoss
 from torch.optim import lr_scheduler
 
 from .base_model import BaseModel

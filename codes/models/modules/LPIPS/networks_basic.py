@@ -2,8 +2,8 @@ from __future__ import absolute_import
 
 import torch
 import torch.nn as nn
-from models.modules.LPIPS import perceptual_loss as util
-from models.modules.architectures.block import Upsample
+from codes.models.modules.LPIPS import perceptual_loss as util
+from codes.models.modules.architectures.block import Upsample
 from torch.autograd import Variable
 
 # from skimage import color

@@ -4,7 +4,7 @@
 import functools  # for MSRResNet
 import math
 
-import models.archs.arch_util as arch_util  # for MSRResNet (need to check what is needed and where to add it)
+import codes.models.archs.arch_util as arch_util  # for MSRResNet (need to check what is needed and where to add it)
 import torch
 import torch.nn as nn
 import torch.nn.functional as F  # for MSRResNet

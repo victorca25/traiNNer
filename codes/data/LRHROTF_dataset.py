@@ -1,16 +1,11 @@
 import os.path
 import random
-import sys
-
 import cv2
-import data.util as util
+import codes.data.util as util
 import numpy as np
 import torch
 import torch.utils.data as data
-
-sys.path.append("../codes/scripts")
-sys.path.append("../codes/data")
-import augmentations
+import codes.scripts.augmentations as augmentations
 
 
 class LRHRDataset(data.Dataset):

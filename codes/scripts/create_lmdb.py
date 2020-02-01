@@ -1,13 +1,11 @@
 import glob
 import os.path
 import pickle
-import sys
 
 import cv2
 import lmdb
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from utils.progress_bar import ProgressBar
+from codes.utils.progress_bar import ProgressBar
 
 # configurations
 img_folder = (

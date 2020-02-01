@@ -1,11 +1,9 @@
 import os
-import sys
 
 import cv2
 import numpy as np
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from data.util import imresize_np
+from codes.data.util import imresize_np
 
 
 def generate_mod_LR_bic():

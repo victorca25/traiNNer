@@ -2,12 +2,12 @@ import glob
 import os.path
 
 import cv2
-import models.modules.architectures.seg_arch as seg_arch
+import codes.models.modules.architectures.seg_arch as seg_arch
 import numpy as np
 import torch
 import torchvision.utils
-import utils.util as util
-from data.util import imresize, modcrop
+import codes.utils.util as util
+from codes.data.util import imresize, modcrop
 
 # options
 test_img_folder_name = "samples"  # image folder name

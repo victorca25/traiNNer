@@ -3,13 +3,13 @@ from __future__ import absolute_import
 import logging
 from collections import OrderedDict
 
-import models.networks as networks
+import codes.models.networks as networks
 import torch
 import torch.nn as nn
-from models.modules.LPIPS import (
+from codes.models.modules.LPIPS import (
     perceptual_loss as models,
 )  # import models.modules.LPIPS as models
-from models.modules.loss import (
+from codes.models.modules.loss import (
     GANLoss,
     GradientPenaltyLoss,
     HFENLoss,
@@ -19,8 +19,8 @@ from models.modules.loss import (
     RelativeL1,
     L1CosineSim,
 )
-from models.modules.losses import spl_loss as spl
-from models.modules.losses.ssim2 import (
+from codes.models.modules.losses import spl_loss as spl
+from codes.models.modules.losses.ssim2 import (
     SSIM,
     MS_SSIM,
 )  # implementation for use with any PyTorch
@@ -31,7 +31,7 @@ from .base_model import BaseModel
 # from models.modules.losses.ssim3 import SSIM, MS_SSIM #for use of the PyTorch 1.1.1+ optimized implementation
 logger = logging.getLogger("base")
 
-import models.lr_schedulerR as lr_schedulerR
+import codes.models.lr_schedulerR as lr_schedulerR
 
 """
 import numpy as np
