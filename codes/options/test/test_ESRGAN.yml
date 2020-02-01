@@ -1,0 +1,58 @@
+
+# Reading and Operating this file
+# ~ is basically Null/None/False e.t.c, you can either use ~ as the value, or comment out the line
+# A commented-out line's value is typically it's default but is disabled due to it being commented out
+# When a line starts with two #'s (comment line starting with #), then when un-commenting, it's intended to be disabled
+# for example, under network_G everything but ESRGAN's values are commented-out, so to show which should still be
+# enabled/disabled, a double-comment is used
+
+name: RRDB_ESRGAN_x4
+suffix: _ESRGAN
+model: srragan  # srragan | asrragan | ppon
+scale: 4
+gpu_ids:
+- 0
+datasets:
+  test_1:
+    # the 1st test dataset
+    name: seta
+    mode: LR
+    #dataroot_HR: ../test1/HR
+    dataroot_LR: ../test1/LR
+    #znorm: true  # Test. To use with models that have been trained [-1, 1] range. Default = None (range [0,1])
+  test_2:
+    # the 2nd test dataset
+    name: setb
+    mode: LR
+    #dataroot_HR: ../test2/HR
+    dataroot_LR: ../test2/LR
+    #znorm: true  # Test. To use with models that have been trained [-1, 1] range. Default = None (range [0,1])
+path:
+  root: D:/Code/GitHub/BasicSR
+  pretrain_model_G: ../experiments/pretrained_models/RRDB_ESRGAN_x4.pth
+network_G:
+  # ESRGAN
+  which_model_G: RRDB_net  # RRDB_net | sr_resnet
+  norm_type: ~
+  mode: CNA
+  nf: 64
+  nb: 23
+  in_nc: 3
+  out_nc: 3
+  gc: 32
+  group: 1
+  #convtype: PartialConv2D  # Conv2D | PartialConv2D
+  #net_act: swish  # swish | leakyrelu
+
+  # ASRGAN
+  #which_model_G: asr_resnet  # asr_resnet | asr_cnn
+  #nf: 64
+
+  # PPON
+  #which_model_G: ppon
+  #mode: CNA
+  #nf: 64
+  #nb: 24
+  #in_nc: 3
+  #out_nc: 3
+  #group: 1

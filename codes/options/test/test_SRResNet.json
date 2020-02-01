@@ -1,3 +1,4 @@
+//This is the original JSON template, only kept for reference
 {
   "name": "SRResNet_bicx4_in3nf64nb16",
   "suffix": null,

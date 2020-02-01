@@ -1,0 +1,38 @@
+
+# Reading and Operating this file
+# ~ is basically Null/None/False e.t.c, you can either use ~ as the value, or comment out the line
+# A commented-out line's value is typically it's default but is disabled due to it being commented out
+# When a line starts with two #'s (comment line starting with #), then when un-commenting, it's intended to be disabled
+# for example, under network_G everything but ESRGAN's values are commented-out, so to show which should still be
+# enabled/disabled, a double-comment is used
+
+name: SRGAN
+suffix: _SRGAN
+model: srgan
+scale: 4
+gpu_ids:
+- 0
+datasets:
+  test_1:
+    # the 1st test dataset
+    name: set5
+    mode: LRHR
+    dataroot_HR: /mnt/SSD/xtwang/BasicSR_datasets/val_set5/Set5
+    dataroot_LR: /mnt/SSD/xtwang/BasicSR_datasets/val_set5/Set5_bicLRx4
+  test_2:
+    # the 2nd test dataset
+    name: set14
+    mode: LRHR
+    dataroot_HR: /mnt/SSD/xtwang/BasicSR_datasets/val_set14/Set14
+    dataroot_LR: /mnt/SSD/xtwang/BasicSR_datasets/val_set14/Set14_bicLRx4
+path:
+  root: /home/xtwang/Projects/BasicSR
+  pretrain_model_G: ../experiments/pretrained_models/SRGAN_bicx4_303_505.pth
+network_G:
+  which_model_G: sr_resnet
+  norm_type: ~
+  mode: CNA
+  nf: 64
+  nb: 16
+  in_nc: 3
+  out_nc: 3

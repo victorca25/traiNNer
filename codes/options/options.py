@@ -1,18 +1,26 @@
-import json
 import logging
 import os
 import os.path as osp
 from collections import OrderedDict
 
+import yaml
+
 
 def parse(opt_path, is_train=True):
-    # remove comments starting with '//'
-    json_str = ""
-    with open(opt_path, "r") as f:
-        for line in f:
-            line = line.split("//")[0] + "\n"
-            json_str += line
-    opt = json.loads(json_str, object_pairs_hook=OrderedDict)
+    # load yaml opt file
+    class OrderedLoader(yaml.SafeLoader):
+        pass
+
+    def construct_mapping(loader, node):
+        loader.flatten_mapping(node)
+        return OrderedDict(loader.construct_pairs(node))
+
+    OrderedLoader.add_constructor(
+        yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG,
+        construct_mapping
+    )
+    with open(opt_path, mode="r", encoding="utf-8") as f:
+        opt = yaml.load(f, OrderedLoader)
 
     opt["is_train"] = is_train
     scale = opt["scale"]

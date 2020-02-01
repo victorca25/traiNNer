@@ -1,3 +1,4 @@
+//This is the original JSON template, only kept for reference
 {
   "name": "debug_001_template"
   //use "debug" in the name to run a test session and check everything is working. Does validation and state saving every 8 iterations.
