@@ -153,7 +153,8 @@ def main():
     logger.info(
         "Start training from epoch: {:d}, iter: {:d}".format(start_epoch, current_step)
     )
-    for epoch in range(start_epoch, total_epochs):
+    epoch = start_epoch
+    while current_step <= total_iters:
         for n, train_data in enumerate(train_loader, start=1):
             current_step += 1
             if current_step > total_iters:
@@ -311,6 +312,7 @@ def main():
                     tb_logger.add_scalar("psnr", avg_psnr, current_step)
                     tb_logger.add_scalar("ssim", avg_ssim, current_step)
                     tb_logger.add_scalar("lpips", avg_lpips, current_step)
+        epoch += 1
 
     logger.info("Saving the final model.")
     model.save("latest")
