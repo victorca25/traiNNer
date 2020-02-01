@@ -1,4 +1,5 @@
 import os
+from collections import Counter
 
 import torch
 import torch.nn as nn
@@ -206,11 +207,14 @@ class BaseModel:
                         )
                     print(
                         "Updating lr_steps from ",
-                        self.schedulers[i].milestones,
+                        list(self.schedulers[i].milestones),
                         " to",
                         train_opt["lr_steps"],
                     )
-                    self.schedulers[i].milestones = train_opt["lr_steps"]
+                    if isinstance(self.schedulers[i].milestones, Counter):
+                        self.schedulers[i].milestones = Counter(train_opt["lr_steps"])
+                    else:
+                        self.schedulers[i].milestones = train_opt["lr_steps"]
                 # common
                 if (
                         self.schedulers[i].gamma != train_opt["lr_gamma"]
@@ -235,6 +239,11 @@ class BaseModel:
                             " increasing integers. Got {}",
                             train_opt["lr_steps"],
                         )
+                    print("Updating lr_steps from ", list(self.schedulers[i].milestones), " to", train_opt["lr_steps"])
+                    if isinstance(self.schedulers[i].milestones, Counter):
+                        self.schedulers[i].milestones = Counter(train_opt["lr_steps"])
+                    else:
+                        self.schedulers[i].milestones = train_opt["lr_steps"]
                 if (
                         self.schedulers[i].restarts != train_opt["restarts"]
                         and train_opt["restarts"] is not None
