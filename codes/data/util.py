@@ -35,14 +35,20 @@ def is_image_file(filename):
 
 def _get_paths_from_images(path):
     """get image path list from image folder"""
-    assert os.path.isdir(path), "{:s} is not a valid directory".format(path)
+    if isinstance(path, str):
+        # add support for both list and str by just converting str to a list
+        path = [path]
     images = []
-    for dirpath, _, fnames in sorted(os.walk(path)):
-        for fname in sorted(fnames):
-            if is_image_file(fname):
-                img_path = os.path.join(dirpath, fname)
-                images.append(img_path)
-    assert images, "{:s} has no valid image file".format(path)
+    for p in path:
+        if not os.path.isdir(p):
+            raise ValueError(f"Error: {p:s} is not a valid directory")
+        for dirpath, _, fnames in sorted(os.walk(p)):
+            for fname in sorted(fnames):
+                if is_image_file(fname):
+                    img_path = os.path.join(dirpath, fname)
+                    images.append(img_path)
+    if not images:
+        raise ValueError(f"{p:s} has no valid image file")
     return images
 
 
