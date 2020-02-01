@@ -7,12 +7,12 @@ from torch.optim import lr_scheduler
 
 import codes.models.networks as networks
 from codes.models.modules.loss import GANLoss, GradientPenaltyLoss
-from .base_model import BaseModel
+from .__model__ import Model
 
 logger = logging.getLogger("base")
 
 
-class SFTGAN_ACD_Model(BaseModel):
+class SFTGAN_ACD_Model(Model):
     def __init__(self, opt):
         super(SFTGAN_ACD_Model, self).__init__(opt)
         train_opt = opt["train"]

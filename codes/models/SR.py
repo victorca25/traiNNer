@@ -6,12 +6,12 @@ import torch.nn as nn
 from torch.optim import lr_scheduler
 
 import codes.models.networks as networks
-from .base_model import BaseModel
+from .__model__ import Model
 
 logger = logging.getLogger("base")
 
 
-class SRModel(BaseModel):
+class SRModel(Model):
     def __init__(self, opt):
         super(SRModel, self).__init__(opt)
         train_opt = opt["train"]

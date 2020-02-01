@@ -26,7 +26,7 @@ from codes.models.modules.losses.ssim2 import (
     SSIM,
     MS_SSIM,
 )  # implementation for use with any PyTorch
-from .base_model import BaseModel
+from .__model__ import Model
 
 # from models.modules.losses.ssim3 import SSIM, MS_SSIM #for use of the PyTorch 1.1.1+ optimized implementation
 logger = logging.getLogger("base")
@@ -43,7 +43,7 @@ def save_images(image, num_rep, sufix):
 #"""
 
 
-class ASRRaGANModel(BaseModel):
+class ASRRaGANModel(Model):
     def __init__(self, opt):
         super(ASRRaGANModel, self).__init__(opt)
         train_opt = opt["train"]

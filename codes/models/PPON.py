@@ -26,12 +26,20 @@ from codes.models.modules.losses.ssim2 import (
     SSIM,
     MS_SSIM,
 )  # implementation for use with any PyTorch
-from .base_model import BaseModel
+from .__model__ import Model
 
 # from models.modules.losses.ssim3 import SSIM, MS_SSIM #for use of the PyTorch 1.1.1+ optimized implementation
 logger = logging.getLogger("base")
 
 import codes.models.lr_schedulerR as lr_schedulerR
+
+"""
+import numpy as np
+def convert_shape(img):
+    img = np.transpose((img * 255.0).round(), (1, 2, 0))
+    img = np.uint8(np.clip(img, 0, 255))
+    return img
+"""
 
 """ #debug
 def save_images(image, num_rep, sufix):
@@ -43,9 +51,9 @@ def save_images(image, num_rep, sufix):
 #"""
 
 
-class SRRaGANModel(BaseModel):
+class PPONModel(Model):
     def __init__(self, opt):
-        super(SRRaGANModel, self).__init__(opt)
+        super(PPONModel, self).__init__(opt)
         train_opt = opt["train"]
 
         if self.is_train:
@@ -61,6 +69,32 @@ class SRRaGANModel(BaseModel):
             if train_opt["gan_weight"]:
                 self.netD = networks.define_D(opt).to(self.device)  # D
                 self.netD.train()
+            # PPON
+            """
+            self.phase1_s = train_opt['phase1_s']
+            if self.phase1_s is None:
+                self.phase1_s = 138000
+            self.phase2_s = train_opt['phase2_s']
+            if self.phase2_s is None:
+                self.phase2_s = 138000+34500
+            self.phase3_s = train_opt['phase3_s']
+            if self.phase3_s is None:
+                self.phase3_s = 138000+34500+34500
+            """
+            self.phase1_s = train_opt["phase1_s"] if train_opt["phase1_s"] else 138000
+            self.phase2_s = (
+                train_opt["phase2_s"] if train_opt["phase2_s"] else (138000 + 34500)
+            )
+            self.phase3_s = (
+                train_opt["phase3_s"]
+                if train_opt["phase3_s"]
+                else (138000 + 34500 + 34500)
+            )
+            self.train_phase = (
+                train_opt["train_phase"] - 1 if train_opt["train_phase"] else 0
+            )  # change to start from 0 (Phase 1: from 0 to 1, Phase 1: from 1 to 2, etc)
+            self.restarts = train_opt["restarts"] if train_opt["restarts"] else [0]
+
         self.load()  # load G and D if needed
 
         # define losses, optimizer and scheduler
@@ -456,190 +490,159 @@ class SRRaGANModel(BaseModel):
             input_ref = data["ref"] if "ref" in data else data["HR"]
             self.var_ref = input_ref.to(self.device)
 
-    def feed_data_batch(self, data, need_HR=True):
-        # LR
-        self.var_L = data
-
     def optimize_parameters(self, step):
         # G
+        # Freeze Discriminator during the Generator training
         if self.cri_gan:
             for p in self.netD.parameters():
                 p.requires_grad = False
+
         self.optimizer_G.zero_grad()
-        if self.outm:  # if the model has the final activation option
-            self.fake_H = self.netG(self.var_L, outm=self.outm)
-        else:  # regular models without the final activation option
-            self.fake_H = self.netG(self.var_L)
-        l_g_total = 0
 
-        """ # Debug
-        print ("SR min. val: ", torch.min(self.fake_H))
-        print ("SR max. val: ", torch.max(self.fake_H))
-        
-        print ("LR min. val: ", torch.min(self.var_L))
-        print ("LR max. val: ", torch.max(self.var_L))
-        
-        print ("HR min. val: ", torch.min(self.var_H))
-        print ("HR max. val: ", torch.max(self.var_H))
-        #"""
+        # Prevent the new lr after a restart from being used by the previous phase between phase changes
+        # Originally this was in the end of the function, but led to one step during phase change where there were no parameters with requires_grad for l_g_total.backward() to use, which stops with an error
+        if step in self.restarts:
+            # Freeze all Generator layers to prevent training leaks during phase change
+            for p in self.netG.parameters():
+                p.requires_grad = False
 
-        """ #debug
-        #####################################################################
-        #test_save_img = False
-        # test_save_img = None
-        # test_save_img = True
-        if test_save_img:
-            save_images(self.var_H, 0, "self.var_H")
-            save_images(self.fake_H.detach(), 0, "self.fake_H")
-        #####################################################################
-        #"""
-
-        if self.cri_gan:
-            if step % self.D_update_ratio == 0 and step > self.D_init_iters:
-                if self.cri_pix:  # pixel loss
-                    l_g_pix = self.l_pix_w * self.cri_pix(self.fake_H, self.var_H)
-                    l_g_total += l_g_pix
-                if self.cri_ssim:  # structural loss
-                    l_g_ssim = 1.0 - (
-                            self.l_ssim_w * self.cri_ssim(self.fake_H, self.var_H)
-                    )  # using ssim2.py
-                    if torch.isnan(l_g_ssim).any():
-                        l_g_total = l_g_total
-                    else:
-                        l_g_total += l_g_ssim
-                if self.cri_fea:  # feature loss
-                    real_fea = self.netF(self.var_H).detach()
-                    fake_fea = self.netF(self.fake_H)
-                    l_g_fea = self.l_fea_w * self.cri_fea(fake_fea, real_fea)
-                    l_g_total += l_g_fea
-                if self.cri_hfen:  # HFEN loss
-                    l_g_HFEN = self.l_hfen_w * self.cri_hfen(self.fake_H, self.var_H)
-                    l_g_total += l_g_HFEN
-                if self.cri_tv:  # TV loss
-                    l_g_tv = self.cri_tv(
-                        self.fake_H
-                    )  # note: the weight is already multiplied inside the function, doesn't need to be here
-                    l_g_total += l_g_tv
-                if self.cri_lpips:  # LPIPS loss
-                    # If "spatial = False" .forward() returns a scalar value, if "spatial = True", returns a map (5 layers for vgg and alex or 7 for squeeze)
-                    # NOTE: .mean() is only to make the resulting loss into a scalar if "spatial = True", the mean distance is approximately the same as the non-spatial distance: https://github.com/richzhang/PerceptualSimilarity/blob/master/test_network.py
-                    # l_g_lpips = self.cri_lpips.forward(self.fake_H,self.var_H).mean() # -> If normalize is False (default), assumes the images are already between [-1,+1]
-                    l_g_lpips = self.cri_lpips.forward(
-                        self.fake_H, self.var_H, normalize=self.lpips_norm
-                    ).mean()  # -> # If normalize is True, assumes the images are between [0,1] and then scales them between [-1,+1]
-                    # l_g_lpips = self.cri_lpips.forward(self.fake_H, self.var_H, normalize=True) # If "spatial = False" should return a scalar value
-                    # print(l_g_lpips)
-                    l_g_total += l_g_lpips
-                if self.cri_gpl:  # GPL Loss (SPL)
-                    l_g_gpl = self.l_spl_w * self.cri_gpl(self.fake_H, self.var_H)
-                    # l_spl = l_g_gpl + l_g_cpl
-                    l_g_total += l_g_gpl
-                if self.cri_cpl:  # CPL Loss (SPL)
-                    l_g_cpl = self.l_spl_w * self.cri_cpl(self.fake_H, self.var_H)
-                    l_g_total += l_g_cpl
-
-                # G gan + cls loss
-                pred_g_fake = self.netD(self.fake_H)
-                pred_d_real = self.netD(self.var_ref).detach()
-                l_g_gan = (
-                        self.l_gan_w
-                        * (
-                                self.cri_gan(pred_d_real - torch.mean(pred_g_fake), False)
-                                + self.cri_gan(pred_g_fake - torch.mean(pred_d_real), True)
-                        )
-                        / 2
-                )
-                l_g_total += l_g_gan
-                l_g_total.backward()
-                self.optimizer_G.step()
-
-            # D
-            for p in self.netD.parameters():
+        ### PPON freeze and unfreeze the components at each phase (Content, Structure, Perceptual)
+        # Phase 1
+        if step > 0 and step < self.phase1_s and self.phase1_s > 0:
+            # Freeze/Unfreeze layers
+            if self.train_phase == 0 or (step in self.restarts):
+                print("Starting phase 1")
+                self.train_phase = 1
+                self.log_dict = OrderedDict()  # Clear the loss logs
+            # Freeze all layers
+            for p in self.netG.parameters():
+                # print(p)
+                p.requires_grad = False
+            """
+            for param_name in self.netG.state_dict():
+                self.netG.state_dict()[param_name].requires_grad = False
+            #"""
+            # Unfreeze the Content Layers, CFEM and CRM
+            # CFEM_param = self.netG.module.CFEM.parameters()
+            for p in self.netG.module.CFEM.parameters():
                 p.requires_grad = True
+            """
+            for param_name in self.netG.module.CFEM.state_dict():
+                print('Name: ' + str(param_name))
+                self.netG.module.CFEM.state_dict()[param_name].requires_grad = True
+                print('\tRequires Grad: ' + str(self.netG.module.CFEM.state_dict()[param_name].requires_grad))
+            """
+            # CRM_param = self.netG.module.CRM.parameters()
+            for p in self.netG.module.CRM.parameters():
+                p.requires_grad = True
+            """
+            for param_name in self.netG.module.CRM.state_dict():
+                self.netG.module.CRM.state_dict()[param_name].requires_grad = True
+            """
+            self.optimizer_G.zero_grad()
 
-            self.optimizer_D.zero_grad()
-            l_d_total = 0
-            pred_d_real = self.netD(self.var_ref)
-            pred_d_fake = self.netD(self.fake_H.detach())  # detach to avoid BP to G
-            l_d_real = self.cri_gan(pred_d_real - torch.mean(pred_d_fake), True)
-            l_d_fake = self.cri_gan(pred_d_fake - torch.mean(pred_d_real), False)
+            self.fake_Hc, self.fake_Hs, self.fake_Hp = self.netG(self.var_L)
+            self.fake_H = self.fake_Hc
 
-            l_d_total = (l_d_real + l_d_fake) / 2
-
-            if self.opt["train"]["gan_type"] == "wgan-gp":
-                batch_size = self.var_ref.size(0)
-                if self.random_pt.size(0) != batch_size:
-                    self.random_pt.resize_(batch_size, 1, 1, 1)
-                self.random_pt.uniform_()  # Draw random interpolation points
-                interp = (
-                        self.random_pt * self.fake_H.detach()
-                        + (1 - self.random_pt) * self.var_ref
-                )
-                interp.requires_grad = True
-                interp_crit = self.netD(interp)
-                l_d_gp = self.l_gp_w * self.cri_gp(interp, interp_crit)
-                l_d_total += l_d_gp
-
-            l_d_total.backward()
-            self.optimizer_D.step()
-
-            # set log
-            if step % self.D_update_ratio == 0 and step > self.D_init_iters:
-                # G
-                if self.cri_pix:
-                    self.log_dict["l_g_pix"] = l_g_pix.item()
-                if self.cri_fea:
-                    self.log_dict["l_g_fea"] = l_g_fea.item()
-                if self.cri_hfen:
-                    self.log_dict["l_g_HFEN"] = l_g_HFEN.item()
-                if self.cri_tv:
-                    self.log_dict["l_g_tv"] = l_g_tv.item()
-                if self.cri_ssim:
-                    self.log_dict["l_g_ssim"] = l_g_ssim.item()
-                if self.cri_lpips:
-                    self.log_dict["l_g_lpips"] = l_g_lpips.item()
-                if self.cri_gpl:
-                    self.log_dict["l_g_gpl"] = l_g_gpl.item()
-                if self.cri_cpl:
-                    self.log_dict["l_g_cpl"] = l_g_cpl.item()
-                self.log_dict["l_g_gan"] = l_g_gan.item()
-            # D
-            self.log_dict["l_d_real"] = l_d_real.item()
-            self.log_dict["l_d_fake"] = l_d_fake.item()
-
-            if self.opt["train"]["gan_type"] == "wgan-gp":
-                self.log_dict["l_d_gp"] = l_d_gp.item()
-            # D outputs
-            self.log_dict["D_real"] = torch.mean(pred_d_real.detach())
-            self.log_dict["D_fake"] = torch.mean(pred_d_fake.detach())
-
-        else:
+            # Calculate losses
+            l_g_total = 0
             if self.cri_pix:  # pixel loss
                 l_g_pix = self.l_pix_w * self.cri_pix(self.fake_H, self.var_H)
                 l_g_total += l_g_pix
-            if self.cri_ssim:  # structural loss (Structural Dissimilarity)
+            # if self.cri_ssim: # structural loss
+            # l_g_ssim = 1.-(self.l_ssim_w *self.cri_ssim(self.fake_H, self.var_H)) #using ssim2.py
+            # if torch.isnan(l_g_ssim).any(): #at random, l_g_ssim is returning NaN for ms-ssim, which breaks the model. Temporary hack, until I find out what's going on.
+            # l_g_total = l_g_total
+            # else:
+            # l_g_total += l_g_ssim
+            if self.cri_tv:  # TV loss
+                l_g_tv = self.cri_tv(
+                    self.fake_H
+                )  # note: the weight is already multiplied inside the function, doesn't need to be here
+                l_g_total += l_g_tv
+            if self.cri_lpips:  # LPIPS loss
+                # If "spatial = False" .forward() returns a scalar value, if "spatial = True", returns a map (5 layers for vgg and alex or 7 for squeeze)
+                # NOTE: .mean() is only to make the resulting loss into a scalar if "spatial = True", the mean distance is approximately the same as the non-spatial distance: https://github.com/richzhang/PerceptualSimilarity/blob/master/test_network.py
+                # l_g_lpips = self.cri_lpips.forward(self.fake_H,self.var_H).mean() # -> If normalize is False (default), assumes the images are already between [-1,+1]
+                l_g_lpips = self.cri_lpips.forward(
+                    self.fake_H, self.var_H, normalize=self.lpips_norm
+                ).mean()  # -> # If normalize is True, assumes the images are between [0,1] and then scales them between [-1,+1]
+                # l_g_lpips = self.cri_lpips.forward(self.fake_H, self.var_H, normalize=True) # If "spatial = False" returns a scalar value
+                # print(l_g_lpips)
+                l_g_total += l_g_lpips
+            if self.cri_gpl:  # GPL Loss (SPL)
+                l_g_gpl = self.l_spl_w * self.cri_gpl(self.fake_H, self.var_H)
+                l_g_total += l_g_gpl
+            if self.cri_cpl:  # CPL Loss (SPL)
+                l_g_cpl = self.l_spl_w * self.cri_cpl(self.fake_H, self.var_H)
+                l_g_total += l_g_cpl
+
+            try:  # Prevent error if there are no parameter for autograd during phase change
+                l_g_total.backward()
+                self.optimizer_G.step()
+            except:
+                print("skipping iteration", step)
+                print("error in the backward pass")
+
+            # set log
+            # G
+            if self.cri_pix:
+                self.log_dict["l_g_pix"] = l_g_pix.item()
+            # if self.cri_fea:
+            #    self.log_dict['l_g_fea'] = l_g_fea.item()
+            # if self.cri_hfen:
+            #    self.log_dict['l_g_HFEN'] = l_g_HFEN.item()
+            if self.cri_tv:
+                self.log_dict["l_g_tv"] = l_g_tv.item()
+            # if self.cri_ssim:
+            #    self.log_dict['l_g_ssim'] = l_g_ssim.item()
+            if self.cri_lpips:
+                self.log_dict["l_g_lpips"] = l_g_lpips.item()
+            if self.cri_gpl:
+                self.log_dict["l_g_gpl"] = l_g_gpl.item()
+            if self.cri_cpl:
+                self.log_dict["l_g_cpl"] = l_g_cpl.item()
+
+        # Phase 2
+        elif step > self.phase1_s and step < self.phase2_s and self.phase2_s > 0:
+            # Freeze/Unfreeze layers
+            if self.train_phase == 1 or (step in self.restarts):
+                print("Starting phase 2")
+                self.train_phase = 2
+                self.log_dict = OrderedDict()  # Clear the loss logs
+            # Freeze all layers
+            for p in self.netG.parameters():
+                p.requires_grad = False
+            # Unfreeze the Structure Layers, SFEM and SRM
+            # SFEM_param = self.netG.module.SFEM.parameters()
+            for p in self.netG.module.SFEM.parameters():
+                p.requires_grad = True
+            # SRM_param = self.netG.module.SRM.parameters()
+            for p in self.netG.module.SRM.parameters():
+                p.requires_grad = True
+            self.optimizer_G.zero_grad()
+
+            self.fake_Hc, self.fake_Hs, self.fake_Hp = self.netG(self.var_L)
+            self.fake_H = self.fake_Hs
+
+            # Calculate losses
+            l_g_total = 0
+            if self.cri_pix:  # pixel loss
+                l_g_pix = self.l_pix_w * self.cri_pix(self.fake_H, self.var_H)
+                l_g_total += l_g_pix
+            if self.cri_ssim:  # structural loss
                 l_g_ssim = 1.0 - (
                         self.l_ssim_w * self.cri_ssim(self.fake_H, self.var_H)
-                )  # using ssim2.py
+                )
                 if torch.isnan(
                         l_g_ssim
                 ).any():  # at random, l_g_ssim is returning NaN for ms-ssim, which breaks the model. Temporary hack, until I find out what's going on.
                     l_g_total = l_g_total
                 else:
                     l_g_total += l_g_ssim
-            if self.cri_fea:  # feature loss
-                real_fea = self.netF(self.var_H).detach()
-                fake_fea = self.netF(self.fake_H)
-                l_g_fea = self.l_fea_w * self.cri_fea(fake_fea, real_fea)
-                l_g_total += l_g_fea
             if self.cri_hfen:  # HFEN loss
                 l_g_HFEN = self.l_hfen_w * self.cri_hfen(self.fake_H, self.var_H)
                 l_g_total += l_g_HFEN
-            if self.cri_tv:  # TV loss
-                l_g_tv = self.cri_tv(
-                    self.fake_H
-                )  # note: the weight is already multiplied inside the function, doesn't need to be here
-                l_g_total += l_g_tv
             if self.cri_lpips:  # LPIPS loss
                 # If "spatial = False" .forward() returns a scalar value, if "spatial = True", returns a map (5 layers for vgg and alex or 7 for squeeze)
                 # NOTE: .mean() is only to make the resulting loss into a scalar if "spatial = True", the mean distance is approximately the same as the non-spatial distance: https://github.com/richzhang/PerceptualSimilarity/blob/master/test_network.py
@@ -660,19 +663,23 @@ class SRRaGANModel(BaseModel):
                 l_g_cpl = self.l_spl_w * self.cri_cpl(self.fake_H, self.var_H)
                 l_g_total += l_g_cpl
 
-            l_g_total.backward()
-            self.optimizer_G.step()
+            try:  # Prevent error if there are no parameter for autograd during phase change
+                l_g_total.backward()
+                self.optimizer_G.step()
+            except:
+                print("skipping iteration", step)
+                print("error in the backward pass")
 
             # set log
             # G
             if self.cri_pix:
                 self.log_dict["l_g_pix"] = l_g_pix.item()
-            if self.cri_fea:
-                self.log_dict["l_g_fea"] = l_g_fea.item()
+            # if self.cri_fea:
+            #    self.log_dict['l_g_fea'] = l_g_fea.item()
             if self.cri_hfen:
                 self.log_dict["l_g_HFEN"] = l_g_HFEN.item()
-            if self.cri_tv:
-                self.log_dict["l_g_tv"] = l_g_tv.item()
+            # if self.cri_tv:
+            #    self.log_dict['l_g_tv'] = l_g_tv.item()
             if self.cri_ssim:
                 self.log_dict["l_g_ssim"] = l_g_ssim.item()
             if self.cri_lpips:
@@ -682,14 +689,264 @@ class SRRaGANModel(BaseModel):
             if self.cri_cpl:
                 self.log_dict["l_g_cpl"] = l_g_cpl.item()
 
+        # Phase 3
+        elif step > self.phase2_s and step < self.phase3_s and self.phase3_s > 0:
+            # Freeze/Unfreeze layers
+            if self.train_phase == 2 or (step in self.restarts):
+                print("Starting phase 3")
+                self.train_phase = 3
+                self.log_dict = OrderedDict()  # Clear the loss logs
+            # Freeze all layers
+            for p in self.netG.parameters():
+                p.requires_grad = False
+            # Unfreeze the Perceptual Layers, PFEM and PRM
+            # PFEM_param = self.netG.module.PFEM.parameters()
+            for p in self.netG.module.PFEM.parameters():
+                p.requires_grad = True
+            # PRM_param = self.netG.module.PRM.parameters()
+            for p in self.netG.module.PRM.parameters():
+                p.requires_grad = True
+            self.optimizer_G.zero_grad()
+
+            self.fake_Hc, self.fake_Hs, self.fake_Hp = self.netG(self.var_L)
+            self.fake_H = self.fake_Hp
+
+            # test_save_img = False
+            # test_save_img = None
+            """ #debug
+            #####################################################################
+            if test_save_img:
+                save_images(self.var_H, 0, "self.var_H")
+                save_images(self.fake_H.detach(), 0, "self.fake_H")
+            #####################################################################
+            #"""
+
+            # Calculate losses
+            l_g_total = 0
+            if step % self.D_update_ratio == 0 and step > self.D_init_iters:
+                # if self.cri_pix:  # pixel loss
+                # l_g_pix = self.l_pix_w * self.cri_pix(self.fake_H, self.var_H)
+                # l_g_total += l_g_pix
+                # if self.cri_ssim: # structural loss
+                # l_g_ssim = 1.-(self.l_ssim_w *self.cri_ssim(self.fake_H, self.var_H)) #using ssim2.py
+                # if torch.isnan(l_g_ssim).any():
+                # l_g_total = l_g_total
+                # else:
+                # l_g_total += l_g_ssim
+                if self.cri_fea:  # feature loss
+                    real_fea = self.netF(self.var_H).detach()
+                    fake_fea = self.netF(self.fake_H)
+                    l_g_fea = self.l_fea_w * self.cri_fea(fake_fea, real_fea)
+                    l_g_total += l_g_fea
+                # if self.cri_hfen:  # HFEN loss
+                # l_g_HFEN = self.l_hfen_w * self.cri_hfen(self.fake_H, self.var_H)
+                # l_g_total += l_g_HFEN
+                # if self.cri_tv: #TV loss
+                # l_g_tv = self.cri_tv(self.fake_H) #note: the weight is already multiplied inside the function, doesn't need to be here
+                # l_g_total += l_g_tv
+                if self.cri_lpips:  # LPIPS loss
+                    # If "spatial = False" .forward() returns a scalar value, if "spatial = True", returns a map (5 layers for vgg and alex or 7 for squeeze)
+                    # NOTE: .mean() is only to make the resulting loss into a scalar if "spatial = True", the mean distance is approximately the same as the non-spatial distance: https://github.com/richzhang/PerceptualSimilarity/blob/master/test_network.py
+                    # l_g_lpips = self.cri_lpips.forward(self.fake_H,self.var_H).mean() # -> If normalize is False (default), assumes the images are already between [-1,+1]
+                    l_g_lpips = self.cri_lpips.forward(
+                        self.fake_H, self.var_H, normalize=self.lpips_norm
+                    ).mean()  # -> # If normalize is True, assumes the images are between [0,1] and then scales them between [-1,+1]
+                    # l_g_lpips = self.cri_lpips.forward(self.fake_H, self.var_H, normalize=True) # If "spatial = False" should return a scalar value
+                    # print(l_g_lpips)
+                    l_g_total += l_g_lpips
+                if self.cri_gpl:  # GPL Loss (SPL)
+                    l_g_gpl = self.l_spl_w * self.cri_gpl(self.fake_H, self.var_H)
+                    l_g_total += l_g_gpl
+                if self.cri_cpl:  # CPL Loss (SPL)
+                    l_g_cpl = self.l_spl_w * self.cri_cpl(self.fake_H, self.var_H)
+                    l_g_total += l_g_cpl
+                if self.cri_gan:  # GAN loss
+                    # G gan + cls loss
+                    pred_g_fake = self.netD(self.fake_H)
+                    pred_d_real = self.netD(self.var_ref).detach()
+                    l_g_gan = (
+                            self.l_gan_w
+                            * (
+                                    self.cri_gan(pred_d_real - torch.mean(pred_g_fake), False)
+                                    + self.cri_gan(pred_g_fake - torch.mean(pred_d_real), True)
+                            )
+                            / 2
+                    )
+                    l_g_total += l_g_gan
+
+            try:  # Prevent error if there are no parameter for autograd during phase change
+                l_g_total.backward()
+                self.optimizer_G.step()
+            except:
+                print("skipping iteration", step)
+                print("error in the backward pass")
+
+            # D
+            # Unfreeze the Discriminator for training
+            if self.cri_gan:
+                for p in self.netD.parameters():
+                    p.requires_grad = True
+
+                self.optimizer_D.zero_grad()
+                l_d_total = 0
+                pred_d_real = self.netD(self.var_ref)
+                pred_d_fake = self.netD(self.fake_H.detach())  # detach to avoid BP to G
+                l_d_real = self.cri_gan(pred_d_real - torch.mean(pred_d_fake), True)
+                l_d_fake = self.cri_gan(pred_d_fake - torch.mean(pred_d_real), False)
+
+                l_d_total = (l_d_real + l_d_fake) / 2
+
+                if self.opt["train"]["gan_type"] == "wgan-gp":
+                    batch_size = self.var_ref.size(0)
+                    if self.random_pt.size(0) != batch_size:
+                        self.random_pt.resize_(batch_size, 1, 1, 1)
+                    self.random_pt.uniform_()  # Draw random interpolation points
+                    interp = (
+                            self.random_pt * self.fake_H.detach()
+                            + (1 - self.random_pt) * self.var_ref
+                    )
+                    interp.requires_grad = True
+                    interp_crit = self.netD(interp)
+                    l_d_gp = self.l_gp_w * self.cri_gp(interp, interp_crit)
+                    l_d_total += l_d_gp
+
+                try:  # Prevent error if there are no parameter for autograd during phase change
+                    l_d_total.backward()
+                    self.optimizer_D.step()
+                except:
+                    print("skipping iteration", step)
+                    print("error in the backward pass")
+
+                # set log
+                if step % self.D_update_ratio == 0 and step > self.D_init_iters:
+                    # G
+                    # if self.cri_pix:
+                    # self.log_dict['l_g_pix'] = l_g_pix.item()
+                    if self.cri_fea:
+                        self.log_dict["l_g_fea"] = l_g_fea.item()
+                    # if self.cri_hfen:
+                    #    self.log_dict['l_g_HFEN'] = l_g_HFEN.item()
+                    # if self.cri_tv:
+                    #    self.log_dict['l_g_tv'] = l_g_tv.item()
+                    # if self.cri_ssim:
+                    #    self.log_dict['l_g_ssim'] = l_g_ssim.item()
+                    if self.cri_lpips:
+                        self.log_dict["l_g_lpips"] = l_g_lpips.item()
+                    if self.cri_gpl:
+                        self.log_dict["l_g_gpl"] = l_g_gpl.item()
+                    if self.cri_cpl:
+                        self.log_dict["l_g_cpl"] = l_g_cpl.item()
+                    if self.cri_gan:
+                        self.log_dict["l_g_gan"] = l_g_gan.item()
+                    # D
+                    self.log_dict["l_d_real"] = l_d_real.item()
+                    self.log_dict["l_d_fake"] = l_d_fake.item()
+
+                    if self.opt["train"]["gan_type"] == "wgan-gp":
+                        self.log_dict["l_d_gp"] = l_d_gp.item()
+                    # D outputs
+                    self.log_dict["D_real"] = torch.mean(pred_d_real.detach())
+                    self.log_dict["D_fake"] = torch.mean(pred_d_fake.detach())
+
+        # Potential additional phase, can be disabled
+        '''
+        #Phase 4
+        # Test recurrent training of model CFEM
+        elif step > self.phase3_s and step < self.niter and self.phase4_s > 0:
+            #Freeze/Unfreeze layers
+            if self.train_phase == 3 or (step in self.restarts):
+                print('Starting phase 4')
+                self.train_phase = 4
+            #Freeze all layers
+            for p in self.netG.parameters():
+                p.requires_grad = False
+            #Unfreeze the Content Layers, CFEM and CRM
+            #CFEM_param = self.netG.module.CFEM.parameters()
+            for p in self.netG.module.CFEM.parameters():
+                p.requires_grad = True
+            #CRM_param = self.netG.module.CRM.parameters()
+            for p in self.netG.module.CRM.parameters():
+                p.requires_grad = True
+            
+            if self.bm_count == 0:
+                #self.optimizer.step()
+                self.optimizer_G.zero_grad()
+                self.bm_count = self.batch_multiplier
+                print("reset count")
+            
+            test_save_img = False
+            # test_save_img = None
+            
+            self.fake_Hc, self.fake_Hs, self.fake_Hp = self.netG(self.var_L)
+            self.fake_H = self.fake_Hc
+            
+            #"""
+            #####################################################################
+            if test_save_img:
+                save_images(self.var_H, 0, "self.var_H")
+                save_images(self.fake_H.detach(), 0, "self.fake_H")
+            #####################################################################
+            #"""
+            
+            #Calculate losses
+            l_g_total = 0
+            if self.cri_pix:  # pixel loss
+                l_g_pix = self.l_pix_w * self.cri_pix(self.fake_H, self.var_H)/self.batch_multiplier
+                l_g_total += l_g_pix
+            if self.cri_tv: #TV loss
+                l_g_tv = self.cri_tv(self.fake_H)/self.batch_multiplier #note: the weight is already multiplied inside the function, doesn't need to be here
+                l_g_total += l_g_tv
+
+            try: # Prevent error if there are no parameter for autograd during phase change
+                l_g_total.backward()
+                #self.optimizer_G.step()
+            except:
+                #print(sys.exc_info()[0])
+                print("skipping iteration", step)
+                #pass
+            
+            self.bm_count -= 1
+            print(self.bm_count)
+            print(l_g_total)
+            
+            if self.bm_count == 0:
+                print("step")
+                self.optimizer_G.step()
+            
+            # set log
+            # G
+            if self.cri_pix:
+                self.log_dict['l_g_pix'] = l_g_pix.item()
+            #if self.cri_fea:
+            #    self.log_dict['l_g_fea'] = l_g_fea.item()
+            #if self.cri_hfen:
+            #    self.log_dict['l_g_HFEN'] = l_g_HFEN.item()
+            if self.cri_tv:
+                self.log_dict['l_g_tv'] = l_g_tv.item()
+            #if self.cri_ssim:
+            #    self.log_dict['l_g_ssim'] = l_g_ssim.item()
+        #'''
+
+        """
+        print('Network Parameters:')
+        model_dict = self.netG.state_dict()
+        for param_name in model_dict:
+            param = model_dict[param_name]
+            if param.requires_grad == True:
+                print('Name: ' + str(param_name))
+                print('\tRequires Grad: ' + str(param.requires_grad))
+        #"""
+
+        # Prevent the new lr after a restart from being used by the previous phase between phase changes
+        if step in self.restarts:
+            # Freeze all layers
+            for p in self.netG.parameters():
+                p.requires_grad = False
+
     def test(self):
         self.netG.eval()
         with torch.no_grad():
-            if self.is_train:
-                self.fake_H = self.netG(self.var_L)
-            else:
-                # self.fake_H = self.netG(self.var_L, isTest=True)
-                self.fake_H = self.netG(self.var_L)
+            self.out_c, self.out_s, self.out_p = self.netG(self.var_L)
         self.netG.train()
 
     def get_current_log(self):
@@ -698,17 +955,14 @@ class SRRaGANModel(BaseModel):
     def get_current_visuals(self, need_HR=True):
         out_dict = OrderedDict()
         out_dict["LR"] = self.var_L.detach()[0].float().cpu()
-        out_dict["SR"] = self.fake_H.detach()[0].float().cpu()
+        out_dict["img_c"], out_dict["img_s"], out_dict["img_p"] = (
+            self.out_c.detach()[0].float().cpu(),
+            self.out_s.detach()[0].float().cpu(),
+            self.out_p.detach()[0].float().cpu(),
+        )
+
         if need_HR:
             out_dict["HR"] = self.var_H.detach()[0].float().cpu()
-        return out_dict
-
-    def get_current_visuals_batch(self, need_HR=True):
-        out_dict = OrderedDict()
-        out_dict["LR"] = self.var_L.detach().float().cpu()
-        out_dict["SR"] = self.fake_H.detach().float().cpu()
-        if need_HR:
-            out_dict["HR"] = self.var_H.detach().float().cpu()
         return out_dict
 
     def print_network(self):
@@ -776,5 +1030,5 @@ class SRRaGANModel(BaseModel):
 
     def save(self, iter_step):
         self.save_network(self.netG, "G", iter_step)
-        if self.cri_gan:
+        if self.cri_gan and self.train_phase >= 3:
             self.save_network(self.netD, "D", iter_step)

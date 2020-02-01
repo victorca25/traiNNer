@@ -5,15 +5,20 @@
       <w>artefacts</w>
       <w>asrgan</w>
       <w>asrragan</w>
+      <w>cuda</w>
       <w>dataset</w>
       <w>denoising</w>
+      <w>espcn</w>
       <w>esrgan</w>
       <w>hfen</w>
       <w>lmdb</w>
+      <w>lpips</w>
       <w>ppon</w>
+      <w>pretrained</w>
       <w>pytorch</w>
       <w>resnet</w>
       <w>rrdb</w>
+      <w>sftgan</w>
       <w>srgan</w>
       <w>srragan</w>
       <w>ssim</w>
