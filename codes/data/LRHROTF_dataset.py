@@ -10,7 +10,7 @@ import codes.data.util as util
 import codes.scripts.augmentations as augmentations
 
 
-class LRHRDataset(data.Dataset):
+class LRHROTFDataset(data.Dataset):
     """
     Read LR and HR image pairs.
     If only HR image is provided, generate LR image on-the-fly.
@@ -18,7 +18,7 @@ class LRHRDataset(data.Dataset):
     """
 
     def __init__(self, opt):
-        super(LRHRDataset, self).__init__()
+        super(LRHROTFDataset, self).__init__()
         self.opt = opt
         self.paths_LR = None
         self.paths_HR = None
@@ -89,37 +89,26 @@ class LRHRDataset(data.Dataset):
             """
             assert len(self.paths_LR) == len(self.paths_HR), 'HR and LR datasets have different number of images - {}, {}.'.format(len(self.paths_LR), len(self.paths_HR))
             """
-            # """
+            """
             assert len(self.paths_HR) >= len(
                 self.paths_LR
             ), "HR dataset contains less images than LR dataset  - {}, {}.".format(
                 len(self.paths_LR), len(self.paths_HR)
             )
-            # """
-            if len(self.paths_LR) < len(self.paths_HR):
-                print(
-                    "LR contains less images than HR dataset  - {}, {}. Will generate missing images on the fly.".format(
-                        len(self.paths_LR), len(self.paths_HR)
-                    )
-                )
-                i = 0
-                tmp = []
-                for idx in range(0, len(self.paths_HR)):
-                    _, HRtail = os.path.split(self.paths_HR[idx])
-                    if i < len(self.paths_LR):
-                        LRhead, LRtail = os.path.split(self.paths_LR[i])
-
-                        if LRtail == HRtail:
-                            LRimg_path = os.path.join(LRhead, LRtail)
-                            tmp.append(LRimg_path)
-                            i += 1
-                        else:
-                            LRimg_path = None
-                            tmp.append(LRimg_path)
-                    else:  # if the last image is missing
-                        LRimg_path = None
-                        tmp.append(LRimg_path)
-                self.paths_LR = tmp
+            """
+            for path_LR in self.paths_LR:
+                hr_name = os.path.join(opt["dataroot_HR"], os.path.relpath(path_LR, opt["dataroot_LR"]))
+                if not os.path.exists(hr_name):
+                    print("LR dataset contains extra images. Extra images will be ignored.")
+            tmp = []
+            for path_HR in self.paths_HR:
+                lr_name = os.path.join(opt["dataroot_LR"], os.path.relpath(path_HR, opt["dataroot_HR"]))
+                if not os.path.exists(lr_name):
+                    print(f"No LR, generating on-the-fly: {lr_name}")
+                    tmp.append(None)
+                else:
+                    tmp.append(lr_name)
+            self.paths_LR = tmp
 
         # self.random_scale_list = [1]
 
