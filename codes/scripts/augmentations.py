@@ -137,39 +137,40 @@ def random_erasing(image_origin, p=0.5, s=(0.02, 0.4), r=(0.3, 3), modes=[0,1,2]
         image[top:bottom, left:right, :] = np.random.rand(mask_height, mask_width, image.shape[2])
     return image
 
-def blobpng(image): # convert Wand image back to NumPy 
-    image.depth=8
-    image.format        = 'png'
-    image.alpha_channel = 'remove' # discard alpha channel
-    imgbuff=np.asarray(bytearray(image.make_blob('png')), dtype=np.uint8)
-    return cv2.imdecode(imgbuff, cv2.IMREAD_COLOR)
-	
 def liquidscale(image,dim): # liquid rescale for God knows what
-    succeed, blobimg=cv2.imencode('.png', image*255)			
-    with Image(blob=blobimg) as imgin:
+    with Image.from_array(image) as imgin:	
         imgin.liquid_rescale(dim[0],dim[1])		
-        scaled = blobpng(imgin)
-    return scaled.astype(np.float32) / 255.0
+        return np.array(imgin).astype(np.float32) / 255.0
 
+def rgbscale(image,dim): # rgbscale, better clarity than 'cv2.INTER_AREA'
+    with Image.from_array(image) as imgin:
+        imgin.transform_colorspace('rgb')	
+        #imgin.resize(dim[0],dim[1],filter='box')
+        imgin.adaptive_resize(dim[0],dim[1])
+        imgin.transform_colorspace('srgb')
+        return np.array(imgin).astype(np.float32) / 255.0
+		
 # scale image
 def scale_img(image, scale, algo=None):
     h,w,c = image.shape
     newdim = (int(w/scale), int(h/scale))
-    
+    resized=image
     # randomly use OpenCV2 algorithms if none are provided
-    if algo is None:
+    if algo is None:    	
         scale_algos = [cv2.INTER_NEAREST, cv2.INTER_LINEAR, cv2.INTER_CUBIC, cv2.INTER_AREA, cv2.INTER_LANCZOS4, cv2.INTER_LINEAR_EXACT] #scaling interpolation options
         interpol = random.choice(scale_algos)
         resized = cv2.resize(image, newdim, interpolation = interpol)
 
-    # using matlab imresize
+    # using matlab / imresize
     else:
         if isinstance(algo, list):
             interpol = random.choice(algo)
         elif isinstance(algo, int):
             interpol = algo
-        if is_wand_available == True and interpol==420: #'Wand liquid rescale           
-            resized = liquidscale(image,newdim)	
+        if is_wand_available == True and interpol==420: #liquid rescale
+            resized = liquidscale(image,newdim) 
+        elif is_wand_available == True and interpol==123: #rgb scale
+            resized = rgbscale(image,newdim)
         elif interpol == 777: #'matlab_bicubic'
             resized = util.imresize_np(image, 1 / scale, True)
             # force to 3 channels
@@ -196,10 +197,7 @@ def resize_img(image, crop_size=(128, 128), algo=None):
             interpol = random.choice(algo)
         elif isinstance(algo, int):
             interpol = algo
-            
-    if is_wand_available == True and interpol==420: #'Wand liquid rescale           
-        resized = liquidscale(image,newdim)	
-    elif interpol == 777: #'matlab_bicubic'
+    if interpol == 777: #'matlab_bicubic'
         resized = util.imresize_np(image, 1 / scale, True)
         # force to 3 channels
         # if resized.ndim == 2:
@@ -366,6 +364,7 @@ def minmax(v): #for Floyd-Steinberg dithering noise
     if v < 0:
         v = 0
     return v
+
 
 def noise_img(img_LR, noise_types=['clean']):
     noise_type = random.choice(noise_types) 
@@ -596,13 +595,12 @@ def noise_img(img_LR, noise_types=['clean']):
     
     elif is_wand_available == True and noise_type in ['imdither','imquantize']: # Fatality-inspired Imagemagick noise
         #print("Doing IM noise") 
-        succeed, blobimg=cv2.imencode('.png', img_LR*255)			
-        with Image(blob=blobimg) as imgin:
-        #with Image.from_array(img_LR) as imgin: # wait for Wand fix to use
+        #Convert to BGR because Wand loads numpy this way for some reason
+        img = cv2.cvtColor(img_LR, cv2.COLOR_BGR2RGB)
+        with Image.from_array(img) as imgin:
             i=imgin.clone()
-            i.quantize(random.randint(6,32),'srgb',0,True,False)
-            if noise_type == 'imquantize':
-                #print("Quantizing...")   
+            i.quantize(random.randint(6,32),'srgb',0,False,False)
+            if noise_type == 'imquantize':  
                 imgin=i
             elif noise_type == 'imdither':
                 colordith_types = ['bayer', 'other']
@@ -612,18 +610,19 @@ def noise_img(img_LR, noise_types=['clean']):
                     #print("Ordered dithering...")
                     imgin.ordered_dither(random.choice(order_types),'all_channels')
                     imgin.remap(i) # remap to quantised sample
-                else :                      #other dither noise
+                else :             #other dither noise
                     #print("Scattered dithering...")
                     imgin.remap(i,random.choice(['floyd_steinberg','riemersma']))
-            noise_img = blobpng(imgin)
-        noise_img = noise_img.astype(np.float32) / 255.0
+            noise_img = np.array(imgin).astype(np.float32) / 255.0
+        #Convert back to RGB
+        noise_img = cv2.cvtColor(noise_img, cv2.COLOR_BGR2RGB)
 
     elif is_wand_available == True and noise_type == 'kuwahara': # inpainting training
-        succeed, blobimg=cv2.imencode('.png', img_LR*255)			
-        with Image(blob=blobimg) as imgin:
-            imgin.kuwahara(radius=2, sigma=1.5)
-            noise_img = blobpng(imgin)
-        noise_img = noise_img.astype(np.float32) / 255.0   			
+        img = cv2.cvtColor(img_LR, cv2.COLOR_BGR2RGB)
+        with Image.from_array(img) as imgin:
+            imgin.kuwahara(radius=2, sigma=1)
+            noise_img = np.array(imgin).astype(np.float32) / 255.0			
+        noise_img = cv2.cvtColor(noise_img, cv2.COLOR_BGR2RGB)
         
     else: # Pass clean noiseless image, removed 'clean' condition so that noise_img intializes
         noise_img = img_LR
@@ -906,7 +905,8 @@ def single_image(img_path, save_path, crop_size=(128, 128), scale=1, blur_algos=
     #"""
     cv2.imwrite(save_path+'/crop_.png',img_crop*255) 
     #"""
-    
+
+    print("Resizing")    
     img_resize, _ = resize_img(img, crop_size)
     print(img_resize.shape)
     #"""
@@ -930,12 +930,16 @@ def single_image(img_path, save_path, crop_size=(128, 128), scale=1, blur_algos=
     #"""
     cv2.imwrite(save_path+'/erasing_.png',img_erasing*255) 
     #"""
-    
+
+    scaletype=[0,1,2,3,4,5,123,420,777]
+    #scaletype=[123]
+    for which in scaletype :
+        print("Scaling - ",which)    
     #scale = 4
-    img_scale, interpol_algo = scale_img(img, scale)
-    print(img_scale.shape)    
+        img_scale, interpol_algo = scale_img(img, scale,which)
+        print(img_scale.shape)    
     #"""
-    cv2.imwrite(save_path+'/scale_'+str(scale)+'_'+str(interpol_algo)+'_.png',img_scale*255) 
+        cv2.imwrite(save_path+'/scale_'+str(scale)+'_'+str(interpol_algo)+'_.png',img_scale*255) 
     #"""
     
     img_blur, blur_algo, blur_kernel_size = blur_img(img, blur_algos)
@@ -1007,7 +1011,7 @@ def apply_dir(img_path, save_path, crop_size=(128, 128), scale=1, blur_algos=['c
         #"""
         
         #scale = 4
-        img_scale, interpol_algo = scale_img(img, scale)
+        img_scale, interpol_algo = scale_img(img, scale,which)
         print(img_scale.shape)    
         #"""
         cv2.imwrite(save_path+'/'+rann+'scale_'+str(scale)+'_'+str(interpol_algo)+'_.png',img_scale*255) 
