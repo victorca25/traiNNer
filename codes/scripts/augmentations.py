@@ -3,9 +3,10 @@ import os
 import os.path
 import random
 
-import codes.data.util as util
-import numpy as np
 import cv2
+import numpy as np
+
+import codes.data.util as util
 
 IMAGE_EXTENSIONS = [".png", ".jpg"]
 

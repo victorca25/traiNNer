@@ -5,9 +5,9 @@ from collections import OrderedDict
 
 import numpy as np
 import torch
-from codes.models.modules.LPIPS import perceptual_loss as util
 from torch.autograd import Variable
 
+from codes.models.modules.LPIPS import perceptual_loss as util
 from . import networks_basic as networks
 # import itertools
 from .base_model import BaseModel

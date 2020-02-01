@@ -1,10 +1,11 @@
 import random
 
 import cv2
-import codes.data.util as util
 import numpy as np
 import torch
 import torch.utils.data as data
+
+import codes.data.util as util
 
 
 class LRHRSeg_BG_Dataset(data.Dataset):

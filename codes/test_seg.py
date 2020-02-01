@@ -2,10 +2,11 @@ import glob
 import os.path
 
 import cv2
-import codes.models.modules.architectures.seg_arch as seg_arch
 import numpy as np
 import torch
 import torchvision.utils
+
+import codes.models.modules.architectures.seg_arch as seg_arch
 import codes.utils.util as util
 from codes.data.util import imresize, modcrop
 

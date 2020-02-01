@@ -5,8 +5,9 @@ import time
 from collections import OrderedDict
 
 import numpy as np
-import codes.options.options as option
 import torch
+
+import codes.options.options as option
 import codes.utils.util as util
 from codes.data import create_dataset, create_dataloader
 from codes.data.util import bgr2ycbcr, patchify_tensor, recompose_tensor
