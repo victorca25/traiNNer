@@ -108,8 +108,10 @@ datasets:
   val:
     name: val_set14_part
     mode: LRHROTF
-    dataroot_HR: ../datasets/val/hr
-    dataroot_LR: ../datasets/val/lr
+    dataroot_HR:
+    - ../datasets/val/hr
+    dataroot_LR:
+    - ../datasets/val/lr
     znorm: false  # true | false // To normalize images in [-1, 1] range. Default = None (range [0,1]). Can use with activation function like tanh.
 
     # Color space conversion: "color" for both LR and HR, "color_LR" for LR independently, "color_HR" for HR independently
