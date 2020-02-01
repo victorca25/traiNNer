@@ -1,6 +1,6 @@
-'''
+"""
 architecture for sft
-'''
+"""
 import torch.nn as nn
 import torch.nn.functional as F
 
@@ -15,8 +15,12 @@ class SFTLayer(nn.Module):
 
     def forward(self, x):
         # x[0]: fea; x[1]: cond
-        scale = self.SFT_scale_conv1(F.leaky_relu(self.SFT_scale_conv0(x[1]), 0.1, inplace=True))
-        shift = self.SFT_shift_conv1(F.leaky_relu(self.SFT_shift_conv0(x[1]), 0.1, inplace=True))
+        scale = self.SFT_scale_conv1(
+            F.leaky_relu(self.SFT_scale_conv0(x[1]), 0.1, inplace=True)
+        )
+        shift = self.SFT_shift_conv1(
+            F.leaky_relu(self.SFT_shift_conv0(x[1]), 0.1, inplace=True)
+        )
         return x[0] * (scale + 1) + shift
 
 
@@ -58,7 +62,7 @@ class SFT_Net(nn.Module):
             nn.ReLU(True),
             nn.Conv2d(64, 64, 3, 1, 1),
             nn.ReLU(True),
-            nn.Conv2d(64, 3, 3, 1, 1)
+            nn.Conv2d(64, 3, 3, 1, 1),
         )
 
         self.CondNet = nn.Sequential(
@@ -70,7 +74,7 @@ class SFT_Net(nn.Module):
             nn.LeakyReLU(0.1, True),
             nn.Conv2d(128, 128, 1),
             nn.LeakyReLU(0.1, True),
-            nn.Conv2d(128, 32, 1)
+            nn.Conv2d(128, 32, 1),
         )
 
     def forward(self, x):
@@ -91,31 +95,24 @@ class ACD_VGG_BN_96(nn.Module):
         self.feature = nn.Sequential(
             nn.Conv2d(3, 64, 3, 1, 1),
             nn.LeakyReLU(0.1, True),
-
             nn.Conv2d(64, 64, 4, 2, 1),
             nn.BatchNorm2d(64, affine=True),
             nn.LeakyReLU(0.1, True),
-
             nn.Conv2d(64, 128, 3, 1, 1),
             nn.BatchNorm2d(128, affine=True),
             nn.LeakyReLU(0.1, True),
-
             nn.Conv2d(128, 128, 4, 2, 1),
             nn.BatchNorm2d(128, affine=True),
             nn.LeakyReLU(0.1, True),
-
             nn.Conv2d(128, 256, 3, 1, 1),
             nn.BatchNorm2d(256, affine=True),
             nn.LeakyReLU(0.1, True),
-
             nn.Conv2d(256, 256, 4, 2, 1),
             nn.BatchNorm2d(256, affine=True),
             nn.LeakyReLU(0.1, True),
-
             nn.Conv2d(256, 512, 3, 1, 1),
             nn.BatchNorm2d(512, affine=True),
             nn.LeakyReLU(0.1, True),
-
             nn.Conv2d(512, 512, 4, 2, 1),
             nn.BatchNorm2d(512, affine=True),
             nn.LeakyReLU(0.1, True),
@@ -123,15 +120,11 @@ class ACD_VGG_BN_96(nn.Module):
 
         # gan
         self.gan = nn.Sequential(
-            nn.Linear(512*6*6, 100),
-            nn.LeakyReLU(0.1, True),
-            nn.Linear(100, 1)
+            nn.Linear(512 * 6 * 6, 100), nn.LeakyReLU(0.1, True), nn.Linear(100, 1)
         )
 
         self.cls = nn.Sequential(
-            nn.Linear(512*6*6, 100),
-            nn.LeakyReLU(0.1, True),
-            nn.Linear(100, 8)
+            nn.Linear(512 * 6 * 6, 100), nn.LeakyReLU(0.1, True), nn.Linear(100, 8)
         )
 
     def forward(self, x):
@@ -157,8 +150,12 @@ class SFTLayer_torch(nn.Module):
 
     def forward(self, x):
         # x[0]: fea; x[1]: cond
-        scale = self.SFT_scale_conv1(F.leaky_relu(self.SFT_scale_conv0(x[1]), 0.01, inplace=True))
-        shift = self.SFT_shift_conv1(F.leaky_relu(self.SFT_shift_conv0(x[1]), 0.01, inplace=True))
+        scale = self.SFT_scale_conv1(
+            F.leaky_relu(self.SFT_scale_conv0(x[1]), 0.01, inplace=True)
+        )
+        shift = self.SFT_shift_conv1(
+            F.leaky_relu(self.SFT_shift_conv0(x[1]), 0.01, inplace=True)
+        )
         return x[0] * scale + shift
 
 
@@ -192,15 +189,15 @@ class SFT_Net_torch(nn.Module):
         self.sft_branch = nn.Sequential(*sft_branch)
 
         self.HR_branch = nn.Sequential(
-            nn.Upsample(scale_factor=2, mode='nearest'),
+            nn.Upsample(scale_factor=2, mode="nearest"),
             nn.Conv2d(64, 64, 3, 1, 1),
             nn.ReLU(True),
-            nn.Upsample(scale_factor=2, mode='nearest'),
+            nn.Upsample(scale_factor=2, mode="nearest"),
             nn.Conv2d(64, 64, 3, 1, 1),
             nn.ReLU(True),
             nn.Conv2d(64, 64, 3, 1, 1),
             nn.ReLU(True),
-            nn.Conv2d(64, 3, 3, 1, 1)
+            nn.Conv2d(64, 3, 3, 1, 1),
         )
 
         # Condtion network
@@ -213,7 +210,7 @@ class SFT_Net_torch(nn.Module):
             nn.LeakyReLU(0.1, True),
             nn.Conv2d(128, 128, 1),
             nn.LeakyReLU(0.1, True),
-            nn.Conv2d(128, 32, 1)
+            nn.Conv2d(128, 32, 1),
         )
 
     def forward(self, x):

@@ -9,7 +9,7 @@ from models.modules.architectures.convolutions.partialconv2d import PartialConv2
 
 # Swish activation funtion
 def swish_func(x, beta=1.0):
-    '''
+    """
     "Swish: a Self-Gated Activation Function"
     Searching for Activation Functions (https://arxiv.org/abs/1710.05941)
     
@@ -27,45 +27,48 @@ def swish_func(x, beta=1.0):
       set as a trainable parameter.
       
     Alt: 1.78718727865 * (x * sigmoid(x) - 0.20662096414)
-    '''
-    
-    # In-place implementation, may consume less GPU memory: 
+    """
+
+    # In-place implementation, may consume less GPU memory:
     """ 
     result = x.clone()
     torch.sigmoid_(beta*x)
     x *= result
     return x
     #"""
-    
+
     # Normal out-of-place implementation:
-    #"""
-    return x * torch.sigmoid(beta*x)
-    #"""
-    
+    # """
+    return x * torch.sigmoid(beta * x)
+    # """
+
+
 # Swish module
 class Swish(nn.Module):
-    
-    __constants__ = ['beta', 'slope', 'inplace']
-    
-    def __init__(self, beta = 1.0, slope = 1.67653251702, inplace=False):
-        '''
+
+    __constants__ = ["beta", "slope", "inplace"]
+
+    def __init__(self, beta=1.0, slope=1.67653251702, inplace=False):
+        """
         Shape:
         - Input: (N, *) where * means, any number of additional
           dimensions
         - Output: (N, *), same shape as the input
-        '''
+        """
         super().__init__()
         self.inplace = inplace
-        #self.beta = beta # user-defined beta parameter, non-trainable
-        #self.beta = beta * torch.nn.Parameter(torch.ones(1)) # learnable beta parameter, create a tensor out of beta
-        self.beta = torch.nn.Parameter(torch.tensor(beta)) # learnable beta parameter, create a tensor out of beta
-        self.beta.requiresGrad = True # set requiresGrad to true to make it trainable
+        # self.beta = beta # user-defined beta parameter, non-trainable
+        # self.beta = beta * torch.nn.Parameter(torch.ones(1)) # learnable beta parameter, create a tensor out of beta
+        self.beta = torch.nn.Parameter(
+            torch.tensor(beta)
+        )  # learnable beta parameter, create a tensor out of beta
+        self.beta.requiresGrad = True  # set requiresGrad to true to make it trainable
 
-        self.slope = slope/2 # user-defined "slope", non-trainable
-        #self.slope = slope * torch.nn.Parameter(torch.ones(1)) # learnable slope parameter, create a tensor out of slope
-        #self.slope = torch.nn.Parameter(torch.tensor(slope)) # learnable slope parameter, create a tensor out of slope
-        #self.slope.requiresGrad = True # set requiresGrad to true to true to make it trainable
-    
+        self.slope = slope / 2  # user-defined "slope", non-trainable
+        # self.slope = slope * torch.nn.Parameter(torch.ones(1)) # learnable slope parameter, create a tensor out of slope
+        # self.slope = torch.nn.Parameter(torch.tensor(slope)) # learnable slope parameter, create a tensor out of slope
+        # self.slope.requiresGrad = True # set requiresGrad to true to true to make it trainable
+
     def forward(self, input):
         """
         # Disabled, using inplace causes:
@@ -77,7 +80,7 @@ class Swish(nn.Module):
             return 2 * self.slope * swish_func(input, self.beta)
         """
         return 2 * self.slope * swish_func(input, self.beta)
-        
+
 
 def act(act_type, inplace=True, neg_slope=0.2, n_prelu=1, beta=1.0):
     # helper selecting activation
@@ -85,32 +88,36 @@ def act(act_type, inplace=True, neg_slope=0.2, n_prelu=1, beta=1.0):
     # n_prelu: for p_relu num_parameters
     # beta: for swish
     act_type = act_type.lower()
-    if act_type == 'relu':
+    if act_type == "relu":
         layer = nn.ReLU(inplace)
-    elif act_type == 'leakyrelu' or act_type == 'lrelu':
+    elif act_type == "leakyrelu" or act_type == "lrelu":
         layer = nn.LeakyReLU(neg_slope, inplace)
-    elif act_type == 'prelu':
+    elif act_type == "prelu":
         layer = nn.PReLU(num_parameters=n_prelu, init=neg_slope)
-    elif act_type == 'Tanh' or act_type == 'tanh' : # [-1, 1] range output
+    elif act_type == "Tanh" or act_type == "tanh":  # [-1, 1] range output
         layer = nn.Tanh()
-    elif act_type == 'sigmoid': # [0, 1] range output
+    elif act_type == "sigmoid":  # [0, 1] range output
         layer = nn.Sigmoid()
-    elif act_type == 'swish':
-        layer = Swish(beta=beta,inplace=inplace)
+    elif act_type == "swish":
+        layer = Swish(beta=beta, inplace=inplace)
     else:
-        raise NotImplementedError('activation layer [{:s}] is not found'.format(act_type))
+        raise NotImplementedError(
+            "activation layer [{:s}] is not found".format(act_type)
+        )
     return layer
 
 
 def norm(norm_type, nc):
     # helper selecting normalization layer
     norm_type = norm_type.lower()
-    if norm_type == 'batch':
+    if norm_type == "batch":
         layer = nn.BatchNorm2d(nc, affine=True)
-    elif norm_type == 'instance':
+    elif norm_type == "instance":
         layer = nn.InstanceNorm2d(nc, affine=False)
     else:
-        raise NotImplementedError('normalization layer [{:s}] is not found'.format(norm_type))
+        raise NotImplementedError(
+            "normalization layer [{:s}] is not found".format(norm_type)
+        )
     return layer
 
 
@@ -120,12 +127,14 @@ def pad(pad_type, padding):
     pad_type = pad_type.lower()
     if padding == 0:
         return None
-    if pad_type == 'reflect':
+    if pad_type == "reflect":
         layer = nn.ReflectionPad2d(padding)
-    elif pad_type == 'replicate':
+    elif pad_type == "replicate":
         layer = nn.ReplicationPad2d(padding)
     else:
-        raise NotImplementedError('padding layer [{:s}] is not implemented'.format(pad_type))
+        raise NotImplementedError(
+            "padding layer [{:s}] is not implemented".format(pad_type)
+        )
     return layer
 
 
@@ -146,14 +155,14 @@ class ConcatBlock(nn.Module):
         return output
 
     def __repr__(self):
-        tmpstr = 'Identity .. \n|'
-        modstr = self.sub.__repr__().replace('\n', '\n|')
+        tmpstr = "Identity .. \n|"
+        modstr = self.sub.__repr__().replace("\n", "\n|")
         tmpstr = tmpstr + modstr
         return tmpstr
 
 
 class ShortcutBlock(nn.Module):
-    #Elementwise sum the output of a submodule to its input
+    # Elementwise sum the output of a submodule to its input
     def __init__(self, submodule):
         super(ShortcutBlock, self).__init__()
         self.sub = submodule
@@ -163,8 +172,8 @@ class ShortcutBlock(nn.Module):
         return output
 
     def __repr__(self):
-        tmpstr = 'Identity + \n|'
-        modstr = self.sub.__repr__().replace('\n', '\n|')
+        tmpstr = "Identity + \n|"
+        modstr = self.sub.__repr__().replace("\n", "\n|")
         tmpstr = tmpstr + modstr
         return tmpstr
 
@@ -173,7 +182,7 @@ def sequential(*args):
     # Flatten Sequential. It unwraps nn.Sequential.
     if len(args) == 1:
         if isinstance(args[0], OrderedDict):
-            raise NotImplementedError('sequential does not support OrderedDict input.')
+            raise NotImplementedError("sequential does not support OrderedDict input.")
         return args[0]  # No sequential is needed.
     modules = []
     for module in args:
@@ -185,34 +194,62 @@ def sequential(*args):
     return nn.Sequential(*modules)
 
 
-def conv_block(in_nc, out_nc, kernel_size, stride=1, dilation=1, groups=1, bias=True, \
-               pad_type='zero', norm_type=None, act_type='relu', mode='CNA', convtype='Conv2D', \
-               spectral_norm=False):
-    '''
+def conv_block(
+    in_nc,
+    out_nc,
+    kernel_size,
+    stride=1,
+    dilation=1,
+    groups=1,
+    bias=True,
+    pad_type="zero",
+    norm_type=None,
+    act_type="relu",
+    mode="CNA",
+    convtype="Conv2D",
+    spectral_norm=False,
+):
+    """
     Conv layer with padding, normalization, activation
     mode: CNA --> Conv -> Norm -> Act
         NAC --> Norm -> Act --> Conv (Identity Mappings in Deep Residual Networks, ECCV16)
-    '''
-    assert mode in ['CNA', 'NAC', 'CNAC'], 'Wrong conv mode [{:s}]'.format(mode)
+    """
+    assert mode in ["CNA", "NAC", "CNAC"], "Wrong conv mode [{:s}]".format(mode)
     padding = get_valid_padding(kernel_size, dilation)
-    p = pad(pad_type, padding) if pad_type and pad_type != 'zero' else None
-    padding = padding if pad_type == 'zero' else 0
-    
-    if convtype=='PartialConv2D':
-        c = PartialConv2d(in_nc, out_nc, kernel_size=kernel_size, stride=stride, padding=padding, \
-               dilation=dilation, bias=bias, groups=groups)
-    else: #default case is standard 'Conv2D':
-        c = nn.Conv2d(in_nc, out_nc, kernel_size=kernel_size, stride=stride, padding=padding, \
-                dilation=dilation, bias=bias, groups=groups) #normal conv2d
-            
+    p = pad(pad_type, padding) if pad_type and pad_type != "zero" else None
+    padding = padding if pad_type == "zero" else 0
+
+    if convtype == "PartialConv2D":
+        c = PartialConv2d(
+            in_nc,
+            out_nc,
+            kernel_size=kernel_size,
+            stride=stride,
+            padding=padding,
+            dilation=dilation,
+            bias=bias,
+            groups=groups,
+        )
+    else:  # default case is standard 'Conv2D':
+        c = nn.Conv2d(
+            in_nc,
+            out_nc,
+            kernel_size=kernel_size,
+            stride=stride,
+            padding=padding,
+            dilation=dilation,
+            bias=bias,
+            groups=groups,
+        )  # normal conv2d
+
     if spectral_norm:
         c = nn.utils.spectral_norm(c)
-    
+
     a = act(act_type) if act_type else None
-    if 'CNA' in mode:
+    if "CNA" in mode:
         n = norm(norm_type, out_nc) if norm_type else None
         return sequential(p, c, n, a)
-    elif mode == 'NAC':
+    elif mode == "NAC":
         if norm_type is None and act_type is not None:
             a = act(act_type, inplace=False)
             # Important!
@@ -229,24 +266,63 @@ def conv_block(in_nc, out_nc, kernel_size, stride=1, dilation=1, groups=1, bias=
 
 
 class ResNetBlock(nn.Module):
-    '''
+    """
     ResNet Block, 3-3 style
     with extra residual scaling used in EDSR
     (Enhanced Deep Residual Networks for Single Image Super-Resolution, CVPRW 17)
-    '''
+    """
 
-    def __init__(self, in_nc, mid_nc, out_nc, kernel_size=3, stride=1, dilation=1, groups=1, \
-            bias=True, pad_type='zero', norm_type=None, act_type='relu', mode='CNA', res_scale=1, convtype='Conv2D'):
+    def __init__(
+        self,
+        in_nc,
+        mid_nc,
+        out_nc,
+        kernel_size=3,
+        stride=1,
+        dilation=1,
+        groups=1,
+        bias=True,
+        pad_type="zero",
+        norm_type=None,
+        act_type="relu",
+        mode="CNA",
+        res_scale=1,
+        convtype="Conv2D",
+    ):
         super(ResNetBlock, self).__init__()
-        conv0 = conv_block(in_nc, mid_nc, kernel_size, stride, dilation, groups, bias, pad_type, \
-            norm_type, act_type, mode, convtype)
-        if mode == 'CNA':
+        conv0 = conv_block(
+            in_nc,
+            mid_nc,
+            kernel_size,
+            stride,
+            dilation,
+            groups,
+            bias,
+            pad_type,
+            norm_type,
+            act_type,
+            mode,
+            convtype,
+        )
+        if mode == "CNA":
             act_type = None
-        if mode == 'CNAC':  # Residual path: |-CNAC-|
+        if mode == "CNAC":  # Residual path: |-CNAC-|
             act_type = None
             norm_type = None
-        conv1 = conv_block(mid_nc, out_nc, kernel_size, stride, dilation, groups, bias, pad_type, \
-            norm_type, act_type, mode, convtype)
+        conv1 = conv_block(
+            mid_nc,
+            out_nc,
+            kernel_size,
+            stride,
+            dilation,
+            groups,
+            bias,
+            pad_type,
+            norm_type,
+            act_type,
+            mode,
+            convtype,
+        )
         # if in_nc != out_nc:
         #     self.project = conv_block(in_nc, out_nc, 1, stride, dilation, 1, bias, pad_type, \
         #         None, None)
@@ -262,35 +338,97 @@ class ResNetBlock(nn.Module):
 
 
 class ResidualDenseBlock_5C(nn.Module):
-    '''
+    """
     Residual Dense Block
     style: 5 convs
     The core module of paper: (Residual Dense Network for Image Super-Resolution, CVPR 18)
-    '''
+    """
 
-    def __init__(self, nc, kernel_size=3, gc=32, stride=1, bias=True, pad_type='zero', \
-            norm_type=None, act_type='leakyrelu', mode='CNA', convtype='Conv2D', spectral_norm=False):
+    def __init__(
+        self,
+        nc,
+        kernel_size=3,
+        gc=32,
+        stride=1,
+        bias=True,
+        pad_type="zero",
+        norm_type=None,
+        act_type="leakyrelu",
+        mode="CNA",
+        convtype="Conv2D",
+        spectral_norm=False,
+    ):
         super(ResidualDenseBlock_5C, self).__init__()
         # gc: growth channel, i.e. intermediate channels
-        self.conv1 = conv_block(nc, gc, kernel_size, stride, bias=bias, pad_type=pad_type, \
-            norm_type=norm_type, act_type=act_type, mode=mode, convtype=convtype, \
-            spectral_norm=spectral_norm)
-        self.conv2 = conv_block(nc+gc, gc, kernel_size, stride, bias=bias, pad_type=pad_type, \
-            norm_type=norm_type, act_type=act_type, mode=mode, convtype=convtype, \
-            spectral_norm=spectral_norm)
-        self.conv3 = conv_block(nc+2*gc, gc, kernel_size, stride, bias=bias, pad_type=pad_type, \
-            norm_type=norm_type, act_type=act_type, mode=mode, convtype=convtype, \
-            spectral_norm=spectral_norm)
-        self.conv4 = conv_block(nc+3*gc, gc, kernel_size, stride, bias=bias, pad_type=pad_type, \
-            norm_type=norm_type, act_type=act_type, mode=mode, convtype=convtype, \
-            spectral_norm=spectral_norm)
-        if mode == 'CNA':
+        self.conv1 = conv_block(
+            nc,
+            gc,
+            kernel_size,
+            stride,
+            bias=bias,
+            pad_type=pad_type,
+            norm_type=norm_type,
+            act_type=act_type,
+            mode=mode,
+            convtype=convtype,
+            spectral_norm=spectral_norm,
+        )
+        self.conv2 = conv_block(
+            nc + gc,
+            gc,
+            kernel_size,
+            stride,
+            bias=bias,
+            pad_type=pad_type,
+            norm_type=norm_type,
+            act_type=act_type,
+            mode=mode,
+            convtype=convtype,
+            spectral_norm=spectral_norm,
+        )
+        self.conv3 = conv_block(
+            nc + 2 * gc,
+            gc,
+            kernel_size,
+            stride,
+            bias=bias,
+            pad_type=pad_type,
+            norm_type=norm_type,
+            act_type=act_type,
+            mode=mode,
+            convtype=convtype,
+            spectral_norm=spectral_norm,
+        )
+        self.conv4 = conv_block(
+            nc + 3 * gc,
+            gc,
+            kernel_size,
+            stride,
+            bias=bias,
+            pad_type=pad_type,
+            norm_type=norm_type,
+            act_type=act_type,
+            mode=mode,
+            convtype=convtype,
+            spectral_norm=spectral_norm,
+        )
+        if mode == "CNA":
             last_act = None
         else:
             last_act = act_type
-        self.conv5 = conv_block(nc+4*gc, nc, 3, stride, bias=bias, pad_type=pad_type, \
-            norm_type=norm_type, act_type=last_act, mode=mode, convtype=convtype, \
-            spectral_norm=spectral_norm)
+        self.conv5 = conv_block(
+            nc + 4 * gc,
+            nc,
+            3,
+            stride,
+            bias=bias,
+            pad_type=pad_type,
+            norm_type=norm_type,
+            act_type=last_act,
+            mode=mode,
+            convtype=convtype,
+            spectral_norm=spectral_norm,
+        )
 
     def forward(self, x):
         x1 = self.conv1(x)
@@ -302,21 +440,65 @@ class ResidualDenseBlock_5C(nn.Module):
 
 
 class RRDB(nn.Module):
-    '''
+    """
     Residual in Residual Dense Block
     (ESRGAN: Enhanced Super-Resolution Generative Adversarial Networks)
-    '''
+    """
 
-    def __init__(self, nc, kernel_size=3, gc=32, stride=1, bias=True, pad_type='zero', \
-            norm_type=None, act_type='leakyrelu', mode='CNA', convtype='Conv2D', \
-            spectral_norm=False):
+    def __init__(
+        self,
+        nc,
+        kernel_size=3,
+        gc=32,
+        stride=1,
+        bias=True,
+        pad_type="zero",
+        norm_type=None,
+        act_type="leakyrelu",
+        mode="CNA",
+        convtype="Conv2D",
+        spectral_norm=False,
+    ):
         super(RRDB, self).__init__()
-        self.RDB1 = ResidualDenseBlock_5C(nc, kernel_size, gc, stride, bias, pad_type, \
-            norm_type, act_type, mode, convtype, spectral_norm=spectral_norm)
-        self.RDB2 = ResidualDenseBlock_5C(nc, kernel_size, gc, stride, bias, pad_type, \
-            norm_type, act_type, mode, convtype, spectral_norm=spectral_norm)
-        self.RDB3 = ResidualDenseBlock_5C(nc, kernel_size, gc, stride, bias, pad_type, \
-            norm_type, act_type, mode, convtype, spectral_norm=spectral_norm)
+        self.RDB1 = ResidualDenseBlock_5C(
+            nc,
+            kernel_size,
+            gc,
+            stride,
+            bias,
+            pad_type,
+            norm_type,
+            act_type,
+            mode,
+            convtype,
+            spectral_norm=spectral_norm,
+        )
+        self.RDB2 = ResidualDenseBlock_5C(
+            nc,
+            kernel_size,
+            gc,
+            stride,
+            bias,
+            pad_type,
+            norm_type,
+            act_type,
+            mode,
+            convtype,
+            spectral_norm=spectral_norm,
+        )
+        self.RDB3 = ResidualDenseBlock_5C(
+            nc,
+            kernel_size,
+            gc,
+            stride,
+            bias,
+            pad_type,
+            norm_type,
+            act_type,
+            mode,
+            convtype,
+            spectral_norm=spectral_norm,
+        )
 
     def forward(self, x):
         out = self.RDB1(x)
@@ -325,21 +507,20 @@ class RRDB(nn.Module):
         return out.mul(0.2) + x
 
 
-
-#PPON
+# PPON
 class _ResBlock_32(nn.Module):
     def __init__(self, nc=64):
         super(_ResBlock_32, self).__init__()
         self.c1 = conv_layer(nc, nc, 3, 1, 1)
-        self.d1 = conv_layer(nc, nc//2, 3, 1, 1)  # rate=1
-        self.d2 = conv_layer(nc, nc//2, 3, 1, 2)  # rate=2
-        self.d3 = conv_layer(nc, nc//2, 3, 1, 3)  # rate=3
-        self.d4 = conv_layer(nc, nc//2, 3, 1, 4)  # rate=4
-        self.d5 = conv_layer(nc, nc//2, 3, 1, 5)  # rate=5
-        self.d6 = conv_layer(nc, nc//2, 3, 1, 6)  # rate=6
-        self.d7 = conv_layer(nc, nc//2, 3, 1, 7)  # rate=7
-        self.d8 = conv_layer(nc, nc//2, 3, 1, 8)  # rate=8
-        self.act = act('lrelu')
+        self.d1 = conv_layer(nc, nc // 2, 3, 1, 1)  # rate=1
+        self.d2 = conv_layer(nc, nc // 2, 3, 1, 2)  # rate=2
+        self.d3 = conv_layer(nc, nc // 2, 3, 1, 3)  # rate=3
+        self.d4 = conv_layer(nc, nc // 2, 3, 1, 4)  # rate=4
+        self.d5 = conv_layer(nc, nc // 2, 3, 1, 5)  # rate=5
+        self.d6 = conv_layer(nc, nc // 2, 3, 1, 6)  # rate=6
+        self.d7 = conv_layer(nc, nc // 2, 3, 1, 7)  # rate=7
+        self.d8 = conv_layer(nc, nc // 2, 3, 1, 8)  # rate=8
+        self.act = act("lrelu")
         self.c2 = conv_layer(nc * 4, nc, 1, 1, 1)  # 256-->64
 
     def forward(self, input):
@@ -367,6 +548,7 @@ class _ResBlock_32(nn.Module):
 
         return output
 
+
 class RRBlock_32(nn.Module):
     def __init__(self):
         super(RRBlock_32, self).__init__()
@@ -385,13 +567,16 @@ class RRBlock_32(nn.Module):
 # Upsampler
 ####################
 
+
 class Upsample(nn.Module):
-    #To prevent warning: nn.Upsample is deprecated
-    #https://discuss.pytorch.org/t/which-function-is-better-for-upsampling-upsampling-or-interpolate/21811/8
-    #From: https://pytorch.org/docs/stable/_modules/torch/nn/modules/upsampling.html#Upsample
-    #Alternative: https://discuss.pytorch.org/t/using-nn-function-interpolate-inside-nn-sequential/23588/2?u=ptrblck
-    
-    def __init__(self, size=None, scale_factor=None, mode="nearest", align_corners=None):
+    # To prevent warning: nn.Upsample is deprecated
+    # https://discuss.pytorch.org/t/which-function-is-better-for-upsampling-upsampling-or-interpolate/21811/8
+    # From: https://pytorch.org/docs/stable/_modules/torch/nn/modules/upsampling.html#Upsample
+    # Alternative: https://discuss.pytorch.org/t/using-nn-function-interpolate-inside-nn-sequential/23588/2?u=ptrblck
+
+    def __init__(
+        self, size=None, scale_factor=None, mode="nearest", align_corners=None
+    ):
         super(Upsample, self).__init__()
         if isinstance(scale_factor, tuple):
             self.scale_factor = tuple(float(factor) for factor in scale_factor)
@@ -400,46 +585,105 @@ class Upsample(nn.Module):
         self.mode = mode
         self.size = size
         self.align_corners = align_corners
-        #self.interp = nn.functional.interpolate
-    
+        # self.interp = nn.functional.interpolate
+
     def forward(self, x):
-        return nn.functional.interpolate(x, size=self.size, scale_factor=self.scale_factor, mode=self.mode, align_corners=self.align_corners)
-        #return self.interp(x, size=self.size, scale_factor=self.scale_factor, mode=self.mode, align_corners=self.align_corners)
-    
+        return nn.functional.interpolate(
+            x,
+            size=self.size,
+            scale_factor=self.scale_factor,
+            mode=self.mode,
+            align_corners=self.align_corners,
+        )
+        # return self.interp(x, size=self.size, scale_factor=self.scale_factor, mode=self.mode, align_corners=self.align_corners)
+
     def extra_repr(self):
         if self.scale_factor is not None:
-            info = 'scale_factor=' + str(self.scale_factor)
+            info = "scale_factor=" + str(self.scale_factor)
         else:
-            info = 'size=' + str(self.size)
-        info += ', mode=' + self.mode
+            info = "size=" + str(self.size)
+        info += ", mode=" + self.mode
         return info
 
-def pixelshuffle_block(in_nc, out_nc, upscale_factor=2, kernel_size=3, stride=1, bias=True, \
-                        pad_type='zero', norm_type=None, act_type='relu', convtype='Conv2D'):
-    '''
+
+def pixelshuffle_block(
+    in_nc,
+    out_nc,
+    upscale_factor=2,
+    kernel_size=3,
+    stride=1,
+    bias=True,
+    pad_type="zero",
+    norm_type=None,
+    act_type="relu",
+    convtype="Conv2D",
+):
+    """
     Pixel shuffle layer
     (Real-Time Single Image and Video Super-Resolution Using an Efficient Sub-Pixel Convolutional
     Neural Network, CVPR17)
-    '''
-    conv = conv_block(in_nc, out_nc * (upscale_factor ** 2), kernel_size, stride, bias=bias, \
-                        pad_type=pad_type, norm_type=None, act_type=None, convtype=convtype)
+    """
+    conv = conv_block(
+        in_nc,
+        out_nc * (upscale_factor ** 2),
+        kernel_size,
+        stride,
+        bias=bias,
+        pad_type=pad_type,
+        norm_type=None,
+        act_type=None,
+        convtype=convtype,
+    )
     pixel_shuffle = nn.PixelShuffle(upscale_factor)
 
     n = norm(norm_type, out_nc) if norm_type else None
     a = act(act_type) if act_type else None
     return sequential(conv, pixel_shuffle, n, a)
 
-def upconv_blcok(in_nc, out_nc, upscale_factor=2, kernel_size=3, stride=1, bias=True, \
-                pad_type='zero', norm_type=None, act_type='relu', mode='nearest', convtype='Conv2D'):
+
+def upconv_blcok(
+    in_nc,
+    out_nc,
+    upscale_factor=2,
+    kernel_size=3,
+    stride=1,
+    bias=True,
+    pad_type="zero",
+    norm_type=None,
+    act_type="relu",
+    mode="nearest",
+    convtype="Conv2D",
+):
     # Up conv
     # described in https://distill.pub/2016/deconv-checkerboard/
-    #upsample = nn.Upsample(scale_factor=upscale_factor, mode=mode)
-    upsample = Upsample(scale_factor=upscale_factor, mode=mode) #Updated to prevent the "nn.Upsample is deprecated" Warning
-    conv = conv_block(in_nc, out_nc, kernel_size, stride, bias=bias, \
-                        pad_type=pad_type, norm_type=norm_type, act_type=act_type, convtype=convtype)
+    # upsample = nn.Upsample(scale_factor=upscale_factor, mode=mode)
+    upsample = Upsample(
+        scale_factor=upscale_factor, mode=mode
+    )  # Updated to prevent the "nn.Upsample is deprecated" Warning
+    conv = conv_block(
+        in_nc,
+        out_nc,
+        kernel_size,
+        stride,
+        bias=bias,
+        pad_type=pad_type,
+        norm_type=norm_type,
+        act_type=act_type,
+        convtype=convtype,
+    )
     return sequential(upsample, conv)
 
-#PPON
+
+# PPON
 def conv_layer(in_channels, out_channels, kernel_size, stride=1, dilation=1, groups=1):
     padding = int((kernel_size - 1) / 2) * dilation
-    return nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding=padding, bias=True, dilation=dilation, groups=groups)
+    return nn.Conv2d(
+        in_channels,
+        out_channels,
+        kernel_size,
+        stride,
+        padding=padding,
+        bias=True,
+        dilation=dilation,
+        groups=groups,
+    )

@@ -5,7 +5,7 @@ import data.util as util
 
 
 class LRDataset(data.Dataset):
-    '''Read LR images only in the test phase.'''
+    """Read LR images only in the test phase."""
 
     def __init__(self, opt):
         super(LRDataset, self).__init__()
@@ -15,33 +15,39 @@ class LRDataset(data.Dataset):
         self.znorm = False
 
         # read image list from lmdb or image files
-        self.LR_env, self.paths_LR = util.get_image_paths(opt['data_type'], opt['dataroot_LR'])
-        assert self.paths_LR, 'Error: LR paths are empty.'
+        self.LR_env, self.paths_LR = util.get_image_paths(
+            opt["data_type"], opt["dataroot_LR"]
+        )
+        assert self.paths_LR, "Error: LR paths are empty."
 
     def __getitem__(self, index):
         LR_path = None
-        if self.opt['znorm']:
-            if self.opt['znorm'] == True:
-                self.znorm = True # Alternative: images are z-normalized to the [-1,1] range
+        if self.opt["znorm"]:
+            if self.opt["znorm"] == True:
+                self.znorm = (
+                    True  # Alternative: images are z-normalized to the [-1,1] range
+                )
 
         # get LR image
         LR_path = self.paths_LR[index]
-        #img_LR = util.read_img(self.LR_env, LR_path)
+        # img_LR = util.read_img(self.LR_env, LR_path)
         img_LR = util.read_img(self.LR_env, LR_path, znorm=self.znorm)
         H, W, C = img_LR.shape
 
         # change color space if necessary
-        if self.opt['color']:
-            img_LR = util.channel_convert(C, self.opt['color'], [img_LR])[0]
+        if self.opt["color"]:
+            img_LR = util.channel_convert(C, self.opt["color"], [img_LR])[0]
 
         # BGR to RGB, HWC to CHW, numpy to tensor
         if img_LR.shape[2] == 3:
             img_LR = img_LR[:, :, [2, 1, 0]]
         elif img_LR.shape[2] == 4:
             img_LR = img_LR[:, :, [2, 1, 0, 3]]
-        img_LR = torch.from_numpy(np.ascontiguousarray(np.transpose(img_LR, (2, 0, 1)))).float()
+        img_LR = torch.from_numpy(
+            np.ascontiguousarray(np.transpose(img_LR, (2, 0, 1)))
+        ).float()
 
-        return {'LR': img_LR, 'LR_path': LR_path}
+        return {"LR": img_LR, "LR_path": LR_path}
 
     def __len__(self):
         return len(self.paths_LR)

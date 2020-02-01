@@ -1,6 +1,6 @@
-'''
+"""
 architecture for segmentation
-'''
+"""
 import torch.nn as nn
 from . import block as B
 
@@ -8,15 +8,21 @@ from . import block as B
 class Res131(nn.Module):
     def __init__(self, in_nc, mid_nc, out_nc, dilation=1, stride=1):
         super(Res131, self).__init__()
-        conv0 = B.conv_block(in_nc, mid_nc, 1, 1, 1, 1, False, 'zero', 'batch')
-        conv1 = B.conv_block(mid_nc, mid_nc, 3, stride, dilation, 1, False, 'zero', 'batch')
-        conv2 = B.conv_block(mid_nc, out_nc, 1, 1, 1, 1, False, 'zero', 'batch', None)  #  No ReLU
+        conv0 = B.conv_block(in_nc, mid_nc, 1, 1, 1, 1, False, "zero", "batch")
+        conv1 = B.conv_block(
+            mid_nc, mid_nc, 3, stride, dilation, 1, False, "zero", "batch"
+        )
+        conv2 = B.conv_block(
+            mid_nc, out_nc, 1, 1, 1, 1, False, "zero", "batch", None
+        )  #  No ReLU
         self.res = B.sequential(conv0, conv1, conv2)
         if in_nc == out_nc:
             self.has_proj = False
         else:
             self.has_proj = True
-            self.proj = B.conv_block(in_nc, out_nc, 1, stride, 1, 1, False, 'zero', 'batch', None)
+            self.proj = B.conv_block(
+                in_nc, out_nc, 1, stride, 1, 1, False, "zero", "batch", None
+            )
             #  No ReLU
 
     def forward(self, x):
@@ -31,9 +37,9 @@ class OutdoorSceneSeg(nn.Module):
         super(OutdoorSceneSeg, self).__init__()
         # conv1
         blocks = []
-        conv1_1 = B.conv_block(3, 64, 3, 2, 1, 1, False, 'zero', 'batch')  #  /2
-        conv1_2 = B.conv_block(64, 64, 3, 1, 1, 1, False, 'zero', 'batch')
-        conv1_3 = B.conv_block(64, 128, 3, 1, 1, 1, False, 'zero', 'batch')
+        conv1_1 = B.conv_block(3, 64, 3, 2, 1, 1, False, "zero", "batch")  #  /2
+        conv1_2 = B.conv_block(64, 64, 3, 1, 1, 1, False, "zero", "batch")
+        conv1_3 = B.conv_block(64, 128, 3, 1, 1, 1, False, "zero", "batch")
         max_pool = nn.MaxPool2d(3, stride=2, padding=0, ceil_mode=True)  #  /2
         blocks = [conv1_1, conv1_2, conv1_3, max_pool]
         # conv2, 3 blocks
@@ -52,7 +58,7 @@ class OutdoorSceneSeg(nn.Module):
         blocks.append(Res131(1024, 512, 2048, 4))
         blocks.append(Res131(2048, 512, 2048, 4))
         blocks.append(Res131(2048, 512, 2048, 4))
-        blocks.append(B.conv_block(2048, 512, 3, 1, 1, 1, False, 'zero', 'batch'))
+        blocks.append(B.conv_block(2048, 512, 3, 1, 1, 1, False, "zero", "batch"))
         blocks.append(nn.Dropout(0.1))
         # # conv6
         blocks.append(nn.Conv2d(512, 8, 1, 1))
