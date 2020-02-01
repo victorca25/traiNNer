@@ -197,16 +197,16 @@ network_D:
   in_nc: 3
 
   # ASRGAN (feature extraction)
-  which_model_D: discriminator_vgg_128_fea
-  norm_type: batch
-  act_type: leakyrelu
-  mode: CNA  # CNA | NAC
-  nf: 64
-  in_nc: 3
-  spectral_norm: true
-  self_attention: true
-  max_pool: true
-  poolsize: 4
+  #which_model_D: discriminator_vgg_128_fea
+  #norm_type: batch
+  #act_type: leakyrelu
+  #mode: CNA  # CNA | NAC
+  #nf: 64
+  #in_nc: 3
+  #spectral_norm: true
+  #self_attention: true
+  #max_pool: true
+  #poolsize: 4
 
 # Schedulers options:
 train:
