@@ -302,5 +302,5 @@ train:
   niter: !!float 5e5
   val_freq: !!float 5e3
 logger:
-  print_freq: 200,
+  print_freq: 200
   save_checkpoint_freq: !!float 5e3
