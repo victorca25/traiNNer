@@ -7,7 +7,7 @@ import numpy as np
 import torch
 from torch.autograd import Variable
 
-from codes.models.modules.LPIPS import perceptual_loss as util
+from models.modules.LPIPS import perceptual_loss as util
 from . import networks_basic as networks
 # import itertools
 from .base_model import BaseModel

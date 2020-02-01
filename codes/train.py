@@ -6,11 +6,11 @@ import random
 
 import torch
 
-import codes.options.options as option
-from codes.data import create_dataloader, create_dataset
-from codes.models import create_model
-from codes.models.modules.LPIPS import compute_dists as lpips
-from codes.utils import util
+import options as option
+from data import create_dataloader, create_dataset
+from models import create_model
+from models.modules.LPIPS import compute_dists as lpips
+from utils import util
 
 
 def main():

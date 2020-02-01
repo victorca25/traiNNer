@@ -5,7 +5,7 @@ from multiprocessing import Pool
 import cv2
 import numpy as np
 
-from codes.utils.progress_bar import ProgressBar
+from utils.progress_bar import ProgressBar
 
 
 def main():

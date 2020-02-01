@@ -5,8 +5,8 @@ from multiprocessing import Pool
 
 import cv2
 
-from codes.data.util import bgr2ycbcr
-from codes.utils.progress_bar import ProgressBar
+from data.util import bgr2ycbcr
+from utils.progress_bar import ProgressBar
 
 
 def main():

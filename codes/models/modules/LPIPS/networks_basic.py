@@ -4,8 +4,8 @@ import torch
 import torch.nn as nn
 from torch.autograd import Variable
 
-from codes.models.modules.LPIPS import perceptual_loss as util
-from codes.models.modules.architectures.block import Upsample
+from models.modules.LPIPS import perceptual_loss as util
+from models.modules.architectures.block import Upsample
 # from skimage import color
 from . import pretrained_networks as pn
 

@@ -1,3 +1,5 @@
+torchvision
+PyYAML
 torch
 numpy
 opencv-python

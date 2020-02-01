@@ -23,7 +23,7 @@ datasets:
     - ../datasets/train/hr2
     - ../datasets/train/hr3
     # low resolution images. If there are missing LR images, they will be generated on the fly from HR
-    "dataroot_LR":
+    dataroot_LR:
     - ../datasets/train/lr1
     - ../datasets/train/lr2
     - ../datasets/train/lr3

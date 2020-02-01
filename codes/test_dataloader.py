@@ -4,8 +4,8 @@ import numpy as np
 import torch
 import torchvision.utils
 
-from codes.data import create_dataloader, create_dataset
-from codes.utils import util
+from data import create_dataloader, create_dataset
+from utils import util
 
 opt = {}
 

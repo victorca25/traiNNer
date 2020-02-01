@@ -7,8 +7,8 @@ import numpy as np
 import torch
 import torch.utils.data as data
 
-import codes.data.util as util
-import codes.scripts.augmentations as augmentations
+import data.util as util
+import scripts.augmentations as augmentations
 
 
 class LRHROTFDataset(data.Dataset):

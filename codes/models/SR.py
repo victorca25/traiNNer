@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 from torch.optim import lr_scheduler
 
-import codes.models.networks as networks
+import models.networks as networks
 from .__model__ import Model
 
 logger = logging.getLogger("base")

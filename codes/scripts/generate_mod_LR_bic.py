@@ -3,7 +3,7 @@ import os
 import cv2
 import numpy as np
 
-from codes.data.util import imresize_np
+from data.util import imresize_np
 
 
 def generate_mod_LR_bic():

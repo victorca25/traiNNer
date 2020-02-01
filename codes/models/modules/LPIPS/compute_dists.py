@@ -1,5 +1,5 @@
 # import models
-from codes.models.modules.LPIPS import perceptual_loss as models
+from models.modules.LPIPS import perceptual_loss as models
 
 
 ####################

@@ -5,7 +5,7 @@ import pickle
 import cv2
 import lmdb
 
-from codes.utils.progress_bar import ProgressBar
+from utils.progress_bar import ProgressBar
 
 # configurations
 img_folder = (

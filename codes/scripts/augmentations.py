@@ -6,7 +6,7 @@ import random
 import cv2
 import numpy as np
 
-import codes.data.util as util
+import data.util as util
 
 IMAGE_EXTENSIONS = [".png", ".jpg"]
 
