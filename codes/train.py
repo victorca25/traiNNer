@@ -13,19 +13,6 @@ from codes.models.modules.LPIPS import compute_dists as lpips
 from codes.utils import util
 
 
-def get_pytorch_ver():
-    # print(torch.__version__)
-    pytorch_ver = torch.__version__
-    if pytorch_ver == "0.4.0":
-        return "pre"
-    elif pytorch_ver == "0.4.1":
-        return "pre"
-    elif pytorch_ver == "1.0.0":
-        return "pre"
-    else:  # "1.1.0", "1.1.1", "1.2.0", "1.2.1" and beyond
-        return "post"
-
-
 def main():
     # options
     parser = argparse.ArgumentParser()
@@ -36,7 +23,6 @@ def main():
     opt = option.dict_to_nonedict(
         opt
     )  # Convert to NoneDict, which return None for missing key.
-    pytorch_ver = get_pytorch_ver()
 
     # train from scratch OR resume training
     if opt["path"]["resume_state"]:
@@ -137,6 +123,12 @@ def main():
     # create model
     model = create_model(opt)
 
+    # circumvent pytorch warning
+    # we pass in the iteration count to scheduler.step(), so the warning doesn't apply
+    for scheduler in model.schedulers:
+        if hasattr(scheduler, "_step_count"):
+            scheduler._step_count = 0
+
     # resume training
     if resume_state:
         start_epoch = resume_state["epoch"]
@@ -160,21 +152,12 @@ def main():
             if current_step > total_iters:
                 break
 
-            if pytorch_ver == "pre":  # Order for PyTorch ver < 1.1.0
-                # update learning rate
-                model.update_learning_rate(current_step - 1)
-                # training
-                model.feed_data(train_data)
-                model.optimize_parameters(current_step)
-            elif pytorch_ver == "post":  # Order for PyTorch ver > 1.1.0
-                # training
-                model.feed_data(train_data)
-                model.optimize_parameters(current_step)
-                # update learning rate
-                model.update_learning_rate(current_step - 1)
-            else:
-                print("Error identifying PyTorch version. ", torch.__version__)
-                break
+            # update learning rate
+            model.update_learning_rate(current_step-1)
+
+            # training
+            model.feed_data(train_data)
+            model.optimize_parameters(current_step)
 
             # log
             if current_step % opt["logger"]["print_freq"] == 0:
