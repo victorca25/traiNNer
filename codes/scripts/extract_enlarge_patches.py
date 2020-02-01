@@ -1,5 +1,6 @@
-import os.path
 import glob
+import os.path
+
 import cv2
 
 crt_path = os.path.dirname(os.path.realpath(__file__))

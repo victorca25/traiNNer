@@ -8,9 +8,9 @@ Call `ffmpeg` to make video.
 """
 
 import os.path
-import numpy as np
-import cv2
 
+import cv2
+import numpy as np
 
 crt_path = os.path.dirname(os.path.realpath(__file__))
 

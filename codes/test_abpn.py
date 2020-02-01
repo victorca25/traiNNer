@@ -1,26 +1,19 @@
-import os
-import sys
-import logging
-import time
 import argparse
-import numpy as np
+import logging
+import os
+import time
 from collections import OrderedDict
 
+import numpy as np
 import options.options as option
+import torch
 import utils.util as util
-from data.util import bgr2ycbcr, ImageSplitter, patchify_tensor, recompose_tensor
 from data import create_dataset, create_dataloader
+from data.util import bgr2ycbcr, patchify_tensor, recompose_tensor
 from models import create_model
 
-from os import listdir
-from os.path import join
-import cv2
-import torch
-import torchvision.transforms as transforms
 
 # from torchvision.transforms import Compose, ToTensor
-import torch.utils.data as utils
-from torch.autograd import Variable
 
 
 def chop_forward2(lowres_img, model, scale, patch_size=200):

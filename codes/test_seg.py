@@ -1,15 +1,13 @@
-import os
-import os.path
 import glob
-import cv2
-import numpy as np
+import os.path
 
+import cv2
+import models.modules.architectures.seg_arch as seg_arch
+import numpy as np
 import torch
 import torchvision.utils
-
-import models.modules.architectures.seg_arch as seg_arch
-from data.util import imresize, modcrop
 import utils.util as util
+from data.util import imresize, modcrop
 
 # options
 test_img_folder_name = "samples"  # image folder name

@@ -5,13 +5,14 @@
 # https://github.com/aitorzip/PyTorch-SRGAN/blob/master/models.py
 
 import math
+
 import torch
 import torch.nn as nn
 
-# from . import spectral_norm as SN
-import torch.nn.functional as F
-
 from . import block as B
+
+
+# from . import spectral_norm as SN
 
 # from torch.autograd import Variable
 # import numpy as np

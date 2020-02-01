@@ -1,6 +1,6 @@
 import sys
-from shutil import get_terminal_size
 import time
+from shutil import get_terminal_size
 
 
 class ProgressBar(object):

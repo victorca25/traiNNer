@@ -1,12 +1,12 @@
 import os.path
 import random
-import numpy as np
+import sys
+
 import cv2
+import data.util as util
+import numpy as np
 import torch
 import torch.utils.data as data
-import data.util as util
-
-import sys
 
 sys.path.append("../codes/scripts")
 sys.path.append("../codes/data")

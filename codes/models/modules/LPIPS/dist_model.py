@@ -1,27 +1,23 @@
 from __future__ import absolute_import
 
-import sys
-import numpy as np
-import torch
-from torch import nn
 import os
 from collections import OrderedDict
+
+import numpy as np
+import torch
+from models.modules.LPIPS import perceptual_loss as util
 from torch.autograd import Variable
 
+from . import networks_basic as networks
 # import itertools
 from .base_model import BaseModel
+
 
 # from scipy.ndimage import zoom
 # import fractions
 # import functools
 # import skimage.transform
 # from tqdm import tqdm
-
-from IPython import embed
-
-from . import networks_basic as networks
-
-from models.modules.LPIPS import perceptual_loss as util
 
 
 class DistModel(BaseModel):

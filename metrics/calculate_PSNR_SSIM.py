@@ -2,11 +2,12 @@
 calculate the PSNR and SSIM.
 same as MATLAB's results
 '''
-import os
-import math
-import numpy as np
-import cv2
 import glob
+import math
+import os
+
+import cv2
+import numpy as np
 
 
 def main():

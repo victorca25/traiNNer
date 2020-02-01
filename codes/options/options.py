@@ -1,8 +1,8 @@
+import json
+import logging
 import os
 import os.path as osp
-import logging
 from collections import OrderedDict
-import json
 
 
 def parse(opt_path, is_train=True):

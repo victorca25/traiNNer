@@ -1,7 +1,7 @@
+import data.util as util
 import numpy as np
 import torch
 import torch.utils.data as data
-import data.util as util
 
 
 class LRDataset(data.Dataset):

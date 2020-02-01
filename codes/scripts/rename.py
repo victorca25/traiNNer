@@ -1,7 +1,5 @@
-import os
 import os.path
-import glob
-
+import os.path
 
 input_folder = (
     "/home/xtwang/Projects/PIRM18/results/pirm_selfval_img06/*"  # glob matching pattern

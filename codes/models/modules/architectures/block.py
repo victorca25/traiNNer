@@ -1,7 +1,9 @@
 from collections import OrderedDict
+
 import torch
 import torch.nn as nn
 from models.modules.architectures.convolutions.partialconv2d import PartialConv2d
+
 
 ####################
 # Basic blocks

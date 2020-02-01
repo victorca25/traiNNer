@@ -1,15 +1,11 @@
 from __future__ import absolute_import
 
-import os
 import logging
 from collections import OrderedDict
 
+import models.networks as networks
 import torch
 import torch.nn as nn
-from torch.optim import lr_scheduler
-
-import models.networks as networks
-from .base_model import BaseModel
 from models.modules.LPIPS import (
     perceptual_loss as models,
 )  # import models.modules.LPIPS as models
@@ -28,6 +24,9 @@ from models.modules.losses.ssim2 import (
     SSIM,
     MS_SSIM,
 )  # implementation for use with any PyTorch
+from torch.optim import lr_scheduler
+
+from .base_model import BaseModel
 
 # from models.modules.losses.ssim3 import SSIM, MS_SSIM #for use of the PyTorch 1.1.1+ optimized implementation
 logger = logging.getLogger("base")

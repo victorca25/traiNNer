@@ -1,11 +1,12 @@
-import os.path
 import glob
+import os.path
+
 import cv2
+import models.modules.sft_arch as sft
 import numpy as np
 import torch
-from data.util import imresize, modcrop
 import utils.util as util
-import models.modules.sft_arch as sft
+from data.util import imresize, modcrop
 
 # model_path = '../experiments/pretrained_models/sft_net_torch.pth' # torch version
 model_path = (

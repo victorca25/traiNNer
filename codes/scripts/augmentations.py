@@ -1,8 +1,7 @@
-import random
 import argparse
-
 import os
 import os.path
+import random
 import sys
 
 sys.path.append("../data")

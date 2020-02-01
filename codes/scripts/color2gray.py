@@ -2,6 +2,7 @@ import os
 import os.path
 import sys
 from multiprocessing import Pool
+
 import cv2
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

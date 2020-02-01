@@ -2,8 +2,9 @@ import os
 import os.path
 import sys
 from multiprocessing import Pool
-import numpy as np
+
 import cv2
+import numpy as np
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.progress_bar import ProgressBar

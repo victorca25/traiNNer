@@ -1,7 +1,8 @@
-import random
-import torch
 import argparse
+import random
 from collections import OrderedDict
+
+import torch
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-netA", type=str, required=False, help="Path to model A.")

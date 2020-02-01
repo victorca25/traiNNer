@@ -1,14 +1,12 @@
-import os
+import logging
 import math
+import os
 import pickle
 import random
+
+import cv2
 import numpy as np
 import torch
-import cv2
-import logging
-
-import copy
-
 
 ####################
 # Files & IO

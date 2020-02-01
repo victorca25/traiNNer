@@ -1,4 +1,9 @@
+import unittest
+from collections import defaultdict, Counter
 from math import sqrt
+from sys import stdout
+from time import time
+from warnings import warn
 
 from numpy import (
     array,
@@ -16,22 +21,14 @@ from numpy import (
     meshgrid,
     dot,
     logical_and,
-    mean,
-    std,
     cov,
     argsort,
     linspace,
     transpose,
 )
-from collections import defaultdict, Counter
-from warnings import warn
-from sys import stdout
-from time import time
-
 # for unit tests
 from numpy.testing import assert_almost_equal, assert_array_almost_equal
 from numpy.testing import assert_array_equal
-import unittest
 
 """
     Minimalistic implementation of the Self Organizing Maps (SOM).

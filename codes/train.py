@@ -1,20 +1,15 @@
-import os.path
-import sys
-import math
 import argparse
-import time
-import random
-import numpy as np
-from collections import OrderedDict
 import logging
-
-import torch
+import math
+import os.path
+import random
 
 import options.options as option
-from utils import util
+import torch
 from data import create_dataloader, create_dataset
 from models import create_model
 from models.modules.LPIPS import compute_dists as lpips
+from utils import util
 
 
 def get_pytorch_ver():
