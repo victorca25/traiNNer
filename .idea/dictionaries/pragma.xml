@@ -9,6 +9,7 @@
       <w>denoising</w>
       <w>esrgan</w>
       <w>hfen</w>
+      <w>lmdb</w>
       <w>ppon</w>
       <w>pytorch</w>
       <w>resnet</w>
@@ -16,6 +17,7 @@
       <w>srgan</w>
       <w>srragan</w>
       <w>ssim</w>
+      <w>znorm</w>
     </words>
   </dictionary>
 </component>

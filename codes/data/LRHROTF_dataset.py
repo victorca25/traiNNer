@@ -1,4 +1,5 @@
-import os.path
+import logging
+import os
 import random
 
 import cv2
@@ -13,8 +14,19 @@ import codes.scripts.augmentations as augmentations
 class LRHROTFDataset(data.Dataset):
     """
     Read LR and HR image pairs.
-    If only HR image is provided, generate LR image on-the-fly.
-    The pair is ensured by 'sorted' function, so please check the name convention.
+    If no LR image exist's for a HR image, one will be generated on-the-fly.
+    Make sure filename's and it's relative to root locations are kept the same between LR and HR!
+
+    Augmentations can be enabled/disabled in the training json:
+    - flip
+    - rotate
+    - downscale
+    - blur
+    - noise
+    - color fringing
+    - auto levels
+    - un-sharpening masks
+    - (test) cutout/erasing
     """
 
     def __init__(self, opt):
@@ -24,7 +36,8 @@ class LRHROTFDataset(data.Dataset):
         self.paths_HR = None
         self.LR_env = None  # environment for lmdb
         self.HR_env = None
-        self.output_sample_imgs = None
+        self.output_sample_imgs = False  # debugging
+        self.log = logging.getLogger("base")
 
         # read image list from subset list txt
         if opt["subset_file"] is not None and opt["phase"] == "train":
@@ -37,78 +50,45 @@ class LRHROTFDataset(data.Dataset):
                     "Now subset only supports generating LR on-the-fly."
                 )
         else:  # read image list from lmdb or image files
-            # Check if dataroot_HR is a list of directories or a single directory. Note: lmdb will not currently work with a list
-            HR_images_paths = opt["dataroot_HR"]
-            if type(HR_images_paths) is list:
-                self.HR_env = []
-                self.paths_HR = []
-                for path in HR_images_paths:
-                    HR_env, paths_HR = util.get_image_paths(opt["data_type"], path)
-                    if type(HR_env) is list:
-                        for imgs in HR_env:
-                            self.HR_env.append(imgs)
-                    for imgs in paths_HR:
-                        self.paths_HR.append(imgs)
-                if self.HR_env.count(None) == len(self.HR_env):
-                    self.HR_env = None
-                else:
-                    self.HR_env = sorted(self.HR_env)
+            # Note: lmdb is not working
+            if type(opt["dataroot_HR"]) is str:
+                opt["dataroot_HR"] = [opt["dataroot_HR"]]
+            if type(opt["dataroot_LR"]) is str:
+                opt["dataroot_LR"] = [opt["dataroot_LR"]]
+            for i, hr_path in enumerate(opt["dataroot_HR"]):
+                HR_env, paths_HR = util.get_image_paths(opt["data_type"], hr_path)
+                if type(HR_env) is list:
+                    if type(self.HR_env) is not list:
+                        self.HR_env = []
+                    self.HR_env += HR_env
+                if type(paths_HR) is list:
+                    if type(self.paths_HR) is not list:
+                        self.paths_HR = []
+                    self.paths_HR += paths_HR
+                    for hr_img in paths_HR:
+                        lr_img = os.path.join(opt["dataroot_LR"][i], os.path.relpath(hr_img, hr_path))
+                        if not os.path.exists(lr_img):
+                            self.log.warning(f"LR not found, generating on-the-fly: {lr_img}")
+                            self.paths_LR.append(None)
+                        else:
+                            if type(self.paths_LR) is not list:
+                                self.paths_LR = []
+                            self.paths_LR.append(lr_img)
+            self.log.info(f"Missing but generated on-the-fly LR images: {self.paths_LR.count(None)}")
+            # sort images and env's if any
+            if self.HR_env:
+                self.HR_env = sorted(self.HR_env)
+            if self.LR_env:
+                self.LR_env = sorted(self.LR_env)
+            if self.paths_HR:
                 self.paths_HR = sorted(self.paths_HR)
-            elif type(HR_images_paths) is str:
-                self.HR_env, self.paths_HR = util.get_image_paths(
-                    opt["data_type"], HR_images_paths
-                )
-
-            # Check if dataroot_LR is a list of directories or a single directory. Note: lmdb will not currently work with a list
-            LR_images_paths = opt["dataroot_LR"]
-            if type(LR_images_paths) is list:
-                self.LR_env = []
-                self.paths_LR = []
-                for path in LR_images_paths:
-                    LR_env, paths_LR = util.get_image_paths(opt["data_type"], path)
-                    if type(LR_env) is list:
-                        for imgs in LR_env:
-                            self.LR_env.append(imgs)
-                    for imgs in paths_LR:
-                        self.paths_LR.append(imgs)
-                if self.LR_env.count(None) == len(self.LR_env):
-                    self.LR_env = None
-                else:
-                    self.LR_env = sorted(self.LR_env)
+            if self.paths_LR:
                 self.paths_LR = sorted(self.paths_LR)
-            elif type(LR_images_paths) is str:
-                self.LR_env, self.paths_LR = util.get_image_paths(
-                    opt["data_type"], LR_images_paths
-                )
-
-        assert self.paths_HR, "Error: HR path is empty."
-        if self.paths_LR and self.paths_HR:
-            # Modify to allow using HR and LR folders with different amount of images
-            # - If an LR image pair is not found, downscale HR on the fly, else, use the LR
-            # - If all LR are provided and 'lr_downscale' is enabled, randomize use of provided LR and OTF LR for augmentation
-            """
-            assert len(self.paths_LR) == len(self.paths_HR), 'HR and LR datasets have different number of images - {}, {}.'.format(len(self.paths_LR), len(self.paths_HR))
-            """
-            """
-            assert len(self.paths_HR) >= len(
-                self.paths_LR
-            ), "HR dataset contains less images than LR dataset  - {}, {}.".format(
-                len(self.paths_LR), len(self.paths_HR)
-            )
-            """
-            for path_LR in self.paths_LR:
-                hr_name = os.path.join(opt["dataroot_HR"], os.path.relpath(path_LR, opt["dataroot_LR"]))
-                if not os.path.exists(hr_name):
-                    print("LR dataset contains extra images. Extra images will be ignored.")
-            tmp = []
-            for path_HR in self.paths_HR:
-                lr_name = os.path.join(opt["dataroot_LR"], os.path.relpath(path_HR, opt["dataroot_HR"]))
-                if not os.path.exists(lr_name):
-                    print(f"No LR, generating on-the-fly: {lr_name}")
-                    tmp.append(None)
-                else:
-                    tmp.append(lr_name)
-            self.paths_LR = tmp
+        if not self.paths_HR:
+            raise ValueError("Error: No HR images found in specified directories.")
+        if len(self.paths_HR) != len(self.paths_LR):
+            raise ValueError(
+                f"Error: HR and LR contain different amounts of images - {len(self.paths_LR)}, {len(self.paths_HR)}")
 
         # self.random_scale_list = [1]
 
@@ -119,30 +99,21 @@ class LRHROTFDataset(data.Dataset):
         if HR_size:
             LR_size = HR_size // scale
 
-        self.znorm = False  # Default case: images are in the [0,1] range
+        self.znorm = False  # images are in the [0,1] range
         if self.opt["znorm"]:
-            if self.opt["znorm"] == True:
-                self.znorm = (
-                    True  # Alternative: images are z-normalized to the [-1,1] range
-                )
+            self.znorm = True  # images are z-normalized to the [-1,1] range
 
         ######## Read the images ########
 
-        # Check if LR Path is provided
         if self.paths_LR:
-            # If LR is provided, check if 'rand_flip_LR_HR' is enabled
+            LRHRchance = 0.0
+            flip_chance = 0.0
             if self.opt["rand_flip_LR_HR"] and self.opt["phase"] == "train":
                 LRHRchance = random.uniform(0, 1)
                 if self.opt["flip_chance"]:
                     flip_chance = self.opt["flip_chance"]
                 else:
                     flip_chance = 0.05
-                # print("Random Flip Enabled")
-            # Normal case, no flipping:
-            else:
-                LRHRchance = 0.0
-                flip_chance = 0.0
-                # print("No Random Flip")
 
             # get HR and LR images
             # If enabled, random chance that LR and HR images are flipped
@@ -153,15 +124,11 @@ class LRHROTFDataset(data.Dataset):
                 LR_path = self.paths_LR[index]
                 if LR_path is None:
                     LR_path = HR_path
-                # print("HR kept")
-            # Flipped case:
-            # If img_HR (LR_path) doesn't exist, use img_HR (LR_path)
-            else:
+            else:  # flip
                 HR_path = self.paths_LR[index]
                 LR_path = self.paths_HR[index]
                 if HR_path is None:
                     HR_path = LR_path
-                # print("HR flipped")
 
             # Read the LR and HR images from the provided paths
             img_LR = util.read_img(self.LR_env, LR_path, znorm=self.znorm)
@@ -174,8 +141,8 @@ class LRHROTFDataset(data.Dataset):
                 if np.random.rand() < aug_downscale:
                     img_LR = img_HR
 
-        # If LR is not provided, use HR and modify on the fly
         else:
+            # No LR, let's use HR
             HR_path = self.paths_HR[index]
             img_HR = util.read_img(self.HR_env, HR_path, znorm=self.znorm)
             img_LR = img_HR
@@ -210,7 +177,7 @@ class LRHROTFDataset(data.Dataset):
             # Validate there's an img_LR, if not, use img_HR
             if img_LR is None:
                 img_LR = img_HR
-                print(
+                self.log.warning(
                     "Image LR: ",
                     LR_path,
                     (
@@ -220,7 +187,7 @@ class LRHROTFDataset(data.Dataset):
 
             # Check that HR and LR have the same dimensions ratio, else, generate new LR from HR
             if img_HR.shape[0] // img_LR.shape[0] != img_HR.shape[1] // img_LR.shape[1]:
-                print(
+                self.log.warning(
                     "Warning: img_LR dimensions ratio does not match img_HR dimensions ratio for: ",
                     HR_path,
                 )
@@ -236,7 +203,7 @@ class LRHROTFDataset(data.Dataset):
 
             # Or if the HR images are too small, Resize to the HR_size size and fit LR pair to LR_size too
             if img_HR.shape[0] < HR_size or img_HR.shape[1] < HR_size:
-                print(
+                self.log.warning(
                     "Warning: Image: ",
                     HR_path,
                     " size does not match HR size: (",
@@ -266,7 +233,7 @@ class LRHROTFDataset(data.Dataset):
                         ds_algo = self.opt["lr_downscale_types"]
                 else:  # else, if for some reason img_LR is too large, default to matlab-like bicubic downscale
                     # if not self.opt['aug_downscale']: #only print the warning if not being forced to use HR images instead of LR dataset (which is a known case)
-                    print(
+                    self.log.warning(
                         "LR image is too large, auto generating new LR for: ", LR_path
                     )
                 img_LR, scale_interpol_algo = augmentations.scale_img(
@@ -313,7 +280,7 @@ class LRHROTFDataset(data.Dataset):
             # Final checks
             # if the resulting HR image size so far is too large or too small, resize HR to the correct size and downscale to generate a new LR on the fly
             if img_HR.shape[0] != HR_size or img_HR.shape[1] != HR_size:
-                print(
+                self.log.warning(
                     "Image: ",
                     HR_path,
                     " size does not match HR size: (",
@@ -335,7 +302,7 @@ class LRHROTFDataset(data.Dataset):
                 img_LR, _ = augmentations.scale_img(img_HR, scale, algo=ds_algo)
             # if the resulting LR so far does not have the correct dimensions, also generate a new HR-LR image pair on the fly
             if img_LR.shape[0] != LR_size or img_LR.shape[0] != LR_size:
-                print(
+                self.log.warning(
                     "Image: ",
                     LR_path,
                     " size does not match LR size: (",
@@ -364,7 +331,7 @@ class LRHROTFDataset(data.Dataset):
                         img_HR, noise_types=self.opt["hr_noise_types"]
                     )
                 else:
-                    print(
+                    self.log.warning(
                         "Noise types 'hr_noise_types' not defined. Skipping OTF noise for HR."
                     )
 
@@ -388,7 +355,7 @@ class LRHROTFDataset(data.Dataset):
                         img_LR, blur_algos=self.opt["lr_blur_types"]
                     )
                 else:
-                    print("Blur types 'lr_blur_types' not defined. Skipping OTF blur.")
+                    self.log.warning("Blur types 'lr_blur_types' not defined. Skipping OTF blur.")
             # """
 
             # """
@@ -399,7 +366,7 @@ class LRHROTFDataset(data.Dataset):
                         img_LR, noise_types=self.opt["lr_noise_types"]
                     )
                 else:
-                    print(
+                    self.log.warning(
                         "Noise types 'lr_noise_types' not defined. Skipping OTF noise."
                     )
             # v LR secondary noise: Add additional noise to LR if enabled AND noise types are provided, else will skip
@@ -409,7 +376,7 @@ class LRHROTFDataset(data.Dataset):
                         img_LR, noise_types=self.opt["lr_noise_types2"]
                     )
                 else:
-                    print(
+                    self.log.warning(
                         "Noise types 'lr_noise_types2' not defined. Skipping OTF secondary noise."
                     )
             # """
