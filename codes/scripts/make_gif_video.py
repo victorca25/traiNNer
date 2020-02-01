@@ -71,9 +71,9 @@ for img_name, write_txt in zip(img_name_list, text_list):
     if is_crop:
         print("Crop image ...")
         if img.ndim == 2:
-            img = img[h_start : h_start + h_len, w_start : w_start + w_len]
+            img = img[h_start: h_start + h_len, w_start: w_start + w_len]
         elif img.ndim == 3:
-            img = img[h_start : h_start + h_len, w_start : w_start + w_len, :]
+            img = img[h_start: h_start + h_len, w_start: w_start + w_len, :]
         else:
             raise ValueError("Wrong image dim [{:d}]".format(img.ndim))
 

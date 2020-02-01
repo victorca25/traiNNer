@@ -17,7 +17,7 @@ class GPLoss(nn.Module):
         super(GPLoss, self).__init__()
         self.spl_norm = spl_norm
         if (
-            trace == True
+                trace == True
         ):  # Alternate behavior: use the complete calculation with SPL_ComputeWithTrace()
             self.trace = SPL_ComputeWithTrace()
         else:  # Default behavior: use the more efficient SPLoss()
@@ -50,13 +50,13 @@ class GPLoss(nn.Module):
 ## Colour Profile (CP) loss
 class CPLoss(nn.Module):
     def __init__(
-        self,
-        rgb=True,
-        yuv=True,
-        yuvgrad=True,
-        trace=False,
-        spl_norm=False,
-        yuv_norm=False,
+            self,
+            rgb=True,
+            yuv=True,
+            yuvgrad=True,
+            trace=False,
+            spl_norm=False,
+            yuv_norm=False,
     ):
         super(CPLoss, self).__init__()
         self.rgb = rgb
@@ -66,7 +66,7 @@ class CPLoss(nn.Module):
         self.yuv_norm = yuv_norm
 
         if (
-            trace == True
+                trace == True
         ):  # Alternate behavior: use the complete calculation with SPL_ComputeWithTrace()
             self.trace = SPL_ComputeWithTrace()
             self.trace_YUV = SPL_ComputeWithTrace()
@@ -130,21 +130,21 @@ class CPLoss(nn.Module):
                 + Wb * input[:, 2, :, :].unsqueeze(1),
                 Uc
                 * (
-                    input[:, 2, :, :].unsqueeze(1)
-                    - (
-                        Wr * input[:, 0, :, :].unsqueeze(1)
-                        + Wg * input[:, 1, :, :].unsqueeze(1)
-                        + Wb * input[:, 2, :, :].unsqueeze(1)
-                    )
+                        input[:, 2, :, :].unsqueeze(1)
+                        - (
+                                Wr * input[:, 0, :, :].unsqueeze(1)
+                                + Wg * input[:, 1, :, :].unsqueeze(1)
+                                + Wb * input[:, 2, :, :].unsqueeze(1)
+                        )
                 ),
                 Vc
                 * (
-                    input[:, 0, :, :].unsqueeze(1)
-                    - (
-                        Wr * input[:, 0, :, :].unsqueeze(1)
-                        + Wg * input[:, 1, :, :].unsqueeze(1)
-                        + Wb * input[:, 2, :, :].unsqueeze(1)
-                    )
+                        input[:, 0, :, :].unsqueeze(1)
+                        - (
+                                Wr * input[:, 0, :, :].unsqueeze(1)
+                                + Wg * input[:, 1, :, :].unsqueeze(1)
+                                + Wb * input[:, 2, :, :].unsqueeze(1)
+                        )
                 ),
             ),
             dim=1,
@@ -211,7 +211,7 @@ class SPL_ComputeWithTrace(nn.Module):
     """
 
     def __init__(
-        self, weight=[1.0, 1.0, 1.0]
+            self, weight=[1.0, 1.0, 1.0]
     ):  # The variable 'weight' was originally intended to weigh color channels differently. In our experiments, we found that an equal weight between all channels gives the best results. As such, this variable is a leftover from that time and can be removed.
         super(SPL_ComputeWithTrace, self).__init__()
         self.weight = weight
@@ -222,24 +222,24 @@ class SPL_ComputeWithTrace(nn.Module):
         for i in range(input.shape[0]):
             for j in range(input.shape[1]):
                 a += (
-                    torch.trace(
-                        torch.matmul(
-                            F.normalize(input[i, j, :, :], p=2, dim=1),
-                            torch.t(F.normalize(reference[i, j, :, :], p=2, dim=1)),
+                        torch.trace(
+                            torch.matmul(
+                                F.normalize(input[i, j, :, :], p=2, dim=1),
+                                torch.t(F.normalize(reference[i, j, :, :], p=2, dim=1)),
+                            )
                         )
-                    )
-                    / input.shape[2]
-                    * self.weight[j]
+                        / input.shape[2]
+                        * self.weight[j]
                 )
                 b += (
-                    torch.trace(
-                        torch.matmul(
-                            torch.t(F.normalize(input[i, j, :, :], p=2, dim=0)),
-                            F.normalize(reference[i, j, :, :], p=2, dim=0),
+                        torch.trace(
+                            torch.matmul(
+                                torch.t(F.normalize(input[i, j, :, :], p=2, dim=0)),
+                                F.normalize(reference[i, j, :, :], p=2, dim=0),
+                            )
                         )
-                    )
-                    / input.shape[3]
-                    * self.weight[j]
+                        / input.shape[3]
+                        * self.weight[j]
                 )
         a = -torch.sum(a) / input.shape[0]
         b = -torch.sum(b) / input.shape[0]

@@ -44,9 +44,9 @@ class PartialConv2d(nn.Conv2d):
             )
 
         self.slide_winsize = (
-            self.weight_maskUpdater.shape[1]
-            * self.weight_maskUpdater.shape[2]
-            * self.weight_maskUpdater.shape[3]
+                self.weight_maskUpdater.shape[1]
+                * self.weight_maskUpdater.shape[2]
+                * self.weight_maskUpdater.shape[3]
         )
 
         self.last_size = (None, None, None, None)

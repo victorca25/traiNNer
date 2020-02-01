@@ -86,9 +86,9 @@ class GaussianSmoothing(nn.Module):
         for size, std, mgrid in zip(kernel_size, sigma, meshgrids):
             mean = (size - 1) / 2
             kernel *= (
-                1
-                / (std * math.sqrt(2 * math.pi))
-                * torch.exp(-(((mgrid - mean) / std) ** 2) / 2)
+                    1
+                    / (std * math.sqrt(2 * math.pi))
+                    * torch.exp(-(((mgrid - mean) / std) ** 2) / 2)
             )
 
         kernel = kernel / torch.sum(kernel)
@@ -364,11 +364,11 @@ class TVLoss(nn.Module):
                 pixel_dif2 = x[..., :, 1:] - x[..., :, :-1]
                 reduce_axes = (-3, -2, -1)
                 loss = self.tvloss_weight * (
-                    pixel_dif1.abs().sum(dim=reduce_axes)
-                    + pixel_dif2.abs().sum(dim=reduce_axes)
+                        pixel_dif1.abs().sum(dim=reduce_axes)
+                        + pixel_dif2.abs().sum(dim=reduce_axes)
                 )  # Calculates the TV loss for each image in the batch
                 loss = (
-                    loss.sum() / batch_size
+                        loss.sum() / batch_size
                 )  # averages the TV loss all the images in the batch
                 return loss
 
@@ -390,11 +390,11 @@ class TVLoss(nn.Module):
                 pixel_dif2 = x[..., :, 1:] - x[..., :, :-1]
                 reduce_axes = (-3, -2, -1)
                 loss = self.tvloss_weight * (
-                    torch.pow(pixel_dif1, 2).sum(dim=reduce_axes)
-                    + torch.pow(pixel_dif2, 2).sum(dim=reduce_axes)
+                        torch.pow(pixel_dif1, 2).sum(dim=reduce_axes)
+                        + torch.pow(pixel_dif2, 2).sum(dim=reduce_axes)
                 )  # Calculates the TV loss for each image in the batch
                 loss = (
-                    loss.sum() / batch_size
+                        loss.sum() / batch_size
                 )  # averages the TV loss all the images in the batch
                 return loss
 

@@ -1,6 +1,7 @@
 # import models
 from models.modules.LPIPS import perceptual_loss as models
 
+
 ####################
 # metric
 ####################
@@ -43,7 +44,7 @@ def calculate_lpips(img1_im, img2_im, use_gpu=False, net="squeeze", spatial=Fals
         # print('Distance: %.3f'%dist01) #%.8f
 
         return (
-            1000 * dist01
+                1000 * dist01
         )  # Check, normal order of magnitude is too small (0.0001 or so)
 
     distances = []

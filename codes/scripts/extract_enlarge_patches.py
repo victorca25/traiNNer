@@ -46,9 +46,9 @@ for i, path in enumerate(img_list):
     print(i, base_name)
     # crop patch
     if img.ndim == 2:
-        patch = img[h_start : h_start + h_len, w_start : w_start + w_len]
+        patch = img[h_start: h_start + h_len, w_start: w_start + w_len]
     elif img.ndim == 3:
-        patch = img[h_start : h_start + h_len, w_start : w_start + w_len, :]
+        patch = img[h_start: h_start + h_len, w_start: w_start + w_len, :]
     else:
         raise ValueError("Wrong image dim [{:d}]".format(img.ndim))
 

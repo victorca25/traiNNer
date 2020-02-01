@@ -20,19 +20,19 @@ from . import block as B
 
 class RRDBNet(nn.Module):
     def __init__(
-        self,
-        in_nc,
-        out_nc,
-        nf,
-        nb,
-        gc=32,
-        upscale=4,
-        norm_type=None,
-        act_type="leakyrelu",
-        mode="CNA",
-        upsample_mode="upconv",
-        convtype="Conv2D",
-        finalact=None,
+            self,
+            in_nc,
+            out_nc,
+            nf,
+            nb,
+            gc=32,
+            upscale=4,
+            norm_type=None,
+            act_type="leakyrelu",
+            mode="CNA",
+            upsample_mode="upconv",
+            convtype="Conv2D",
+            finalact=None,
     ):
         super(RRDBNet, self).__init__()
         n_upscale = int(math.log(upscale, 2))
@@ -96,7 +96,7 @@ class RRDBNet(nn.Module):
         x = self.model(x)
 
         if (
-            outm == "scaltanh"
+                outm == "scaltanh"
         ):  # limit output range to [-1,1] range with tanh and rescale to [0,1] Idea from: https://github.com/goldhuang/SRGAN-PyTorch/blob/master/model.py
             return (torch.tanh(x) + 1.0) / 2.0
         elif outm == "tanh":  # limit output to [-1,1] range

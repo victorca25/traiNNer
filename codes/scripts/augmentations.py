@@ -68,10 +68,10 @@ def random_crop_pairs(img_HR, img_LR, HR_size, scale):
     rnd_h = random.randint(0, max(0, H - LR_size))
     rnd_w = random.randint(0, max(0, W - LR_size))
     # print ("LR rnd: ",rnd_h, rnd_w)
-    img_LR = img_LR[rnd_h : rnd_h + LR_size, rnd_w : rnd_w + LR_size, :]
+    img_LR = img_LR[rnd_h: rnd_h + LR_size, rnd_w: rnd_w + LR_size, :]
     rnd_h_HR, rnd_w_HR = int(rnd_h * scale), int(rnd_w * scale)
     # print ("HR rnd: ",rnd_h_HR, rnd_w_HR)
-    img_HR = img_HR[rnd_h_HR : rnd_h_HR + HR_size, rnd_w_HR : rnd_w_HR + HR_size, :]
+    img_HR = img_HR[rnd_h_HR: rnd_h_HR + HR_size, rnd_w_HR: rnd_w_HR + HR_size, :]
 
     return img_HR, img_LR
 
@@ -98,7 +98,7 @@ def cutout(image_origin, mask_size, p=0.5):
 
 
 def random_erasing(
-    image_origin, p=0.5, s=(0.02, 0.4), r=(0.3, 3), modes=[0, 1, 2]
+        image_origin, p=0.5, s=(0.02, 0.4), r=(0.3, 3), modes=[0, 1, 2]
 ):  # erasing probability p, the area ratio range of erasing region sl and sh, and the aspect ratio range of erasing region r1 and r2.
     if np.random.rand() > p:
         return image_origin
@@ -172,7 +172,7 @@ def scale_img(image, scale, algo=None):
         elif isinstance(algo, int):
             interpol = algo
 
-        if interpol == 777:  #'matlab_bicubic'
+        if interpol == 777:  # 'matlab_bicubic'
             resized = util.imresize_np(image, 1 / scale, True)
             # force to 3 channels
             # if resized.ndim == 2:
@@ -207,7 +207,7 @@ def resize_img(image, crop_size=(128, 128), algo=None):
         elif isinstance(algo, int):
             interpol = algo
 
-    if interpol == 777:  #'matlab_bicubic'
+    if interpol == 777:  # 'matlab_bicubic'
         resized = util.imresize_np(image, 1 / scale, True)
         # force to 3 channels
         # if resized.ndim == 2:
@@ -294,7 +294,7 @@ def random_rotate(image, angle=0, center=None, scale=1.0):
     h, w, c = image.shape
 
     if (
-        np.random.rand() > 0.5
+            np.random.rand() > 0.5
     ):  # randomly upscaling 2x like HD Mode7 to reduce jaggy lines after rotating, more accurate underlying "sub-pixel" data. cv2.INTER_LANCZOS4?
         image, _ = scale_img(image, 1 / 2, cv2.INTER_CUBIC)
 
@@ -308,7 +308,7 @@ def random_rotate_pairs(img_HR, img_LR, HR_size, scale, angle=0, center=0):
         angle = int(np.random.uniform(-45, 45))
 
     if (
-        np.random.rand() > 0.5
+            np.random.rand() > 0.5
     ):  # randomly upscaling 2x like HD Mode7 to reduce jaggy lines after rotating, more accurate underlying "sub-pixel" data. cv2.INTER_LANCZOS4?
         img_HR, _ = scale_img(img_HR, 1 / 2, cv2.INTER_CUBIC)
         img_LR, _ = scale_img(img_LR, 1 / 2, cv2.INTER_CUBIC)
@@ -398,7 +398,7 @@ def noise_img(img_LR, noise_types=["clean"]):
     noise_type = random.choice(noise_types)
 
     if (
-        noise_type == "poisson"
+            noise_type == "poisson"
     ):  # note: Poisson noise is not additive like Gaussian, it's dependant on the image values: https://tomroelandts.com/articles/gaussian-noise-is-added-poisson-noise-is-applied
         vals = len(np.unique(img_LR))
         vals = 2 ** np.ceil(np.log2(vals))
@@ -535,8 +535,8 @@ def noise_img(img_LR, noise_types=["clean"]):
         elif dither_type == "bayer":
             re_bayer = np.zeros(size, dtype=np.uint8)
             bayer_matrix = (
-                np.array([[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]])
-                / 256
+                    np.array([[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]])
+                    / 256
             )  # 4x4 Bayer matrix
 
             bayer_matrix = bayer_matrix * 16
@@ -557,7 +557,7 @@ def noise_img(img_LR, noise_types=["clean"]):
                 for j in range(1, size[1] - 1):
                     oldPixel = re_fs[i, j]  # [y, x]
                     newPixel = np.round(samplingF * oldPixel / 255.0) * (
-                        255 / samplingF
+                            255 / samplingF
                     )
 
                     re_fs[i, j] = newPixel
@@ -584,8 +584,8 @@ def noise_img(img_LR, noise_types=["clean"]):
         # Bayer works more or less. I think it's missing a part of the image, the ditherng pattern is apparent, but the quantized (color palette) is not there. Still enough for models to learn dedithering
         if dither_type == "bayer":
             bayer_matrix = (
-                np.array([[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]])
-                / 256
+                    np.array([[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]])
+                    / 256
             )  # 4x4 Bayer matrix
 
             bayer_matrix = bayer_matrix * 16
@@ -597,7 +597,7 @@ def noise_img(img_LR, noise_types=["clean"]):
             img_split = np.zeros((img_LR.shape[0], img_LR.shape[1], 3), dtype=red.dtype)
 
             for values, color, channel in zip(
-                (red, green, blue), ("red", "green", "blue"), (2, 1, 0)
+                    (red, green, blue), ("red", "green", "blue"), (2, 1, 0)
             ):
                 for i in range(0, values.shape[0]):
                     for j in range(0, values.shape[1]):
@@ -621,13 +621,13 @@ def noise_img(img_LR, noise_types=["clean"]):
                     oldPixel_r = re_fs[i, j, 2]  # [y, x]
 
                     newPixel_b = np.round(samplingF * oldPixel_b / 255.0) * (
-                        255 / samplingF
+                            255 / samplingF
                     )
                     newPixel_g = np.round(samplingF * oldPixel_g / 255.0) * (
-                        255 / samplingF
+                            255 / samplingF
                     )
                     newPixel_r = np.round(samplingF * oldPixel_r / 255.0) * (
-                        255 / samplingF
+                            255 / samplingF
                     )
 
                     re_fs[i, j, 0] = newPixel_b
@@ -800,9 +800,8 @@ def max_rgb_filter(image):
 # http://www.morethantechnical.com/2015/01/14/simplest-color-balance-with-opencv-wcode/
 # https://web.stanford.edu/~sujason/ColorBalancing/simplestcb.html
 def simplest_cb(img, percent=1, znorm=False):
-
     if (
-        znorm == True
+            znorm == True
     ):  # img is znorm'ed in the [-1,1] range, else img in the [0,1] range
         img = (img + 1.0) / 2.0
 
@@ -840,17 +839,17 @@ def simplest_cb(img, percent=1, znorm=False):
 
 # https://www.idtools.com.au/unsharp-masking-python-opencv/
 def unsharp_mask(
-    img,
-    blur_algo="median",
-    kernel_size=None,
-    strength=None,
-    unsharp_algo="laplacian",
-    znorm=False,
+        img,
+        blur_algo="median",
+        kernel_size=None,
+        strength=None,
+        unsharp_algo="laplacian",
+        znorm=False,
 ):
     # h,w,c = img.shape
 
     if (
-        znorm == True
+            znorm == True
     ):  # img is znorm'ed in the [-1,1] range, else img in the [0,1] range
         img = (img + 1.0) / 2.0
     # back to the OpenCV [0,255] range
@@ -896,13 +895,13 @@ def unsharp_mask(
 
 
 def random_img(
-    img_dir,
-    save_path,
-    crop_size=(128, 128),
-    scale=1,
-    blur_algos=["clean"],
-    noise_types=["clean"],
-    noise_types2=["clean"],
+        img_dir,
+        save_path,
+        crop_size=(128, 128),
+        scale=1,
+        blur_algos=["clean"],
+        noise_types=["clean"],
+        noise_types2=["clean"],
 ):
     img_list = _get_paths_from_dir(img_dir)
 
@@ -984,13 +983,13 @@ def random_img(
 
 
 def single_image(
-    img_path,
-    save_path,
-    crop_size=(128, 128),
-    scale=1,
-    blur_algos=["clean"],
-    noise_types=["clean"],
-    noise_types2=["clean"],
+        img_path,
+        save_path,
+        crop_size=(128, 128),
+        scale=1,
+        blur_algos=["clean"],
+        noise_types=["clean"],
+        noise_types2=["clean"],
 ):
     env = None
     img = util.read_img(
@@ -1070,13 +1069,13 @@ def single_image(
 
 
 def apply_dir(
-    img_path,
-    save_path,
-    crop_size=(128, 128),
-    scale=1,
-    blur_algos=["clean"],
-    noise_types=["clean"],
-    noise_types2=["clean"],
+        img_path,
+        save_path,
+        crop_size=(128, 128),
+        scale=1,
+        blur_algos=["clean"],
+        noise_types=["clean"],
+        noise_types2=["clean"],
 ):
     img_list = _get_paths_from_dir(img_dir)
 

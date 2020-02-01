@@ -88,8 +88,8 @@ class SFTGAN_ACD_Model(BaseModel):
             optim_params_SFT = []
             optim_params_other = []
             for (
-                k,
-                v,
+                    k,
+                    v,
             ) in self.netG.named_parameters():  # can optimize for a part of the model
                 if "SFT" in k or "Cond" in k:
                     optim_params_SFT.append(v)
@@ -195,8 +195,8 @@ class SFTGAN_ACD_Model(BaseModel):
                 self.random_pt.resize_(batch_size, 1, 1, 1)
             self.random_pt.uniform_()  # Draw random interpolation points
             interp = (
-                self.random_pt * self.fake_H.detach()
-                + (1 - self.random_pt) * self.var_H
+                    self.random_pt * self.fake_H.detach()
+                    + (1 - self.random_pt) * self.var_H
             )
             interp.requires_grad = True
             interp_crit, _ = self.netD(interp)

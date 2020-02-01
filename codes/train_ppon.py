@@ -58,8 +58,8 @@ def main():
                 path
                 for key, path in opt["path"].items()
                 if not key == "experiments_root"
-                and "pretrain_model" not in key
-                and "resume" not in key
+                   and "pretrain_model" not in key
+                   and "resume" not in key
             )
         )
 
@@ -270,33 +270,33 @@ def main():
                     # For training models with only one channel ndim==2, if RGB ndim==3, etc.
                     if gt_img.ndim == 2:
                         cropped_gt_img = gt_img[
-                            crop_size:-crop_size, crop_size:-crop_size
-                        ]
+                                         crop_size:-crop_size, crop_size:-crop_size
+                                         ]
                     else:  # gt_img.ndim == 3, # Default: RGB images
                         cropped_gt_img = gt_img[
-                            crop_size:-crop_size, crop_size:-crop_size, :
-                        ]
+                                         crop_size:-crop_size, crop_size:-crop_size, :
+                                         ]
                     # All 3 output images will have the same dimensions
                     if sr_img_c.ndim == 2:
                         cropped_sr_img_c = sr_img_c[
-                            crop_size:-crop_size, crop_size:-crop_size
-                        ]
+                                           crop_size:-crop_size, crop_size:-crop_size
+                                           ]
                         cropped_sr_img_s = sr_img_s[
-                            crop_size:-crop_size, crop_size:-crop_size
-                        ]
+                                           crop_size:-crop_size, crop_size:-crop_size
+                                           ]
                         cropped_sr_img_p = sr_img_p[
-                            crop_size:-crop_size, crop_size:-crop_size
-                        ]
+                                           crop_size:-crop_size, crop_size:-crop_size
+                                           ]
                     else:  # sr_img_c.ndim == 3, # Default: RGB images
                         cropped_sr_img_c = sr_img_c[
-                            crop_size:-crop_size, crop_size:-crop_size, :
-                        ]
+                                           crop_size:-crop_size, crop_size:-crop_size, :
+                                           ]
                         cropped_sr_img_s = sr_img_s[
-                            crop_size:-crop_size, crop_size:-crop_size, :
-                        ]
+                                           crop_size:-crop_size, crop_size:-crop_size, :
+                                           ]
                         cropped_sr_img_p = sr_img_p[
-                            crop_size:-crop_size, crop_size:-crop_size, :
-                        ]
+                                           crop_size:-crop_size, crop_size:-crop_size, :
+                                           ]
 
                     avg_psnr_c += util.calculate_psnr(
                         cropped_sr_img_c * 255, cropped_gt_img * 255

@@ -15,7 +15,7 @@ class Res131(nn.Module):
         )
         conv2 = B.conv_block(
             mid_nc, out_nc, 1, 1, 1, 1, False, "zero", "batch", None
-        )  #  No ReLU
+        )  # No ReLU
         self.res = B.sequential(conv0, conv1, conv2)
         if in_nc == out_nc:
             self.has_proj = False
@@ -38,17 +38,17 @@ class OutdoorSceneSeg(nn.Module):
         super(OutdoorSceneSeg, self).__init__()
         # conv1
         blocks = []
-        conv1_1 = B.conv_block(3, 64, 3, 2, 1, 1, False, "zero", "batch")  #  /2
+        conv1_1 = B.conv_block(3, 64, 3, 2, 1, 1, False, "zero", "batch")  # /2
         conv1_2 = B.conv_block(64, 64, 3, 1, 1, 1, False, "zero", "batch")
         conv1_3 = B.conv_block(64, 128, 3, 1, 1, 1, False, "zero", "batch")
-        max_pool = nn.MaxPool2d(3, stride=2, padding=0, ceil_mode=True)  #  /2
+        max_pool = nn.MaxPool2d(3, stride=2, padding=0, ceil_mode=True)  # /2
         blocks = [conv1_1, conv1_2, conv1_3, max_pool]
         # conv2, 3 blocks
         blocks.append(Res131(128, 64, 256))
         for i in range(2):
             blocks.append(Res131(256, 64, 256))
         # conv3, 4 blocks
-        blocks.append(Res131(256, 128, 512, 1, 2))  #  /2
+        blocks.append(Res131(256, 128, 512, 1, 2))  # /2
         for i in range(3):
             blocks.append(Res131(512, 128, 512))
         # conv4, 23 blocks

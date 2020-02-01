@@ -62,9 +62,9 @@ def generate_mod_LR_bic():
         height = int(np.floor(image.shape[0] / mod_scale))
         # modcrop
         if len(image.shape) == 3:
-            image_HR = image[0 : mod_scale * height, 0 : mod_scale * width, :]
+            image_HR = image[0: mod_scale * height, 0: mod_scale * width, :]
         else:
-            image_HR = image[0 : mod_scale * height, 0 : mod_scale * width]
+            image_HR = image[0: mod_scale * height, 0: mod_scale * width]
         # LR
         image_LR = imresize_np(image_HR, 1 / up_scale, True)
         # bic

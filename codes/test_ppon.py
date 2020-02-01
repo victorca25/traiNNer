@@ -99,11 +99,11 @@ def main():
 
                 crop_border = test_loader.dataset.opt["scale"]
                 cropped_sr_img = sr_img[
-                    crop_border:-crop_border, crop_border:-crop_border, :
-                ]
+                                 crop_border:-crop_border, crop_border:-crop_border, :
+                                 ]
                 cropped_gt_img = gt_img[
-                    crop_border:-crop_border, crop_border:-crop_border, :
-                ]
+                                 crop_border:-crop_border, crop_border:-crop_border, :
+                                 ]
 
                 psnr = util.calculate_psnr(cropped_sr_img * 255, cropped_gt_img * 255)
                 ssim = util.calculate_ssim(cropped_sr_img * 255, cropped_gt_img * 255)
@@ -114,11 +114,11 @@ def main():
                     sr_img_y = bgr2ycbcr(sr_img, only_y=True)
                     gt_img_y = bgr2ycbcr(gt_img, only_y=True)
                     cropped_sr_img_y = sr_img_y[
-                        crop_border:-crop_border, crop_border:-crop_border
-                    ]
+                                       crop_border:-crop_border, crop_border:-crop_border
+                                       ]
                     cropped_gt_img_y = gt_img_y[
-                        crop_border:-crop_border, crop_border:-crop_border
-                    ]
+                                       crop_border:-crop_border, crop_border:-crop_border
+                                       ]
                     psnr_y = util.calculate_psnr(
                         cropped_sr_img_y * 255, cropped_gt_img_y * 255
                     )

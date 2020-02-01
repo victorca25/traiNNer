@@ -351,8 +351,8 @@ class SRRaGANModel(BaseModel):
 
             optim_params = []
             for (
-                k,
-                v,
+                    k,
+                    v,
             ) in self.netG.named_parameters():  # can optimize for a part of the model
                 if v.requires_grad:
                     optim_params.append(v)
@@ -501,7 +501,7 @@ class SRRaGANModel(BaseModel):
                     l_g_total += l_g_pix
                 if self.cri_ssim:  # structural loss
                     l_g_ssim = 1.0 - (
-                        self.l_ssim_w * self.cri_ssim(self.fake_H, self.var_H)
+                            self.l_ssim_w * self.cri_ssim(self.fake_H, self.var_H)
                     )  # using ssim2.py
                     if torch.isnan(l_g_ssim).any():
                         l_g_total = l_g_total
@@ -542,12 +542,12 @@ class SRRaGANModel(BaseModel):
                 pred_g_fake = self.netD(self.fake_H)
                 pred_d_real = self.netD(self.var_ref).detach()
                 l_g_gan = (
-                    self.l_gan_w
-                    * (
-                        self.cri_gan(pred_d_real - torch.mean(pred_g_fake), False)
-                        + self.cri_gan(pred_g_fake - torch.mean(pred_d_real), True)
-                    )
-                    / 2
+                        self.l_gan_w
+                        * (
+                                self.cri_gan(pred_d_real - torch.mean(pred_g_fake), False)
+                                + self.cri_gan(pred_g_fake - torch.mean(pred_d_real), True)
+                        )
+                        / 2
                 )
                 l_g_total += l_g_gan
                 l_g_total.backward()
@@ -572,8 +572,8 @@ class SRRaGANModel(BaseModel):
                     self.random_pt.resize_(batch_size, 1, 1, 1)
                 self.random_pt.uniform_()  # Draw random interpolation points
                 interp = (
-                    self.random_pt * self.fake_H.detach()
-                    + (1 - self.random_pt) * self.var_ref
+                        self.random_pt * self.fake_H.detach()
+                        + (1 - self.random_pt) * self.var_ref
                 )
                 interp.requires_grad = True
                 interp_crit = self.netD(interp)
@@ -619,10 +619,10 @@ class SRRaGANModel(BaseModel):
                 l_g_total += l_g_pix
             if self.cri_ssim:  # structural loss (Structural Dissimilarity)
                 l_g_ssim = 1.0 - (
-                    self.l_ssim_w * self.cri_ssim(self.fake_H, self.var_H)
+                        self.l_ssim_w * self.cri_ssim(self.fake_H, self.var_H)
                 )  # using ssim2.py
                 if torch.isnan(
-                    l_g_ssim
+                        l_g_ssim
                 ).any():  # at random, l_g_ssim is returning NaN for ms-ssim, which breaks the model. Temporary hack, until I find out what's going on.
                     l_g_total = l_g_total
                 else:

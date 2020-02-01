@@ -7,6 +7,8 @@ from torch.nn import init
 
 # import models.modules.sft_arch as sft_arch
 logger = logging.getLogger("base")
+
+
 ####################
 # initialize
 ####################
@@ -30,7 +32,7 @@ def weights_init_normal(m, std=0.02):
 def weights_init_kaiming(m, scale=1):
     classname = m.__class__.__name__
     if (
-        classname.find("Conv") != -1 and classname != "DiscConvBlock"
+            classname.find("Conv") != -1 and classname != "DiscConvBlock"
     ):  # ASRResNet's DiscConvBlock causes confusion
         init.kaiming_normal_(m.weight.data, a=0, mode="fan_in")
         m.weight.data *= scale
@@ -231,7 +233,7 @@ def define_D(opt):
             arch=model_G,
         )
     elif (
-        which_model == "discriminator_vgg_192" or which_model == "discriminator_192"
+            which_model == "discriminator_vgg_192" or which_model == "discriminator_192"
     ):  # vic in PPON its called Discriminator_192, instead of BasicSR's Discriminator_VGG_192
         from models.modules.architectures import discriminators
 
@@ -296,7 +298,7 @@ def define_D(opt):
             poolsize=opt_net["poolsize"],
         )
     elif (
-        which_model == "discriminator_vgg_128_fea"
+            which_model == "discriminator_vgg_128_fea"
     ):  # VGG-like discriminator with features extraction
         from models.modules.architectures import ASRResNet_arch
 

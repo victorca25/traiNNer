@@ -282,7 +282,7 @@ class ABPN_v5(nn.Module):
 
 class ConvBlock(torch.nn.Module):
     def __init__(
-        self, input_size, output_size, kernel_size, stride, padding, bias=True
+            self, input_size, output_size, kernel_size, stride, padding, bias=True
     ):
         super(ConvBlock, self).__init__()
 
@@ -300,7 +300,7 @@ class ConvBlock(torch.nn.Module):
 
 class DeconvBlock(torch.nn.Module):
     def __init__(
-        self, input_size, output_size, kernel_size, stride, padding, bias=True
+            self, input_size, output_size, kernel_size, stride, padding, bias=True
     ):
         super(DeconvBlock, self).__init__()
 
@@ -388,7 +388,6 @@ class ResnetBlock(torch.nn.Module):
         self.act2 = torch.nn.PReLU()
 
     def forward(self, x):
-
         out = self.conv1(x)
         out = self.act1(out)
         out = self.conv2(out)

@@ -25,21 +25,21 @@ class DistModel(BaseModel):
         return self.model_name
 
     def initialize(
-        self,
-        model="net-lin",
-        net="alex",
-        colorspace="Lab",
-        pnet_rand=False,
-        pnet_tune=False,
-        model_path=None,
-        use_gpu=True,
-        printNet=False,
-        spatial=False,
-        is_train=False,
-        lr=0.0001,
-        beta1=0.5,
-        version="0.1",
-        gpu_ids=[0],
+            self,
+            model="net-lin",
+            net="alex",
+            colorspace="Lab",
+            pnet_rand=False,
+            pnet_tune=False,
+            model_path=None,
+            use_gpu=True,
+            printNet=False,
+            spatial=False,
+            is_train=False,
+            lr=0.0001,
+            beta1=0.5,
+            version="0.1",
+            gpu_ids=[0],
     ):
         """
         INPUTS

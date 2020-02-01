@@ -140,6 +140,7 @@ def augment(img_list, hflip=True, rot=True):
     hflip = hflip and random.random() < 0.5
     vflip = rot and random.random() < 0.5
     rot90 = rot and random.random() < 0.5
+
     # rot90n = rot and random.random() < 0.5
 
     def _augment(img):
@@ -308,17 +309,16 @@ def patchify_tensor(features, patch_size, overlap=10):
                 patch_start_width = min(w * effective_patch_size, width - patch_size)
                 patches.append(
                     features[
-                        b : b + 1,
-                        :,
-                        patch_start_height : patch_start_height + patch_size,
-                        patch_start_width : patch_start_width + patch_size,
+                    b: b + 1,
+                    :,
+                    patch_start_height: patch_start_height + patch_size,
+                    patch_start_width: patch_start_width + patch_size,
                     ]
                 )
     return torch.cat(patches, 0)
 
 
 def recompose_tensor(patches, full_height, full_width, overlap=10):
-
     batch_size, channels, patch_size, _ = patches.size()
     effective_patch_size = patch_size - overlap
     n_patches_height = full_height // effective_patch_size
@@ -351,10 +351,10 @@ def recompose_tensor(patches, full_height, full_width, overlap=10):
             patch_start_height = min(h * effective_patch_size, full_height - patch_size)
             patch_start_width = min(w * effective_patch_size, full_width - patch_size)
             blending_image[
-                0,
-                :,
-                patch_start_height : patch_start_height + patch_size,
-                patch_start_width : patch_start_width + patch_size,
+            0,
+            :,
+            patch_start_height: patch_start_height + patch_size,
+            patch_start_width: patch_start_width + patch_size,
             ] += blending_patch[None]
 
     recomposed_tensor = torch.zeros(final_batch_size, channels, full_height, full_width)
@@ -373,10 +373,10 @@ def recompose_tensor(patches, full_height, full_width, overlap=10):
                     w * effective_patch_size, full_width - patch_size
                 )
                 recomposed_tensor[
-                    b,
-                    :,
-                    patch_start_height : patch_start_height + patch_size,
-                    patch_start_width : patch_start_width + patch_size,
+                b,
+                :,
+                patch_start_height: patch_start_height + patch_size,
+                patch_start_width: patch_start_width + patch_size,
                 ] += (patches[patch_index] * blending_patch)
                 patch_index += 1
     recomposed_tensor /= blending_image
@@ -395,12 +395,12 @@ def cubic(x):
     absx2 = absx ** 2
     absx3 = absx ** 3
     return (1.5 * absx3 - 2.5 * absx2 + 1) * ((absx <= 1).type_as(absx)) + (
-        -0.5 * absx3 + 2.5 * absx2 - 4 * absx + 2
+            -0.5 * absx3 + 2.5 * absx2 - 4 * absx + 2
     ) * (((absx > 1) * (absx <= 2)).type_as(absx))
 
 
 def calculate_weights_indices(
-    in_length, out_length, scale, kernel, kernel_width, antialiasing
+        in_length, out_length, scale, kernel, kernel_width, antialiasing
 ):
     if (scale < 1) and (antialiasing):
         # Use a modified kernel to simultaneously interpolate and antialias- larger kernel width
@@ -499,13 +499,13 @@ def imresize(img, scale, antialiasing=True):
     for i in range(out_H):
         idx = int(indices_H[i][0])
         out_1[0, i, :] = (
-            img_aug[0, idx : idx + kernel_width, :].transpose(0, 1).mv(weights_H[i])
+            img_aug[0, idx: idx + kernel_width, :].transpose(0, 1).mv(weights_H[i])
         )
         out_1[1, i, :] = (
-            img_aug[1, idx : idx + kernel_width, :].transpose(0, 1).mv(weights_H[i])
+            img_aug[1, idx: idx + kernel_width, :].transpose(0, 1).mv(weights_H[i])
         )
         out_1[2, i, :] = (
-            img_aug[2, idx : idx + kernel_width, :].transpose(0, 1).mv(weights_H[i])
+            img_aug[2, idx: idx + kernel_width, :].transpose(0, 1).mv(weights_H[i])
         )
 
     # process W dimension
@@ -527,9 +527,9 @@ def imresize(img, scale, antialiasing=True):
     kernel_width = weights_W.size(1)
     for i in range(out_W):
         idx = int(indices_W[i][0])
-        out_2[0, :, i] = out_1_aug[0, :, idx : idx + kernel_width].mv(weights_W[i])
-        out_2[1, :, i] = out_1_aug[1, :, idx : idx + kernel_width].mv(weights_W[i])
-        out_2[2, :, i] = out_1_aug[2, :, idx : idx + kernel_width].mv(weights_W[i])
+        out_2[0, :, i] = out_1_aug[0, :, idx: idx + kernel_width].mv(weights_W[i])
+        out_2[1, :, i] = out_1_aug[1, :, idx: idx + kernel_width].mv(weights_W[i])
+        out_2[2, :, i] = out_1_aug[2, :, idx: idx + kernel_width].mv(weights_W[i])
 
     return out_2
 
@@ -577,13 +577,13 @@ def imresize_np(img, scale, antialiasing=True):
     for i in range(out_H):
         idx = int(indices_H[i][0])
         out_1[i, :, 0] = (
-            img_aug[idx : idx + kernel_width, :, 0].transpose(0, 1).mv(weights_H[i])
+            img_aug[idx: idx + kernel_width, :, 0].transpose(0, 1).mv(weights_H[i])
         )
         out_1[i, :, 1] = (
-            img_aug[idx : idx + kernel_width, :, 1].transpose(0, 1).mv(weights_H[i])
+            img_aug[idx: idx + kernel_width, :, 1].transpose(0, 1).mv(weights_H[i])
         )
         out_1[i, :, 2] = (
-            img_aug[idx : idx + kernel_width, :, 2].transpose(0, 1).mv(weights_H[i])
+            img_aug[idx: idx + kernel_width, :, 2].transpose(0, 1).mv(weights_H[i])
         )
 
     # process W dimension
@@ -605,9 +605,9 @@ def imresize_np(img, scale, antialiasing=True):
     kernel_width = weights_W.size(1)
     for i in range(out_W):
         idx = int(indices_W[i][0])
-        out_2[:, i, 0] = out_1_aug[:, idx : idx + kernel_width, 0].mv(weights_W[i])
-        out_2[:, i, 1] = out_1_aug[:, idx : idx + kernel_width, 1].mv(weights_W[i])
-        out_2[:, i, 2] = out_1_aug[:, idx : idx + kernel_width, 2].mv(weights_W[i])
+        out_2[:, i, 0] = out_1_aug[:, idx: idx + kernel_width, 0].mv(weights_W[i])
+        out_2[:, i, 1] = out_1_aug[:, idx: idx + kernel_width, 1].mv(weights_W[i])
+        out_2[:, i, 2] = out_1_aug[:, idx: idx + kernel_width, 2].mv(weights_W[i])
 
     return out_2.numpy()
 

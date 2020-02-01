@@ -171,7 +171,7 @@ def ssim(img1, img2):
     sigma12 = cv2.filter2D(img1 * img2, -1, window)[5:-5, 5:-5] - mu1_mu2
 
     ssim_map = ((2 * mu1_mu2 + C1) * (2 * sigma12 + C2)) / (
-        (mu1_sq + mu2_sq + C1) * (sigma1_sq + sigma2_sq + C2)
+            (mu1_sq + mu2_sq + C1) * (sigma1_sq + sigma2_sq + C2)
     )
     return ssim_map.mean()
 

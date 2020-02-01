@@ -11,12 +11,12 @@ import torchvision
 # Assume input range is [0, 1]
 class VGGFeatureExtractor(nn.Module):
     def __init__(
-        self,
-        feature_layer=34,
-        use_bn=False,
-        use_input_norm=True,
-        device=torch.device("cpu"),
-        z_norm=False,
+            self,
+            feature_layer=34,
+            use_bn=False,
+            use_input_norm=True,
+            device=torch.device("cpu"),
+            z_norm=False,
     ):  # Note: PPON uses cuda instead of CPU
         super(VGGFeatureExtractor, self).__init__()
         if use_bn:
@@ -28,13 +28,13 @@ class VGGFeatureExtractor(nn.Module):
             if z_norm:  # if input in range [-1,1]
                 mean = (
                     torch.Tensor([0.485 - 1, 0.456 - 1, 0.406 - 1])
-                    .view(1, 3, 1, 1)
-                    .to(device)
+                        .view(1, 3, 1, 1)
+                        .to(device)
                 )
                 std = (
                     torch.Tensor([0.229 * 2, 0.224 * 2, 0.225 * 2])
-                    .view(1, 3, 1, 1)
-                    .to(device)
+                        .view(1, 3, 1, 1)
+                        .to(device)
                 )
             else:  # input in range [0,1]
                 mean = torch.Tensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1).to(device)
@@ -65,13 +65,13 @@ class ResNet101FeatureExtractor(nn.Module):
             if z_norm:  # if input in range [-1,1]
                 mean = (
                     torch.Tensor([0.485 - 1, 0.456 - 1, 0.406 - 1])
-                    .view(1, 3, 1, 1)
-                    .to(device)
+                        .view(1, 3, 1, 1)
+                        .to(device)
                 )
                 std = (
                     torch.Tensor([0.229 * 2, 0.224 * 2, 0.225 * 2])
-                    .view(1, 3, 1, 1)
-                    .to(device)
+                        .view(1, 3, 1, 1)
+                        .to(device)
                 )
             else:  # input in range [0,1]
                 mean = torch.Tensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1).to(device)
@@ -136,11 +136,11 @@ class MINCNet(nn.Module):
 # Assume input range is [0, 1]
 class MINCFeatureExtractor(nn.Module):
     def __init__(
-        self,
-        feature_layer=34,
-        use_bn=False,
-        use_input_norm=True,
-        device=torch.device("cpu"),
+            self,
+            feature_layer=34,
+            use_bn=False,
+            use_input_norm=True,
+            device=torch.device("cpu"),
     ):
         super(MINCFeatureExtractor, self).__init__()
 

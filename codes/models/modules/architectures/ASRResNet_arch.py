@@ -30,7 +30,7 @@ class Upsample(nn.Module):
     # Alternative: https://discuss.pytorch.org/t/using-nn-function-interpolate-inside-nn-sequential/23588/2?u=ptrblck
 
     def __init__(
-        self, size=None, scale_factor=None, mode="nearest", align_corners=None
+            self, size=None, scale_factor=None, mode="nearest", align_corners=None
     ):
         super(Upsample, self).__init__()
         if isinstance(scale_factor, tuple):
@@ -74,12 +74,12 @@ class SelfAttentionBlock(nn.Module):
     """
 
     def __init__(
-        self,
-        in_dim,
-        max_pool=False,
-        poolsize=4,
-        spectral_norm=True,
-        ret_attention=False,
+            self,
+            in_dim,
+            max_pool=False,
+            poolsize=4,
+            spectral_norm=True,
+            ret_attention=False,
     ):  # in_dim = in_feature_maps
         super(SelfAttentionBlock, self).__init__()
 
@@ -180,12 +180,12 @@ class ResidualBlock(nn.Module):
     """ Implementaion of Residual Block. Used in generator and discriminator networks. """
 
     def __init__(
-        self,
-        in_channels=64,
-        out_channels=64,
-        kernel_size=3,
-        stride=1,
-        spectral_norm=True,
+            self,
+            in_channels=64,
+            out_channels=64,
+            kernel_size=3,
+            stride=1,
+            spectral_norm=True,
     ):
         super(ResidualBlock, self).__init__()
 
@@ -233,9 +233,10 @@ class UpscaleBlock(nn.Module):
     However, while this approach helps, it is still easy for deconvolution to fall into creating artifacts.
     https://distill.pub/2016/deconv-checkerboard/
     """
+
     # Implements resize-convolution
     def __init__(
-        self, in_channels, out_channels=None, kernel_size=3, stride=1, upscale_factor=2
+            self, in_channels, out_channels=None, kernel_size=3, stride=1, upscale_factor=2
     ):
         super(UpscaleBlock, self).__init__()
 
@@ -270,18 +271,18 @@ class UpconvBlock(nn.Module):
 
     # Implements resize-convolution
     def __init__(
-        self,
-        in_channels,
-        out_channels,
-        kernel_size=3,
-        stride=1,
-        upscale_factor=2,
-        bias=True,
-        pad_type="zero",
-        norm_type=None,
-        act_type="relu",
-        mode="nearest",
-        convtype="Conv2D",
+            self,
+            in_channels,
+            out_channels,
+            kernel_size=3,
+            stride=1,
+            upscale_factor=2,
+            bias=True,
+            pad_type="zero",
+            norm_type=None,
+            act_type="relu",
+            mode="nearest",
+            convtype="Conv2D",
     ):
         super(UpconvBlock, self).__init__()
 
@@ -316,12 +317,12 @@ class UpconvBlock(nn.Module):
 
 class ASRResNet(nn.Module):
     def __init__(
-        self,
-        scale_factor=4,
-        spectral_norm=True,
-        self_attention=True,
-        max_pool=False,
-        poolsize=4,
+            self,
+            scale_factor=4,
+            spectral_norm=True,
+            self_attention=True,
+            max_pool=False,
+            poolsize=4,
     ):
         super(ASRResNet, self).__init__()
         upsample_block_num = int(math.log(scale_factor, 2))
@@ -446,7 +447,7 @@ class ASRResNet(nn.Module):
             )
 
         if (
-            outm == "scaltanh"
+                outm == "scaltanh"
         ):  # limit output range to [-1,1] range with tanh and rescale to [0,1] Idea from: https://github.com/goldhuang/SRGAN-PyTorch/blob/master/model.py
             return (torch.tanh(block8) + 1.0) / 2.0  # Normalize to [0,1]
         elif outm == "tanh":  # Normalize limit output to [-1,1] range
@@ -467,7 +468,7 @@ class ASRResNet(nn.Module):
 
 class ADiscriminator(nn.Module):
     def __init__(
-        self, spectral_norm=True, self_attention=True, max_pool=False, poolsize=4
+            self, spectral_norm=True, self_attention=True, max_pool=False, poolsize=4
     ):
         super(ADiscriminator, self).__init__()
         self.self_attention = self_attention
@@ -613,18 +614,18 @@ class ADiscriminator(nn.Module):
 # VGG style Discriminator with input size 128*128, with feature_maps extraction and self-attention
 class Discriminator_VGG_128_fea(nn.Module):
     def __init__(
-        self,
-        in_nc,
-        base_nf,
-        norm_type="batch",
-        act_type="leakyrelu",
-        mode="CNA",
-        convtype="Conv2D",
-        arch="ESRGAN",
-        spectral_norm=False,
-        self_attention=False,
-        max_pool=False,
-        poolsize=4,
+            self,
+            in_nc,
+            base_nf,
+            norm_type="batch",
+            act_type="leakyrelu",
+            mode="CNA",
+            convtype="Conv2D",
+            arch="ESRGAN",
+            spectral_norm=False,
+            self_attention=False,
+            max_pool=False,
+            poolsize=4,
     ):
         super(Discriminator_VGG_128_fea, self).__init__()
         # features

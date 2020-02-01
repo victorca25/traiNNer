@@ -111,14 +111,14 @@ def _ssim(X, Y, win, data_range=255, size_average=True, full=False):
 
 
 def ssim(
-    X,
-    Y,
-    win_size=11,
-    win_sigma=1.5,
-    win=None,
-    data_range=255,
-    size_average=True,
-    full=False,
+        X,
+        Y,
+        win_size=11,
+        win_sigma=1.5,
+        win=None,
+        data_range=255,
+        size_average=True,
+        full=False,
 ):
     r""" interface of ssim
     Args:
@@ -167,15 +167,15 @@ def ssim(
 
 
 def ms_ssim(
-    X,
-    Y,
-    win_size=11,
-    win_sigma=1.5,
-    win=None,
-    data_range=255,
-    size_average=True,
-    full=False,
-    weights=None,
+        X,
+        Y,
+        win_size=11,
+        win_sigma=1.5,
+        win=None,
+        data_range=255,
+        size_average=True,
+        full=False,
+        weights=None,
 ):
     r""" interface of ms-ssim
     Args:
@@ -223,7 +223,7 @@ def ms_ssim(
         if win_size > H_s or win_size > W_s:
             size_s = min(win_size, H_s, W_s)
             if not (
-                size_s % 2 == 1
+                    size_s % 2 == 1
             ):  # kernel win_size has to be odd and smaller than the image W and H
                 size_s = size_s - 1
             # Control: Scale down sigma if a smaller filter size is used.
@@ -256,7 +256,7 @@ def ms_ssim(
 # Classes to re-use window
 class SSIM(torch.nn.Module):
     def __init__(
-        self, win_size=11, win_sigma=1.5, data_range=None, size_average=True, channel=3
+            self, win_size=11, win_sigma=1.5, data_range=None, size_average=True, channel=3
     ):
         r""" class for ssim
         Args:
@@ -284,13 +284,13 @@ class SSIM(torch.nn.Module):
 
 class MS_SSIM(torch.nn.Module):
     def __init__(
-        self,
-        win_size=11,
-        win_sigma=1.5,
-        data_range=None,
-        size_average=True,
-        channel=3,
-        weights=None,
+            self,
+            win_size=11,
+            win_sigma=1.5,
+            data_range=None,
+            size_average=True,
+            channel=3,
+            weights=None,
     ):
         r""" class for ms-ssim
         Args:

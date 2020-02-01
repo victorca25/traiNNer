@@ -15,10 +15,10 @@ test_img_folder_name = "samples"  # image folder name
 test_img_folder = "../data/" + test_img_folder_name  # HR images
 save_prob_path = "../data/" + test_img_folder_name + "_segprob"  # probability maps
 save_byteimg_path = (
-    "../data/" + test_img_folder_name + "_byteimg"
+        "../data/" + test_img_folder_name + "_byteimg"
 )  # segmentation annotations
 save_colorimg_path = (
-    "../data/" + test_img_folder_name + "_colorimg"
+        "../data/" + test_img_folder_name + "_colorimg"
 )  # segmentaion color results
 
 # make dirs

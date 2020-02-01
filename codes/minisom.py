@@ -43,8 +43,8 @@ def _incremental_index_verbose(m):
     for i in range(m):
         yield i
         it_per_sec = (time() - beginning) / (i + 1)
-        progress = f"\r [ {i+1:{len(str(m))}} / {m} ]"
-        progress += f" {100*(i+1)/m:3.0f}%"
+        progress = f"\r [ {i + 1:{len(str(m))}} / {m} ]"
+        progress += f" {100 * (i + 1) / m:3.0f}%"
         progress += f" - {it_per_sec:4.5f} it/s"
         stdout.write(progress)
 
@@ -75,15 +75,15 @@ def asymptotic_decay(learning_rate, t, max_iter):
 
 class MiniSom(object):
     def __init__(
-        self,
-        x,
-        y,
-        input_len,
-        sigma=1.0,
-        learning_rate=0.5,
-        decay_function=asymptotic_decay,
-        neighborhood_function="gaussian",
-        random_seed=None,
+            self,
+            x,
+            y,
+            input_len,
+            sigma=1.0,
+            learning_rate=0.5,
+            decay_function=asymptotic_decay,
+            neighborhood_function="gaussian",
+            random_seed=None,
     ):
         """Initializes a Self Organizing Maps.
 
@@ -309,8 +309,8 @@ class MiniSom(object):
         self._check_input_len(data)
         if len(self._neigx) == 1 or len(self._neigy) == 1:
             msg = (
-                "PCA initialization inappropriate:"
-                + "One of the dimensions of the map is 1."
+                    "PCA initialization inappropriate:"
+                    + "One of the dimensions of the map is 1."
             )
             warn(msg)
         pc_length, pc = linalg.eig(cov(transpose(data)))
@@ -386,10 +386,10 @@ class MiniSom(object):
             for ii in range(it.multi_index[0] - 1, it.multi_index[0] + 2):
                 for jj in range(it.multi_index[1] - 1, it.multi_index[1] + 2):
                     if (
-                        ii >= 0
-                        and ii < self._weights.shape[0]
-                        and jj >= 0
-                        and jj < self._weights.shape[1]
+                            ii >= 0
+                            and ii < self._weights.shape[0]
+                            and jj >= 0
+                            and jj < self._weights.shape[1]
                     ):
                         w_1 = self._weights[ii, jj, :]
                         w_2 = self._weights[it.multi_index]

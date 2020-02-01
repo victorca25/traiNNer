@@ -30,14 +30,14 @@ def upsample(in_tens, out_H=64):  # assumes scale factor is same for H and W
 # Learned perceptual metric
 class PNetLin(nn.Module):
     def __init__(
-        self,
-        pnet_type="vgg",
-        pnet_rand=False,
-        pnet_tune=False,
-        use_dropout=True,
-        spatial=False,
-        version="0.1",
-        lpips=True,
+            self,
+            pnet_type="vgg",
+            pnet_rand=False,
+            pnet_tune=False,
+            use_dropout=True,
+            spatial=False,
+            version="0.1",
+            lpips=True,
     ):
         super(PNetLin, self).__init__()
 
@@ -144,7 +144,7 @@ class NetLinLayer(nn.Module):
     def __init__(self, chn_in, chn_out=1, use_dropout=False):
         super(NetLinLayer, self).__init__()
 
-        layers = [nn.Dropout(),] if (use_dropout) else []
+        layers = [nn.Dropout(), ] if (use_dropout) else []
         layers += [
             nn.Conv2d(chn_in, chn_out, 1, stride=1, padding=0, bias=False),
         ]

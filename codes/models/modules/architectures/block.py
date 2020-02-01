@@ -47,7 +47,6 @@ def swish_func(x, beta=1.0):
 
 # Swish module
 class Swish(nn.Module):
-
     __constants__ = ["beta", "slope", "inplace"]
 
     def __init__(self, beta=1.0, slope=1.67653251702, inplace=False):
@@ -197,19 +196,19 @@ def sequential(*args):
 
 
 def conv_block(
-    in_nc,
-    out_nc,
-    kernel_size,
-    stride=1,
-    dilation=1,
-    groups=1,
-    bias=True,
-    pad_type="zero",
-    norm_type=None,
-    act_type="relu",
-    mode="CNA",
-    convtype="Conv2D",
-    spectral_norm=False,
+        in_nc,
+        out_nc,
+        kernel_size,
+        stride=1,
+        dilation=1,
+        groups=1,
+        bias=True,
+        pad_type="zero",
+        norm_type=None,
+        act_type="relu",
+        mode="CNA",
+        convtype="Conv2D",
+        spectral_norm=False,
 ):
     """
     Conv layer with padding, normalization, activation
@@ -275,21 +274,21 @@ class ResNetBlock(nn.Module):
     """
 
     def __init__(
-        self,
-        in_nc,
-        mid_nc,
-        out_nc,
-        kernel_size=3,
-        stride=1,
-        dilation=1,
-        groups=1,
-        bias=True,
-        pad_type="zero",
-        norm_type=None,
-        act_type="relu",
-        mode="CNA",
-        res_scale=1,
-        convtype="Conv2D",
+            self,
+            in_nc,
+            mid_nc,
+            out_nc,
+            kernel_size=3,
+            stride=1,
+            dilation=1,
+            groups=1,
+            bias=True,
+            pad_type="zero",
+            norm_type=None,
+            act_type="relu",
+            mode="CNA",
+            res_scale=1,
+            convtype="Conv2D",
     ):
         super(ResNetBlock, self).__init__()
         conv0 = conv_block(
@@ -347,18 +346,18 @@ class ResidualDenseBlock_5C(nn.Module):
     """
 
     def __init__(
-        self,
-        nc,
-        kernel_size=3,
-        gc=32,
-        stride=1,
-        bias=True,
-        pad_type="zero",
-        norm_type=None,
-        act_type="leakyrelu",
-        mode="CNA",
-        convtype="Conv2D",
-        spectral_norm=False,
+            self,
+            nc,
+            kernel_size=3,
+            gc=32,
+            stride=1,
+            bias=True,
+            pad_type="zero",
+            norm_type=None,
+            act_type="leakyrelu",
+            mode="CNA",
+            convtype="Conv2D",
+            spectral_norm=False,
     ):
         super(ResidualDenseBlock_5C, self).__init__()
         # gc: growth channel, i.e. intermediate channels
@@ -448,18 +447,18 @@ class RRDB(nn.Module):
     """
 
     def __init__(
-        self,
-        nc,
-        kernel_size=3,
-        gc=32,
-        stride=1,
-        bias=True,
-        pad_type="zero",
-        norm_type=None,
-        act_type="leakyrelu",
-        mode="CNA",
-        convtype="Conv2D",
-        spectral_norm=False,
+            self,
+            nc,
+            kernel_size=3,
+            gc=32,
+            stride=1,
+            bias=True,
+            pad_type="zero",
+            norm_type=None,
+            act_type="leakyrelu",
+            mode="CNA",
+            convtype="Conv2D",
+            spectral_norm=False,
     ):
         super(RRDB, self).__init__()
         self.RDB1 = ResidualDenseBlock_5C(
@@ -577,7 +576,7 @@ class Upsample(nn.Module):
     # Alternative: https://discuss.pytorch.org/t/using-nn-function-interpolate-inside-nn-sequential/23588/2?u=ptrblck
 
     def __init__(
-        self, size=None, scale_factor=None, mode="nearest", align_corners=None
+            self, size=None, scale_factor=None, mode="nearest", align_corners=None
     ):
         super(Upsample, self).__init__()
         if isinstance(scale_factor, tuple):
@@ -609,16 +608,16 @@ class Upsample(nn.Module):
 
 
 def pixelshuffle_block(
-    in_nc,
-    out_nc,
-    upscale_factor=2,
-    kernel_size=3,
-    stride=1,
-    bias=True,
-    pad_type="zero",
-    norm_type=None,
-    act_type="relu",
-    convtype="Conv2D",
+        in_nc,
+        out_nc,
+        upscale_factor=2,
+        kernel_size=3,
+        stride=1,
+        bias=True,
+        pad_type="zero",
+        norm_type=None,
+        act_type="relu",
+        convtype="Conv2D",
 ):
     """
     Pixel shuffle layer
@@ -644,17 +643,17 @@ def pixelshuffle_block(
 
 
 def upconv_blcok(
-    in_nc,
-    out_nc,
-    upscale_factor=2,
-    kernel_size=3,
-    stride=1,
-    bias=True,
-    pad_type="zero",
-    norm_type=None,
-    act_type="relu",
-    mode="nearest",
-    convtype="Conv2D",
+        in_nc,
+        out_nc,
+        upscale_factor=2,
+        kernel_size=3,
+        stride=1,
+        bias=True,
+        pad_type="zero",
+        norm_type=None,
+        act_type="relu",
+        mode="nearest",
+        convtype="Conv2D",
 ):
     # Up conv
     # described in https://distill.pub/2016/deconv-checkerboard/

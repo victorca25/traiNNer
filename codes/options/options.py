@@ -58,9 +58,9 @@ def parse(opt_path, is_train=True):
         dataset["data_type"] = "lmdb" if is_lmdb else "img"
 
         if (
-            phase == "train"
-            and "subset_file" in dataset
-            and dataset["subset_file"] is not None
+                phase == "train"
+                and "subset_file" in dataset
+                and dataset["subset_file"] is not None
         ):
             dataset["subset_file"] = os.path.expanduser(dataset["subset_file"])
 

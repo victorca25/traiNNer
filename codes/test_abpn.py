@@ -33,7 +33,7 @@ def chop_forward2(lowres_img, model, scale, patch_size=200):
 
     with torch.no_grad():
         for p in range(n_patches):
-            lowres_input = lowres_patches[p : p + 1]
+            lowres_input = lowres_patches[p: p + 1]
             model.feed_data_batch(lowres_input, need_HR=False)
             model.test()  # test
             visuals = model.get_current_visuals_batch(need_HR=False)
@@ -113,7 +113,7 @@ def main():
             if chop2 == True:
                 lowres_img = data["LR"]  # .to('cuda')
                 if (
-                    multi_upscale
+                        multi_upscale
                 ):  # Upscale 8 times in different rotations/flips and average the results in a single image
                     LR_90 = lowres_img.transpose(2, 3).flip(2)  # PyTorch > 0.4.1
                     LR_180 = LR_90.transpose(2, 3).flip(2)  # PyTorch > 0.4.1
@@ -158,7 +158,7 @@ def main():
 
                     # convert to numpy array
                     if (
-                        znorm
+                            znorm
                     ):  # opt['datasets']['train']['znorm']: # If the image range is [-1,1] # In testing, each "dataset" can have a different name (not train, val or other)
                         pred = util.tensor2img(pred, min_max=(-1, 1)).clip(
                             0, 255
@@ -206,15 +206,15 @@ def main():
                     # To avoid overflow, your arrays should be able to contain values beyond 255. You need to convert them to floats for instance, perform the blending operation and convert the result back to uint8:
                     # sr_img = (pred + pred_90 + pred_180 + pred_270 + pred_f + pred_90f + pred_180f + pred_270f) / 8.0
                     sr_img = (
-                        pred.astype("float")
-                        + pred_90.astype("float")
-                        + pred_180.astype("float")
-                        + pred_270.astype("float")
-                        + pred_f.astype("float")
-                        + pred_90f.astype("float")
-                        + pred_180f.astype("float")
-                        + pred_270f.astype("float")
-                    ) / 8.0
+                                     pred.astype("float")
+                                     + pred_90.astype("float")
+                                     + pred_180.astype("float")
+                                     + pred_270.astype("float")
+                                     + pred_f.astype("float")
+                                     + pred_90f.astype("float")
+                                     + pred_180f.astype("float")
+                                     + pred_270f.astype("float")
+                             ) / 8.0
                     sr_img = sr_img.astype("uint8")
 
                 else:
@@ -225,7 +225,7 @@ def main():
                     # convert to numpy array
                     # highres_image = highres_output[0].permute(1, 2, 0).clamp(0.0, 1.0).cpu()
                     if (
-                        znorm
+                            znorm
                     ):  # opt['datasets']['train']['znorm']: # If the image range is [-1,1] # In testing, each "dataset" can have a different name (not train, val or other)
                         sr_img = util.tensor2img(
                             highres_output, min_max=(-1, 1)
@@ -239,7 +239,7 @@ def main():
                 visuals = model.get_current_visuals(need_HR=need_HR)
 
                 if (
-                    znorm
+                        znorm
                 ):  # opt['datasets']['train']['znorm']: # If the image range is [-1,1] # In testing, each "dataset" can have a different name (not train, val or other)
                     sr_img = util.tensor2img(visuals["SR"], min_max=(-1, 1))  # uint8
                 else:  # Default: Image range is [0,1]
@@ -256,7 +256,7 @@ def main():
             # calculate PSNR and SSIM
             if need_HR:
                 if (
-                    znorm
+                        znorm
                 ):  # opt['datasets']['train']['znorm']: # If the image range is [-1,1] # In testing, each "dataset" can have a different name (not train, val or other)
                     gt_img = util.tensor2img(visuals["HR"], min_max=(-1, 1))  # uint8
                 else:  # Default: Image range is [0,1]
@@ -266,11 +266,11 @@ def main():
 
                 crop_border = test_loader.dataset.opt["scale"]
                 cropped_sr_img = sr_img[
-                    crop_border:-crop_border, crop_border:-crop_border, :
-                ]
+                                 crop_border:-crop_border, crop_border:-crop_border, :
+                                 ]
                 cropped_gt_img = gt_img[
-                    crop_border:-crop_border, crop_border:-crop_border, :
-                ]
+                                 crop_border:-crop_border, crop_border:-crop_border, :
+                                 ]
 
                 psnr = util.calculate_psnr(cropped_sr_img * 255, cropped_gt_img * 255)
                 ssim = util.calculate_ssim(cropped_sr_img * 255, cropped_gt_img * 255)
@@ -281,11 +281,11 @@ def main():
                     sr_img_y = bgr2ycbcr(sr_img, only_y=True)
                     gt_img_y = bgr2ycbcr(gt_img, only_y=True)
                     cropped_sr_img_y = sr_img_y[
-                        crop_border:-crop_border, crop_border:-crop_border
-                    ]
+                                       crop_border:-crop_border, crop_border:-crop_border
+                                       ]
                     cropped_gt_img_y = gt_img_y[
-                        crop_border:-crop_border, crop_border:-crop_border
-                    ]
+                                       crop_border:-crop_border, crop_border:-crop_border
+                                       ]
                     psnr_y = util.calculate_psnr(
                         cropped_sr_img_y * 255, cropped_gt_img_y * 255
                     )

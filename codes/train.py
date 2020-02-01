@@ -58,8 +58,8 @@ def main():
                 path
                 for key, path in opt["path"].items()
                 if not key == "experiments_root"
-                and "pretrain_model" not in key
-                and "resume" not in key
+                   and "pretrain_model" not in key
+                   and "resume" not in key
             )
         )
 
@@ -252,20 +252,20 @@ def main():
                     # For training models with only one channel ndim==2, if RGB ndim==3, etc.
                     if gt_img.ndim == 2:
                         cropped_gt_img = gt_img[
-                            crop_size:-crop_size, crop_size:-crop_size
-                        ]
+                                         crop_size:-crop_size, crop_size:-crop_size
+                                         ]
                     else:
                         cropped_gt_img = gt_img[
-                            crop_size:-crop_size, crop_size:-crop_size, :
-                        ]
+                                         crop_size:-crop_size, crop_size:-crop_size, :
+                                         ]
                     if sr_img.ndim == 2:
                         cropped_sr_img = sr_img[
-                            crop_size:-crop_size, crop_size:-crop_size
-                        ]
+                                         crop_size:-crop_size, crop_size:-crop_size
+                                         ]
                     else:  # Default: RGB images
                         cropped_sr_img = sr_img[
-                            crop_size:-crop_size, crop_size:-crop_size, :
-                        ]
+                                         crop_size:-crop_size, crop_size:-crop_size, :
+                                         ]
 
                     val_gt_imgs_list.append(
                         cropped_gt_img

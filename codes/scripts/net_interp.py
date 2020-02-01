@@ -49,7 +49,6 @@ else:
     netB = torch.load(netB_path)
     print("Loaded default RRDB_ESRGAN_x4.pth model")
 
-
 if args.interpolate:
     alpha = args.interpolate
     net_interp_path = "../../experiments/pretrained_models/int_{:02d}.pth".format(

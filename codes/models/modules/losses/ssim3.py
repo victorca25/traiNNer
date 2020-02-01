@@ -131,12 +131,12 @@ class SSIM(torch.jit.ScriptModule):
     __constants__ = ["data_range", "use_padding"]
 
     def __init__(
-        self,
-        window_size=11,
-        window_sigma=1.5,
-        data_range=255.0,
-        channel=3,
-        use_padding=False,
+            self,
+            window_size=11,
+            window_sigma=1.5,
+            data_range=255.0,
+            channel=3,
+            use_padding=False,
     ):
         """
         :param window_size: the size of gauss kernel
@@ -167,14 +167,14 @@ class MS_SSIM(torch.jit.ScriptModule):
     __constants__ = ["data_range", "use_padding"]
 
     def __init__(
-        self,
-        window_size=11,
-        window_sigma=1.5,
-        data_range=255.0,
-        channel=3,
-        use_padding=False,
-        weights=None,
-        levels=None,
+            self,
+            window_size=11,
+            window_sigma=1.5,
+            data_range=255.0,
+            channel=3,
+            use_padding=False,
+            weights=None,
+            levels=None,
     ):
         """
         class for ms-ssim
@@ -230,7 +230,6 @@ if __name__ == "__main__":
 
     print(loss.item())
     print(loss2.item())
-
 
 if __name__ == "__main__":
     print("Training Test")
@@ -355,7 +354,6 @@ if __name__ == "__main__":
     if out_test_video:
         video.close()
 
-
 if __name__ == "__main__":
     print("Performance Testing SSIM")
     import time
@@ -363,8 +361,8 @@ if __name__ == "__main__":
     s = SSIM(data_range=1.0).cuda()
 
     a = (
-        torch.randint(0, 255, size=(20, 3, 256, 256), dtype=torch.float32).cuda()
-        / 255.0
+            torch.randint(0, 255, size=(20, 3, 256, 256), dtype=torch.float32).cuda()
+            / 255.0
     )
     b = a * 0.5
     a.requires_grad = True
@@ -386,7 +384,6 @@ if __name__ == "__main__":
     print("cuda time", start_record.elapsed_time(end_record))
     print("perf_counter time", end_time - start_time)
 
-
 if __name__ == "__main__":
     print("Performance Testing MS_SSIM")
     import time
@@ -394,8 +391,8 @@ if __name__ == "__main__":
     s = MS_SSIM(data_range=1.0).cuda()
 
     a = (
-        torch.randint(0, 255, size=(20, 3, 256, 256), dtype=torch.float32).cuda()
-        / 255.0
+            torch.randint(0, 255, size=(20, 3, 256, 256), dtype=torch.float32).cuda()
+            / 255.0
     )
     b = a * 0.5
     a.requires_grad = True

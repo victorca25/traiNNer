@@ -55,7 +55,7 @@ class LRHRSeg_BG_Dataset(data.Dataset):
 
         # get HR image
         if (
-            self.opt["phase"] == "train" and random.choice(list(range(self.ratio))) == 0
+                self.opt["phase"] == "train" and random.choice(list(range(self.ratio))) == 0
         ):  # read background images
             bg_index = random.randint(0, len(self.paths_HR_bg) - 1)
             HR_path = self.paths_HR_bg[bg_index]
@@ -113,12 +113,12 @@ class LRHRSeg_BG_Dataset(data.Dataset):
             # randomly crop
             rnd_h = random.randint(0, max(0, H - LR_size))
             rnd_w = random.randint(0, max(0, W - LR_size))
-            img_LR = img_LR[rnd_h : rnd_h + LR_size, rnd_w : rnd_w + LR_size, :]
+            img_LR = img_LR[rnd_h: rnd_h + LR_size, rnd_w: rnd_w + LR_size, :]
             rnd_h_HR, rnd_w_HR = int(rnd_h * scale), int(rnd_w * scale)
             img_HR = img_HR[
-                rnd_h_HR : rnd_h_HR + HR_size, rnd_w_HR : rnd_w_HR + HR_size, :
-            ]
-            seg = seg[rnd_h_HR : rnd_h_HR + HR_size, rnd_w_HR : rnd_w_HR + HR_size, :]
+                     rnd_h_HR: rnd_h_HR + HR_size, rnd_w_HR: rnd_w_HR + HR_size, :
+                     ]
+            seg = seg[rnd_h_HR: rnd_h_HR + HR_size, rnd_w_HR: rnd_w_HR + HR_size, :]
 
             # augmentation - flip, rotate
             img_LR, img_HR, seg = util.augment(

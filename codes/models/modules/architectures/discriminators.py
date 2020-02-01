@@ -14,15 +14,15 @@ from . import spectral_norm as SN
 # VGG style Discriminator
 class Discriminator_VGG(nn.Module):
     def __init__(
-        self,
-        size,
-        in_nc,
-        base_nf,
-        norm_type="batch",
-        act_type="leakyrelu",
-        mode="CNA",
-        convtype="Conv2D",
-        arch="ESRGAN",
+            self,
+            size,
+            in_nc,
+            base_nf,
+            norm_type="batch",
+            act_type="leakyrelu",
+            mode="CNA",
+            convtype="Conv2D",
+            arch="ESRGAN",
     ):
         super(Discriminator_VGG, self).__init__()
 
@@ -105,14 +105,14 @@ class Discriminator_VGG(nn.Module):
 # VGG style Discriminator with input size 96*96
 class Discriminator_VGG_96(nn.Module):
     def __init__(
-        self,
-        in_nc,
-        base_nf,
-        norm_type="batch",
-        act_type="leakyrelu",
-        mode="CNA",
-        convtype="Conv2D",
-        arch="ESRGAN",
+            self,
+            in_nc,
+            base_nf,
+            norm_type="batch",
+            act_type="leakyrelu",
+            mode="CNA",
+            convtype="Conv2D",
+            arch="ESRGAN",
     ):
         super(Discriminator_VGG_96, self).__init__()
         # features
@@ -277,14 +277,14 @@ class Discriminator_VGG_128_SN(nn.Module):
 # VGG style Discriminator with input size 128*128
 class Discriminator_VGG_128(nn.Module):
     def __init__(
-        self,
-        in_nc,
-        base_nf,
-        norm_type="batch",
-        act_type="leakyrelu",
-        mode="CNA",
-        convtype="Conv2D",
-        arch="ESRGAN",
+            self,
+            in_nc,
+            base_nf,
+            norm_type="batch",
+            act_type="leakyrelu",
+            mode="CNA",
+            convtype="Conv2D",
+            arch="ESRGAN",
     ):
         super(Discriminator_VGG_128, self).__init__()
         # features
@@ -403,14 +403,14 @@ class Discriminator_VGG_128(nn.Module):
 # VGG style Discriminator with input size 192*192
 class Discriminator_VGG_192(nn.Module):  # vic in PPON is called Discriminator_192
     def __init__(
-        self,
-        in_nc,
-        base_nf,
-        norm_type="batch",
-        act_type="leakyrelu",
-        mode="CNA",
-        convtype="Conv2D",
-        arch="ESRGAN",
+            self,
+            in_nc,
+            base_nf,
+            norm_type="batch",
+            act_type="leakyrelu",
+            mode="CNA",
+            convtype="Conv2D",
+            arch="ESRGAN",
     ):
         super(Discriminator_VGG_192, self).__init__()
         # features
@@ -559,14 +559,14 @@ class Discriminator_VGG_192(nn.Module):  # vic in PPON is called Discriminator_1
 # VGG style Discriminator with input size 256*256
 class Discriminator_VGG_256(nn.Module):
     def __init__(
-        self,
-        in_nc,
-        base_nf,
-        norm_type="batch",
-        act_type="leakyrelu",
-        mode="CNA",
-        convtype="Conv2D",
-        arch="ESRGAN",
+            self,
+            in_nc,
+            base_nf,
+            norm_type="batch",
+            act_type="leakyrelu",
+            mode="CNA",
+            convtype="Conv2D",
+            arch="ESRGAN",
     ):
         super(Discriminator_VGG_256, self).__init__()
         # features
@@ -720,12 +720,12 @@ class Discriminator_VGG_256(nn.Module):
 # Assume input range is [0, 1]
 class VGGFeatureExtractor(nn.Module):
     def __init__(
-        self,
-        feature_layer=34,
-        use_bn=False,
-        use_input_norm=True,
-        device=torch.device("cpu"),
-        z_norm=False,
+            self,
+            feature_layer=34,
+            use_bn=False,
+            use_input_norm=True,
+            device=torch.device("cpu"),
+            z_norm=False,
     ):  # Note: PPON uses cuda instead of CPU
         super(VGGFeatureExtractor, self).__init__()
         if use_bn:
@@ -737,13 +737,13 @@ class VGGFeatureExtractor(nn.Module):
             if z_norm:  # if input in range [-1,1]
                 mean = (
                     torch.Tensor([0.485 - 1, 0.456 - 1, 0.406 - 1])
-                    .view(1, 3, 1, 1)
-                    .to(device)
+                        .view(1, 3, 1, 1)
+                        .to(device)
                 )
                 std = (
                     torch.Tensor([0.229 * 2, 0.224 * 2, 0.225 * 2])
-                    .view(1, 3, 1, 1)
-                    .to(device)
+                        .view(1, 3, 1, 1)
+                        .to(device)
                 )
             else:  # input in range [0,1]
                 mean = torch.Tensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1).to(device)
@@ -774,13 +774,13 @@ class ResNet101FeatureExtractor(nn.Module):
             if z_norm:  # if input in range [-1,1]
                 mean = (
                     torch.Tensor([0.485 - 1, 0.456 - 1, 0.406 - 1])
-                    .view(1, 3, 1, 1)
-                    .to(device)
+                        .view(1, 3, 1, 1)
+                        .to(device)
                 )
                 std = (
                     torch.Tensor([0.229 * 2, 0.224 * 2, 0.225 * 2])
-                    .view(1, 3, 1, 1)
-                    .to(device)
+                        .view(1, 3, 1, 1)
+                        .to(device)
                 )
             else:  # input in range [0,1]
                 mean = torch.Tensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1).to(device)
@@ -845,11 +845,11 @@ class MINCNet(nn.Module):
 # Assume input range is [0, 1]
 class MINCFeatureExtractor(nn.Module):
     def __init__(
-        self,
-        feature_layer=34,
-        use_bn=False,
-        use_input_norm=True,
-        device=torch.device("cpu"),
+            self,
+            feature_layer=34,
+            use_bn=False,
+            use_input_norm=True,
+            device=torch.device("cpu"),
     ):
         super(MINCFeatureExtractor, self).__init__()
 

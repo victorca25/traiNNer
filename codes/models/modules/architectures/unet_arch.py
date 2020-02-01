@@ -83,13 +83,13 @@ class UnetGenerator(nn.Module):
     """Create a Unet-based generator"""
 
     def __init__(
-        self,
-        input_nc,
-        output_nc,
-        num_downs,
-        ngf=64,
-        norm_layer=nn.BatchNorm2d,
-        use_dropout=False,
+            self,
+            input_nc,
+            output_nc,
+            num_downs,
+            ngf=64,
+            norm_layer=nn.BatchNorm2d,
+            use_dropout=False,
     ):
         """Construct a Unet generator
         Parameters:
@@ -152,15 +152,15 @@ class UnetSkipConnectionBlock(nn.Module):
     """
 
     def __init__(
-        self,
-        outer_nc,
-        inner_nc,
-        input_nc=None,
-        submodule=None,
-        outermost=False,
-        innermost=False,
-        norm_layer=nn.BatchNorm2d,
-        use_dropout=False,
+            self,
+            outer_nc,
+            inner_nc,
+            input_nc=None,
+            submodule=None,
+            outermost=False,
+            innermost=False,
+            norm_layer=nn.BatchNorm2d,
+            use_dropout=False,
     ):
         """Construct a Unet submodule with skip connections.
         Parameters:
@@ -354,6 +354,5 @@ class UNet(nn.Module):
         x = self.up4(x, x1)
         x = self.outc(x)
         return output, x
-
 
 # PartialConv U-Net

@@ -11,10 +11,10 @@ def create_model(opt):
     # elif model == 'srgan':
     # from .SRGAN_model import SRGANModel as M
     elif (
-        model == "srgan"
-        or model == "srragan"
-        or model == "srragan_hfen"
-        or model == "lpips"
+            model == "srgan"
+            or model == "srragan"
+            or model == "srragan_hfen"
+            or model == "lpips"
     ):
         from .SRRaGAN_model import SRRaGANModel as M
     elif model == "sftgan":

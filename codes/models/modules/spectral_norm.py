@@ -122,12 +122,12 @@ def spectral_norm(module, name="weight", n_power_iterations=1, eps=1e-12, dim=No
     """
     if dim is None:
         if isinstance(
-            module,
-            (
-                torch.nn.ConvTranspose1d,
-                torch.nn.ConvTranspose2d,
-                torch.nn.ConvTranspose3d,
-            ),
+                module,
+                (
+                        torch.nn.ConvTranspose1d,
+                        torch.nn.ConvTranspose2d,
+                        torch.nn.ConvTranspose3d,
+                ),
         ):
             dim = 1
         else:

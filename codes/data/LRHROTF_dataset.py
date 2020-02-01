@@ -304,7 +304,7 @@ class LRHRDataset(data.Dataset):
                     )
                 else:
                     if (
-                        np.random.rand() > 0.5
+                            np.random.rand() > 0.5
                     ):  # randomize the random rotations, so half the images are the original
                         img_HR, img_LR = augmentations.random_rotate_pairs(
                             img_HR, img_LR, HR_size, scale
@@ -318,7 +318,7 @@ class LRHRDataset(data.Dataset):
                 )
             elif self.opt["hr_rrot"]:
                 if (
-                    np.random.rand() > 0.5
+                        np.random.rand() > 0.5
                 ):  # randomize the random rotations, so half the images are the original
                     img_HR, img_LR = augmentations.random_rotate_pairs(
                         img_HR, img_LR, HR_size, scale
@@ -436,7 +436,7 @@ class LRHRDataset(data.Dataset):
                 img_LR = augmentations.random_erasing(img_LR)
             elif self.opt["lr_cutout"] and self.opt["lr_erasing"]:
                 if (
-                    np.random.rand() > 0.5
+                        np.random.rand() > 0.5
                 ):  # only do cutout or erasing, not both at the same time
                     img_LR = augmentations.cutout(img_LR, img_LR.shape[0] // 2, p=0.5)
                 else:
@@ -455,7 +455,7 @@ class LRHRDataset(data.Dataset):
                 elif self.opt["auto_levels"] == "LR":
                     img_LR = augmentations.simplest_cb(img_LR, znorm=self.znorm)
                 elif (
-                    self.opt["auto_levels"] == True or self.opt["auto_levels"] == "Both"
+                        self.opt["auto_levels"] == True or self.opt["auto_levels"] == "Both"
                 ):
                     img_HR = augmentations.simplest_cb(img_HR, znorm=self.znorm)
                     img_LR = augmentations.simplest_cb(img_LR, znorm=self.znorm)

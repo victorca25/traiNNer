@@ -17,19 +17,19 @@ import torch.nn.functional as F  # for MSRResNet
 
 class SRResNet(nn.Module):
     def __init__(
-        self,
-        in_nc,
-        out_nc,
-        nf,
-        nb,
-        upscale=4,
-        norm_type="batch",
-        act_type="relu",
-        mode="NAC",
-        res_scale=1,
-        upsample_mode="upconv",
-        convtype="Conv2D",
-        finalact=None,
+            self,
+            in_nc,
+            out_nc,
+            nf,
+            nb,
+            upscale=4,
+            norm_type="batch",
+            act_type="relu",
+            mode="NAC",
+            res_scale=1,
+            upsample_mode="upconv",
+            convtype="Conv2D",
+            finalact=None,
     ):
         super(SRResNet, self).__init__()
         n_upscale = int(math.log(upscale, 2))
@@ -91,7 +91,7 @@ class SRResNet(nn.Module):
         x = self.model(x)
 
         if (
-            outm == "scaltanh"
+                outm == "scaltanh"
         ):  # limit output range to [-1,1] range with tanh and rescale to [0,1] Idea from: https://github.com/goldhuang/SRGAN-PyTorch/blob/master/model.py
             return (torch.tanh(x) + 1.0) / 2.0
         elif outm == "tanh":  # limit output to [-1,1] range

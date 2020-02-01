@@ -77,9 +77,9 @@ def worker(path, save_folder, crop_sz, step, thres_sz, compression_level):
         for y in w_space:
             index += 1
             if n_channels == 2:
-                crop_img = img[x : x + crop_sz, y : y + crop_sz]
+                crop_img = img[x: x + crop_sz, y: y + crop_sz]
             else:
-                crop_img = img[x : x + crop_sz, y : y + crop_sz, :]
+                crop_img = img[x: x + crop_sz, y: y + crop_sz, :]
             crop_img = np.ascontiguousarray(crop_img)
             # var = np.var(crop_img / 255)
             # if var > 0.008:

@@ -394,8 +394,8 @@ class ASRRaGANModel(BaseModel):
 
             optim_params = []
             for (
-                k,
-                v,
+                    k,
+                    v,
             ) in self.netG.named_parameters():  # can optimize for a part of the model
                 if v.requires_grad:
                     optim_params.append(v)
@@ -573,8 +573,8 @@ class ASRRaGANModel(BaseModel):
                     self.random_pt.resize_(batch_size, 1, 1, 1)
                 self.random_pt.uniform_()  # Draw random interpolation points
                 interp = (
-                    self.random_pt * self.fake_H.detach()
-                    + (1 - self.random_pt) * self.var_ref
+                        self.random_pt * self.fake_H.detach()
+                        + (1 - self.random_pt) * self.var_ref
                 )
                 interp.requires_grad = True
                 interp_crit = self.netD(interp)
@@ -591,7 +591,7 @@ class ASRRaGANModel(BaseModel):
                     l_g_total += l_g_pix
                 if self.cri_ssim:  # structural loss
                     l_g_ssim = 1.0 - (
-                        self.l_ssim_w * self.cri_ssim(self.fake_H, self.var_H)
+                            self.l_ssim_w * self.cri_ssim(self.fake_H, self.var_H)
                     )  # using ssim2.py
                     if torch.isnan(l_g_ssim).any():
                         l_g_total = l_g_total
@@ -605,7 +605,7 @@ class ASRRaGANModel(BaseModel):
                     # print(l_g_fea)
                     l_g_total += l_g_fea
                 if (
-                    self.cri_disfea
+                        self.cri_disfea
                 ):  # SRPGAN-like Features Perceptual loss, extracted from the discriminator
                     l_g_disfea = 0
                     for hr_feat_map, sr_feat_map in zip(feats_d_fake, feats_d_real):
@@ -651,12 +651,12 @@ class ASRRaGANModel(BaseModel):
                 pred_d_real, _ = self.netD(self.var_ref)  # Original with Feature maps
                 pred_d_real = pred_d_real.detach()  # Original with Feature maps
                 l_g_gan = (
-                    self.l_gan_w
-                    * (
-                        self.cri_gan(pred_d_real - torch.mean(pred_g_fake), False)
-                        + self.cri_gan(pred_g_fake - torch.mean(pred_d_real), True)
-                    )
-                    / 2
+                        self.l_gan_w
+                        * (
+                                self.cri_gan(pred_d_real - torch.mean(pred_g_fake), False)
+                                + self.cri_gan(pred_g_fake - torch.mean(pred_d_real), True)
+                        )
+                        / 2
                 )  # Original
                 l_g_total += l_g_gan  # Original
 
@@ -701,10 +701,10 @@ class ASRRaGANModel(BaseModel):
                 l_g_total += l_g_pix
             if self.cri_ssim:  # structural loss (Structural Dissimilarity)
                 l_g_ssim = (
-                    1.0 - (self.l_ssim_w * self.cri_ssim(self.fake_H, self.var_H))
-                ) / 2  # using ssim2.py
+                                   1.0 - (self.l_ssim_w * self.cri_ssim(self.fake_H, self.var_H))
+                           ) / 2  # using ssim2.py
                 if torch.isnan(
-                    l_g_ssim
+                        l_g_ssim
                 ).any():  # at random, l_g_ssim is returning NaN for ms-ssim, which breaks the model. Temporary hack, until I find out what's going on.
                     l_g_total = l_g_total
                 else:

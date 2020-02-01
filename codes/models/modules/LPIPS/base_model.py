@@ -56,4 +56,4 @@ class BaseModel:
 
     def save_done(self, flag=False):
         np.save(os.path.join(self.save_dir, "done_flag"), flag)
-        np.savetxt(os.path.join(self.save_dir, "done_flag"), [flag,], fmt="%i")
+        np.savetxt(os.path.join(self.save_dir, "done_flag"), [flag, ], fmt="%i")

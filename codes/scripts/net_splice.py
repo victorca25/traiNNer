@@ -75,7 +75,7 @@ count_netB = 0
 
 for k, v_netA in netA.items():
     if (
-        k in netB
+            k in netB
     ):  # for models with different scales, this will automatically work for convolution layers only, upscale layers are different
         v_netB = netB[k]
         if splice > 0:  # random splice enabled, no interpolation
