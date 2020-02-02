@@ -120,8 +120,8 @@ class LRHRDataset(data.Dataset):
             img_LR = img_LR[rnd_h: rnd_h + LR_size, rnd_w: rnd_w + LR_size, :]
             rnd_h_HR, rnd_w_HR = int(rnd_h * scale), int(rnd_w * scale)
             img_HR = img_HR[
-                     rnd_h_HR: rnd_h_HR + HR_size, rnd_w_HR: rnd_w_HR + HR_size, :
-                     ]
+                rnd_h_HR: rnd_h_HR + HR_size, rnd_w_HR: rnd_w_HR + HR_size, :
+            ]
 
             # augmentation - flip, rotate
             img_LR, img_HR = util.augment(

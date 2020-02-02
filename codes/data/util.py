@@ -121,17 +121,26 @@ def read_img(env, path, out_nc=3, znorm=False):
     else:
         img = _read_lmdb_img(env, path)
     img = img.astype(np.float32) / 255.0
-    if znorm == True:  # normalize images range to [-1, 1] (zero-normalization)
+    if znorm:  # normalize images range to [-1, 1] (zero-normalization)
         img = (img - 0.5) * 2  # xi' = (xi - mu)/sigma
     # print("Min. image value:",img.min()) # Debug
     # print("Max. image value:",img.max()) # Debug
+    """ og code:
+    if img.ndim == 2:	
+	        img = np.expand_dims(img, axis=2)	
+	    # some images have 4 channels	
+	    if img.shape[2] > 3:	
+	        img = img[:, :, :3]
+    """
+    # """ edit:
     if img.ndim == 2:
-        # img = np.expand_dims(img, axis=2)
-        img = np.tile(np.expand_dims(img, axis=2), (1, 1, 3))
+        img = np.expand_dims(img, axis=2)
+        img = np.tile(img, (1, 1, 3))
     if img.shape[2] > out_nc:  # remove extra channels
         img = img[:, :, :out_nc]
     elif img.shape[2] == 3 and out_nc == 4:  # pad with solid alpha channel
         img = np.dstack((img, np.full(img.shape[:-1], 1.0, dtype=np.float32)))
+    # """
     return img
 
 
@@ -147,19 +156,31 @@ def augment(img_list, hflip=True, rot=True):
     vflip = rot and random.random() < 0.5
     rot90 = rot and random.random() < 0.5
 
-    # rot90n = rot and random.random() < 0.5
-
     def _augment(img):
         if hflip:
-            img = np.flip(img, axis=1)  # img[:, ::-1, :]
+            """ og code:
+            img = img[:, ::-1, :]
+            """
+            # """ edit:
+            img = np.flip(img, axis=1)
+            # """
         if vflip:
-            img = np.flip(img, axis=0)  # img[::-1, :, :]
-        # if rot90: img = img.transpose(1, 0, 2)
+            """ og code:
+            img = img[::-1, :, :]
+            """
+            # """ edit:
+            img = np.flip(img, axis=0)
+            # """
         if rot90:
-            img = np.rot90(
-                img, 1
-            )  # 90 degrees # In PIL: img.transpose(Image.ROTATE_90)
-        # if rot90n: img = np.rot90(img, -1) #-90 degrees
+            """ og code:
+            img = img.transpose(1, 0, 2)
+            """
+            # """ edit:
+            img = np.rot90(img, 1)
+            # """
+            """ PIL alt:
+            img = img.transpose(Image.ROTATE_90)
+            """
         return img
 
     return [_augment(img) for img in img_list]
@@ -171,20 +192,20 @@ def channel_convert(in_c, tar_type, img_list):
     #  If images are loaded with something other than OpenCV,
     #  check that the channels are in the correct order and use
     #  the alternative conversion functions.
-    if in_c == 4 and tar_type == "RGB-A":  # BGRA to BGR, remove alpha channel
-        return [cv2.cvtColor(img, cv2.COLOR_BGRA2BGR) for img in img_list]
-    elif in_c == 3 and tar_type == "gray":  # BGR to gray
+    if in_c == 3 and tar_type == "gray":  # BGR to gray
         gray_list = [cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) for img in img_list]
         return [np.expand_dims(img, axis=2) for img in gray_list]
-    elif in_c == 3 and tar_type == "RGB-LAB":  # RGB to LAB
-        return [cv2.cvtColor(img, cv2.COLOR_BGR2LAB) for img in img_list]
-    elif in_c == 3 and tar_type == "LAB-RGB":  # RGB to LAB
-        return [cv2.cvtColor(img, cv2.COLOR_LAB2BGR) for img in img_list]
     elif in_c == 3 and tar_type == "y":  # BGR to y
         y_list = [bgr2ycbcr(img, only_y=True) for img in img_list]
         return [np.expand_dims(img, axis=2) for img in y_list]
     elif in_c == 1 and tar_type == "RGB":  # gray/y to BGR
         return [cv2.cvtColor(img, cv2.COLOR_GRAY2BGR) for img in img_list]
+    elif in_c == 3 and tar_type == "RGB-LAB":  # RGB to LAB [add]
+        return [cv2.cvtColor(img, cv2.COLOR_BGR2LAB) for img in img_list]
+    elif in_c == 3 and tar_type == "LAB-RGB":  # RGB to LAB [add]
+        return [cv2.cvtColor(img, cv2.COLOR_LAB2BGR) for img in img_list]
+    elif in_c == 4 and tar_type == "RGB-A":  # BGRA to BGR, remove alpha channel [add]
+        return [cv2.cvtColor(img, cv2.COLOR_BGRA2BGR) for img in img_list]
     else:
         return img_list
 
@@ -197,15 +218,20 @@ def rgb2ycbcr(img, only_y=True):
         float, [0, 1]
     """
     in_img_type = img.dtype
-    img_ = img.astype(np.float32)
+    """ og code:
+    img.astype(np.float32)
+    """
+    # """ edit:
+    img = img.astype(np.float32)
+    # """
     if in_img_type != np.uint8:
-        img_ *= 255.0
+        img *= 255.0
     # convert
     if only_y:
-        rlt = np.dot(img_, [65.481, 128.553, 24.966]) / 255.0 + 16.0
+        rlt = np.dot(img, [65.481, 128.553, 24.966]) / 255.0 + 16.0
     else:
         rlt = np.matmul(
-            img_,
+            img,
             [
                 [65.481, -37.797, 112.0],
                 [128.553, -74.203, -93.786],
@@ -227,15 +253,20 @@ def bgr2ycbcr(img, only_y=True):
         float, [0, 1]
     """
     in_img_type = img.dtype
-    img_ = img.astype(np.float32)
+    """ og code:
+    img.astype(np.float32)
+    """
+    # """ edit:
+    img = img.astype(np.float32)
+    # """
     if in_img_type != np.uint8:
-        img_ *= 255.0
+        img *= 255.0
     # convert
     if only_y:
-        rlt = np.dot(img_, [24.966, 128.553, 65.481]) / 255.0 + 16.0
+        rlt = np.dot(img, [24.966, 128.553, 65.481]) / 255.0 + 16.0
     else:
         rlt = np.matmul(
-            img_,
+            img,
             [
                 [24.966, 112.0, -18.214],
                 [128.553, -74.203, -93.786],
@@ -256,12 +287,17 @@ def ycbcr2rgb(img):
         float, [0, 1]
     """
     in_img_type = img.dtype
-    img_ = img.astype(np.float32)
+    """ og code:
+    img.astype(np.float32)
+    """
+    # """ edit:
+    img = img.astype(np.float32)
+    # """
     if in_img_type != np.uint8:
-        img_ *= 255.0
+        img *= 255.0
     # convert
     rlt = np.matmul(
-        img_,
+        img,
         [
             [0.00456621, 0.00456621, 0.00456621],
             [0, -0.00153632, 0.00791071],
@@ -293,6 +329,7 @@ def modcrop(img_in, scale):
 
 ####################
 # Prepare Images
+# None of these were used by original code
 ####################
 # https://github.com/sunreef/BlindSR/blob/master/src/image_utils.py
 def patchify_tensor(features, patch_size, overlap=10):
@@ -406,7 +443,7 @@ def cubic(x):
 
 
 def calculate_weights_indices(
-        in_length, out_length, scale, kernel, kernel_width, antialiasing
+    in_length, out_length, scale, kernel, kernel_width, antialiasing
 ):
     if (scale < 1) and (antialiasing):
         # Use a modified kernel to simultaneously interpolate and antialias- larger kernel width

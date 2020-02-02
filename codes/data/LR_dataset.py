@@ -23,15 +23,10 @@ class LRDataset(data.Dataset):
 
     def __getitem__(self, index):
         LR_path = None
-        if self.opt["znorm"]:
-            if self.opt["znorm"] == True:
-                self.znorm = (
-                    True  # Alternative: images are z-normalized to the [-1,1] range
-                )
+        self.znorm = self.opt["znorm"]
 
         # get LR image
         LR_path = self.paths_LR[index]
-        # img_LR = util.read_img(self.LR_env, LR_path)
         img_LR = util.read_img(self.LR_env, LR_path, znorm=self.znorm)
         H, W, C = img_LR.shape
 

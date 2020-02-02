@@ -49,10 +49,7 @@ class SRRaGANModel(Model):
         train_opt = opt["train"]
 
         if self.is_train:
-            if opt["datasets"]["train"]["znorm"]:
-                z_norm = opt["datasets"]["train"]["znorm"]
-            else:
-                z_norm = False
+            z_norm = opt["datasets"]["train"]["znorm"]
 
         # define networks and load pretrained models
         self.netG = networks.define_G(opt).to(self.device)  # G
@@ -66,17 +63,14 @@ class SRRaGANModel(Model):
         # define losses, optimizer and scheduler
         if self.is_train:
             # Define if the generator will have a final capping mechanism in the output
-            self.outm = None
-            if train_opt["finalcap"]:
-                self.outm = train_opt["finalcap"]
+            self.outm = train_opt["finalcap"]
 
             # G pixel loss
             # """
             if train_opt["pixel_weight"]:
+                l_pix_type = "cb"
                 if train_opt["pixel_criterion"]:
                     l_pix_type = train_opt["pixel_criterion"]
-                else:  # default to cb
-                    l_fea_type = "cb"
 
                 if l_pix_type == "l1":
                     self.cri_pix = nn.L1Loss().to(self.device)
@@ -103,10 +97,9 @@ class SRRaGANModel(Model):
             # G feature loss
             # """
             if train_opt["feature_weight"]:
+                l_fea_type = "l1"
                 if train_opt["feature_criterion"]:
                     l_fea_type = train_opt["feature_criterion"]
-                else:  # default to l1
-                    l_fea_type = "l1"
 
                 if l_fea_type == "l1":
                     self.cri_fea = nn.L1Loss().to(self.device)
@@ -128,6 +121,33 @@ class SRRaGANModel(Model):
                 self.netF = networks.define_F(opt, use_bn=False).to(self.device)
             # """
 
+            # GD gan loss
+            # """
+            if train_opt["gan_weight"]:
+                self.cri_gan = GANLoss(train_opt["gan_type"], 1.0, 0.0).to(self.device)
+                self.l_gan_w = train_opt["gan_weight"]
+                # D_update_ratio and D_init_iters are for WGAN
+                self.D_update_ratio = (
+                    train_opt["D_update_ratio"] if train_opt["D_update_ratio"] else 1
+                )
+                self.D_init_iters = (
+                    train_opt["D_init_iters"] if train_opt["D_init_iters"] else 0
+                )
+
+                if train_opt["gan_type"] == "wgan-gp":
+                    self.random_pt = torch.Tensor(1, 1, 1, 1).to(self.device)
+                    # gradient penalty loss
+                    self.cri_gp = GradientPenaltyLoss(device=self.device).to(
+                        self.device
+                    )
+                    self.l_gp_w = train_opt["gp_weigth"]
+            else:
+                logger.info("Remove GAN loss.")
+                self.cri_gan = None
+            # """
+
+            # New Loss functions:
+            
             # HFEN loss
             # """
             if train_opt["hfen_weight"]:
@@ -318,31 +338,6 @@ class SRRaGANModel(Model):
                 logger.info("Remove SPL loss.")
                 self.cri_gpl = None
                 self.cri_cpl = None
-            # """
-
-            # GD gan loss
-            # """
-            if train_opt["gan_weight"]:
-                self.cri_gan = GANLoss(train_opt["gan_type"], 1.0, 0.0).to(self.device)
-                self.l_gan_w = train_opt["gan_weight"]
-                # D_update_ratio and D_init_iters are for WGAN
-                self.D_update_ratio = (
-                    train_opt["D_update_ratio"] if train_opt["D_update_ratio"] else 1
-                )
-                self.D_init_iters = (
-                    train_opt["D_init_iters"] if train_opt["D_init_iters"] else 0
-                )
-
-                if train_opt["gan_type"] == "wgan-gp":
-                    self.random_pt = torch.Tensor(1, 1, 1, 1).to(self.device)
-                    # gradient penalty loss
-                    self.cri_gp = GradientPenaltyLoss(device=self.device).to(
-                        self.device
-                    )
-                    self.l_gp_w = train_opt["gp_weigth"]
-            else:
-                logger.info("Remove GAN loss.")
-                self.cri_gan = None
             # """
 
             # optimizers
