@@ -96,6 +96,10 @@ def main():
     for scheduler in model.schedulers:
         if hasattr(scheduler, '_step_count'):
             scheduler._step_count = 0
+        # fix broken MultiStepLR.step(epoch)
+        pytorch_ver = torch.__version__
+        if opt['train']['lr_scheme'] == 'MultiStepLR' and pytorch_ver == '1.4.0':
+            scheduler.milestones = sorted(list(scheduler.milestones))
 
     # resume training
     if resume_state:
