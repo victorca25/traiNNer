@@ -31,3 +31,6 @@ data_samples/samples_byteimg
 data_samples/samples_colorimg
 data_samples/samples_segprob
 data_samples/samples_result
+codes/scripts/imgout/
+
+codes/scripts/nico02.png
