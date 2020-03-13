@@ -277,7 +277,7 @@ def random_rotate(image, angle=0, center=None, scale=1.0):
         image, _ = scale_img(image, 1/2, cv2.INTER_CUBIC)
     
     rotated = rotate(image, angle) #will change image shape unless auto_bound is used
-    rotated = random_crop(image, crop_size=(w, h)) #crop back to the original size
+    rotated = random_crop(rotated, crop_size=(w, h)) #crop back to the original size
     return rotated, angle 
 
 def random_rotate_pairs(img_HR, img_LR, HR_size, scale, angle=0, center=0):
