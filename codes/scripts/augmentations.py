@@ -599,7 +599,7 @@ def noise_img(img_LR, noise_types=['clean']):
         img = cv2.cvtColor(img_LR, cv2.COLOR_BGR2RGB)
         with Image.from_array(img) as imgin:
             i=imgin.clone()
-            i.quantize(random.randint(6,32),'srgb',0,True,False)
+            i.quantize(random.randint(6,32),'srgb',0,False,False)
             if noise_type == 'imquantize':  
                 imgin=i
             elif noise_type == 'imdither':
