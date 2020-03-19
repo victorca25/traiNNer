@@ -10,6 +10,7 @@ sys.path.append('../')
 import util as util
 import numpy as np
 import cv2
+import math
 
 try :
     from wand.image import Image
@@ -47,7 +48,7 @@ def vertical_flip(image, rate=0.5):
 
 def random_crop(image, crop_size=(224, 224)): 
     h, w, _ = image.shape
-    
+    #print('Random crop size:',crop_size) #delete this
     if h > crop_size[0] and w > crop_size[1]:
         top = np.random.randint(0, h - crop_size[0])
         left = np.random.randint(0, w - crop_size[1])
@@ -55,7 +56,7 @@ def random_crop(image, crop_size=(224, 224)):
         bottom = top + crop_size[0]
         right = left + crop_size[1]
 
-        image = image[top:bottom, left:right, :]
+        image = image[top:bottom, left:right, :] # 
     else:
         image, _ = resize_img(image, crop_size, algo=[4])
     
@@ -149,11 +150,24 @@ def rgbscale(image,dim): # rgbscale, better clarity than 'cv2.INTER_AREA'
         imgin.adaptive_resize(dim[0],dim[1])
         imgin.transform_colorspace('srgb')
         return np.array(imgin).astype(np.float32) / 255.0
-		
+
+# random scale
+def randomscale(image,safelength,algo=None):
+    h,w,c = image.shape
+    shortest = min(w,h)
+    #print("Old shortest length : ", shortest)
+    scale = shortest / random.randint(safelength,shortest)
+    #print("New scale : ", scale)
+    scaled, interpol = scale_img(image,scale,algo)
+    #cv2.imwrite('D:/tmp_test/beforescale.jpg',image*255) #delete this
+    #cv2.imwrite('D:/tmp_test/scaledown.jpg',scaled*255) #delete this
+    return scaled, interpol
+	
 # scale image
 def scale_img(image, scale, algo=None):
     h,w,c = image.shape
     newdim = (int(w/scale), int(h/scale))
+    # print("New dimension: ",newdim) # delete this
     resized=image
     # randomly use OpenCV2 algorithms if none are provided
     if algo is None:    	
@@ -293,6 +307,105 @@ def random_rotate_pairs(img_HR, img_LR, HR_size, scale, angle=0, center=0):
     
     img_HR, img_LR = random_crop_pairs(img_HR, img_LR, HR_size, scale) #crop back to the original size if needed 
     return img_HR, img_LR
+
+def random_HRrotate(image, tilesize):
+    """
+    Rotates an OpenCV 2 / NumPy image about it's centre by the given angle
+    (in degrees). The returned image will be large enough to hold the entire
+    new image, with a black background
+    """
+    #cv2.imwrite('D:/tmp_test/unrotated.jpg',image*255) #delete this
+    angle = int(np.random.uniform(-45, 45))
+    #print("Rotate angle: ",angle) # delete this		
+    # Get the image size
+    # No that's not an error - NumPy stores image matricies backwards
+    image_size = (image.shape[1], image.shape[0])
+    image_center = tuple(np.array(image_size) / 2)
+
+    # Convert the OpenCV 3x2 rotation matrix to 3x3
+    rot_mat = np.vstack(
+        [cv2.getRotationMatrix2D(image_center, angle, 1.0), [0, 0, 1]]
+    )
+
+    rot_mat_notranslate = np.matrix(rot_mat[0:2, 0:2])
+
+    # Shorthand for below calcs
+    image_w2 = image_size[0] * 0.5
+    image_h2 = image_size[1] * 0.5
+
+    # Obtain the rotated coordinates of the image corners
+    rotated_coords = [
+        (np.array([-image_w2,  image_h2]) * rot_mat_notranslate).A[0],
+        (np.array([ image_w2,  image_h2]) * rot_mat_notranslate).A[0],
+        (np.array([-image_w2, -image_h2]) * rot_mat_notranslate).A[0],
+        (np.array([ image_w2, -image_h2]) * rot_mat_notranslate).A[0]
+    ]
+
+    # Find the size of the new image
+    x_coords = [pt[0] for pt in rotated_coords]
+    x_pos = [x for x in x_coords if x > 0]
+    x_neg = [x for x in x_coords if x < 0]
+
+    y_coords = [pt[1] for pt in rotated_coords]
+    y_pos = [y for y in y_coords if y > 0]
+    y_neg = [y for y in y_coords if y < 0]
+
+    right_bound = max(x_pos)
+    left_bound = min(x_neg)
+    top_bound = max(y_pos)
+    bot_bound = min(y_neg)
+
+    new_w = int(abs(right_bound - left_bound))
+    new_h = int(abs(top_bound - bot_bound))
+
+    # We require a translation matrix to keep the image centred
+    trans_mat = np.matrix([
+        [1, 0, int(new_w * 0.5 - image_w2)],
+        [0, 1, int(new_h * 0.5 - image_h2)],
+        [0, 0, 1]
+    ])
+
+    # Compute the tranform for the combined rotation and translation
+    affine_mat = (np.matrix(trans_mat) * np.matrix(rot_mat))[0:2, :]
+
+    # Apply the transform
+    result = cv2.warpAffine(
+        image,
+        affine_mat,
+        (new_w, new_h),
+        flags=cv2.INTER_LINEAR
+    )
+	
+    #print("tilesize :", tilesize) # delete this
+    #cv2.imwrite('D:/tmp_test/rotated.jpg',result*255) # delete this
+    image_cropped = crop_around_center(result, tilesize, tilesize)
+		
+    #cv2.imwrite('D:/tmp_test/rotatecropped.jpg',image_cropped*255) # delete this
+    return image_cropped
+
+
+def crop_around_center(image, width, height):
+    """
+    Given a NumPy / OpenCV 2 image, crops it to the given width and height,
+    around it's centre point
+    """
+
+    image_size = (image.shape[1], image.shape[0])
+    image_center = (int(image_size[0] * 0.5), int(image_size[1] * 0.5))
+
+    if(width > image_size[0]):
+        width = image_size[0]
+
+    if(height > image_size[1]):
+        height = image_size[1]
+
+    x1 = int(image_center[0] - width * 0.5)
+    x2 = int(image_center[0] + width * 0.5)
+    y1 = int(image_center[1] - height * 0.5)
+    y2 = int(image_center[1] + height * 0.5)
+
+    return image[y1:y2, x1:x2]
+
 
 def blur_img(img_LR, blur_algos=['clean'], kernel_size = 0):
     h,w,c = img_LR.shape
@@ -599,7 +712,7 @@ def noise_img(img_LR, noise_types=['clean']):
         img = cv2.cvtColor(img_LR, cv2.COLOR_BGR2RGB)
         with Image.from_array(img) as imgin:
             i=imgin.clone()
-            i.quantize(random.randint(6,32),'srgb',0,False,False)
+            i.quantize(random.randint(8,32),'srgb',0,False,False)
             if noise_type == 'imquantize':  
                 imgin=i
             elif noise_type == 'imdither':
