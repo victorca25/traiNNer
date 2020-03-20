@@ -212,23 +212,19 @@ class LRHRDataset(data.Dataset):
         
         #Augmentations during training
         if self.opt['phase'] == 'train':
+            use_flip = use_rot = hr_rrot = False
             # Precalculate if flip/rotate/HRrotate is done
-            alter_HR = None
-            if (self.opt['use_flip'] or self.opt['use_rot']) and self.opt['hr_rrot']:
-                if np.random.rand() > 0.5:
-                    alter_HR = 'FlipRotate'
-                else:
-                    if np.random.rand() > 0.5: # randomize the random rotations, so half the images are the original
-                        alter_HR = 'HRrotate'
-            elif (self.opt['use_flip'] or self.opt['use_rot']) and not self.opt['hr_rrot']:
-                # augmentation - flip, rotate
-                alter_HR = 'fliprotate'
-            elif self.opt['hr_rrot']:
-                if np.random.rand() > 0.5: # randomize the random rotations, so half the images are the original
-                    alter_HR ='HRrotate'
-            #alter_HR ='HRrotate' # delete this!			
-            print('alter_HR :' , alter_HR)			
-			# Only if LRHR paired image mode 
+            # 50% of flipping
+            if self.opt['use_flip']:
+                use_flip = True
+            # 50% of 90 degree turn
+            if self.opt['use_rot']:
+                use_rot = True
+            # 50% of 45 degree turn            
+            if self.opt['hr_rrot'] and np.random.rand() < 0.5:
+                hr_rrot = True
+ 
+			# LRHR paired image mode 
             if LRHR:
 
                 # 1) Validate there's an img_LR, if not, use img_HR
@@ -276,9 +272,11 @@ class LRHRDataset(data.Dataset):
                 
             
                 # 6) Rotations. 'use_flip' = 180 or 270 degrees (mirror), 'use_rot' = 90 degrees, 'HR_rrot' = random rotations +-45 degrees
-                if alter_HR == 'FlipRotate':
-                    img_LR, img_HR = util.augment([img_LR, img_HR], self.opt['use_flip'], self.opt['use_rot'])
-                elif alter_HR == 'HRrotate':
+                if use_flip:
+                    img_LR, img_HR = util.augment([img_LR, img_HR], self.opt['use_flip'])
+                if use_rot:
+                    img_LR, img_HR = util.augment([img_LR, img_HR], self.opt['use_rot'])
+                if hr_rrot:
                     img_HR, img_LR = augmentations.random_rotate_pairs(img_HR, img_LR, HR_size, scale)
             
             else:
@@ -295,20 +293,28 @@ class LRHRDataset(data.Dataset):
                 if self.opt['hr_downscale'] and min(img_HR.shape[0],img_HR.shape[1]) > HR_safecrop:
                     if np.random.rand() > 0.5:
                         img_HR, _ = augmentations.randomscale(img_HR,HR_safecrop,ds_algo)
-				# Random crop & rotate
-                if alter_HR=='HRrotate':
-                    crop_size=(HR_safecrop, HR_safecrop)
-                    #print('HR Safecrop size: ', crop_size)
-                    img_HR = augmentations.random_crop(img_HR, crop_size)
+
+				# Apply transformations
+				# 1. Crop before transforming
+                # cv2.imwrite('D:/tmp_test/1-input.jpg',img_HR*255) # delete this
+                crop_size = (HR_safecrop, HR_safecrop) if hr_rrot else (HR_size, HR_size)
+                img_HR = augmentations.random_crop(img_HR, crop_size)
+                # cv2.imwrite('D:/tmp_test/2-cropped.jpg',img_HR*255) # delete this
+				
+                # 2. Flip horizontal/vertical
+                if use_flip:
+                    img_HR = augmentations.horizontal_flip(img_HR)
+                    img_HR = augmentations.vertical_flip(img_HR)
+                    # cv2.imwrite('D:/tmp_test/3-flipped.jpg',img_HR*255) # delete this
+                # 3. Rotate 90 deg
+                if use_rot:
+                    img_HR = augmentations.rotate90(img_HR)
+                    # cv2.imwrite('D:/tmp_test/4-rotated.jpg',img_HR*255) # delete this
+                # 4. HR Rotate 45 deg 
+                if hr_rrot:
                     img_HR = augmentations.random_HRrotate(img_HR, HR_size)
-                else:
-                    crop_size=(HR_size, HR_size)
-                    #print('HR size: ', crop_size)
-                    img_HR = augmentations.random_crop(img_HR, crop_size)
-                    # Randomly flip/mirror rotate 
-                    if alter_HR == 'fliprotate':
-                        img_HR = util.augment(img_HR, self.opt['use_flip'], self.opt['use_rot'])
-				#downscale LR
+                    # cv2.imwrite('D:/tmp_test/5-rotate_HR.jpg',img_HR*255) # delete this
+				# Create LR based on scale
                 img_LR, _ = augmentations.scale_img(img_HR, scale, algo=ds_algo)
 
 				
@@ -423,7 +429,7 @@ class LRHRDataset(data.Dataset):
         # Debug
         # Save img_LR and img_HR images to a directory to visualize what is the result of the on the fly augmentations
         # DO NOT LEAVE ON DURING REAL TRAINING
-        self.output_sample_imgs = True
+        self.output_sample_imgs = False
         if self.opt['phase'] == 'train':
             if self.output_sample_imgs:
                 import os
@@ -433,7 +439,7 @@ class LRHRDataset(data.Dataset):
                 #debugpath = os.path.join(baseHRdir, os.sep, 'sampleOTFimgs')
                 
                 # debugpath = os.path.join(os.path.split(LR_dir)[0], 'sampleOTFimgs')
-                debugpath = os.path.join('D:/temp', 'debugimg')
+                debugpath = os.path.join('D:/tmp_test', 'debugimg')
                 #print(debugpath)
                 if not os.path.exists(debugpath):
                     os.makedirs(debugpath)

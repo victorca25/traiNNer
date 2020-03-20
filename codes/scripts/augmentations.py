@@ -38,12 +38,20 @@ def _get_paths_from_dir(path):
 
 def horizontal_flip(image, rate=0.5):
     if np.random.rand() < rate:
-        image = image[:, ::-1, :]
+        #image = image[:, ::-1, :]
+        image = cv2.flip(image, 1)
     return image
 
-def vertical_flip(image, rate=0.5):
+def vertical_flip(image, rate=0.25): # rate reduced because of practicality
     if np.random.rand() < rate:
-        image = image[::-1, :, :]
+        #image = image[::-1, :, :]
+        image = cv2.flip(image, 0)
+    return image
+
+def rotate90(image, rate=0.5): # probably should reduce this as well
+    if np.random.rand() < rate:
+        #image = np.rot90(image, 1)
+        image = cv2.rotate(image,cv2.ROTATE_90_CLOCKWISE)
     return image
 
 def random_crop(image, crop_size=(224, 224)): 
