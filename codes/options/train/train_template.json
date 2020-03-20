@@ -43,7 +43,7 @@
       // If manually configuring on the fly generation of LR: (else, it will automatically default to Matlab-like downscale algorithm (777) when/if required
       , "lr_downscale": true //false
       , "lr_downscale_types": [1,2,777] //select from [0,1,2,3,4,5,420,777] where each number is: ["cv2.INTER_NEAREST", "cv2.INTER_LINEAR", "cv2.INTER_CUBIC", "cv2.INTER_AREA", "cv2.INTER_LANCZOS4", "cv2.INTER_LINEAR_EXACT","liquidscale", matlab.bicubic] //scale_algos //scaling interpolation options
-      
+      , "hr_downscale": false, // randomly downscale HR as well
       // Rotations augmentations:
       , "use_flip": true //flip images 
       , "use_rot": true //rotate images in 90 degree angles
