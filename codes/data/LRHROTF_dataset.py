@@ -212,6 +212,8 @@ class LRHRDataset(data.Dataset):
         
         #Augmentations during training
         if self.opt['phase'] == 'train':
+            # Generate random colour for padding
+            bordercolor = (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255), 0)
             use_flip = use_rot = hr_rrot = False
             # Precalculate if flip/rotate/HRrotate is done
             # 50% of flipping
@@ -295,10 +297,14 @@ class LRHRDataset(data.Dataset):
                         img_HR, _ = augmentations.randomscale(img_HR,HR_safecrop,ds_algo)
 
 				# Apply transformations
-				# 1. Crop before transforming
                 # cv2.imwrite('D:/tmp_test/1-input.jpg',img_HR*255) # delete this
-                crop_size = (HR_safecrop, HR_safecrop) if hr_rrot else (HR_size, HR_size)
-                img_HR = augmentations.random_crop(img_HR, crop_size)
+				# 1a. Pad if too small
+                if img_HR.shape[0] < HR_size or img_HR.shape[1] < HR_size: 
+                    img_HR = augmentations.addPad(img_HR, HR_size, bordercolor)
+				# b. otherwise crop before transforming if larger than HR_size
+                else:
+                    crop_size = (HR_safecrop, HR_safecrop) if hr_rrot else (HR_size, HR_size)
+                    img_HR = augmentations.random_crop(img_HR, crop_size)
                 # cv2.imwrite('D:/tmp_test/2-cropped.jpg',img_HR*255) # delete this
 				
                 # 2. Flip horizontal/vertical
@@ -312,8 +318,9 @@ class LRHRDataset(data.Dataset):
                     # cv2.imwrite('D:/tmp_test/4-rotated.jpg',img_HR*255) # delete this
                 # 4. HR Rotate 45 deg 
                 if hr_rrot:
-                    img_HR = augmentations.random_HRrotate(img_HR, HR_size)
-                    # cv2.imwrite('D:/tmp_test/5-rotate_HR.jpg',img_HR*255) # delete this
+                    img_HR = augmentations.random_HRrotate(img_HR, bordercolor)
+                    img_HR = augmentations.crop_center(img_HR, HR_size)
+                    #cv2.imwrite('D:/tmp_test/5-rotate_HR.jpg',img_HR*255) # delete this
 				# Create LR based on scale
                 img_LR, _ = augmentations.scale_img(img_HR, scale, algo=ds_algo)
 

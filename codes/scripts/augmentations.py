@@ -316,7 +316,7 @@ def random_rotate_pairs(img_HR, img_LR, HR_size, scale, angle=0, center=0):
     img_HR, img_LR = random_crop_pairs(img_HR, img_LR, HR_size, scale) #crop back to the original size if needed 
     return img_HR, img_LR
 
-def random_HRrotate(image, tilesize):
+def random_HRrotate(image, bordercolor):
     """
     Rotates an OpenCV 2 / NumPy image about it's centre by the given angle
     (in degrees). The returned image will be large enough to hold the entire
@@ -378,25 +378,23 @@ def random_HRrotate(image, tilesize):
 
     # Apply the transform
     result = cv2.warpAffine(
-        image,
+        image*255,
         affine_mat,
         (new_w, new_h),
-        flags=cv2.INTER_LINEAR
+        flags=cv2.INTER_CUBIC, # original: INTER_LINEAR,
+        borderMode=cv2.BORDER_CONSTANT,
+        borderValue=bordercolor
     )
 	
-    #print("tilesize :", tilesize) # delete this
-    #cv2.imwrite('D:/tmp_test/rotated.jpg',result*255) # delete this
-    image_cropped = crop_around_center(result, tilesize, tilesize)
-		
-    #cv2.imwrite('D:/tmp_test/rotatecropped.jpg',image_cropped*255) # delete this
-    return image_cropped
+    return result/255
 
 
-def crop_around_center(image, width, height):
+def crop_center(image, tilesize):
     """
     Given a NumPy / OpenCV 2 image, crops it to the given width and height,
     around it's centre point
     """
+    width = height = tilesize
 
     image_size = (image.shape[1], image.shape[0])
     image_center = (int(image_size[0] * 0.5), int(image_size[1] * 0.5))
@@ -414,7 +412,20 @@ def crop_around_center(image, width, height):
 
     return image[y1:y2, x1:x2]
 
+def addPad(img, HR_size, bordercolor):
+    h, w = img.shape	[:2]
+	# calculate how much needed to pad
+    pad_top = (HR_size - h) // 2 if h < HR_size else 0
+    pad_bot = pad_top + h % 2 if h< HR_size else 0
+    pad_left = (HR_size - w) // 2 if w < HR_size else 0
+    pad_right = pad_left + w % 2 if w < HR_size else 0
 
+    #print("Pad color: ", padcolor)
+    # pad image
+    padimg = cv2.copyMakeBorder(img*255, pad_top, pad_bot, pad_left, pad_right, borderType=cv2.BORDER_CONSTANT, value=bordercolor)
+    #cv2.imwrite('D:/tmp_test/padded.jpg', padimg)
+    return padimg/255
+	
 def blur_img(img_LR, blur_algos=['clean'], kernel_size = 0):
     h,w,c = img_LR.shape
     blur_type = random.choice(blur_algos)
@@ -720,7 +731,7 @@ def noise_img(img_LR, noise_types=['clean']):
         img = cv2.cvtColor(img_LR, cv2.COLOR_BGR2RGB)
         with Image.from_array(img) as imgin:
             i=imgin.clone()
-            i.quantize(random.randint(8,32),'srgb',0,False,False)
+            i.quantize(random.randint(6,32),'srgb',0,False,False)
             if noise_type == 'imquantize':  
                 imgin=i
             elif noise_type == 'imdither':
