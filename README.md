@@ -4,7 +4,7 @@ This is a fork of victorca25's [BasicSR](https://github.com/victorca25/BasicSR/)
 
 ## Table of Contents
 1. [Dependencies](#dependencies)
-3. [BasicSR Enhanced features](#features)
+3. [Features](#features)
 4. [Datasets](#datasets)
 5. [Pretrained models](#pretrained-models)
 
@@ -14,47 +14,24 @@ This is a fork of victorca25's [BasicSR](https://github.com/victorca25/BasicSR/)
 - [ImageMagick](https://imagemagick.org/script/download.php) for the image manipulation library. 
 - Python package: [`pip install wand`](https://pypi.org/project/Wand/), to access IM from Python.
 
-# BasicSR Enhanced features
+# Features
 This features are configured in the training `.json` file.
 
 ### Load state via CPU
-Lower end graphics card with low VRAM may have difficulty resuming from a state. If you get a out of memory error when continuing a training session, then set `"load2CPU":true` so that it is loaded to the system RAM instead.
+-Lower end graphics card with low VRAM may have difficulty resuming from a state. If you get a out of memory error when continuing a training session, then set `"load2CPU":true` so that it is loaded to the system RAM instead.
+
+### Image transformation
+- Random flipping, 90 degree rotate and HR rotate are all independent from each other, and can be applied together.
+
+### Revamped single-image HR workflow (SISR mode)
+- When training with no LR data sources set, transformations are done only on the HR tile and LR tile are only generated at the last step. 
+- If `hr_downscale": true` is set, large HR image are randomly downscaled before cropping to HR tile size.
+- If HR image is smaller than HR tile size, then it is automatically padded to the proper size with a random colour. This is different from original branch which scales the tile up, thus potentially compromising image quality.
+- If `"hr_rrot": true` is set, a different HR rotate function is used in SISR which does not scale up the result. If used in conjuction with random cropping, the image is cropped to a rotation-safe size before rotation, then cropped to the proper HR tile size.
+
+### New LR noises
 
 
-## How to Train
-### Train ESRGAN (SRGAN) models
-We use a PSNR-oriented pretrained SR model to initialize the parameters for better quality. According to the author's paper and some testing, this will also stabilize the GAN training and allows for faster convergence. 
-
-1. Prepare datasets, usually the DIV2K dataset. More details are in [`codes/data`](https://github.com/victorca25/BasicSR/tree/master/codes/data) and [
-(Faster IO speed)](https://github.com/xinntao/BasicSR/wiki/Faster-IO-speed). 
-1. Optional: If the intention is to replicate the original paper here you would prerapre the PSNR-oriented pretrained model. You can also use the original `RRDB_PSNR_x4.pth` as the pretrained model for that purpose, otherwise *any* existing model will work as pretrained.
-1. Modify the configuration file  `options/train/train_esrgan.json`
-1. Run command: `python train.py -opt options/train/train_esrgan.json`
-
-### Train SR models
-1. Prepare datasets, usually the DIV2K dataset. More details are in [`codes/data`](https://github.com/victorca25/BasicSR/tree/master/codes/data). 
-1. Modify the configuration file `options/train/train_sr.json`
-1. Run command: `python train.py -opt options/train/train_sr.json`
-
-### Train SFTGAN models 
-*Pretraining is also important*. We use a PSNR-oriented pretrained SR model (trained on DIV2K) to initialize the SFTGAN model.
-
-1. First prepare the segmentation probability maps for training data: run [`test_seg.py`](https://github.com/victorca25/BasicSR/blob/master/codes/test_seg.py). We provide a pretrained segmentation model for 7 outdoor categories in [Pretrained models](#pretrained-models). We use [Xiaoxiao Li's codes](https://github.com/lxx1991/caffe_mpi) to train our segmentation model and transfer it to a PyTorch model.
-1. Put the images and segmentation probability maps in a folder as described in [`codes/data`](https://github.com/victorca25/BasicSR/tree/master/codes/data).
-1. Transfer the pretrained model parameters to the SFTGAN model. 
-    1. First train with `debug` mode and obtain a saved model.
-    1. Run [`transfer_params_sft.py`](https://github.com/victorca25/BasicSR/blob/master/codes/scripts/transfer_params_sft.py) to initialize the model.
-    1. We provide an initialized model named `sft_net_ini.pth` in [Pretrained models](#pretrained-models)
-1. Modify the configuration file in `options/train/train_sftgan.json`
-1. Run command: `python train.py -opt options/train/train_sftgan.json`
-
-### Train PPON models 
-1. Prepare datasets, usually the DIV2K dataset. More details are in [`codes/data`](https://github.com/victorca25/BasicSR/tree/master/codes/data). 
-1. Modify the configuration file `options/train/train_PPON.json`
-1. Run command: `python train_ppon.py -opt options/train/train_PPON.json`
-
-### Resuming Training 
-When resuming training, just pass a option with the name `resume_state`, like , <small>`"resume_state": "../experiments/debug_001_RRDB_PSNR_x4_DIV2K/training_state/200.state"`. </small>
 
 
 ## Additional Help 
