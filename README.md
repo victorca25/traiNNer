@@ -18,7 +18,7 @@ This is a fork of victorca25's [BasicSR](https://github.com/victorca25/BasicSR/)
 This features are configured in the training `.json` file.
 
 ### Load state via CPU
--Lower end graphics card with low VRAM may have difficulty resuming from a state. If you get a out of memory error when continuing a training session, then set `"load2CPU":true` so that it is loaded to the system RAM instead.
+- Lower end graphics card with low VRAM may have difficulty resuming from a state. If you get a out of memory error when continuing a training session, then set `"load2CPU":true` so that it is loaded to the system RAM instead.
 
 ### Image transformation
 - Random flipping, 90 degree rotate and HR rotate are all independent from each other, and can be applied together.
@@ -30,9 +30,14 @@ This features are configured in the training `.json` file.
 - If `"hr_rrot": true` is set, a different HR rotate function is used in SISR which does not scale up the result. If used in conjuction with random cropping, the image is cropped to a rotation-safe size before rotation, then cropped to the proper HR tile size.
 
 ### New LR noises
+![alt text](figures/dithercompare.png)
+- `imdither` uses Imagemagick's dither engine to create mapped dithering. Unlike the default `dither` noise, the new image's colours are more faithful to the original image. A noticible trend when using `dither` to train models was that the colour contrast slowly declined over time, which is due to the extreme colours in the generated image being mapped to less vibrant colours. This approach emulates how the Fatality model's undithering training is done.
+- `imquantize` is basically is everything above, except for posterising the image.
+- `kuwahara` uses Imagemagick's [Kuwahara filter](https://en.wikipedia.org/wiki/Kuwahara_filter) that basically removes all details from the image and only maintains the general shape. This theoratically help to train inpainting, though it is recommended to use only in short periods since normally the validation phase will act against this.
 
-
-
+### New LR downscale types
+- `123` will use Imagemagick's RGB scale, which supposedly maintains contrast when downscaling.
+- `420` will use Imagemagick's liquid scale, which theoratically has no use whatsoever. However in practice, it forces the model to keep certain details while blurring out all other. Use only if one needs to get high.
 
 ## Additional Help 
 
