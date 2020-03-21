@@ -23,6 +23,7 @@ This features are configured in the training `.json` file.
 - Random flipping, 90 degree rotate and HR rotate are all independent from each other, and can be applied together.
 
 ### Revamped single-image HR workflow (SISR mode)
+Currently only usable with `LRHROTF` mode.
 - When training with no LR data sources set, transformations are done only on the HR tile and LR tile are only generated at the last step. 
 - If `hr_downscale": true` is set, large HR image are randomly downscaled before cropping to HR tile size.
 - If HR image is smaller than HR tile size, then it is automatically padded to the proper size with a random colour. This is different from original branch which scales the tile up, thus potentially compromising image quality.
