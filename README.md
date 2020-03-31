@@ -21,6 +21,7 @@ This features are configured in the training `.json` file.
 
 ### Image transformation
 - Random flipping, 90 degree rotate and HR rotate are all independent from each other, and can be applied together.
+
 ![Basic transformations](figures/basictransforms.png)
 
 ### Revamped single-image HR workflow (SISR mode)
@@ -29,14 +30,17 @@ Currently only usable with `LRHROTF` mode.
 - If `hr_downscale": true` is set, large HR image are randomly downscaled before cropping to HR tile size.
 - If HR image is smaller than HR tile size, then it is automatically padded to the proper size with a random colour. This is different from original branch which scales the tile up, thus potentially compromising image quality.
 - If `"hr_rrot": true` is set, a different HR rotate function is used in SISR which does not scale up the result. If used in conjuction with random cropping, the image is cropped to a rotation-safe size before rotation, then cropped to the proper HR tile size.
+
 ![Basic transformations](figures/hrrotation.png)
 
 ### New LR noises
 - `imdither` uses Imagemagick's dither engine to create mapped dithering. Unlike the default `dither` noise, the new image's colours are more faithful to the original image. A noticible trend when using `dither` to train models was that the colour contrast slowly declined over time, which is due to the extreme colours in the generated image being mapped to less vibrant colours.
   This approach emulates how the Fatality model's undithering training is done. As a bonus, it requires less processing than the normal dithering method.
+  
 ![Dither comparison](figures/dithercompare.png)
 - `imquantize` is basically is everything above, except for posterising the image.
 - `kuwahara` uses Imagemagick's [Kuwahara filter](https://en.wikipedia.org/wiki/Kuwahara_filter) that basically removes all details from the image and only maintains the general shape. This theoratically help to train inpainting, though it is recommended to use only in short periods since normally the validation phase will act against this.
+
 ![Kuwahara filter](figures/kuwahara.png)
 
 ### New LR downscale types
