@@ -20,6 +20,7 @@ This features are configured in the training `.json` file.
 - Lower end graphics card with low VRAM may have difficulty resuming from a state. If you get a out of memory error when continuing a training session, then set `"load2CPU":true` so that it is loaded to the system RAM instead.
 
 ### Image transformation
+![Basic transformations](figures/basictransforms.png)
 - Random flipping, 90 degree rotate and HR rotate are all independent from each other, and can be applied together.
 
 ### Revamped single-image HR workflow (SISR mode)
@@ -27,10 +28,11 @@ Currently only usable with `LRHROTF` mode.
 - When training with no LR data sources set, transformations are done only on the HR tile and LR tile are only generated at the last step. 
 - If `hr_downscale": true` is set, large HR image are randomly downscaled before cropping to HR tile size.
 - If HR image is smaller than HR tile size, then it is automatically padded to the proper size with a random colour. This is different from original branch which scales the tile up, thus potentially compromising image quality.
+![Basic transformations](figures/hrrotation.png)
 - If `"hr_rrot": true` is set, a different HR rotate function is used in SISR which does not scale up the result. If used in conjuction with random cropping, the image is cropped to a rotation-safe size before rotation, then cropped to the proper HR tile size.
 
 ### New LR noises
-![alt text](figures/dithercompare.png)
+![Dither comparison](figures/dithercompare.png)
 - `imdither` uses Imagemagick's dither engine to create mapped dithering. Unlike the default `dither` noise, the new image's colours are more faithful to the original image. A noticible trend when using `dither` to train models was that the colour contrast slowly declined over time, which is due to the extreme colours in the generated image being mapped to less vibrant colours.
   This approach emulates how the Fatality model's undithering training is done. As a bonus, it requires less processing than the normal dithering method.
 - `imquantize` is basically is everything above, except for posterising the image.
