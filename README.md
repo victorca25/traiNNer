@@ -52,14 +52,14 @@ Currently only usable with `LRHROTF` mode.
 
 ## Additional Help 
 
-If you have any questions, we have a [discord server](https://discord.gg/SxvYsgE) where you can ask them and a [Wiki](https://github.com/alsa64/AI-wiki/wiki) with more information.
+If you have any questions, we have a [discord server](https://discord.gg/cpAUpDK) where you can ask them and a [Wiki](https://upscale.wiki/wiki/Main_Page) with more information.
 
 ---
 
 ## Acknowledgement
 - Big thanks to *victorca25* for encouraging the creation of this fork.
 - Thanks to *Twittman* for sharing how Fatality's training tiles were generated.
-- Code architecture is inspired by [pytorch-cyclegan](https://github.com/junyanz/pytorch-CycleGAN-and-pix2pix).
+- Code architecture is inspired by [pytorch-cyclegan](https://u).
 - Thanks to *Wai Ho Kwok*, who contributes to the initial version.
 
 ### BibTex
