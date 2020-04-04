@@ -120,6 +120,8 @@ def read_img(env, path, out_nc=3, znorm=False):
         # img = (255*plt.imread(path)[:,:,:3]).astype('uint8')
     else:
         img = _read_lmdb_img(env, path)
+    if not img:
+        raise ValueError(f"Failed to read image: {path}")
     img = img.astype(np.float32) / 255.0
     if znorm:  # normalize images range to [-1, 1] (zero-normalization)
         img = (img - 0.5) * 2  # xi' = (xi - mu)/sigma
