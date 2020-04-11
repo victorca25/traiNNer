@@ -34,7 +34,6 @@ Currently only usable with `LRHROTF` mode.
 ![Basic transformations](figures/hrrotation.png)
 
 ### New LR noises
-![alt text](figures/dithercompare.png)
 - `imdither` uses Imagemagick's dither engine to create mapped dithering. Unlike the default `dither` noise, the new image's colours are more faithful to the original image. A noticible trend when using `dither` to train models was that the colour contrast slowly declined over time, which is due to the extreme colours in the generated image being mapped to less vibrant colours.
   This approach emulates how the Fatality model's undithering training is done. As a bonus, it requires less processing than the normal dithering method.
   
