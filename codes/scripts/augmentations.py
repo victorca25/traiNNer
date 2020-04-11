@@ -725,7 +725,7 @@ def noise_img(img_LR, noise_types=['clean']):
                     
             noise_img = re_fs/255.0
     
-    elif is_wand_available == True and noise_type in ['imdither','imquantize']: # Fatality-inspired Imagemagick noise
+    elif is_wand_available == True and noise_type in ['imdither','imrandither','imquantize']: # Fatality-inspired Imagemagick noise
         #print("Doing IM noise") 
         #Convert to BGR because Wand loads numpy this way for some reason
         img = cv2.cvtColor(img_LR, cv2.COLOR_BGR2RGB)
@@ -734,12 +734,10 @@ def noise_img(img_LR, noise_types=['clean']):
             i.quantize(random.randint(6,32),'srgb',0,False,False)
             if noise_type == 'imquantize':  
                 imgin=i
-            elif noise_type == 'imdither':
-                colordith_types = ['bayer', 'other']
-                order_types     = ['o2x2','o4x4','o8x8']
-                dither_type = random.choice(colordith_types)
-                if dither_type == 'bayer':  #ordered dither
+            elif noise_type in ['imdither','imrandither']:
+                if noise_type == 'imdither':  #ordered dither
                     #print("Ordered dithering...")
+                    order_types     = ['o2x2','o4x4','o8x8']
                     imgin.ordered_dither(random.choice(order_types),'all_channels')
                     imgin.remap(i) # remap to quantised sample
                 else :             #other dither noise
