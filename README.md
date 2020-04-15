@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿# BasicSR (Enhanced)
+﻿﻿﻿﻿﻿﻿﻿# BasicSR (Enhanced)
 
 This is a fork of victorca25's [BasicSR](https://github.com/victorca25/BasicSR/) branch. Most of the documentation is there if you need any information regarding BasicSR. This readme will focus specifically on the differences of this fork.
 
@@ -39,7 +39,7 @@ Currently only usable with `LRHROTF` mode.
 
 ![comparing dithers](figures/dithercompare.png)
 
-- `imrandither` uses Imagemagick's dither engine to create mapped scattered dithering. This produces dither pattern that are more randomized, and care must be taken place because it is almost similar to how some pixelart portrays detail. Use only if you need extra denoising & blending strength.
+- `imrandither` uses Imagemagick's dither engine to create mapped scattered dithering. This produces dither pattern that are more randomized. Care must be taken place when enabling this noise because it is almost similar to how some pixelart portray detail. Use only if you need extra denoising & blending strength.
 - `imquantize` is basically is similar to ordered dithering, except for posterising the image.
 - `kuwahara` uses Imagemagick's [Kuwahara filter](https://en.wikipedia.org/wiki/Kuwahara_filter) that basically removes all details from the image and only maintains the general shape. This theoratically help to train inpainting, though it is recommended to use only in short periods since normally the validation phase will act against this.
 
@@ -95,6 +95,16 @@ If you have any questions, we have a [discord server](https://discord.gg/cpAUpDK
         month = {October},
         year = {2019}
     }
+
+
+
+
+
+
+
+
+
+
 
 
 
