@@ -388,6 +388,40 @@ def random_HRrotate(image, bordercolor):
 	
     return result/255
 
+def subimage(image, center, angle, tilesize): # directly rotatecrops  from a centerpoint
+    # modified from Xaedas @ Stackoverlow
+    h, w, _ = image.shape    
+    theta = math.radians(angle)
+    dir = -1 if angle < 0 else 1
+    
+    v_x = (math.cos(theta), math.sin(theta))
+    s_x = center[0] - (v_x[0] - v_x[1]) * (tilesize-1) / 2
+    s_y = center[1] - (v_x[1] + v_x[0]) * (tilesize-1) / 2
+    nudge_x = nudge_y = 0
+    dist =  (tilesize-1)/2*(v_x[0] + v_x[1]*dir)
+    bound_x = np.array([center[0]-dist , center[0] + dist])
+    bound_y = np.array([center[1]-dist , center[1] + dist])
+   
+   #if cropping area is out of bounds, nudge edges to boundary
+    if bound_x[0] < 0:
+        nudge_x = 0 - bound_x[0]
+    elif bound_x[1] > w:
+        nudge_x = w-bound_x[1]
+    if bound_y[0] < 0:
+        nudge_y = 0 - bound_y[0]
+    elif bound_y[1] > h:
+        nudge_y = h-bound_y[1]
+
+    mapping = np.array([[v_x[0],-v_x[1], s_x+nudge_x],
+                        [v_x[1],v_x[0], s_y+nudge_y]])
+    return cv2.warpAffine(image,mapping,(tilesize, tilesize),flags=cv2.WARP_INVERSE_MAP+cv2.INTER_CUBIC,borderMode=cv2.BORDER_CONSTANT)
+
+def crop_rotate(image, angle, tilesize): # randomly get a subimage from image
+    h, w, _ = image.shape
+    halfsize = tilesize / 2
+    crop_point = np.array([int(np.random.uniform(halfsize, w-halfsize)) , int(np.random.uniform(halfsize, h-halfsize))])
+    return subimage(image, crop_point, angle, tilesize)
+
 
 def crop_center(image, tilesize):
     """
@@ -954,7 +988,7 @@ def unsharp_mask(img, blur_algo='median', kernel_size=None, strength=None, unsha
 
 def random_img(img_dir, save_path, crop_size=(128, 128), scale=1, blur_algos=['clean'], noise_types=['clean'], noise_types2=['clean']):
     img_list = _get_paths_from_dir(img_dir)
-    
+    print("random image mode")
     random_img_path = random.choice(img_list)
     
     env = None
@@ -1027,40 +1061,49 @@ def random_img(img_dir, save_path, crop_size=(128, 128), scale=1, blur_algos=['c
 def single_image(img_path, save_path, crop_size=(128, 128), scale=1, blur_algos=['clean'], noise_types=['clean'], noise_types2=['clean']):
     env = None
     img = util.read_img(env, img_path) #read image from path, opens with OpenCV, value ranges from 0 to 1
-    
+    print("Single image mode")
     print(img.shape)
     
+    #"""
     img_crop = random_crop(img, crop_size)
     print(img_crop.shape)
-    #"""
     cv2.imwrite(save_path+'/crop_.png',img_crop*255) 
     #"""
 
+    #"""
+    angle = int(np.random.uniform(-45, 45))
+    print("Angle:",angle)
+    img_croprotate = crop_rotate(img, angle, crop_size[0])
+    print(img_croprotate.shape)
+    cv2.imwrite(save_path+'/croprotate_.png',img_croprotate*255) 
+    #"""
+	
+    #"""
     print("Resizing")    
     img_resize, _ = resize_img(img, crop_size)
     print(img_resize.shape)
-    #"""
     cv2.imwrite(save_path+'/resize_.png',img_resize*255) 
     #"""
     
+    #"""
     img_random_resize, _ = random_resize_img(img, crop_size)
     print(img_random_resize.shape)
-    #"""
     cv2.imwrite(save_path+'/random_resize_.png',img_random_resize*255) 
     #"""
     
+    #"""
     img_cutout = cutout(img, img.shape[0] // 2)
     print(img_cutout.shape)
-    #"""
     cv2.imwrite(save_path+'/cutout_.png',img_cutout*255) 
     #"""
     
+    #"""
     img_erasing = random_erasing(img)
     print(img_erasing.shape)
-    #"""
     cv2.imwrite(save_path+'/erasing_.png',img_erasing*255) 
     #"""
 
+    #"""
     scaletype=[0,1,2,3,4,5,123,420,777]
     #scaletype=[123]
     for which in scaletype :
@@ -1068,32 +1111,31 @@ def single_image(img_path, save_path, crop_size=(128, 128), scale=1, blur_algos=
     #scale = 4
         img_scale, interpol_algo = scale_img(img, scale,which)
         print(img_scale.shape)    
-    #"""
         cv2.imwrite(save_path+'/scale_'+str(scale)+'_'+str(interpol_algo)+'_.png',img_scale*255) 
     #"""
     
+    #"""
     img_blur, blur_algo, blur_kernel_size = blur_img(img, blur_algos)
     print(img_blur.shape)
-    #"""
     cv2.imwrite(save_path+'/blur_'+str(blur_kernel_size)+'_'+str(blur_algo)+'_.png',img_blur*255) 
     #"""
 
+    #"""
     img_noise, noise_algo = noise_img(img, noise_types)
     #img_noise, noise_algo = noise_img(img_scale, noise_types)
     print(img_noise.shape)
-    #"""
     cv2.imwrite(save_path+'/noise_'+str(noise_algo)+'_.png',img_noise*255) 
     #"""
     
+    #"""
     img_noise2, noise_algo2 = noise_img(img_noise, noise_types2)
     print(img_noise2.shape)
-    #"""
     cv2.imwrite(save_path+'/noise2_'+str(noise_algo2)+'_.png',img_noise2*255) 
     #"""
     
+    #"""
     img_rrot, angle = random_rotate(img)
     print(img_rrot.shape)
-    #"""
     cv2.imwrite(save_path+'/rrot_'+str(angle)+'_.png',img_rrot*255) 
     #"""
     
@@ -1140,6 +1182,13 @@ def apply_dir(img_path, save_path, crop_size=(128, 128), scale=1, blur_algos=['c
         cv2.imwrite(save_path+'/'+rann+'erasing_.png',img_erasing*255) 
         #"""
         
+        img_croprotate = crop_rotate(img, int(np.random.uniform(-45, 45)), crop_size[0])
+        print(img_croprotate)
+        #"""
+        cv2.imwrite(save_path+'/'+rann+'croprotate_.png',img_croprotate*255) 
+        #"""
+		
+		
         #scale = 4
         img_scale, interpol_algo = scale_img(img, scale,which)
         print(img_scale.shape)    
