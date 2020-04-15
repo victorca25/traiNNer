@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿# BasicSR (Enhanced)
+# BasicSR (Enhanced)
 
 This is a fork of victorca25's [BasicSR](https://github.com/victorca25/BasicSR/) branch. Most of the documentation is there if you need any information regarding BasicSR. This readme will focus specifically on the differences of this fork.
 
