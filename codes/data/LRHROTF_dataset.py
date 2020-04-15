@@ -435,7 +435,7 @@ class LRHRDataset(data.Dataset):
         # Debug
         # Save img_LR and img_HR images to a directory to visualize what is the result of the on the fly augmentations
         # DO NOT LEAVE ON DURING REAL TRAINING
-        self.output_sample_imgs = True
+        self.output_sample_imgs = False
         if self.opt['phase'] == 'train':
             if self.output_sample_imgs:
                 import os

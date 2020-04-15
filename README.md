@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿# BasicSR (Enhanced)
+﻿﻿﻿﻿﻿﻿# BasicSR (Enhanced)
 
 This is a fork of victorca25's [BasicSR](https://github.com/victorca25/BasicSR/) branch. Most of the documentation is there if you need any information regarding BasicSR. This readme will focus specifically on the differences of this fork.
 
@@ -21,7 +21,9 @@ This features are configured in the training `.json` file.
 
 ### Image transformation
 - Random flipping, 90 degree rotate and HR rotate are all independent from each other, and can be applied together.
+
 ![Basic transforms](figures/basictransforms.png)
+
 ### Revamped single-image HR workflow (SISR mode)
 Currently only usable with `LRHROTF` mode.
 - When training with no LR data sources set, transformations are done only on the HR tile and LR tile are only generated at the last step. 
@@ -34,10 +36,13 @@ Currently only usable with `LRHROTF` mode.
 ### New LR noises
 - `imdither` uses Imagemagick's dither engine to create mapped ordered dithering. Unlike the default `dither` noise, the new image's colours are more faithful to the original image. A noticible trend when using `dither` to train models was that the colour contrast slowly declined over time, which is due to the extreme colours in the generated image being mapped to less vibrant colours.
   This approach emulates how the Fatality model's undithering training is done. As a bonus, it requires less processing than the normal dithering method.
+
 ![comparing dithers](figures/dithercompare.png)
+
 - `imrandither` uses Imagemagick's dither engine to create mapped scattered dithering. This produces dither pattern that are more randomized, and care must be taken place because it is almost similar to how some pixelart portrays detail. Use only if you need extra denoising & blending strength.
 - `imquantize` is basically is similar to ordered dithering, except for posterising the image.
 - `kuwahara` uses Imagemagick's [Kuwahara filter](https://en.wikipedia.org/wiki/Kuwahara_filter) that basically removes all details from the image and only maintains the general shape. This theoratically help to train inpainting, though it is recommended to use only in short periods since normally the validation phase will act against this.
+
 ![Kuwahara filter](figures/kuwahara.png)
 
 ![Kuwahara filter](figures/kuwahara.png)
@@ -90,6 +95,7 @@ If you have any questions, we have a [discord server](https://discord.gg/cpAUpDK
         month = {October},
         year = {2019}
     }
+
 
 
 
