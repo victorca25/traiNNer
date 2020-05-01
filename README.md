@@ -36,7 +36,7 @@ This features are configured in the training `.json` file.
 
 ### New LR noises
 - `imdither` uses Imagemagick's dither engine to create more colour-accurate ordered dithering. Unlike the default ordered `dither` noise, this produces more random varying levels of colour depth that may help represent the original image colours more accurately. A noticeable trend when using `dither` to train models was that the colour contrast slowly declined over time, which is due to the extreme colours in the generated image being mapped to less vibrant colours. Even when using low colour depth, `imdither` has slightly better colour assignment.
-  This approach emulates how the Fatality model's undithering training is done. As a bonus, it requires less processing than the normal dithering method.
+  This approach emulates how the Fatality model's undithering training is done. As a bonus, it requires less processing time than the normal dithering method.
 
 ![comparing ordered dithers](figures/orderdither.png)
 
