@@ -1,4 +1,4 @@
-# BasicSR (Enhanced)
+﻿﻿﻿﻿﻿﻿# BasicSR (Enhanced)
 
 This is a fork of victorca25's [BasicSR](https://github.com/victorca25/BasicSR/) branch. Most of the documentation is there if you need any information regarding BasicSR. This readme will focus specifically on the differences of this fork.
 
@@ -31,17 +31,25 @@ Currently only usable with `LRHROTF` mode.
 - If HR image is smaller than HR tile size, then it is automatically padded to the proper size with a random colour. This is different from original branch which scales the tile up, thus potentially compromising image quality.
 - If `"hr_rrot": true` is set, a different HR rotate function is used in SISR which does not scale up the result. This function is used in conjunction with cropping, so the HR tile is built directly from the HR image.
 
-![Basic transformations](figures/hrrotation.png)
+![Advanced transforms](figures/new_rotatescale.png)
+
+- Since the tile cropping happens at the same time as rotation, and will be applied to a downscaled input image if HR downscale is used as well. If all transformations are used in tandem, the results in a highly robust model with a low possibility of over-fitting. The downside is takes longer for the model to take shape.
 
 ### New LR noises
-- `imdither` uses Imagemagick's dither engine to create mapped ordered dithering. Unlike the default `dither` noise, the new image's colours are more faithful to the original image. A noticible trend when using `dither` to train models was that the colour contrast slowly declined over time, which is due to the extreme colours in the generated image being mapped to less vibrant colours.
+- `imdither` uses Imagemagick's dither engine to create more colour-accurate ordered dithering. Unlike the default ordered `dither` noise, this produces more random varying levels of colour depth that may help represent the original image colours more accurately. A noticeable trend when using `dither` to train models was that the colour contrast slowly declined over time, which is due to the extreme colours in the generated image being mapped to less vibrant colours. Even when using low colour depth, `imdither` has slightly better colour assignment.
   This approach emulates how the Fatality model's undithering training is done. As a bonus, it requires less processing than the normal dithering method.
 
-![comparing dithers](figures/dithercompare.png)
+![comparing ordered dithers](figures/orderdither.png)
 
-- `imrandither` uses Imagemagick's dither engine to create mapped scattered dithering. This produces dither pattern that are more randomized. Care must be taken place when enabling this noise because it is almost similar to how some pixelart portray detail. Use only if you need extra denoising & blending strength.
-- `imquantize` is basically is similar to ordered dithering, except for posterising the image.
-- `kuwahara` uses Imagemagick's [Kuwahara filter](https://en.wikipedia.org/wiki/Kuwahara_filter) that basically removes all details from the image and only maintains the general shape. This theoratically help to train inpainting, though it is recommended to use only in short periods since normally the validation phase will act against this.
+- `imrandither` uses Imagemagick's dither engine to create mapped scattered dithering. Main difference between the implemention in the original `dither` noise is that it allows for higher colour depth, and adds Riemersma dither apart from Floyd-Steinberg. Care must be taken place when enabling this noise because the result may be almost similar to how some pixel art portray detail. Use only if you need extra denoising & blending strength.
+
+![comparing scatter dithers](figures/scatterdither.png)
+
+- `imquantize` is similar to the standard `quantize` noise, except has better colour accuracy at higher colour depths.
+
+![comparing scatter dithers](figures/quantize.png)
+
+- `kuwahara` uses Imagemagick's [Kuwahara filter](https://en.wikipedia.org/wiki/Kuwahara_filter) that basically removes all details from the image and only maintains the general shape. This theoretically help to train inpainting, though it is recommended to use only in short periods since normally the validation phase will act against this.
 
 ![Kuwahara filter](figures/kuwahara.png)
 
@@ -95,6 +103,12 @@ If you have any questions, we have a [discord server](https://discord.gg/cpAUpDK
         month = {October},
         year = {2019}
     }
+
+
+
+
+
+
 
 
 

@@ -219,10 +219,10 @@ class LRHRDataset(data.Dataset):
             # 50% of flipping
             if self.opt['use_flip']:
                 use_flip = True
-            # 50% of 90 degree turn
+            # 25% of 90 degree turn
             if self.opt['use_rot']:
                 use_rot = True
-            # 50% of 45 degree turn            
+            # 50% of -45 to 45 degree turn            
             if self.opt['hr_rrot'] and np.random.rand() < 0.5:
                 hr_rrot = True
                 angle = int(np.random.uniform(-45, 45))
@@ -434,7 +434,7 @@ class LRHRDataset(data.Dataset):
             
         # Debug
         # Save img_LR and img_HR images to a directory to visualize what is the result of the on the fly augmentations
-        # DO NOT LEAVE ON DURING REAL TRAINING
+        # DO NOT LEAVE ON DURING REAL TRAINING, but you can use this to create validation tiles ;)
         self.output_sample_imgs = False
         if self.opt['phase'] == 'train':
             if self.output_sample_imgs:
@@ -461,8 +461,8 @@ class LRHRDataset(data.Dataset):
                 
                 import uuid
                 hex = uuid.uuid4().hex
-                cv2.imwrite(debugpath+"/"+im_name+hex+'_LR.png',img_LRn*255) #random name to save + had to multiply by 255, else getting all black image
-                cv2.imwrite(debugpath+"/"+im_name+hex+'_HR.png',img_HRn*255) #random name to save + had to multiply by 255, else getting all black image
+                cv2.imwrite(debugpath+"/LR/"+im_name+hex+'.png',img_LRn*255) #random name to save + had to multiply by 255, else getting all black image
+                cv2.imwrite(debugpath+"/HR/"+im_name+hex+'.png',img_HRn*255) #random name to save + had to multiply by 255, else getting all black image
                 # cv2.imwrite(debugpath+"\\"+im_name+hex+'_HR1.png',img_HRn1*255) #random name to save + had to multiply by 255, else getting all black image
             
         ######## Convert images to PyTorch Tensors ########

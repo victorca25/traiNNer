@@ -48,7 +48,7 @@ def vertical_flip(image, rate=0.25): # rate reduced because of practicality
         image = cv2.flip(image, 0)
     return image
 
-def rotate90(image, rate=0.5): # probably should reduce this as well
+def rotate90(image, rate=0.25): # probably should reduce this as well
     if np.random.rand() < rate:
         #image = np.rot90(image, 1)
         image = cv2.rotate(image,cv2.ROTATE_90_CLOCKWISE)
@@ -764,19 +764,20 @@ def noise_img(img_LR, noise_types=['clean']):
         #Convert to BGR because Wand loads numpy this way for some reason
         img = cv2.cvtColor(img_LR, cv2.COLOR_BGR2RGB)
         with Image.from_array(img) as imgin:
-            i=imgin.clone()
-            i.quantize(random.randint(6,32),'srgb',0,False,False)
-            if noise_type == 'imquantize':  
-                imgin=i
-            elif noise_type in ['imdither','imrandither']:
-                if noise_type == 'imdither':  #ordered dither
-                    #print("Ordered dithering...")
-                    order_types     = ['o2x2','o4x4','o8x8']
-                    imgin.ordered_dither(random.choice(order_types),'all_channels')
-                    imgin.remap(i) # remap to quantised sample
-                else :             #other dither noise
+            if noise_type == 'imdither':  #ordered dither
+                #print("Ordered dithering...")
+                order_types = ['o2x2','o4x4','o8x8']
+                color_depth = random.randint(2,10)
+                imgin.ordered_dither(random.choice(order_types)+','+str(color_depth),'all_channels')
+            else:
+                i=imgin.clone()
+                i.quantize(random.randint(4	,64),'srgb',0,False,False)
+                if noise_type == 'imquantize':  
+                    imgin=i
+                else: #other dither noise
                     #print("Scattered dithering...")
-                    imgin.remap(i,random.choice(['floyd_steinberg','riemersma']))
+                    dither_types = ['floyd_steinberg','riemersma']
+                    imgin.remap(i,random.choice(dither_types))
             noise_img = np.array(imgin).astype(np.float32) / 255.0
         #Convert back to RGB
         noise_img = cv2.cvtColor(noise_img, cv2.COLOR_BGR2RGB)
