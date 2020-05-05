@@ -767,7 +767,7 @@ def noise_img(img_LR, noise_types=['clean']):
             if noise_type == 'imdither':  #ordered dither
                 #print("Ordered dithering...")
                 order_types = ['o2x2','o4x4','o8x8']
-                color_depth = random.randint(2,10)
+                color_depth = random.randint(2,8) #set second parameter higher for more colour depth
                 imgin.ordered_dither(random.choice(order_types)+','+str(color_depth),'all_channels')
             else:
                 i=imgin.clone()
