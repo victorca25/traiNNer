@@ -53,8 +53,6 @@ Currently only usable with `LRHROTF` mode.
 
 ![Kuwahara filter](figures/kuwahara.png)
 
-![Kuwahara filter](figures/kuwahara.png)
-
 ### New LR downscale types
 - `123` will use Imagemagick's RGB scale, which supposedly maintains contrast when downscaling.
 - `420` will use Imagemagick's liquid scale, which in theory has no use whatsoever. However in practice, it forces the model to keep certain details while blurring out all other. Use only if one needs to get high.
