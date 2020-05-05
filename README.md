@@ -24,7 +24,7 @@ These features are configured in the training `.json` file. Because of the natur
 
 ![Basic transforms](figures/basictransforms.png)
 
-### Revamped HR-images-only workflow (SISR mode)
+### Revamped HR-images-only workflow
 Currently only usable with `LRHROTF` mode.
 - When training with no LR data sources set, transformations are done only on the HR tile and LR tile are only generated at the last step. 
 - If `hr_downscale": true` is set, large HR images are randomly downscaled before cropping to HR tile size.
