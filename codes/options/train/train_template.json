@@ -1,6 +1,6 @@
 {
-  "name": "debug_001_template" //use "debug" in the name to run a test session and check everything is working. Does validation and state saving every 8 iterations.
-  //"name": "001_template" //remove "debug" to run the real training session.
+  //"name": "debug_001_template" //use "debug" in the name to run a test session and check everything is working. Does validation and state saving every 8 iterations.
+  "name": "001_template" //remove "debug" to run the real training session.
   , "use_tb_logger": true
   , "model":"srragan" //srragan | sr | srgan | ppon | asrragan
   , "scale": 4
@@ -10,7 +10,7 @@
   , "datasets": {
     "train": {
       "name": "DIV2K"
-      , "mode": "LRHROTF"
+      , "mode": "LRHROTF" // do not change
       //, "dataroot_HR": "../datasets/train/hr" //Original, with a single directory
       //, "dataroot_LR": "../datasets/train/lr" //Original, with a single directory
       , "dataroot_HR": [
@@ -18,7 +18,7 @@
             "../datasets/train/hr2",
             "../datasets/train/hr3"
             ] //high resolution / ground truth images
-      , "dataroot_LR": [
+      , "dataroot_LR": [             // disable this option if you're using only HR images
             "../datasets/train/lr1",
             "../datasets/train/lr2"
             //"../datasets/train/lr3"
@@ -43,7 +43,7 @@
       // If manually configuring on the fly generation of LR: (else, it will automatically default to Matlab-like downscale algorithm (777) when/if required
       , "lr_downscale": true //false
       , "lr_downscale_types": [1,2,777] //select from [0,1,2,3,4,5,420,777] where each number is: ["cv2.INTER_NEAREST", "cv2.INTER_LINEAR", "cv2.INTER_CUBIC", "cv2.INTER_AREA", "cv2.INTER_LANCZOS4", "cv2.INTER_LINEAR_EXACT","liquidscale", matlab.bicubic] //scale_algos //scaling interpolation options
-      , "hr_downscale": false, // randomly downscale HR as well
+      , "hr_downscale": false // randomly downscale HR as well. Best used with no LR
       // Rotations augmentations:
       , "use_flip": true //flip images 
       , "use_rot": true //rotate images in 90 degree angles
@@ -243,11 +243,11 @@
     //, "finalcap": "tanh" // Test. Cap Generator outputs to fit in: [-1, 1] range ("tanh"), rescale tanh to [0,1] range ("scaltanh"), cap ("sigmoid") or clamp ("clamp") to [0,1] range. Default = None. Coordinate with znorm.
     , "manual_seed": 0
     , "niter": 5e5
-    , "val_freq": 1000 //5e3
+    , "val_freq": 5000 //5e3
   }
 
   , "logger": {
     "print_freq": 200
-    , "save_checkpoint_freq": 5e3
+    , "save_checkpoint_freq": 5e3 // reduce this so that you get a checkpoint as often as you like
   }
 }
