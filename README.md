@@ -14,7 +14,7 @@ This is a fork of victorca25's [BasicSR](https://github.com/victorca25/BasicSR/)
 - Python package: [`pip install wand`](https://pypi.org/project/Wand/), to access IM from Python.
 
 ## Features
-This features are configured in the training `.json` file.
+These features are configured in the training `.json` file. Because of the nature of the changes, set training mode to `LRHROTF` beforehand. Using any other modes will behave as the original branch. 
 
 ### Load state via CPU
 - Lower end graphics card with low VRAM may have difficulty resuming from a state. If you get a out of memory error when continuing a training session, then set `"load2CPU":true` so that it is loaded to the system RAM instead.
