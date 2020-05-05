@@ -219,13 +219,16 @@ class LRHRDataset(data.Dataset):
             # 50% of flipping
             if self.opt['use_flip']:
                 use_flip = True
-            # 50% of 90 degree turn
+            # 25% of 90 degree turn
             if self.opt['use_rot']:
                 use_rot = True
-            # 50% of 45 degree turn            
+            # 50% of -45 to 45 degree turn            
             if self.opt['hr_rrot'] and np.random.rand() < 0.5:
                 hr_rrot = True
- 
+                angle = int(np.random.uniform(-45, 45))
+            else:
+                angle = 0
+				
 			# LRHR paired image mode 
             if LRHR:
 
@@ -299,12 +302,12 @@ class LRHRDataset(data.Dataset):
 				# Apply transformations
                 # cv2.imwrite('D:/tmp_test/1-input.jpg',img_HR*255) # delete this
 				# 1a. Pad if too small
-                if img_HR.shape[0] < HR_size or img_HR.shape[1] < HR_size: 
+                if img_HR.shape[0] <= HR_size or img_HR.shape[1] <= HR_size: 
                     img_HR = augmentations.addPad(img_HR, HR_size, bordercolor)
-				# b. otherwise crop before transforming if larger than HR_size
+				# b. otherwise croprotate tile
                 else:
-                    crop_size = (HR_safecrop, HR_safecrop) if hr_rrot else (HR_size, HR_size)
-                    img_HR = augmentations.random_crop(img_HR, crop_size)
+                    #crop_size = (HR_safecrop, HR_safecrop) if hr_rrot else (HR_size, HR_size)
+                    img_HR = augmentations.crop_rotate(img_HR, angle, HR_size)
                 # cv2.imwrite('D:/tmp_test/2-cropped.jpg',img_HR*255) # delete this
 				
                 # 2. Flip horizontal/vertical
@@ -316,11 +319,7 @@ class LRHRDataset(data.Dataset):
                 if use_rot:
                     img_HR = augmentations.rotate90(img_HR)
                     # cv2.imwrite('D:/tmp_test/4-rotated.jpg',img_HR*255) # delete this
-                # 4. HR Rotate 45 deg 
-                if hr_rrot:
-                    img_HR = augmentations.random_HRrotate(img_HR, bordercolor)
-                    img_HR = augmentations.crop_center(img_HR, HR_size)
-                    #cv2.imwrite('D:/tmp_test/5-rotate_HR.jpg',img_HR*255) # delete this
+
 				# Create LR based on scale
                 img_LR, _ = augmentations.scale_img(img_HR, scale, algo=ds_algo)
 
@@ -435,7 +434,7 @@ class LRHRDataset(data.Dataset):
             
         # Debug
         # Save img_LR and img_HR images to a directory to visualize what is the result of the on the fly augmentations
-        # DO NOT LEAVE ON DURING REAL TRAINING
+        # DO NOT LEAVE ON DURING REAL TRAINING, but you can use this to create validation tiles ;)
         self.output_sample_imgs = False
         if self.opt['phase'] == 'train':
             if self.output_sample_imgs:
@@ -446,7 +445,7 @@ class LRHRDataset(data.Dataset):
                 #debugpath = os.path.join(baseHRdir, os.sep, 'sampleOTFimgs')
                 
                 # debugpath = os.path.join(os.path.split(LR_dir)[0], 'sampleOTFimgs')
-                debugpath = os.path.join('D:/tmp_test', 'debugimg')
+                debugpath = os.path.join('D:/temp', 'debugimg')
                 #print(debugpath)
                 if not os.path.exists(debugpath):
                     os.makedirs(debugpath)
@@ -462,8 +461,8 @@ class LRHRDataset(data.Dataset):
                 
                 import uuid
                 hex = uuid.uuid4().hex
-                cv2.imwrite(debugpath+"/"+im_name+hex+'_LR.png',img_LRn*255) #random name to save + had to multiply by 255, else getting all black image
-                cv2.imwrite(debugpath+"/"+im_name+hex+'_HR.png',img_HRn*255) #random name to save + had to multiply by 255, else getting all black image
+                cv2.imwrite(debugpath+"/LR/"+im_name+hex+'.png',img_LRn*255) #random name to save + had to multiply by 255, else getting all black image
+                cv2.imwrite(debugpath+"/HR/"+im_name+hex+'.png',img_HRn*255) #random name to save + had to multiply by 255, else getting all black image
                 # cv2.imwrite(debugpath+"\\"+im_name+hex+'_HR1.png',img_HRn1*255) #random name to save + had to multiply by 255, else getting all black image
             
         ######## Convert images to PyTorch Tensors ########
