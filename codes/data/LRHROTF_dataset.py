@@ -18,7 +18,6 @@ class LRHRDataset(data.Dataset):
     If only HR image is provided, generate LR image on-the-fly.
     The pair is ensured by 'sorted' function, so please check the name convention.
     '''
-    HR_safecrop = None
 	
     def __init__(self, opt):
         super(LRHRDataset, self).__init__()
@@ -28,6 +27,8 @@ class LRHRDataset(data.Dataset):
         self.LR_env = None  # environment for lmdb
         self.HR_env = None
         self.output_sample_imgs = None
+        self.HR_size = None
+        self.HR_safecrop = None
 		
         # read image list from subset list txt
         if opt['subset_file'] is not None and opt['phase'] == 'train':
@@ -114,6 +115,12 @@ class LRHRDataset(data.Dataset):
                     tmp.append(lr_name)
             self.paths_LR = tmp
         
+        if opt['HR_size']:
+            self.HR_size = opt['HR_size']
+            print("HR_size:",self.HR_size)
+            self.HR_safecrop = math.ceil(np.sin(math.radians(45)) * 2 * self.HR_size)
+            print("HR_safecrop:",self.HR_safecrop)
+		
         #self.random_scale_list = [1]
 
     def __getitem__(self, index):
@@ -283,7 +290,7 @@ class LRHRDataset(data.Dataset):
                     img_HR, img_LR = augmentations.random_rotate_pairs(img_HR, img_LR, HR_size, scale)
             
             else:
-			    # SISR mode
+			    # HR-only mode
 
 				#Get downscaler
                 if self.opt['lr_downscale_types']: # if manually provided and scale algorithms are provided, then:
@@ -291,7 +298,11 @@ class LRHRDataset(data.Dataset):
                 else:
                     ## using matlab imresize to generate LR pair
                     ds_algo = 777
-
+                """
+                print("Height:",img_HR.shape[0])
+                print("Width:",img_HR.shape[0])
+                print("HR_safecrop:",HR_safecrop)
+				"""
 				# Random scaling - 50% chance
                 if self.opt['hr_downscale'] and min(img_HR.shape[0],img_HR.shape[1]) > HR_safecrop:
                     if np.random.rand() > 0.5:
