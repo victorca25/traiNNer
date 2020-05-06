@@ -24,12 +24,12 @@ These features are configured in the training `.json` file. Because of the natur
 
 ![Basic transforms](figures/basictransforms.png)
 
-### Revamped single-image HR workflow (SISR mode)
+### Revamped HR-images-only workflow
 Currently only usable with `LRHROTF` mode.
 - When training with no LR data sources set, transformations are done only on the HR tile and LR tile are only generated at the last step. 
-- If `hr_downscale": true` is set, large HR image are randomly downscaled before cropping to HR tile size.
+- If `hr_downscale": true` is set, large HR images are randomly downscaled before cropping to HR tile size.
 - If HR image is smaller than HR tile size, then it is automatically padded to the proper size with a random colour. This is different from original branch which scales the tile up, thus potentially compromising image quality.
-- If `"hr_rrot": true` is set, a different HR rotate function is used in SISR which does not scale up the result. This function is used in conjunction with cropping, so the HR tile is built directly from the HR image.
+- If `"hr_rrot": true` is set, a different HR rotate function is used which does not scale up the result. This function is used in conjunction with cropping, so the HR tile is built directly from the HR image.
 
 ![Advanced transforms](figures/new_rotatescale.png)
 
@@ -37,7 +37,7 @@ Currently only usable with `LRHROTF` mode.
 
 ### New LR noises
 - `imdither` uses Imagemagick's dither engine to create more colour-accurate ordered dithering. Unlike the default ordered `dither` noise, this produces more random varying levels of colour depth that may help represent the original image colours more accurately. A noticeable trend when using `dither` to train models was that the colour contrast slowly declined over time, which is due to the extreme colours in the generated image being mapped to less vibrant colours. Even when using low colour depth, `imdither` has slightly better colour assignment.
-  This approach emulates how the Fatality model's undithering training is done. As a bonus, it requires less processing time than the normal dithering method. *By default, the higher colour depth is clamped out. You can reenable it by increasing the colour depth in `scripts/augmentations.py` if required.`
+  This approach emulates how the Fatality model's undithering training is done. As a bonus, it requires less processing time than the normal dithering method. *By default, the higher colour depth is clamped out. You can reenable it by increasing the colour depth in `scripts/augmentations.py` if required.*
 
 ![comparing ordered dithers](figures/orderdither.png)
 
@@ -49,7 +49,7 @@ Currently only usable with `LRHROTF` mode.
 
 ![comparing scatter dithers](figures/quantize.png)
 
-- `kuwahara` uses Imagemagick's [Kuwahara filter](https://en.wikipedia.org/wiki/Kuwahara_filter) that basically removes all details from the image and only maintains the general shape. This theoretically help to train inpainting, though it is recommended to use only in short periods since normally the validation phase will act against this.
+- `kuwahara` uses Imagemagick's [Kuwahara filter](https://en.wikipedia.org/wiki/Kuwahara_filter) that basically removes all details from the image and only maintains the general shape. This theoretically helps to train inpainting, though it is recommended to be used only in short periods since normally the validation phase will act against this.
 
 ![Kuwahara filter](figures/kuwahara.png)
 
@@ -101,25 +101,3 @@ If you have any questions, we have a [discord server](https://discord.gg/cpAUpDK
         month = {October},
         year = {2019}
     }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
