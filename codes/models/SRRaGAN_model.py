@@ -62,7 +62,7 @@ class SRRaGANModel(BaseModel):
                 if train_opt['pixel_criterion']:
                     l_pix_type = train_opt['pixel_criterion']
                 else: #default to cb
-                    l_fea_type = 'cb'
+                    l_pix_type = 'cb'
                     
                 if l_pix_type == 'l1':
                     self.cri_pix = nn.L1Loss().to(self.device)
