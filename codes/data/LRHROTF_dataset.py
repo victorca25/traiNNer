@@ -117,9 +117,9 @@ class LRHRDataset(data.Dataset):
         
         if opt['HR_size']:
             self.HR_size = opt['HR_size']
-            print("HR_size:",self.HR_size)
+            #print("HR_size:",self.HR_size)
             self.HR_safecrop = math.ceil(np.sin(math.radians(45)) * 2 * self.HR_size)
-            print("HR_safecrop:",self.HR_safecrop)
+            #print("HR_safecrop:",self.HR_safecrop)
 		
         #self.random_scale_list = [1]
 
