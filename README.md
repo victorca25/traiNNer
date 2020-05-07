@@ -26,7 +26,7 @@ These features are configured in the training `.json` file. Because of the natur
 
 ### Revamped HR-images-only workflow
 Currently only usable with `LRHROTF` mode.
-- When training with no LR data sources set, transformations are done only on the HR tile and LR tile are only generated at the last step. 
+- When training with no LR data sources set, transformations are done only on the HR tile. LR tile are only generated at the last step. 
 - If `hr_downscale": true` is set, large HR images are randomly downscaled before cropping to HR tile size.
 - If HR image is smaller than HR tile size, then it is automatically padded to the proper size with a random colour. This is different from original branch which scales the tile up, thus potentially compromising image quality.
 - If `"hr_rrot": true` is set, a different HR rotate function is used which does not scale up the result. This function is used in conjunction with cropping, so the HR tile is built directly from the HR image.
@@ -58,7 +58,7 @@ Currently only usable with `LRHROTF` mode.
 - `420` will use Imagemagick's liquid scale, which in theory has no use whatsoever. However in practice, it forces the model to keep certain details while blurring out all other. Use only if one needs to get high.
 
 ## To Do list:
-- Adapt SISR mode workflow to LRHR training where LR image size is identical to HR image size
+- Adapt HR-only mode workflow to LRHR training where LR image size is identical to HR image size
 
 ## Additional Help 
 
