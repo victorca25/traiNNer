@@ -160,16 +160,18 @@ def rgbscale(image,dim): # rgbscale, better clarity than 'cv2.INTER_AREA'
         return np.array(imgin).astype(np.float32) / 255.0
 
 # random scale
-def randomscale(image,safelength,algo=None):
+def randomscale(image,safelength,algo=None,LRimage=None):
     h,w,c = image.shape
     shortest = min(w,h)
     #print("Old shortest length : ", shortest)
     scale = shortest / random.randint(safelength,shortest)
     #print("New scale : ", scale)
     scaled, interpol = scale_img(image,scale,algo)
+    if LRimage is not None:
+        LRimage, _ = scale_img(LRimage,scale,algo)
     #cv2.imwrite('D:/tmp_test/beforescale.jpg',image*255) #delete this
     #cv2.imwrite('D:/tmp_test/scaledown.jpg',scaled*255) #delete this
-    return scaled, interpol
+    return scaled, interpol, LRimage
 	
 # scale image
 def scale_img(image, scale, algo=None):
@@ -416,11 +418,14 @@ def subimage(image, center, angle, tilesize): # directly rotatecrops  from a cen
                         [v_x[1],v_x[0], s_y+nudge_y]])
     return cv2.warpAffine(image,mapping,(tilesize, tilesize),flags=cv2.WARP_INVERSE_MAP+cv2.INTER_CUBIC,borderMode=cv2.BORDER_CONSTANT)
 
-def crop_rotate(image, angle, tilesize): # randomly get a subimage from image
+def crop_rotate(image, angle, tilesize, imageLR = None): # randomly get a subimage from image
     h, w, _ = image.shape
     halfsize = tilesize / 2
     crop_point = np.array([int(np.random.uniform(halfsize, w-halfsize)) , int(np.random.uniform(halfsize, h-halfsize))])
-    return subimage(image, crop_point, angle, tilesize)
+    image = subimage(image, crop_point, angle, tilesize)
+    if imageLR is not None:
+        imageLR = subimage(imageLR, crop_point, angle, tilesize)
+    return image, imageLR
 
 
 def crop_center(image, tilesize):
@@ -1190,11 +1195,14 @@ def apply_dir(img_path, save_path, crop_size=(128, 128), scale=1, blur_algos=['c
         #"""
 		
 		
-        #scale = 4
-        img_scale, interpol_algo = scale_img(img, scale,which)
-        print(img_scale.shape)    
+        scale = 4
+        scaler = [cv2.INTER_NEAREST, cv2.INTER_LINEAR, cv2.INTER_CUBIC, cv2.INTER_AREA, cv2.INTER_LANCZOS4, cv2.INTER_LINEAR_EXACT]
+        for which in scaler:
+            img_scale, interpol_algo = scale_img(img, scale,which)
+            print(img_scale.shape)
+            img_scale, _ = scale_img(img_scale, 0.25, cv2.INTER_NEAREST)			
         #"""
-        cv2.imwrite(save_path+'/'+rann+'scale_'+str(scale)+'_'+str(interpol_algo)+'_.png',img_scale*255) 
+            cv2.imwrite(save_path+'/'+rann+'scale_'+str(scale)+'_'+str(interpol_algo)+'_.png',img_scale*255) 
         #"""
         
         img_blur, blur_algo, blur_kernel_size = blur_img(img, blur_algos)

@@ -125,6 +125,7 @@ class LRHRDataset(data.Dataset):
 
     def __getitem__(self, index):
         HR_path, LR_path = None, None
+        img_HR, img_LR = None, None
         scale = self.opt['scale']
         HR_size = self.opt['HR_size']
         if HR_size:
@@ -139,7 +140,7 @@ class LRHRDataset(data.Dataset):
         
         ######## Read the images ########
         
-		# Flag for SISR mode
+		# Init flags to check for HR-only and same-scale pair mode
         LRHR = True
 		
         # Check if LR Path is provided
@@ -188,7 +189,7 @@ class LRHRDataset(data.Dataset):
                 if np.random.rand() < aug_downscale:
                     img_LR = img_HR
             
-        # If LR is not provided, use HR and modify on the fly (SISR)
+        # If LR is not provided, use HR and modify on the fly (HR-only)
         else:
             HR_path = self.paths_HR[index]
             img_HR = util.read_img(self.HR_env, HR_path, znorm=self.znorm)
@@ -235,7 +236,7 @@ class LRHRDataset(data.Dataset):
                 angle = 0
 				
 			# LRHR paired image mode 
-            if LRHR:
+            if scale>1 and LRHR:
 
                 # 1) Validate there's an img_LR, if not, use img_HR
                 if img_LR is None:
@@ -290,13 +291,13 @@ class LRHRDataset(data.Dataset):
                     img_HR, img_LR = augmentations.random_rotate_pairs(img_HR, img_LR, HR_size, scale)
             
             else:
-			    # HR-only mode
+			    # HR-only mode or same-sized LRHR
 
 				#Get downscaler
                 if self.opt['lr_downscale_types']: # if manually provided and scale algorithms are provided, then:
                     ds_algo = self.opt['lr_downscale_types']
                 else:
-                    ## using matlab imresize to generate LR pair
+                    # using matlab imresize to generate LR pair
                     ds_algo = 777
                 """
                 print("Height:",img_HR.shape[0])
@@ -306,31 +307,49 @@ class LRHRDataset(data.Dataset):
 				# Random scaling - 50% chance
                 if self.opt['hr_downscale'] and min(img_HR.shape[0],img_HR.shape[1]) > HR_safecrop:
                     if np.random.rand() > 0.5:
-                        img_HR, _ = augmentations.randomscale(img_HR,HR_safecrop,ds_algo)
+                        if img_LR is not None:
+                            #print("LRHR Paired downscale")
+                            img_HR,_,img_LR = augmentations.randomscale(img_HR,HR_safecrop,ds_algo,LRimage=img_LR)
+                        else:
+                            img_HR, _, _ = augmentations.randomscale(img_HR,HR_safecrop,ds_algo)
 
 				# Apply transformations
                 # cv2.imwrite('D:/tmp_test/1-input.jpg',img_HR*255) # delete this
 				# 1a. Pad if too small
                 if img_HR.shape[0] <= HR_size or img_HR.shape[1] <= HR_size: 
                     img_HR = augmentations.addPad(img_HR, HR_size, bordercolor)
+                    if img_LR is not None:
+                        img_LR = augmentations.addPad(img_LR, HR_size, bordercolor)
 				# b. otherwise croprotate tile
                 else:
                     #crop_size = (HR_safecrop, HR_safecrop) if hr_rrot else (HR_size, HR_size)
-                    img_HR = augmentations.crop_rotate(img_HR, angle, HR_size)
+                    if img_LR is None:
+                        img_HR, _ = augmentations.crop_rotate(img_HR, angle, HR_size)
+                    else:
+                        img_HR, img_LR = augmentations.crop_rotate(img_LR, angle, HR_size, img_LR)
                 # cv2.imwrite('D:/tmp_test/2-cropped.jpg',img_HR*255) # delete this
 				
                 # 2. Flip horizontal/vertical
                 if use_flip:
-                    img_HR = augmentations.horizontal_flip(img_HR)
-                    img_HR = augmentations.vertical_flip(img_HR)
-                    # cv2.imwrite('D:/tmp_test/3-flipped.jpg',img_HR*255) # delete this
+                    if np.random.rand() < 0.5:  # flip Horizontal
+                        img_HR =cv2.flip(img_HR, 1)
+                        if img_LR is not None:
+                            img_LR =cv2.flip(img_LR, 1)
+
+                    if np.random.rand() < 0.25:  # flip Vertical
+                        img_HR =cv2.flip(img_HR, 0)
+                        if img_LR is not None:
+                            img_LR =cv2.flip(img_LR, 0)
                 # 3. Rotate 90 deg
-                if use_rot:
-                    img_HR = augmentations.rotate90(img_HR)
-                    # cv2.imwrite('D:/tmp_test/4-rotated.jpg',img_HR*255) # delete this
+                if use_rot and np.random.rand() < 0.25:
+                    img_HR = cv2.rotate(img_HR,cv2.ROTATE_90_CLOCKWISE)
+                    if img_LR is not None:
+                        img_LR = cv2.rotate(img_LR,cv2.ROTATE_90_CLOCKWISE)
 
 				# Create LR based on scale
-                img_LR, _ = augmentations.scale_img(img_HR, scale, algo=ds_algo)
+                if img_LR is None:
+                    img_LR, _ = augmentations.scale_img(img_HR, scale, algo=ds_algo)
+                    #print("Creating LR from HR")
 
 				
             # Final checks
@@ -454,7 +473,7 @@ class LRHRDataset(data.Dataset):
                 #debugpath = os.path.join(baseHRdir, os.sep, 'sampleOTFimgs')
                 
                 # debugpath = os.path.join(os.path.split(LR_dir)[0], 'sampleOTFimgs')
-                debugpath = os.path.join('D:/temp', 'debugimg')
+                debugpath = 'D:/Temp/debugimg/'
                 #print(debugpath)
                 if not os.path.exists(debugpath):
                     os.makedirs(debugpath)
@@ -470,8 +489,8 @@ class LRHRDataset(data.Dataset):
                 
                 import uuid
                 hex = uuid.uuid4().hex
-                cv2.imwrite(debugpath+"/LR/"+im_name+hex+'.png',img_LRn*255) #random name to save + had to multiply by 255, else getting all black image
-                cv2.imwrite(debugpath+"/HR/"+im_name+hex+'.png',img_HRn*255) #random name to save + had to multiply by 255, else getting all black image
+                cv2.imwrite(debugpath+im_name+hex+'_LR.png',img_LRn*255) #random name to save + had to multiply by 255, else getting all black image
+                cv2.imwrite(debugpath+im_name+hex+'_HR.png',img_HRn*255) #random name to save + had to multiply by 255, else getting all black image
                 # cv2.imwrite(debugpath+"\\"+im_name+hex+'_HR1.png',img_HRn1*255) #random name to save + had to multiply by 255, else getting all black image
             
         ######## Convert images to PyTorch Tensors ########
