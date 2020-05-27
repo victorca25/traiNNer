@@ -58,7 +58,8 @@ Currently only usable with `LRHROTF` mode with either only HR datasets defined, 
 - `420` will use Imagemagick's liquid scale, which in theory has no use whatsoever. However in practice, it forces the model to keep certain details while blurring out all other. Use only if one needs to get high.
 
 ## To Do list:
-- Adapt HR-only mode workflow to LRHR training where LR image size is identical to HR image size
+- Adapt new transformation workflow to scaled LRHR datasets.
+- Implement Python CUDA AMP when it becomes standard.
 
 ## Additional Help 
 
