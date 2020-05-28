@@ -172,7 +172,7 @@ def randomscale(image,safelength,algo=None,LRimage=None):
     #cv2.imwrite('D:/tmp_test/beforescale.jpg',image*255) #delete this
     #cv2.imwrite('D:/tmp_test/scaledown.jpg',scaled*255) #delete this
     return scaled, interpol, LRimage
-	
+
 # scale image
 def scale_img(image, scale, algo=None):
     h,w,c = image.shape
@@ -387,7 +387,7 @@ def random_HRrotate(image, bordercolor):
         borderMode=cv2.BORDER_CONSTANT,
         borderValue=bordercolor
     )
-	
+
     return result/255
 
 def subimage(image, center, angle, tilesize): # directly rotatecrops  from a centerpoint
@@ -418,13 +418,13 @@ def subimage(image, center, angle, tilesize): # directly rotatecrops  from a cen
                         [v_x[1],v_x[0], s_y+nudge_y]])
     return cv2.warpAffine(image,mapping,(tilesize, tilesize),flags=cv2.WARP_INVERSE_MAP+cv2.INTER_CUBIC,borderMode=cv2.BORDER_CONSTANT)
 
-def crop_rotate(image, angle, tilesize, imageLR = None): # randomly get a subimage from image
+def crop_rotate(image, angle, tilesize, imageLR = None, scaler=1): # randomly get a subimage from image
     h, w, _ = image.shape
     halfsize = tilesize / 2
     crop_point = np.array([int(np.random.uniform(halfsize, w-halfsize)) , int(np.random.uniform(halfsize, h-halfsize))])
     image = subimage(image, crop_point, angle, tilesize)
     if imageLR is not None:
-        imageLR = subimage(imageLR, crop_point, angle, tilesize)
+        imageLR = subimage(imageLR, crop_point//scaler, angle, tilesize//scaler)
     return image, imageLR
 
 
@@ -464,7 +464,7 @@ def addPad(img, HR_size, bordercolor):
     padimg = cv2.copyMakeBorder(img*255, pad_top, pad_bot, pad_left, pad_right, borderType=cv2.BORDER_CONSTANT, value=bordercolor)
     #cv2.imwrite('D:/tmp_test/padded.jpg', padimg)
     return padimg/255
-	
+
 def blur_img(img_LR, blur_algos=['clean'], kernel_size = 0):
     h,w,c = img_LR.shape
     blur_type = random.choice(blur_algos)
@@ -1083,7 +1083,7 @@ def single_image(img_path, save_path, crop_size=(128, 128), scale=1, blur_algos=
     print(img_croprotate.shape)
     cv2.imwrite(save_path+'/croprotate_.png',img_croprotate*255) 
     #"""
-	
+
     #"""
     print("Resizing")    
     img_resize, _ = resize_img(img, crop_size)
@@ -1193,8 +1193,7 @@ def apply_dir(img_path, save_path, crop_size=(128, 128), scale=1, blur_algos=['c
         #"""
         cv2.imwrite(save_path+'/'+rann+'croprotate_.png',img_croprotate*255) 
         #"""
-		
-		
+
         scale = 4
         scaler = [cv2.INTER_NEAREST, cv2.INTER_LINEAR, cv2.INTER_CUBIC, cv2.INTER_AREA, cv2.INTER_LANCZOS4, cv2.INTER_LINEAR_EXACT]
         for which in scaler:

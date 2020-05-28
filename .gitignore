@@ -33,10 +33,10 @@ data_samples/samples_segprob
 data_samples/samples_result
 codes/scripts/imgout/
 
-codes/scripts/nico02.png
-
-codes/scripts/dospi.jpg
-
-codes/scripts/venus.png
-
 codes/.vs/
+
+codes/scripts/imgin/
+
+codes/data/LRHROTF_dataset - Copy.py
+
+codes/scripts/augmentations - Copy.py
