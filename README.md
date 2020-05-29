@@ -45,7 +45,7 @@ Currently only usable with `LRHROTF` mode with either only HR datasets defined, 
 
 ![comparing scatter dithers](figures/scatterdither.png)
 
-- `imquantize` is similar to the standard `quantize` noise, except has better colour accuracy at higher colour depths.
+- `imquantize` is similar to the standard `quantize` noise, except has better colour accuracy at higher colour depths. Used to train your model to blend. Also helps with antialiasing of sharp diagonals.
 
 ![comparing scatter dithers](figures/quantize.png)
 
