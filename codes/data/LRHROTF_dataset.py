@@ -239,26 +239,29 @@ class LRHRDataset(data.Dataset):
             if LRHR:
 
                 # P1) Validate there's an img_LR, if not, use img_HR
-                if img_LR is None:
-                    img_LR = img_HR
-                    print("Image LR: ", LR_path, ("was not loaded correctly, using HR pair to downscale on the fly."))
+                #if img_LR is None:
+                #    img_LR = img_HR
+                #    print("Image LR: ", LR_path, ("was not loaded correctly, using HR pair to downscale on the fly."))
             
                 # P2) Check that HR and LR have the same dimensions ratio, else, generate new LR from HR
-                # elif img_HR.shape[0]//img_LR.shape[0] != img_HR.shape[1]//img_LR.shape[1]:
-                #     print("Warning: img_LR dimensions ratio does not match img_HR dimensions ratio for: ", HR_path)
-                #     img_LR = img_HR
-            
+                if img_HR.shape[0]//img_LR.shape[0] != img_HR.shape[1]//img_LR.shape[1]:
+                     print("Warning: img_LR dimensions ratio does not match img_HR dimensions ratio for: ", HR_path)
+                     img_LR = None
+          
             # Get downscaler
             if self.opt['lr_downscale_types']: # if manually provided and scale algorithms are provided, then:
                 ds_algo = self.opt['lr_downscale_types']
             else:
                 # using matlab imresize to generate LR pair
                 ds_algo = 777
+           
             """
             print("Height:",img_HR.shape[0])
             print("Width:",img_HR.shape[0])
             print("HR_safecrop:",HR_safecrop)
 			"""
+
+
 			# Apply transformations
 
             # 0. Random scaling - 50% chance
@@ -269,7 +272,6 @@ class LRHRDataset(data.Dataset):
                         img_HR,_,img_LR = augmentations.randomscale(img_HR,HR_safecrop,ds_algo,LRimage=img_LR)
                     else:
                         img_HR, _, _ = augmentations.randomscale(img_HR,HR_safecrop,ds_algo)
-
 
             # cv2.imwrite('D:/tmp_test/1-input.jpg',img_HR*255) # delete this
 			# 1a. Pad if too small
@@ -307,7 +309,7 @@ class LRHRDataset(data.Dataset):
 			# Create LR based on scale
             if img_LR is None:
                 img_LR, _ = augmentations.scale_img(img_HR, scale, algo=ds_algo)
-                 #print("Creating LR from HR")
+                #print("Creating LR from HR")
 
             # Final checks
             # if the resulting HR image size so far is too large or too small, resize HR to the correct size and downscale to generate a new LR on the fly
@@ -322,8 +324,9 @@ class LRHRDataset(data.Dataset):
                     ## using matlab imresize to generate LR pair
                     ds_algo = 777
                 img_LR, _ = augmentations.scale_img(img_HR, scale, algo=ds_algo)
+
             # if the resulting LR so far does not have the correct dimensions, also generate a new HR-LR image pair on the fly
-            if img_LR.shape[0] != LR_size or img_LR.shape[0] != LR_size:
+            if img_LR.shape[0] != LR_size or img_LR.shape[1] != LR_size:
                 print("Image: ", LR_path, " size does not match LR size: (", HR_size//scale,"). The image size is: ", img_LR.shape)
                 # rescale HR image to the HR_size (should not be needed, but something went wrong before, just for sanity)
                 img_HR, _ = augmentations.resize_img(np.copy(img_HR), crop_size=(HR_size,HR_size), algo=cv2.INTER_LINEAR)
@@ -420,8 +423,8 @@ class LRHRDataset(data.Dataset):
             
         # Debug
         # Save img_LR and img_HR images to a directory to visualize what is the result of the on the fly augmentations
-        # DO NOT LEAVE ON DURING REAL TRAINING, but you can use this to create validation tiles ;)
-        self.output_sample_imgs = False
+        # DO NOT LEAVE ON DURING REAL TRAINING, but you can use this to create validation tile pairs if you want ;)
+        self.output_sample_imgs =False
         if self.opt['phase'] == 'train':
             if self.output_sample_imgs:
                 import os
@@ -435,7 +438,10 @@ class LRHRDataset(data.Dataset):
                 #print(debugpath)
                 if not os.path.exists(debugpath):
                     os.makedirs(debugpath)
-                
+                if not os.path.exists(debugpath+'LR/'):
+                    os.makedirs(debugpath+'LR/')
+                if not os.path.exists(debugpath+'HR/'):
+                    os.makedirs(debugpath+'HR/')						
                 if self.opt['znorm']: # Back from [-1,1] range to [0,1] range for OpenCV2
                     img_LRn = (img_LR + 1.0) / 2.0
                     img_HRn = (img_HR + 1.0) / 2.0
@@ -447,8 +453,8 @@ class LRHRDataset(data.Dataset):
                 
                 import uuid
                 hex = uuid.uuid4().hex
-                cv2.imwrite(debugpath+im_name+hex+'_LR.png',img_LRn*255) #random name to save + had to multiply by 255, else getting all black image
-                cv2.imwrite(debugpath+im_name+hex+'_HR.png',img_HRn*255) #random name to save + had to multiply by 255, else getting all black image
+                cv2.imwrite(debugpath+'LR/'+im_name+hex+'.png',img_LRn*255) #random name to save + had to multiply by 255, else getting all black image
+                cv2.imwrite(debugpath+'HR/'+im_name+hex+'.png',img_HRn*255) #random name to save + had to multiply by 255, else getting all black image
                 # cv2.imwrite(debugpath+"\\"+im_name+hex+'_HR1.png',img_HRn1*255) #random name to save + had to multiply by 255, else getting all black image
             
         ######## Convert images to PyTorch Tensors ########
