@@ -536,6 +536,15 @@ def minmax(v): #for Floyd-Steinberg dithering noise
         v = 0
     return v
 
+def screentone(img,angle,dither):
+    #Get Image Dimensions
+    w = img.width
+    h = img.height
+    img.rotate(angle)
+    img.ordered_dither(dither)
+    img.rotate(-angle)
+    img.crop(width=w,height=h,gravity='center')
+    return img
 
 def noise_img(img_LR, noise_types=['clean']):
     noise_type = random.choice(noise_types) 
@@ -792,6 +801,52 @@ def noise_img(img_LR, noise_types=['clean']):
         with Image.from_array(img) as imgin:
             imgin.kuwahara(radius=2, sigma=1)
             noise_img = np.array(imgin).astype(np.float32) / 255.0			
+        noise_img = cv2.cvtColor(noise_img, cv2.COLOR_BGR2RGB)
+
+    elif is_wand_available == True and noise_type in ['imtonephoto','imtonecomic']: # Twittman's screen angle tones
+        #Convert to BGR
+        imgin = cv2.cvtColor(img_LR, cv2.COLOR_BGR2RGB)
+        with Image.from_array(imgin) as img:
+            inputCyan = inputMagenta = inputYellow = inputBlack = None
+            ori = img.clone()
+            
+            #Change to CMYK
+            img.type='colorseparation'
+            img.transform_colorspace='cmyk'
+            img.colorspace='cmyk'
+            img.negate()
+
+            #separate channels
+            inputCyan = img.channel_images['cyan']
+            inputMagenta = img.channel_images['magenta']
+            inputYellow = img.channel_images['yellow']
+            inputBlack = img.channel_images['black']
+
+            #set tone size & type (currently following US standard)
+            dither = "h4x4o"     # change to h8x8o for higher resolution scans emulation 
+            angleCyan = 15
+            angleMagenta = 75
+            angleYellow = 0
+            angleBlack = 45
+
+            #convert to screentones
+            inputCyan=screentone(inputCyan,angleCyan,dither)
+            inputMagenta=screentone(inputMagenta,angleMagenta,dither)
+            inputYellow=screentone(inputYellow,angleYellow,dither)
+            if noise_type=='imtonephoto':
+                inputBlack=screentone(inputBlack,angleBlack,dither)
+            
+            #Reassemble all channels
+            imgout = inputCyan
+            imgout.sequence.append(inputMagenta)
+            imgout.sequence.append(inputYellow)
+            imgout.sequence.append(inputBlack)
+            imgout.combine(colorspace='cmyk')
+            imgout.negate()
+            imgout.type='truecolor'
+            imgout.transform_colorspace='srgb'
+            imgout.colorspace='srgb'
+            noise_img = np.array(imgout).astype(np.float32) / 255.0
         noise_img = cv2.cvtColor(noise_img, cv2.COLOR_BGR2RGB)
         
     else: # Pass clean noiseless image, removed 'clean' condition so that noise_img intializes
@@ -1188,11 +1243,12 @@ def apply_dir(img_path, save_path, crop_size=(128, 128), scale=1, blur_algos=['c
         cv2.imwrite(save_path+'/'+rann+'erasing_.png',img_erasing*255) 
         #"""
         
+        """
         img_croprotate = crop_rotate(img, int(np.random.uniform(-45, 45)), crop_size[0])
         print(img_croprotate)
-        #"""
+        
         cv2.imwrite(save_path+'/'+rann+'croprotate_.png',img_croprotate*255) 
-        #"""
+        """
 
         scale = 4
         scaler = [cv2.INTER_NEAREST, cv2.INTER_LINEAR, cv2.INTER_CUBIC, cv2.INTER_AREA, cv2.INTER_LANCZOS4, cv2.INTER_LINEAR_EXACT]

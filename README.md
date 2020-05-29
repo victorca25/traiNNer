@@ -35,7 +35,7 @@ Currently only usable with `LRHROTF` mode with either only HR datasets defined, 
 
 - Since the tile cropping happens at the same time as rotation, and will be applied to a downscaled input image if HR downscale is used as well. If all transformations are used in tandem, the results in a highly robust model with a low possibility of over-fitting. The downside is takes longer for the model to take shape.
 
-### New LR noises
+### Enhanced LR noises
 - `imdither` uses Imagemagick's dither engine to create more colour-accurate ordered dithering. Unlike the default ordered `dither` noise, this produces more random varying levels of colour depth that may help represent the original image colours more accurately. A noticeable trend when using `dither` to train models was that the colour contrast slowly declined over time, which is due to the extreme colours in the generated image being mapped to less vibrant colours. Even when using low colour depth, `imdither` has slightly better colour assignment.
   This approach emulates how the Fatality model's undithering training is done. As a bonus, it requires less processing time than the normal dithering method. *By default, the higher colour depth is clamped out. You can reenable it by increasing the colour depth in `scripts/augmentations.py` if required.*
 
@@ -51,15 +51,17 @@ Currently only usable with `LRHROTF` mode with either only HR datasets defined, 
 
 - `kuwahara` uses Imagemagick's [Kuwahara filter](https://en.wikipedia.org/wiki/Kuwahara_filter) that basically removes all details from the image and only maintains the general shape. This theoretically helps to train inpainting, though it is recommended to be used only in short periods since normally the validation phase will act against this.
 
-![Kuwahara filter](figures/kuwahara.png)
+- `imtonephoto` uses Imagemagick's dither engine to simulate screen angle tones used in printing. Use if you want to train a de-toner model.
+
+![comparing scatter dithers](figures/quantize.png)
+
+- `imtonecomic` is same as above, except the black channel is not screentoned. Use to emulate how old comics were printed via colour-seperation.
 
 ### New LR downscale types
 - `123` will use Imagemagick's RGB scale, which supposedly maintains contrast when downscaling.
 - `420` will use Imagemagick's liquid scale, which in theory has no use whatsoever. However in practice, it forces the model to keep certain details while blurring out all other. Use only if one needs to get high.
 
 ## To Do list:
-- Reimplement LR-HR gotchas that were removed in the new transformation workflow revamp.
-- Add print-style angled screentone noise.
 - Implement Python CUDA AMP when it becomes standard.
 
 ## Additional Help 
@@ -70,7 +72,7 @@ If you have any questions, we have a [discord server](https://discord.gg/cpAUpDK
 
 ## Acknowledgement
 - Big thanks to *victorca25* for encouraging the creation of this fork.
-- Thanks to *Twittman* for sharing how Fatality's training tiles were generated.
+- Thanks to *Twittman* for sharing how Fatality's training tiles and screentones were generated.
 - Code architecture is inspired by [pytorch-cyclegan](https://github.com/junyanz/pytorch-CycleGAN-and-pix2pix).
 - Thanks to *Wai Ho Kwok*, who contributes to the initial version.
 
