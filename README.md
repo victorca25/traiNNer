@@ -25,8 +25,8 @@ These features are configured in the training `.json` file. Because of the natur
 ![Basic transforms](figures/basictransforms.png)
 
 ### Revamped HR transform workflow
-Currently only usable with `LRHROTF` mode with either only HR datasets defined, or same-scale datasets.
-- When training with no LR data sources set, transformations are done only on the HR tile and LR tile are only generated at the last step. 
+Currently only usable with `LRHROTF` mode only.
+- When training with no LR data sources set, transformations are done only on the HR tile and LR tile are only auto-generated at the last step. 
 - If `hr_downscale": true` is set, large dataset images are randomly downscaled before cropping to the training tile size. This also applies to the LR dataset if same-scale training is used.
 - If dataset image is smaller than training tile size, then it is automatically padded to the proper size with a random colour. This is different from original branch which scales the tile up, thus potentially compromising image quality.
 - If `"hr_rrot": true` is set, a different image rotate function is used which does not scale up the result. This function is used in conjunction with cropping, so the image tile is built directly from the dataset image.
