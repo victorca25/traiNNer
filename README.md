@@ -53,7 +53,7 @@ Currently only usable with `LRHROTF` mode with either only HR datasets defined, 
 
 - `imtonephoto` uses Imagemagick's dither engine to simulate screen angle tones used in printing. Use if you want to train a de-toner model.
 
-![comparing scatter dithers](figures/quantize.png)
+![comparing screentone](figures/screentone.png)
 
 - `imtonecomic` is same as above, except the black channel is not screentoned. Use to emulate how old comics were printed via colour-seperation.
 
