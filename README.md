@@ -51,6 +51,8 @@ Currently only usable with `LRHROTF` mode with either only HR datasets defined, 
 
 - `kuwahara` uses Imagemagick's [Kuwahara filter](https://en.wikipedia.org/wiki/Kuwahara_filter) that basically removes all details from the image and only maintains the general shape. This theoretically helps to train inpainting, though it is recommended to be used only in short periods since normally the validation phase will act against this.
 
+![comparing screentone](figures/kuwahara.png)
+
 - `imtonephoto` uses Imagemagick's dither engine to simulate screen angle tones used in printing. Use if you want to train a de-toner model.
 
 ![comparing screentone](figures/screentone.png)
