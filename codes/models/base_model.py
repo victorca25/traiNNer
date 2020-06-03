@@ -22,7 +22,7 @@ class BaseModel():
     def feed_data(self, data):
         pass
 
-    def optimize_parameters(self):
+    def optimize_parameters(self, step):
         pass
 
     def get_current_visuals(self):
@@ -40,12 +40,9 @@ class BaseModel():
     def load(self):
         pass
 
-    def update_learning_rate(self, epoch=None):
+    def update_learning_rate(self):
         for scheduler in self.schedulers:
-            if epoch:
-                scheduler.step(epoch)
-            else:
-                scheduler.step()
+            scheduler.step()
 
     if torch.__version__ >= '1.4.0':
         def get_current_learning_rate(self):

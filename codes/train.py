@@ -91,16 +91,6 @@ def main():
     # create model
     model = create_model(opt)
 
-    # circumvent pytorch warning
-    # we pass in the iteration count to scheduler.step(), so the warning doesn't apply
-    for scheduler in model.schedulers:
-        if hasattr(scheduler, '_step_count'):
-            scheduler._step_count = 0
-        # fix broken MultiStepLR.step(epoch)
-        pytorch_ver = torch.__version__
-        if opt['train']['lr_scheme'] == 'MultiStepLR' and pytorch_ver == '1.4.0':
-            scheduler.milestones = sorted(list(scheduler.milestones))
-
     # resume training
     if resume_state:
         start_epoch = resume_state['epoch']
@@ -119,9 +109,6 @@ def main():
             current_step += 1
             if current_step > total_iters:
                 break
-            # update learning rate
-            model.update_learning_rate(current_step-1)
-
             # training
             model.feed_data(train_data)
             model.optimize_parameters(current_step)
@@ -144,6 +131,9 @@ def main():
                 model.save_training_state(epoch + (n >= len(train_loader)), current_step)
                 logger.info('Models and training states saved.')
             
+            # update learning rate
+            model.update_learning_rate()
+
             # validation
             if current_step % opt['train']['val_freq'] == 0:
                 avg_psnr = 0.0
