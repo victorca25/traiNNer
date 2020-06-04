@@ -18,8 +18,7 @@ class LRHRDataset(data.Dataset):
     If only HR image is provided, generate LR image on-the-fly.
     The pair is ensured by 'sorted' function, so please check the name convention.
     '''
-    HR_safecrop = None
-	
+
     def __init__(self, opt):
         super(LRHRDataset, self).__init__()
         self.opt = opt
@@ -28,7 +27,9 @@ class LRHRDataset(data.Dataset):
         self.LR_env = None  # environment for lmdb
         self.HR_env = None
         self.output_sample_imgs = None
-		
+        self.HR_size = None
+        self.HR_safecrop = None
+
         # read image list from subset list txt
         if opt['subset_file'] is not None and opt['phase'] == 'train':
             with open(opt['subset_file']) as f:
@@ -87,46 +88,51 @@ class LRHRDataset(data.Dataset):
                 'HR and LR datasets have different number of images - {}, {}.'.format(\
                 len(self.paths_LR), len(self.paths_HR))
             """
-            #"""
+            """
             assert len(self.paths_HR) >= len(self.paths_LR), \
                 'HR dataset contains less images than LR dataset  - {}, {}.'.format(\
                 len(self.paths_LR), len(self.paths_HR))
-            #"""
-            if len(self.paths_LR) < len(self.paths_HR):
-                print('LR contains less images than HR dataset  - {}, {}. Will generate missing images on the fly.'.format(len(self.paths_LR), len(self.paths_HR)))
-                i=0
-                tmp = []
-                for idx in range(0, len(self.paths_HR)):
-                    _, HRtail = os.path.split(self.paths_HR[idx])
-                    if i < len(self.paths_LR):
-                        LRhead, LRtail = os.path.split(self.paths_LR[i])
-                        
-                        if LRtail == HRtail:
-                            LRimg_path = os.path.join(LRhead, LRtail)
-                            tmp.append(LRimg_path)
-                            i+=1
-                        else:
-                            LRimg_path = None
-                            tmp.append(LRimg_path)
-                    else: #if the last image is missing
-                        LRimg_path = None
-                        tmp.append(LRimg_path)
-                self.paths_LR = tmp
+            """
+            warned = False
+            for i in range(len(self.paths_LR)):
+                hr_name = os.path.join(opt['dataroot_HR'], os.path.relpath(self.paths_LR[i], opt['dataroot_LR']))
+                if not os.path.exists(hr_name):
+                    if not warned:
+                        warned = True
+                        print('LR dataset contains extra images. Extra images will be ignored.')
+                    print('Ignored: {}'.format(hr_name))
+            tmp = []
+            warned = False
+            for i in range(len(self.paths_HR)):
+                lr_name = os.path.join(opt['dataroot_LR'], os.path.relpath(self.paths_HR[i], opt['dataroot_HR']))
+                if not os.path.exists(lr_name):
+                    if not warned:
+                        warned = True
+                        print('LR dataset missing images from HR dataset. Will generate missing images on the fly.')
+                    print('Missing: {}'.format(lr_name))
+                    tmp.append(None)
+                else:
+                    tmp.append(lr_name)
+            self.paths_LR = tmp
+        
         if opt['HR_size']:
-            HR_size = opt['HR_size']
-            print('HR size is ',HR_size)
-            self.HR_safecrop = math.ceil(np.sin(math.radians(45)) * 2 * HR_size)
+            self.HR_size = opt['HR_size']
+            #print("HR_size:",self.HR_size)
+            self.HR_safecrop = math.ceil(np.sin(math.radians(45)) * 2 * self.HR_size)
+            #print("HR_safecrop:",self.HR_safecrop)
+
         #self.random_scale_list = [1]
 
     def __getitem__(self, index):
         HR_path, LR_path = None, None
+        img_HR, img_LR = None, None
         scale = self.opt['scale']
         HR_size = self.opt['HR_size']
         if HR_size:
             LR_size = HR_size // scale
         
         HR_safecrop = self.HR_safecrop
-		
+
         self.znorm = False # Default case: images are in the [0,1] range
         if self.opt['znorm']:
             if self.opt['znorm'] == True:
@@ -134,9 +140,9 @@ class LRHRDataset(data.Dataset):
         
         ######## Read the images ########
         
-		# Flag for SISR mode
+		# Init flags to check for HR-only and same-scale pair mode
         LRHR = True
-		
+
         # Check if LR Path is provided
         if self.paths_LR:
             #If LR is provided, check if 'rand_flip_LR_HR' is enabled
@@ -183,7 +189,7 @@ class LRHRDataset(data.Dataset):
                 if np.random.rand() < aug_downscale:
                     img_LR = img_HR
             
-        # If LR is not provided, use HR and modify on the fly (SISR)
+        # If LR is not provided, use HR and modify on the fly (HR-only)
         else:
             HR_path = self.paths_HR[index]
             img_HR = util.read_img(self.HR_env, HR_path, znorm=self.znorm)
@@ -222,110 +228,92 @@ class LRHRDataset(data.Dataset):
             # 25% of 90 degree turn
             if self.opt['use_rot']:
                 use_rot = True
-            # 50% of -45 to 45 degree turn            
-            if self.opt['hr_rrot'] and np.random.rand() < 0.5:
+            # 50% of -45 to 45 degree turn. Do not rotate if image smaller than safe croprotate size.            
+            if self.opt['hr_rrot'] and np.random.rand() < 0.5 and min(img_HR.shape[0],img_HR.shape[1])>HR_safecrop:
                 hr_rrot = True
                 angle = int(np.random.uniform(-45, 45))
             else:
                 angle = 0
-				
-			# LRHR paired image mode 
+
+			# LRHR paired image prepping
             if LRHR:
 
-                # 1) Validate there's an img_LR, if not, use img_HR
-                if img_LR is None:
-                    img_LR = img_HR
-                    print("Image LR: ", LR_path, ("was not loaded correctly, using HR pair to downscale on the fly."))
+                # P1) Validate there's an img_LR, if not, use img_HR
+                #if img_LR is None:
+                #    img_LR = img_HR
+                #    print("Image LR: ", LR_path, ("was not loaded correctly, using HR pair to downscale on the fly."))
             
-                # 2) Check that HR and LR have the same dimensions ratio, else, generate new LR from HR
-                elif img_HR.shape[0]//img_LR.shape[0] != img_HR.shape[1]//img_LR.shape[1]:
-                    print("Warning: img_LR dimensions ratio does not match img_HR dimensions ratio for: ", HR_path)
-                    img_LR = img_HR
-            
-                # 3) Random Crop (reduce computing cost and adjust images to correct size first)
-                if img_HR.shape[0] > HR_size or img_HR.shape[1] > HR_size:
-                
-                    #Original cropper: Here the scale should be in respect to the images, not to the training scale (in case they are being scaled on the fly)
-                    scaleor = img_HR.shape[0]//img_LR.shape[0]
-                    img_HR, img_LR = augmentations.random_crop_pairs(img_HR, img_LR, HR_size, scaleor)
-            
-                # 4a) Or if the HR images are too small, Resize to the HR_size size and fit LR pair to LR_size too
-                elif img_HR.shape[0] < HR_size or img_HR.shape[1] < HR_size:
-                    print("Warning: Image: ", HR_path, " size does not match HR size: (", HR_size,"). The image size is: ", img_HR.shape)
-                    # rescale HR image to the HR_size 
-                    img_HR, _ = augmentations.resize_img(np.copy(img_HR), crop_size=(HR_size,HR_size), algo=cv2.INTER_LINEAR)
-                    # rescale LR image to the LR_size (The original code discarded the img_LR and generated a new one on the fly from img_HR)
-                    img_LR, _ = augmentations.resize_img(np.copy(img_LR), crop_size=(LR_size,LR_size), algo=cv2.INTER_LINEAR)
-            
-                # 5) Randomly scale LR from HR during training if :
-                # - LR dataset is not provided
-                # - LR dataset is not in the correct scale
-                # - Also to check if LR is not at the correct scale already (if img_LR was changed to img_HR)
-                if img_LR.shape[0] != LR_size or img_LR.shape[1] != LR_size:
-                    ds_algo = 777 # default to matlab-like bicubic downscale
-                    if self.opt['lr_downscale']: # if manually set and scale algorithms are provided, then:
-                        if self.opt['lr_downscale_types']:
-                            ds_algo = self.opt['lr_downscale_types']
-                    else: # else, if for some reason img_LR is too large, default to matlab-like bicubic downscale
-                        #if not self.opt['aug_downscale']: #only print the warning if not being forced to use HR images instead of LR dataset (which is a known case)
-                        print("LR image is too large, auto generating new LR for: ", LR_path)
-                    img_LR, scale_interpol_algo = augmentations.scale_img(img_LR, scale, algo=ds_algo)
-                    if self.znorm:
-                        np.clip(img_LR, -1., 1., out=img_LR) # The generated LR sometimes get slightly out of the [-1,1] range
-                    else: 
-                        np.clip(img_LR, 0., 1., out=img_LR) # The generated LR sometimes get slightly out of the [0,1] range
-                
-            
-                # 6) Rotations. 'use_flip' = 180 or 270 degrees (mirror), 'use_rot' = 90 degrees, 'HR_rrot' = random rotations +-45 degrees
-                if use_flip:
-                    img_LR, img_HR = util.augment([img_LR, img_HR], self.opt['use_flip'])
-                if use_rot:
-                    img_LR, img_HR = util.augment([img_LR, img_HR], self.opt['use_rot'])
-                if hr_rrot:
-                    img_HR, img_LR = augmentations.random_rotate_pairs(img_HR, img_LR, HR_size, scale)
-            
+                # P2) Check that HR and LR have the same dimensions ratio, else, generate new LR from HR
+                if img_HR.shape[0]//img_LR.shape[0] != img_HR.shape[1]//img_LR.shape[1]:
+                     print("Warning: img_LR dimensions ratio does not match img_HR dimensions ratio for: ", HR_path)
+                     img_LR = None
+          
+            # Get downscaler
+            if self.opt['lr_downscale_types']: # if manually provided and scale algorithms are provided, then:
+                ds_algo = self.opt['lr_downscale_types']
             else:
-			    # SISR mode
+                # using matlab imresize to generate LR pair
+                ds_algo = 777
+           
+            """
+            print("Height:",img_HR.shape[0])
+            print("Width:",img_HR.shape[0])
+            print("HR_safecrop:",HR_safecrop)
+			"""
 
-				#Get downscaler
-                if self.opt['lr_downscale_types']: # if manually provided and scale algorithms are provided, then:
-                    ds_algo = self.opt['lr_downscale_types']
+
+			# Apply transformations
+
+            # 0. Random scaling - 50% chance
+            if self.opt['hr_downscale'] and min(img_HR.shape[0],img_HR.shape[1]) > HR_safecrop:
+                if np.random.rand() > 0.5:
+                    if img_LR is not None:
+                        #print("LRHR Paired downscale")
+                        img_HR,_,img_LR = augmentations.randomscale(img_HR,HR_safecrop,ds_algo,LRimage=img_LR)
+                    else:
+                        img_HR, _, _ = augmentations.randomscale(img_HR,HR_safecrop,ds_algo)
+
+            # cv2.imwrite('D:/tmp_test/1-input.jpg',img_HR*255) # delete this
+			# 1a. Pad if too small
+            if img_HR.shape[0] <= HR_size or img_HR.shape[1] <= HR_size:
+                img_HR = augmentations.addPad(img_HR, HR_size, bordercolor)
+                if img_LR is not None:
+                    img_LR = augmentations.addPad(img_LR, HR_size//scale, bordercolor)
+                    # b. otherwise croprotate tile
+            else:
+                #crop_size = (HR_safecrop, HR_safecrop) if hr_rrot else (HR_size, HR_size)
+                if img_LR is None:
+                    img_HR, _ = augmentations.crop_rotate(img_HR, angle, HR_size)
                 else:
-                    ## using matlab imresize to generate LR pair
-                    ds_algo = 777
-
-				# Random scaling - 50% chance
-                if self.opt['hr_downscale'] and min(img_HR.shape[0],img_HR.shape[1]) > HR_safecrop:
-                    if np.random.rand() > 0.5:
-                        img_HR, _ = augmentations.randomscale(img_HR,HR_safecrop,ds_algo)
-
-				# Apply transformations
-                # cv2.imwrite('D:/tmp_test/1-input.jpg',img_HR*255) # delete this
-				# 1a. Pad if too small
-                if img_HR.shape[0] <= HR_size or img_HR.shape[1] <= HR_size: 
-                    img_HR = augmentations.addPad(img_HR, HR_size, bordercolor)
-				# b. otherwise croprotate tile
-                else:
-                    #crop_size = (HR_safecrop, HR_safecrop) if hr_rrot else (HR_size, HR_size)
-                    img_HR = augmentations.crop_rotate(img_HR, angle, HR_size)
+                    img_HR, img_LR = augmentations.crop_rotate(img_HR, angle, HR_size, img_LR, scale)
                 # cv2.imwrite('D:/tmp_test/2-cropped.jpg',img_HR*255) # delete this
-				
-                # 2. Flip horizontal/vertical
-                if use_flip:
-                    img_HR = augmentations.horizontal_flip(img_HR)
-                    img_HR = augmentations.vertical_flip(img_HR)
-                    # cv2.imwrite('D:/tmp_test/3-flipped.jpg',img_HR*255) # delete this
-                # 3. Rotate 90 deg
-                if use_rot:
-                    img_HR = augmentations.rotate90(img_HR)
-                    # cv2.imwrite('D:/tmp_test/4-rotated.jpg',img_HR*255) # delete this
 
-				# Create LR based on scale
+            # 2. Flip horizontal/vertical
+            if use_flip:
+                if np.random.rand() < 0.5:  # flip Horizontal
+                    img_HR =cv2.flip(img_HR, 1)
+                    if img_LR is not None:
+                        img_LR =cv2.flip(img_LR, 1)
+
+                if np.random.rand() < 0.25:  # flip Vertical
+                    img_HR =cv2.flip(img_HR, 0)
+                    if img_LR is not None:
+                        img_LR =cv2.flip(img_LR, 0)
+
+            # 3. Rotate 90 deg
+            if use_rot and np.random.rand() < 0.25:
+                 img_HR = cv2.rotate(img_HR,cv2.ROTATE_90_CLOCKWISE)
+                 if img_LR is not None:
+                     img_LR = cv2.rotate(img_LR,cv2.ROTATE_90_CLOCKWISE)
+
+			# Create LR based on scale
+            if img_LR is None:
                 img_LR, _ = augmentations.scale_img(img_HR, scale, algo=ds_algo)
+                #print("Creating LR from HR")
 
-				
             # Final checks
             # if the resulting HR image size so far is too large or too small, resize HR to the correct size and downscale to generate a new LR on the fly
+            
             if img_HR.shape[0] != HR_size or img_HR.shape[1] != HR_size:
                 print("Image: ", HR_path, " size does not match HR size: (", HR_size,"). The image size is: ", img_HR.shape)
                 # rescale HR image to the HR_size 
@@ -336,8 +324,9 @@ class LRHRDataset(data.Dataset):
                     ## using matlab imresize to generate LR pair
                     ds_algo = 777
                 img_LR, _ = augmentations.scale_img(img_HR, scale, algo=ds_algo)
+
             # if the resulting LR so far does not have the correct dimensions, also generate a new HR-LR image pair on the fly
-            if img_LR.shape[0] != LR_size or img_LR.shape[0] != LR_size:
+            if img_LR.shape[0] != LR_size or img_LR.shape[1] != LR_size:
                 print("Image: ", LR_path, " size does not match LR size: (", HR_size//scale,"). The image size is: ", img_LR.shape)
                 # rescale HR image to the HR_size (should not be needed, but something went wrong before, just for sanity)
                 img_HR, _ = augmentations.resize_img(np.copy(img_HR), crop_size=(HR_size,HR_size), algo=cv2.INTER_LINEAR)
@@ -434,8 +423,8 @@ class LRHRDataset(data.Dataset):
             
         # Debug
         # Save img_LR and img_HR images to a directory to visualize what is the result of the on the fly augmentations
-        # DO NOT LEAVE ON DURING REAL TRAINING, but you can use this to create validation tiles ;)
-        self.output_sample_imgs = False
+        # DO NOT LEAVE ON DURING REAL TRAINING, but you can use this to create validation tile pairs if you want ;)
+        self.output_sample_imgs =False
         if self.opt['phase'] == 'train':
             if self.output_sample_imgs:
                 import os
@@ -445,11 +434,14 @@ class LRHRDataset(data.Dataset):
                 #debugpath = os.path.join(baseHRdir, os.sep, 'sampleOTFimgs')
                 
                 # debugpath = os.path.join(os.path.split(LR_dir)[0], 'sampleOTFimgs')
-                debugpath = os.path.join('D:/temp', 'debugimg')
+                debugpath = 'D:/Temp/debugimg/'
                 #print(debugpath)
                 if not os.path.exists(debugpath):
                     os.makedirs(debugpath)
-                
+                if not os.path.exists(debugpath+'LR/'):
+                    os.makedirs(debugpath+'LR/')
+                if not os.path.exists(debugpath+'HR/'):
+                    os.makedirs(debugpath+'HR/')						
                 if self.opt['znorm']: # Back from [-1,1] range to [0,1] range for OpenCV2
                     img_LRn = (img_LR + 1.0) / 2.0
                     img_HRn = (img_HR + 1.0) / 2.0
@@ -461,8 +453,8 @@ class LRHRDataset(data.Dataset):
                 
                 import uuid
                 hex = uuid.uuid4().hex
-                cv2.imwrite(debugpath+"/LR/"+im_name+hex+'.png',img_LRn*255) #random name to save + had to multiply by 255, else getting all black image
-                cv2.imwrite(debugpath+"/HR/"+im_name+hex+'.png',img_HRn*255) #random name to save + had to multiply by 255, else getting all black image
+                cv2.imwrite(debugpath+'LR/'+im_name+hex+'.png',img_LRn*255) #random name to save + had to multiply by 255, else getting all black image
+                cv2.imwrite(debugpath+'HR/'+im_name+hex+'.png',img_HRn*255) #random name to save + had to multiply by 255, else getting all black image
                 # cv2.imwrite(debugpath+"\\"+im_name+hex+'_HR1.png',img_HRn1*255) #random name to save + had to multiply by 255, else getting all black image
             
         ######## Convert images to PyTorch Tensors ########

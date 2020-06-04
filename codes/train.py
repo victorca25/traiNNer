@@ -16,25 +16,12 @@ from data import create_dataloader, create_dataset
 from models import create_model
 from models.modules.LPIPS import compute_dists as lpips
 
-def get_pytorch_ver():
-    #print(torch.__version__)
-    pytorch_ver = torch.__version__
-    if pytorch_ver == "0.4.0":
-        return "pre"
-    elif pytorch_ver == "0.4.1":
-        return "pre"
-    elif pytorch_ver == "1.0.0":
-        return "pre"
-    else: #"1.1.0", "1.1.1", "1.2.0", "1.2.1" and beyond
-        return "post"
-        
 def main():
     # options
     parser = argparse.ArgumentParser()
     parser.add_argument('-opt', type=str, required=True, help='Path to option JSON file.')
     opt = option.parse(parser.parse_args().opt, is_train=True)
     opt = option.dict_to_nonedict(opt)  # Convert to NoneDict, which return None for missing key.
-    pytorch_ver = get_pytorch_ver()
     
     # train from scratch OR resume training
     if opt['path']['resume_state']:
@@ -119,27 +106,15 @@ def main():
 
     # training
     logger.info('Start training from epoch: {:d}, iter: {:d}'.format(start_epoch, current_step))
-    for epoch in range(start_epoch, total_epochs):
+    epoch = start_epoch
+    while current_step <= total_iters:
         for n, train_data in enumerate(train_loader,start=1):
             current_step += 1
             if current_step > total_iters:
                 break
-            
-            if pytorch_ver=="pre": #Order for PyTorch ver < 1.1.0
-                # update learning rate
-                model.update_learning_rate(current_step-1)
-                # training
-                model.feed_data(train_data)
-                model.optimize_parameters(current_step)
-            elif pytorch_ver=="post": #Order for PyTorch ver > 1.1.0
-                # training
-                model.feed_data(train_data)
-                model.optimize_parameters(current_step)
-                # update learning rate
-                model.update_learning_rate(current_step-1)
-            else:
-                print('Error identifying PyTorch version. ', torch.__version__)
-                break
+            # training
+            model.feed_data(train_data)
+            model.optimize_parameters(current_step)
 
             # log
             if current_step % opt['logger']['print_freq'] == 0:
@@ -147,7 +122,7 @@ def main():
                 message = '<epoch:{:3d}, iter:{:8,d}, lr:{:.3e}> '.format(
                     epoch, current_step, model.get_current_learning_rate())
                 for k, v in logs.items():
-                    message += '{:s}: {:.4e} '.format(k, v)
+                    message += '{:s}:{: .4e} '.format(k, v)
                     # tensorboard logger
                     if opt['use_tb_logger'] and 'debug' not in opt['name']:
                         tb_logger.add_scalar(k, v, current_step)
@@ -159,6 +134,9 @@ def main():
                 model.save_training_state(epoch + (n >= len(train_loader)), current_step)
                 logger.info('Models and training states saved.')
             
+            # update learning rate
+            model.update_learning_rate()
+
             # validation
             if current_step % opt['train']['val_freq'] == 0:
                 avg_psnr = 0.0
@@ -225,7 +203,8 @@ def main():
                 avg_psnr = avg_psnr / idx
                 avg_ssim = avg_ssim / idx
                 #avg_lpips = avg_lpips / idx # If calculating for each image
-                avg_lpips = lpips.calculate_lpips(val_sr_imgs_list,val_gt_imgs_list) # If calculating only once for all images
+                if opt['train']['lpips_weight']:
+                    avg_lpips = lpips.calculate_lpips(val_sr_imgs_list,val_gt_imgs_list) # If calculating only once for all images
 
                 # log
                 # logger.info('# Validation # PSNR: {:.5g}, SSIM: {:.5g}'.format(avg_psnr, avg_ssim))
@@ -240,6 +219,7 @@ def main():
                     tb_logger.add_scalar('psnr', avg_psnr, current_step)
                     tb_logger.add_scalar('ssim', avg_ssim, current_step)
                     tb_logger.add_scalar('lpips', avg_lpips, current_step)
+        epoch += 1
 
     logger.info('Saving the final model.')
     model.save('latest')

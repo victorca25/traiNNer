@@ -53,7 +53,7 @@
       , "lr_blur": true //true | false
       , "lr_blur_types":  ["gaussian", "clean", "clean", "clean"] //select from: ["average","box","gaussian","bilateral","clean"] //#blur options #median and motion aren't working yet
       , "lr_noise": true //true | false
-      , "lr_noise_types": ["imdither", "imquantize", "clean", "clean", "clean"] //select from: ["kuwahara","imdither","imrandither","imquantize","gaussian", "JPEG", "quantize", "poisson", "dither", "s&p", "speckle", "clean"]
+      , "lr_noise_types": ["imdither", "imquantize", "clean", "clean", "clean"] //select from: ["kuwahara","imdither","imrandither","imquantize","imtonephoto","imtonecomic","gaussian", "JPEG", "quantize", "poisson", "dither", "s&p", "speckle", "clean"]
       , "lr_noise2": true //true | false
       , "lr_noise_types2": ["JPEG", "dither", "clean", "clean"] //select from: ["gaussian", "JPEG", "quantize", "poisson", "dither", "s&p", "speckle", "clean"]
       , "hr_noise": false //true | false

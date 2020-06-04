@@ -160,17 +160,19 @@ def rgbscale(image,dim): # rgbscale, better clarity than 'cv2.INTER_AREA'
         return np.array(imgin).astype(np.float32) / 255.0
 
 # random scale
-def randomscale(image,safelength,algo=None):
+def randomscale(image,safelength,algo=None,LRimage=None):
     h,w,c = image.shape
     shortest = min(w,h)
     #print("Old shortest length : ", shortest)
     scale = shortest / random.randint(safelength,shortest)
     #print("New scale : ", scale)
     scaled, interpol = scale_img(image,scale,algo)
+    if LRimage is not None:
+        LRimage, _ = scale_img(LRimage,scale,algo)
     #cv2.imwrite('D:/tmp_test/beforescale.jpg',image*255) #delete this
     #cv2.imwrite('D:/tmp_test/scaledown.jpg',scaled*255) #delete this
-    return scaled, interpol
-	
+    return scaled, interpol, LRimage
+
 # scale image
 def scale_img(image, scale, algo=None):
     h,w,c = image.shape
@@ -385,7 +387,7 @@ def random_HRrotate(image, bordercolor):
         borderMode=cv2.BORDER_CONSTANT,
         borderValue=bordercolor
     )
-	
+
     return result/255
 
 def subimage(image, center, angle, tilesize): # directly rotatecrops  from a centerpoint
@@ -416,11 +418,14 @@ def subimage(image, center, angle, tilesize): # directly rotatecrops  from a cen
                         [v_x[1],v_x[0], s_y+nudge_y]])
     return cv2.warpAffine(image,mapping,(tilesize, tilesize),flags=cv2.WARP_INVERSE_MAP+cv2.INTER_CUBIC,borderMode=cv2.BORDER_CONSTANT)
 
-def crop_rotate(image, angle, tilesize): # randomly get a subimage from image
+def crop_rotate(image, angle, tilesize, imageLR = None, scaler=1): # randomly get a subimage from image
     h, w, _ = image.shape
     halfsize = tilesize / 2
     crop_point = np.array([int(np.random.uniform(halfsize, w-halfsize)) , int(np.random.uniform(halfsize, h-halfsize))])
-    return subimage(image, crop_point, angle, tilesize)
+    image = subimage(image, crop_point, angle, tilesize)
+    if imageLR is not None:
+        imageLR = subimage(imageLR, crop_point//scaler, angle, tilesize//scaler)
+    return image, imageLR
 
 
 def crop_center(image, tilesize):
@@ -459,7 +464,7 @@ def addPad(img, HR_size, bordercolor):
     padimg = cv2.copyMakeBorder(img*255, pad_top, pad_bot, pad_left, pad_right, borderType=cv2.BORDER_CONSTANT, value=bordercolor)
     #cv2.imwrite('D:/tmp_test/padded.jpg', padimg)
     return padimg/255
-	
+
 def blur_img(img_LR, blur_algos=['clean'], kernel_size = 0):
     h,w,c = img_LR.shape
     blur_type = random.choice(blur_algos)
@@ -521,7 +526,7 @@ def blur_img(img_LR, blur_algos=['clean'], kernel_size = 0):
         blurred = img_LR
 
     #img_LR = np.clip(blurred, 0, 1) 
-    return img_LR, blur_type, kernel_size
+    return blurred, blur_type, kernel_size
 
 
 def minmax(v): #for Floyd-Steinberg dithering noise
@@ -531,6 +536,15 @@ def minmax(v): #for Floyd-Steinberg dithering noise
         v = 0
     return v
 
+def screentone(img,angle,dither):
+    #Get Image Dimensions
+    w = img.width
+    h = img.height
+    img.rotate(angle)
+    img.ordered_dither(dither)
+    img.rotate(-angle)
+    img.crop(width=w,height=h,gravity='center')
+    return img
 
 def noise_img(img_LR, noise_types=['clean']):
     noise_type = random.choice(noise_types) 
@@ -787,6 +801,52 @@ def noise_img(img_LR, noise_types=['clean']):
         with Image.from_array(img) as imgin:
             imgin.kuwahara(radius=2, sigma=1)
             noise_img = np.array(imgin).astype(np.float32) / 255.0			
+        noise_img = cv2.cvtColor(noise_img, cv2.COLOR_BGR2RGB)
+
+    elif is_wand_available == True and noise_type in ['imtonephoto','imtonecomic']: # Twittman's screen angle tones
+        #Convert to BGR
+        imgin = cv2.cvtColor(img_LR, cv2.COLOR_BGR2RGB)
+        with Image.from_array(imgin) as img:
+            inputCyan = inputMagenta = inputYellow = inputBlack = None
+            ori = img.clone()
+            
+            #Change to CMYK
+            img.type='colorseparation'
+            img.transform_colorspace='cmyk'
+            img.colorspace='cmyk'
+            img.negate()
+
+            #separate channels
+            inputCyan = img.channel_images['cyan']
+            inputMagenta = img.channel_images['magenta']
+            inputYellow = img.channel_images['yellow']
+            inputBlack = img.channel_images['black']
+
+            #set tone size & type (currently following US standard)
+            dither = "h4x4o"     # change to h8x8o for higher resolution scans emulation 
+            angleCyan = 15
+            angleMagenta = 75
+            angleYellow = 0
+            angleBlack = 45
+
+            #convert to screentones
+            inputCyan=screentone(inputCyan,angleCyan,dither)
+            inputMagenta=screentone(inputMagenta,angleMagenta,dither)
+            inputYellow=screentone(inputYellow,angleYellow,dither)
+            if noise_type=='imtonephoto':
+                inputBlack=screentone(inputBlack,angleBlack,dither)
+            
+            #Reassemble all channels
+            imgout = inputCyan
+            imgout.sequence.append(inputMagenta)
+            imgout.sequence.append(inputYellow)
+            imgout.sequence.append(inputBlack)
+            imgout.combine(colorspace='cmyk')
+            imgout.negate()
+            imgout.type='truecolor'
+            imgout.transform_colorspace='srgb'
+            imgout.colorspace='srgb'
+            noise_img = np.array(imgout).astype(np.float32) / 255.0
         noise_img = cv2.cvtColor(noise_img, cv2.COLOR_BGR2RGB)
         
     else: # Pass clean noiseless image, removed 'clean' condition so that noise_img intializes
@@ -1078,7 +1138,7 @@ def single_image(img_path, save_path, crop_size=(128, 128), scale=1, blur_algos=
     print(img_croprotate.shape)
     cv2.imwrite(save_path+'/croprotate_.png',img_croprotate*255) 
     #"""
-	
+
     #"""
     print("Resizing")    
     img_resize, _ = resize_img(img, crop_size)
@@ -1183,18 +1243,21 @@ def apply_dir(img_path, save_path, crop_size=(128, 128), scale=1, blur_algos=['c
         cv2.imwrite(save_path+'/'+rann+'erasing_.png',img_erasing*255) 
         #"""
         
+        """
         img_croprotate = crop_rotate(img, int(np.random.uniform(-45, 45)), crop_size[0])
         print(img_croprotate)
-        #"""
+        
         cv2.imwrite(save_path+'/'+rann+'croprotate_.png',img_croprotate*255) 
+        """
+
+        scale = 4
+        scaler = [cv2.INTER_NEAREST, cv2.INTER_LINEAR, cv2.INTER_CUBIC, cv2.INTER_AREA, cv2.INTER_LANCZOS4, cv2.INTER_LINEAR_EXACT]
+        for which in scaler:
+            img_scale, interpol_algo = scale_img(img, scale,which)
+            print(img_scale.shape)
+            img_scale, _ = scale_img(img_scale, 0.25, cv2.INTER_NEAREST)			
         #"""
-		
-		
-        #scale = 4
-        img_scale, interpol_algo = scale_img(img, scale,which)
-        print(img_scale.shape)    
-        #"""
-        cv2.imwrite(save_path+'/'+rann+'scale_'+str(scale)+'_'+str(interpol_algo)+'_.png',img_scale*255) 
+            cv2.imwrite(save_path+'/'+rann+'scale_'+str(scale)+'_'+str(interpol_algo)+'_.png',img_scale*255) 
         #"""
         
         img_blur, blur_algo, blur_kernel_size = blur_img(img, blur_algos)
