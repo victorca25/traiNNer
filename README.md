@@ -1,6 +1,8 @@
-# BasicSR (Enhanced)
+# BasicSR with Automatic Mixed Precision
 
-This is a fork of victorca25's [BasicSR](https://github.com/victorca25/BasicSR/) branch. Most of the documentation is there if you need any information regarding BasicSR. This readme will focus specifically on the differences of this fork.
+This branch of BasicSR utilises the highly experimental PyTorch CUDA AMP library, which allows Volta/Turing GPUs to take advantage of their Tensor cores, which reduces training time by +/- 50%.
+
+*Most of the documentation is at the Master branch. This branch only deals with AMP specific features.
 
 ## Table of Contents
 1. [Dependencies](#dependencies)
@@ -8,67 +10,15 @@ This is a fork of victorca25's [BasicSR](https://github.com/victorca25/BasicSR/)
 3. [To Do](#todo)
 
 ### Dependencies
-
+- PyTorch 1.6, which is currently the latest nightly builds.
 - All [BasicSR dependencies](https://github.com/victorca25/BasicSR/) as documented at victorca25's branch.
 - [ImageMagick](https://imagemagick.org/script/download.php) for the image manipulation library. 
 - Python package: [`pip install wand`](https://pypi.org/project/Wand/), to access IM from Python.
 
 ## Features
-These features are configured in the training `.json` file. Because of the nature of the changes, set training mode to `LRHROTF` beforehand. Using any other modes will behave as the original branch. 
+To run this branch requires you to own a Volta/Turing GPU. Minimum entry level card is perhaps a GeForce RTX 2060. Running it on normal GTX may bring only slight improvements, or may even be counter-productive. You may read at [nVidia's dev website](https://developer.nvidia.com/automatic-mixed-precision) on how it works.
 
-### Load state via CPU
-- Lower end graphics card with low VRAM may have difficulty resuming from a state. If you get a out of memory error when continuing a training session, then set `"load2CPU":true` so that it is loaded to the system RAM instead.
-
-### Image transformation
-- Random flipping, 90 degree rotate and HR rotate are all independent from each other, and can be applied together.
-
-![Basic transforms](figures/basictransforms.png)
-
-### Revamped HR transform workflow
-Currently only usable with `LRHROTF` mode only.
-- When training with no LR data sources set, transformations are done only on the HR tile and LR tile are only auto-generated at the last step. 
-- If `hr_downscale": true` is set, large dataset images are randomly downscaled before cropping to the training tile size. This also applies to the LR dataset if same-scale training is used.
-- If dataset image is smaller than training tile size, then it is automatically padded to the proper size with a random colour. This is different from original branch which scales the tile up, thus potentially compromising image quality.
-- If `"hr_rrot": true` is set, a different image rotate function is used which does not scale up the result. This function is used in conjunction with cropping, so the image tile is built directly from the dataset image.
-
-![Advanced transforms](figures/new_rotatescale.png)
-
-- Since the tile cropping happens at the same time as rotation, and will be applied to a downscaled input image if HR downscale is used as well. If all transformations are used in tandem, the results in a highly robust model with a low possibility of over-fitting. The downside is takes longer for the model to take shape.
-
-### Enhanced LR noises
-- `imdither` uses Imagemagick's dither engine to create more colour-accurate ordered dithering. Unlike the default ordered `dither` noise, this produces more random varying levels of colour depth that may help represent the original image colours more accurately. A noticeable trend when using `dither` to train models was that the colour contrast slowly declined over time, which is due to the extreme colours in the generated image being mapped to less vibrant colours. Even when using low colour depth, `imdither` has slightly better colour assignment.
-  This approach emulates how the Fatality model's undithering training is done. As a bonus, it requires less processing time than the normal dithering method. *By default, the higher colour depth is clamped out. You can reenable it by increasing the colour depth in `scripts/augmentations.py` if required.*
-
-![comparing ordered dithers](figures/orderdither.png)
-
-- `imrandither` uses Imagemagick's dither engine to create mapped scattered dithering. Main difference between the implemention in the original `dither` noise is that it allows for higher colour depth, and adds Riemersma dither apart from Floyd-Steinberg. Care must be taken place when enabling this noise because the result may be almost similar to how some pixel art portray detail. Use only if you need extra denoising & blending strength.
-
-![comparing scatter dithers](figures/scatterdither.png)
-
-- `imquantize` is similar to the standard `quantize` noise, except has better colour accuracy at higher colour depths. Used to train your model to blend. Also helps with antialiasing of sharp diagonals.
-
-![comparing scatter dithers](figures/quantize.png)
-
-- `kuwahara` uses Imagemagick's [Kuwahara filter](https://en.wikipedia.org/wiki/Kuwahara_filter) that basically removes all details from the image and only maintains the general shape. This theoretically helps to train inpainting, though it is recommended to be used only in short periods since normally the validation phase will act against this.
-
-![comparing screentone](figures/kuwahara.png)
-
-- `imtonephoto` uses Imagemagick's dither engine to simulate screen angle tones used in printing. Use if you want to train a de-toner model.
-
-![comparing screentone](figures/screentone.png)
-
-- `imtonecomic` is same as above, except the black channel is not screentoned. Use to emulate how old comics were printed via colour-seperation.
-
-### New LR downscale types
-- `123` will use Imagemagick's RGB scale, which supposedly maintains contrast when downscaling.
-- `420` will use Imagemagick's liquid scale, which in theory has no use whatsoever. However in practice, it forces the model to keep certain details while blurring out all other. Use only if one needs to get high.
-
-## To Do list:
-- Update PyTorch 1.6 compatibility, and creation of BasicSR-AMP branch.
-
-## Additional Help 
-
-If you have any questions, we have a [discord server](https://discord.gg/cpAUpDK) where you can ask them and a [Wiki](https://upscale.wiki) with more information.
+Currently, the SSIM loss function is **broken** when using mixed precision, so do not use it in your training options.
 
 ---
 
