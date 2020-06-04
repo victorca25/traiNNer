@@ -4,8 +4,8 @@ This is a fork of victorca25's [BasicSR](https://github.com/victorca25/BasicSR/)
 
 ## Table of Contents
 1. [Dependencies](#dependencies)
-3. [Features](#features)
-4. [To Do](#todo)
+2. [Features](#features)
+3. [To Do](#todo)
 
 ### Dependencies
 
@@ -24,18 +24,18 @@ These features are configured in the training `.json` file. Because of the natur
 
 ![Basic transforms](figures/basictransforms.png)
 
-### Revamped HR-images-only workflow
-Currently only usable with `LRHROTF` mode.
-- When training with no LR data sources set, transformations are done only on the HR tile. LR tile are only generated at the last step. 
-- If `hr_downscale": true` is set, large HR images are randomly downscaled before cropping to HR tile size.
-- If HR image is smaller than HR tile size, then it is automatically padded to the proper size with a random colour. This is different from original branch which scales the tile up, thus potentially compromising image quality.
-- If `"hr_rrot": true` is set, a different HR rotate function is used which does not scale up the result. This function is used in conjunction with cropping, so the HR tile is built directly from the HR image.
+### Revamped HR transform workflow
+Currently only usable with `LRHROTF` mode only.
+- When training with no LR data sources set, transformations are done only on the HR tile and LR tile are only auto-generated at the last step. 
+- If `hr_downscale": true` is set, large dataset images are randomly downscaled before cropping to the training tile size. This also applies to the LR dataset if same-scale training is used.
+- If dataset image is smaller than training tile size, then it is automatically padded to the proper size with a random colour. This is different from original branch which scales the tile up, thus potentially compromising image quality.
+- If `"hr_rrot": true` is set, a different image rotate function is used which does not scale up the result. This function is used in conjunction with cropping, so the image tile is built directly from the dataset image.
 
 ![Advanced transforms](figures/new_rotatescale.png)
 
 - Since the tile cropping happens at the same time as rotation, and will be applied to a downscaled input image if HR downscale is used as well. If all transformations are used in tandem, the results in a highly robust model with a low possibility of over-fitting. The downside is takes longer for the model to take shape.
 
-### New LR noises
+### Enhanced LR noises
 - `imdither` uses Imagemagick's dither engine to create more colour-accurate ordered dithering. Unlike the default ordered `dither` noise, this produces more random varying levels of colour depth that may help represent the original image colours more accurately. A noticeable trend when using `dither` to train models was that the colour contrast slowly declined over time, which is due to the extreme colours in the generated image being mapped to less vibrant colours. Even when using low colour depth, `imdither` has slightly better colour assignment.
   This approach emulates how the Fatality model's undithering training is done. As a bonus, it requires less processing time than the normal dithering method. *By default, the higher colour depth is clamped out. You can reenable it by increasing the colour depth in `scripts/augmentations.py` if required.*
 
@@ -45,20 +45,26 @@ Currently only usable with `LRHROTF` mode.
 
 ![comparing scatter dithers](figures/scatterdither.png)
 
-- `imquantize` is similar to the standard `quantize` noise, except has better colour accuracy at higher colour depths.
+- `imquantize` is similar to the standard `quantize` noise, except has better colour accuracy at higher colour depths. Used to train your model to blend. Also helps with antialiasing of sharp diagonals.
 
 ![comparing scatter dithers](figures/quantize.png)
 
 - `kuwahara` uses Imagemagick's [Kuwahara filter](https://en.wikipedia.org/wiki/Kuwahara_filter) that basically removes all details from the image and only maintains the general shape. This theoretically helps to train inpainting, though it is recommended to be used only in short periods since normally the validation phase will act against this.
 
-![Kuwahara filter](figures/kuwahara.png)
+![comparing screentone](figures/kuwahara.png)
+
+- `imtonephoto` uses Imagemagick's dither engine to simulate screen angle tones used in printing. Use if you want to train a de-toner model.
+
+![comparing screentone](figures/screentone.png)
+
+- `imtonecomic` is same as above, except the black channel is not screentoned. Use to emulate how old comics were printed via colour-seperation.
 
 ### New LR downscale types
 - `123` will use Imagemagick's RGB scale, which supposedly maintains contrast when downscaling.
 - `420` will use Imagemagick's liquid scale, which in theory has no use whatsoever. However in practice, it forces the model to keep certain details while blurring out all other. Use only if one needs to get high.
 
 ## To Do list:
-- Adapt HR-only mode workflow to LRHR training where LR image size is identical to HR image size
+- Adapt SISR mode workflow to LRHR training where LR image size is identical to HR image size
 
 ## Additional Help 
 
@@ -68,7 +74,7 @@ If you have any questions, we have a [discord server](https://discord.gg/cpAUpDK
 
 ## Acknowledgement
 - Big thanks to *victorca25* for encouraging the creation of this fork.
-- Thanks to *Twittman* for sharing how Fatality's training tiles were generated.
+- Thanks to *Twittman* for sharing how Fatality's training tiles and screentones were generated.
 - Code architecture is inspired by [pytorch-cyclegan](https://github.com/junyanz/pytorch-CycleGAN-and-pix2pix).
 - Thanks to *Wai Ho Kwok*, who contributes to the initial version.
 
