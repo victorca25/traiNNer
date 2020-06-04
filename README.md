@@ -1,6 +1,6 @@
 # BasicSR with Automatic Mixed Precision
 
-This branch of BasicSR utilises the highly experimental PyTorch CUDA AMP library, which allows Volta/Turing GPUs to take advantage of their Tensor cores, which reduces training time by +/- 50%.
+This branch of BasicSR utilises the highly experimental PyTorch CUDA AMP library, which allows Volta/Turing GPUs to take advantage of their Tensor cores that results in reducing training time by +/- 50%.
 
 *Most of the documentation is at the Master branch. This branch only deals with AMP specific features.
 
