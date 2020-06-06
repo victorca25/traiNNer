@@ -94,6 +94,9 @@ class BaseModel():
         for i, o in enumerate(resume_optimizers):
             self.optimizers[i].load_state_dict(o)
         for i, s in enumerate(resume_schedulers):
+            # Work around a bug in .state files from victorca25's BasicSR
+            if isinstance(self.schedulers[i].milestones, Counter) and isinstance(s['milestones'], list):
+                s['milestones'] = Counter(s['milestones'])
             self.schedulers[i].load_state_dict(s)
 
     def update_schedulers(self, train_opt):
