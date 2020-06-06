@@ -96,6 +96,8 @@ def read_img(env, path, out_nc=3):
             # img = (255*plt.imread(path)[:,:,:3]).astype('uint8')
     else:
         img = _read_lmdb_img(env, path)
+    if img is None:
+        raise ValueError('Image [{:s}] could not be decoded.'.format(path))
     img = img.astype(np.float32) / 255.
     # print("Min. image value:",img.min()) # Debug
     # print("Max. image value:",img.max()) # Debug
