@@ -6,8 +6,18 @@ from collections import OrderedDict
 
 import torch
 import torch.nn as nn
-from torch.optim import lr_scheduler
-from torch.cuda.amp import autocast, GradScaler
+try :
+    from torch.optim import lr_scheduler
+    from torch.cuda.amp import autocast, GradScaler
+    use_amp = True
+    logger.info('Using Automatic Mixed Precision')
+except:
+    use_amp = False
+    class autocast():
+        def __enter__(self):
+            return self
+        def __exit__(self,x,y,z):
+            return self
 
 import models.networks as networks
 from .base_model import BaseModel
@@ -34,7 +44,8 @@ class SRRaGANModel(BaseModel):
     def __init__(self, opt):
         super(SRRaGANModel, self).__init__(opt)
         train_opt = opt['train']
-        self.scaler = GradScaler()
+        if use_amp:
+            self.scaler = GradScaler()
 
         if self.is_train:
             if opt['datasets']['train']['znorm']:
@@ -396,12 +407,6 @@ class SRRaGANModel(BaseModel):
                     if self.cri_pix:  # pixel loss
                         l_g_pix = self.l_pix_w * self.cri_pix(self.fake_H, self.var_H)
                         l_g_total += l_g_pix
-                    if self.cri_ssim: # structural loss
-                        l_g_ssim = 1.-(self.l_ssim_w *self.cri_ssim(self.fake_H, self.var_H)) #using ssim2.py
-                        if torch.isnan(l_g_ssim).any():
-                            l_g_total = l_g_total
-                        else:
-                            l_g_total += l_g_ssim
                     if self.cri_fea:  # feature loss
                         real_fea = self.netF(self.var_H).detach()
                         fake_fea = self.netF(self.fake_H)
@@ -428,16 +433,26 @@ class SRRaGANModel(BaseModel):
                     if self.cri_cpl:# CPL Loss (SPL)
                         l_g_cpl = self.l_spl_w * self.cri_cpl(self.fake_H, self.var_H)
                         l_g_total += l_g_cpl
-                
+                if self.cri_ssim: # structural loss / must be in fp32
+                    l_g_ssim = 1.-(self.l_ssim_w *self.cri_ssim(self.fake_H, self.var_H)) #using ssim2.py
+                    if torch.isnan(l_g_ssim).any():
+                        l_g_total = l_g_total
+                    else:
+                        l_g_total += l_g_ssim
+                with autocast():						
                     # G gan + cls loss
                     pred_g_fake = self.netD(self.fake_H)
                     pred_d_real = self.netD(self.var_ref).detach()
                     l_g_gan = self.l_gan_w * (self.cri_gan(pred_d_real - torch.mean(pred_g_fake), False) +
                                               self.cri_gan(pred_g_fake - torch.mean(pred_d_real), True)) / 2
                     l_g_total += l_g_gan
-                self.scaler.scale(l_g_total).backward()
-                self.scaler.step(self.optimizer_G)
-
+                if use_amp:
+                    self.scaler.scale(l_g_total).backward()
+                    self.scaler.step(self.optimizer_G)
+                else:
+                    l_g_total.backward()
+                    self.optimizer_G.step()
+				
             # D
             for p in self.netD.parameters():
                 p.requires_grad = True
@@ -463,8 +478,12 @@ class SRRaGANModel(BaseModel):
                     l_d_gp = self.l_gp_w * self.cri_gp(interp, interp_crit)
                     l_d_total += l_d_gp
 
-            self.scaler.scale(l_d_total).backward()
-            self.scaler.step(self.optimizer_D)
+            if use_amp:
+                self.scaler.scale(l_d_total).backward()
+                self.scaler.step(self.optimizer_D)
+            else:
+                l_d_total.backward()
+                self.optimizer_D.step()
 
             # set log
             if step % self.D_update_ratio == 0 and step > self.D_init_iters:
@@ -501,12 +520,6 @@ class SRRaGANModel(BaseModel):
                 if self.cri_pix:  # pixel loss
                     l_g_pix = self.l_pix_w * self.cri_pix(self.fake_H, self.var_H)
                     l_g_total += l_g_pix
-                if self.cri_ssim: # structural loss (Structural Dissimilarity)
-                    l_g_ssim = 1.-(self.l_ssim_w.float() *self.cri_ssim(self.fake_H.float(), self.var_H.float())) #using ssim2.py
-                    if torch.isnan(l_g_ssim).any(): #at random, l_g_ssim is returning NaN for ms-ssim, which breaks the model. Temporary hack, until I find out what's going on.
-                        l_g_total = l_g_total
-                    else:
-                        l_g_total += l_g_ssim
                 if self.cri_fea:  # feature loss
                     real_fea = self.netF(self.var_H).detach()
                     fake_fea = self.netF(self.fake_H)
@@ -535,9 +548,19 @@ class SRRaGANModel(BaseModel):
                 if self.cri_cpl: # CPL Loss (SPL)
                     l_g_cpl = self.l_spl_w * self.cri_cpl(self.fake_H, self.var_H)
                     l_g_total += l_g_cpl
-                
-            self.scaler.scale(l_g_total).backward()
-            self.scaler.step(self.optimizer_G)
+            if self.cri_ssim: # structural loss (Structural Dissimilarity)
+                l_g_ssim = 1.-(self.l_ssim_w.float() *self.cri_ssim(self.fake_H.float(), self.var_H.float())) #using ssim2.py
+                if torch.isnan(l_g_ssim).any(): #at random, l_g_ssim is returning NaN for ms-ssim, which breaks the model. Temporary hack, until I find out what's going on.
+                    l_g_total = l_g_total
+                else:
+                    l_g_total += l_g_ssim
+
+            if use_amp:
+                self.scaler.scale(l_g_total).backward()
+                self.scaler.step(self.optimizer_G)
+            else:
+                l_g_total.backward()
+                self.optimizer_G.step()
             
             # set log
             # G
@@ -557,7 +580,8 @@ class SRRaGANModel(BaseModel):
                 self.log_dict['l_g_gpl'] = l_g_gpl.item()
             if self.cri_cpl: 
                 self.log_dict['l_g_cpl'] = l_g_cpl.item()
-        self.scaler.update()
+        if use_amp:
+            self.scaler.update()
 
 
     def test(self):
