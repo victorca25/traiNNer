@@ -6,8 +6,9 @@ from collections import OrderedDict
 
 import torch
 import torch.nn as nn
+from torch.optim import lr_scheduler
+
 try :
-    from torch.optim import lr_scheduler
     from torch.cuda.amp import autocast, GradScaler
     use_amp = True
     print('Using Automatic Mixed Precision.')
