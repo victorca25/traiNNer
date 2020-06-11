@@ -25,6 +25,7 @@ Currently, the SSIM loss function is **broken** when using mixed precision, so d
 ## Acknowledgement
 - Big thanks to *victorca25* for encouraging the creation of this fork.
 - Thanks to *Twittman* for sharing how Fatality's training tiles and screentones were generated.
+- Thanks to [BlueAmulet](https://github.com/BlueAmulet) for his various bug fixes to BasicSR.
 - Code architecture is inspired by [pytorch-cyclegan](https://github.com/junyanz/pytorch-CycleGAN-and-pix2pix).
 - Thanks to *Wai Ho Kwok*, who contributes to the initial version.
 
