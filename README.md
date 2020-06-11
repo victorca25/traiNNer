@@ -67,7 +67,7 @@ Currently only usable with `LRHROTF` mode only.
 - `420` will use Imagemagick's liquid scale, which in theory has no use whatsoever. However in practice, it forces the model to keep certain details while blurring out all other. Use only if one needs to get high.
 
 ## To Do list:
-- Update PyTorch 1.6 compatibility, and creation of BasicSR-AMP branch.
+- ~~Update PyTorch 1.6 compatibility, and creation of BasicSR-AMP branch.~~ DONE.
 
 ## Additional Help 
 
