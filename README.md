@@ -5,13 +5,16 @@ This is a fork of victorca25's [BasicSR](https://github.com/victorca25/BasicSR/)
 ## Table of Contents
 1. [Dependencies](#dependencies)
 2. [Features](#features)
-3. [To Do](#todo)
+3. [To Do](#to-do-list)
 
 ### Dependencies
-
+- Minimum PyTorch 1.5, PyTorch 1.6 (Preview) required if you want to use AMP for training.
 - All [BasicSR dependencies](https://github.com/victorca25/BasicSR/) as documented at victorca25's branch.
 - [ImageMagick](https://imagemagick.org/script/download.php) for the image manipulation library. 
 - Python package: [`pip install wand`](https://pypi.org/project/Wand/), to access IM from Python.
+
+## New feature : Automatic Mixed Precision (AMP)
+Implemented AMP, which will automatically cast tensors to 16-bit floating point depending on usage. The reason for this is for the newer Volta/Turing card to take advantage of their Tensor Cores. Testing this feature shows a speed-up of about ~50% during training. You can read more about AMP at [nvidia's dev site](https://developer.nvidia.com/automatic-mixed-precision).
 
 ## Features
 These features are configured in the training `.json` file. Because of the nature of the changes, set training mode to `LRHROTF` beforehand. Using any other modes will behave as the original branch. 
