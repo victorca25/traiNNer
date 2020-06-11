@@ -203,8 +203,8 @@ def main():
                 avg_psnr = avg_psnr / idx
                 avg_ssim = avg_ssim / idx
                 #avg_lpips = avg_lpips / idx # If calculating for each image
-                if opt['train']['lpips_weight']:
-                    avg_lpips = lpips.calculate_lpips(val_sr_imgs_list,val_gt_imgs_list) # If calculating only once for all images
+                #if opt['train']['lpips_weight']: # Rather slow to calculate, turn on if needed
+                #    avg_lpips = lpips.calculate_lpips(val_sr_imgs_list,val_gt_imgs_list) # If calculating only once for all images
 
                 # log
                 # logger.info('# Validation # PSNR: {:.5g}, SSIM: {:.5g}'.format(avg_psnr, avg_ssim))
