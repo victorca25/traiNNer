@@ -10,7 +10,7 @@ try :
     from torch.optim import lr_scheduler
     from torch.cuda.amp import autocast, GradScaler
     use_amp = True
-    logger.info('Using Automatic Mixed Precision')
+    print('Using Automatic Mixed Precision.')
 except:
     use_amp = False
     class autocast():
@@ -46,6 +46,7 @@ class SRRaGANModel(BaseModel):
         train_opt = opt['train']
         if use_amp:
             self.scaler = GradScaler()
+            print('Creating GradScaler for AMP.')
 
         if self.is_train:
             if opt['datasets']['train']['znorm']:
@@ -353,7 +354,7 @@ class SRRaGANModel(BaseModel):
 
             self.log_dict = OrderedDict()
         # print network
-        self.print_network()
+        #self.print_network()
 
     def feed_data(self, data, need_HR=True):
         # LR
