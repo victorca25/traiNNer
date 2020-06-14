@@ -196,12 +196,12 @@ def main():
                     val_sr_imgs_list.append(cropped_sr_img) # If calculating only once for all images
                     
                     # LPIPS only works for RGB images
-                    avg_psnr += util.calculate_psnr(cropped_sr_img * 255, cropped_gt_img * 255)
-                    avg_ssim += util.calculate_ssim(cropped_sr_img * 255, cropped_gt_img * 255)
+                    #-avg_psnr += util.calculate_psnr(cropped_sr_img * 255, cropped_gt_img * 255)
+                    #-avg_ssim += util.calculate_ssim(cropped_sr_img * 255, cropped_gt_img * 255)
                     #avg_lpips += lpips.calculate_lpips([cropped_sr_img], [cropped_gt_img]) # If calculating for each image
 
-                avg_psnr = avg_psnr / idx
-                avg_ssim = avg_ssim / idx
+                #-avg_psnr = avg_psnr / idx
+                #-avg_ssim = avg_ssim / idx
                 #avg_lpips = avg_lpips / idx # If calculating for each image
                 #if opt['train']['lpips_weight']: # Rather slow to calculate, turn on if needed
                 #    avg_lpips = lpips.calculate_lpips(val_sr_imgs_list,val_gt_imgs_list) # If calculating only once for all images
