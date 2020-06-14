@@ -26,8 +26,10 @@ def main():
     # options
     parser = argparse.ArgumentParser()
     parser.add_argument('-opt', type=str, required=True, help='Path to option JSON file.')
+    parser.add_argument('-simple', action='store_true', help='Enable simple logging.')
     opt = option.parse(parser.parse_args().opt, is_train=True)
     opt = option.dict_to_nonedict(opt)  # Convert to NoneDict, which return None for missing key.
+    use_simple_logging = parser.parse_args().simple
     
     # train from scratch OR resume training
     if opt['path']['resume_state']:
@@ -124,7 +126,8 @@ def main():
                 message = '<epoch:{:3d}, iter:{:8,d}, lr:{:.3e}> '.format(
                     epoch, current_step, model.get_current_learning_rate())
                 for k, v in logs.items():
-                    message += '{:s}:{: .4e} '.format(k, v)
+                    if not use_simple_logging:
+                        message += '{:s}:{: .4e} '.format(k, v)
                     # tensorboard logger
                     if opt['use_tb_logger'] and 'debug' not in opt['name']:
                         tb_logger.add_scalar(k, v, current_step)
@@ -132,9 +135,15 @@ def main():
 
             # save models and training states (changed to save models before validation)
             if current_step % opt['logger']['save_checkpoint_freq'] == 0:
-                model.save(current_step)
+                model.save(current_step, opt['name'])
                 model.save_training_state(epoch + (n >= train_size), current_step)
                 logger.info('Models and training states saved.')
+
+            # save & overwrite backup models & training states
+            if opt['logger']['backup_freq'] and current_step % opt['logger']['backup_freq'] == 0:
+                model.save(current_step, opt['name'], True)
+                model.save_training_state(epoch + (n >= len(train_loader)), current_step, True)
+                logger.info('Backup models and training states saved.')
             
             # update learning rate
             model.update_learning_rate()

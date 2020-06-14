@@ -59,8 +59,11 @@ class BaseModel():
         n = sum(map(lambda x: x.numel(), network.parameters()))
         return s, n
 
-    def save_network(self, network, network_label, iter_step):
-        save_filename = '{}_{}.pth'.format(iter_step, network_label)
+    def save_network(self, network, network_label, iter_step, name, backup=False):
+        if backup:
+            save_filename = 'backup_{}.pth'.format(network_label)
+        else:
+            save_filename = '{}_{}_{}.pth'.format(name, iter_step, network_label)
         save_path = os.path.join(self.opt['path']['models'], save_filename)
         if isinstance(network, nn.DataParallel):
             network = network.module
@@ -74,14 +77,14 @@ class BaseModel():
             network = network.module
         network.load_state_dict(torch.load(load_path), strict=strict)
 
-    def save_training_state(self, epoch, iter_step):
+    def save_training_state(self, epoch, iter_step, backup=False):
         '''Saves training state during training, which will be used for resuming'''
         state = {'epoch': epoch, 'iter': iter_step, 'schedulers': [], 'optimizers': []}
         for s in self.schedulers:
             state['schedulers'].append(s.state_dict())
         for o in self.optimizers:
             state['optimizers'].append(o.state_dict())
-        save_filename = '{}.state'.format(iter_step)
+        save_filename = '{}.state'.format('backup' if backup else iter_step)
         save_path = os.path.join(self.opt['path']['training_state'], save_filename)
         torch.save(state, save_path)
 
