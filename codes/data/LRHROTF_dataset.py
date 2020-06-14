@@ -274,14 +274,14 @@ class LRHRDataset(data.Dataset):
                         img_HR, _, _ = augmentations.randomscale(img_HR,HR_safecrop,ds_algo)
 
             # cv2.imwrite('D:/tmp_test/1-input.jpg',img_HR*255) # delete this
-			# 1a. Pad if too small
-            if img_HR.shape[0] < HR_size or img_HR.shape[1] < HR_size:
+			# 1a. Pad if at least one side is smaller than tile size
+            if min(img_HR.shape[0],img_HR.shape[1]) < HR_size:
                 img_HR = augmentations.addPad(img_HR, HR_size, bordercolor)
                 if img_LR is not None:
                     img_LR = augmentations.addPad(img_LR, HR_size//scale, bordercolor)
                     # b. otherwise croprotate tile
-            else:
-                #crop_size = (HR_safecrop, HR_safecrop) if hr_rrot else (HR_size, HR_size)
+            #1b.Crop if at least one side bigger than tile size
+            if max(img_HR.shape[0],img_HR.shape[1]) > HR_size:
                 if img_LR is None:
                     img_HR, _ = augmentations.crop_rotate(img_HR, angle, HR_size)
                 else:
