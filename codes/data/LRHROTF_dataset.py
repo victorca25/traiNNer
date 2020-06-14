@@ -275,7 +275,7 @@ class LRHRDataset(data.Dataset):
 
             # cv2.imwrite('D:/tmp_test/1-input.jpg',img_HR*255) # delete this
 			# 1a. Pad if too small
-            if img_HR.shape[0] <= HR_size or img_HR.shape[1] <= HR_size:
+            if img_HR.shape[0] < HR_size or img_HR.shape[1] < HR_size:
                 img_HR = augmentations.addPad(img_HR, HR_size, bordercolor)
                 if img_LR is not None:
                     img_LR = augmentations.addPad(img_LR, HR_size//scale, bordercolor)
