@@ -63,8 +63,10 @@
       //, "lr_fringes_chance": 0.4
       //, "auto_levels": "HR" // "HR" | "LR" | "Both" // add auto levels to the images to expand dynamic range. Can use with (MS)-SSIM.
       //, "rand_auto_levels": 0.7 // Example: 0.4 = 40% chance of adding auto levels to images on the fly
-      //, "unsharp_mask": true // add a unsharpening mask to HR images. Can work well together with the HFEN loss function.
-      //, "rand_unsharp": 1 // Example: 0.5 = 50% chance of adding unsharpening mask to HR images on the fly
+      //, "hr_unsharp_mask": true // add a unsharpening mask to HR images. Can work well together with the HFEN loss function.
+      //, "hr_rand_unsharp": 1 // Example: 0.5 = 50% chance of adding unsharpening mask to HR images on the fly
+      //, "lr_unsharp_mask": true // add a unsharpening mask to LR images. Can be useful for training a model to reduce resize sharpness/haloing
+      //, "lr_rand_unsharp": 1 // Example: 0.5 = 50% chance of adding unsharpening mask to LR images on the fly
       
       //Augmentations for classification or (maybe) inpainting networks:
       //, "lr_cutout": false
