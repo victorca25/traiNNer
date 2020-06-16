@@ -93,6 +93,8 @@ class LRHRDataset(data.Dataset):
                 'HR dataset contains less images than LR dataset  - {}, {}.'.format(\
                 len(self.paths_LR), len(self.paths_HR))
             """
+			
+            """ temp disable until fix
             warned = False
             for i in range(len(self.paths_LR)):
                 hr_name = os.path.join(opt['dataroot_HR'], os.path.relpath(self.paths_LR[i], opt['dataroot_LR']))
@@ -113,7 +115,32 @@ class LRHRDataset(data.Dataset):
                     tmp.append(None)
                 else:
                     tmp.append(lr_name)
-            self.paths_LR = tmp
+            self.paths_LR = tmp					
+            """
+            assert len(self.paths_HR) >= len(self.paths_LR), \
+                'HR dataset contains less images than LR dataset  - {}, {}.'.format(\
+                len(self.paths_LR), len(self.paths_HR))
+            #"""
+            if len(self.paths_LR) < len(self.paths_HR):
+                print('LR contains less images than HR dataset  - {}, {}. Will generate missing images on the fly.'.format(len(self.paths_LR), len(self.paths_HR)))
+                i=0
+                tmp = []
+                for idx in range(0, len(self.paths_HR)):
+                    _, HRtail = os.path.split(self.paths_HR[idx])
+                    if i < len(self.paths_LR):
+                        LRhead, LRtail = os.path.split(self.paths_LR[i])
+                        
+                        if LRtail == HRtail:
+                            LRimg_path = os.path.join(LRhead, LRtail)
+                            tmp.append(LRimg_path)
+                            i+=1
+                        else:
+                            LRimg_path = None
+                            tmp.append(LRimg_path)
+                    else: #if the last image is missing
+                        LRimg_path = None
+                        tmp.append(LRimg_path)			
+                self.paths_LR = tmp
         
         if opt['HR_size']:
             self.HR_size = opt['HR_size']
@@ -274,14 +301,14 @@ class LRHRDataset(data.Dataset):
                         img_HR, _, _ = augmentations.randomscale(img_HR,HR_safecrop,ds_algo)
 
             # cv2.imwrite('D:/tmp_test/1-input.jpg',img_HR*255) # delete this
-			# 1a. Pad if too small
-            if img_HR.shape[0] <= HR_size or img_HR.shape[1] <= HR_size:
+			# 1a. Pad if at least one side is smaller than tile size
+            if min(img_HR.shape[0],img_HR.shape[1]) < HR_size:
                 img_HR = augmentations.addPad(img_HR, HR_size, bordercolor)
                 if img_LR is not None:
                     img_LR = augmentations.addPad(img_LR, HR_size//scale, bordercolor)
                     # b. otherwise croprotate tile
-            else:
-                #crop_size = (HR_safecrop, HR_safecrop) if hr_rrot else (HR_size, HR_size)
+            #1b.Crop if at least one side bigger than tile size
+            if max(img_HR.shape[0],img_HR.shape[1]) > HR_size:
                 if img_LR is None:
                     img_HR, _ = augmentations.crop_rotate(img_HR, angle, HR_size)
                 else:

@@ -416,7 +416,11 @@ def subimage(image, center, angle, tilesize): # directly rotatecrops  from a cen
 
     mapping = np.array([[v_x[0],-v_x[1], s_x+nudge_x],
                         [v_x[1],v_x[0], s_y+nudge_y]])
-    return cv2.warpAffine(image,mapping,(tilesize, tilesize),flags=cv2.WARP_INVERSE_MAP+cv2.INTER_CUBIC,borderMode=cv2.BORDER_CONSTANT)
+    if angle==0:
+        interType=cv2.INTER_NEAREST
+    else:
+        interType=cv2.INTER_CUBIC
+    return cv2.warpAffine(image,mapping,(tilesize, tilesize),flags=cv2.WARP_INVERSE_MAP+interType,borderMode=cv2.BORDER_CONSTANT)
 
 def crop_rotate(image, angle, tilesize, imageLR = None, scaler=1): # randomly get a subimage from image
     h, w, _ = image.shape

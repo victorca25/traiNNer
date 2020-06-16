@@ -5,13 +5,16 @@ This is a fork of victorca25's [BasicSR](https://github.com/victorca25/BasicSR/)
 ## Table of Contents
 1. [Dependencies](#dependencies)
 2. [Features](#features)
-3. [To Do](#todo)
+3. [To Do](#to-do-list)
 
 ### Dependencies
-
+- Minimum PyTorch 1.5, PyTorch 1.6 (Preview) required if you want to use AMP for training.
 - All [BasicSR dependencies](https://github.com/victorca25/BasicSR/) as documented at victorca25's branch.
-- [ImageMagick](https://imagemagick.org/script/download.php) for the image manipulation library. 
+- [ImageMagick](https://imagemagick.org/script/download.php) for the image manipulation library. Manually install IM dev library, or just get the library via `apt-get install libmagickwand-dev`
 - Python package: [`pip install wand`](https://pypi.org/project/Wand/), to access IM from Python.
+
+## New feature : Automatic Mixed Precision (AMP)
+Implemented AMP, which will automatically cast tensors to 16-bit floating point depending on usage. The reason for this is for the newer Volta/Turing card to take advantage of their Tensor Cores. Testing this feature shows a speed-up of about ~50% during training. You can read more about AMP at [nvidia's dev site](https://developer.nvidia.com/automatic-mixed-precision).
 
 ## Features
 These features are configured in the training `.json` file. Because of the nature of the changes, set training mode to `LRHROTF` beforehand. Using any other modes will behave as the original branch. 
@@ -64,7 +67,7 @@ Currently only usable with `LRHROTF` mode only.
 - `420` will use Imagemagick's liquid scale, which in theory has no use whatsoever. However in practice, it forces the model to keep certain details while blurring out all other. Use only if one needs to get high.
 
 ## To Do list:
-- Adapt SISR mode workflow to LRHR training where LR image size is identical to HR image size
+- ~~Update PyTorch 1.6 compatibility, and creation of BasicSR-AMP branch.~~ DONE.
 
 ## Additional Help 
 
@@ -75,6 +78,7 @@ If you have any questions, we have a [discord server](https://discord.gg/cpAUpDK
 ## Acknowledgement
 - Big thanks to *victorca25* for encouraging the creation of this fork.
 - Thanks to *Twittman* for sharing how Fatality's training tiles and screentones were generated.
+- Thanks to [BlueAmulet](https://github.com/BlueAmulet) for his various bug fixes to BasicSR.
 - Code architecture is inspired by [pytorch-cyclegan](https://github.com/junyanz/pytorch-CycleGAN-and-pix2pix).
 - Thanks to *Wai Ho Kwok*, who contributes to the initial version.
 
