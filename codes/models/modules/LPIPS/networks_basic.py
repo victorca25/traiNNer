@@ -19,10 +19,9 @@ def spatial_average(in_tens, keepdim=True):
 
 def upsample(in_tens, out_H=64): # assumes scale factor is same for H and W
     in_H = in_tens.shape[2]
-    scale_factor = 1.*out_H/in_H
 
     #return nn.Upsample(scale_factor=scale_factor, mode='bilinear', align_corners=False)(in_tens)
-    return Upsample(scale_factor=scale_factor, mode='bilinear', align_corners=False)(in_tens)
+    return Upsample(size=out_H, mode='bilinear', align_corners=False)(in_tens)
 
 # Learned perceptual metric
 class PNetLin(nn.Module):

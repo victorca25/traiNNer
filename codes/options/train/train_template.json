@@ -64,8 +64,10 @@
       //, "lr_fringes_chance": 0.4
       //, "auto_levels": "HR" // "HR" | "LR" | "Both" //add auto levels to the images to expand dynamic range. Can use with SPL loss or (MS)-SSIM.
       //, "rand_auto_levels": 0.7 //Example: 0.4 = 40% chance of adding auto levels to images on the fly
-      //, "unsharp_mask": true //add a unsharpening mask to HR images. Can work well together with the HFEN loss function.
-      //, "rand_unsharp": 1 //Example: 0.5 = 50% chance of adding unsharpening mask to HR images on the fly
+      //, "hr_unsharp_mask": true //add a unsharpening mask to HR images. Can work well together with the HFEN loss function.
+      //, "hr_rand_unsharp": 1 //Example: 0.5 = 50% chance of adding unsharpening mask to HR images on the fly
+      //, "lr_unsharp_mask": true //add a unsharpening mask to LR images. Can be useful for training a model to reduce resize sharpness/haloing
+      //, "lr_rand_unsharp": 1 //Example: 0.5 = 50% chance of adding unsharpening mask to LR images on the fly
       
       // Augmentations for classification or (maybe) inpainting networks:
       //, "lr_cutout": false
@@ -86,7 +88,7 @@
       
       //, "hr_crop": false //disabled
       , "lr_downscale": false
-      , "lr_downscale_types": [0,1] //[0,1,2,3,4,5] //["cv2.INTER_NEAREST", "cv2.INTER_LINEAR", "cv2.INTER_CUBIC", "cv2.INTER_AREA", "cv2.INTER_LANCZOS4", "cv2.INTER_LINEAR_EXACT"] //scale_algos //scaling interpolation options
+      , "lr_downscale_types": ["nearest", "linear"] //["nearest", "linear", "cubic", "area", "lanczos4", "linear_exact", "matlab_bicubic"] //scale_algos //scaling interpolation options
     }
   }
 
@@ -248,6 +250,7 @@
 
   , "logger": {
     "print_freq": 200
-    , "save_checkpoint_freq": 5e3 // reduce this so that you get a checkpoint as often as you like
+    , "save_checkpoint_freq": 5e3
+    , "backup_freq": 200
   }
 }

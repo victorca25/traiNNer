@@ -2,6 +2,7 @@ import os
 import os.path as osp
 import logging
 from collections import OrderedDict
+import cv2
 import json
 
 
@@ -60,6 +61,17 @@ def parse(opt_path, is_train=True):
         if phase == 'train' and 'subset_file' in dataset and dataset['subset_file'] is not None:
             dataset['subset_file'] = os.path.expanduser(dataset['subset_file'])
 
+        if 'lr_downscale_types' in dataset and dataset['lr_downscale_types'] is not None:
+            types = []
+            for ds_type in dataset['lr_downscale_types']:
+                if type(ds_type) == str:
+                    if ds_type.lower() == 'matlab_bicubic':
+                        ds_type = 777
+                    else:
+                        ds_type = getattr(cv2, 'INTER_' + ds_type.upper())
+                types.append(ds_type)
+            dataset['lr_downscale_types'] = types
+
     # path
     for key, path in opt['path'].items():
         if path and key in opt['path']:
@@ -77,6 +89,7 @@ def parse(opt_path, is_train=True):
             opt['train']['val_freq'] = 8
             opt['logger']['print_freq'] = 2
             opt['logger']['save_checkpoint_freq'] = 8
+            opt['logger']['backup_freq'] = 2
             opt['train']['lr_decay_iter'] = 10
     else:  # test
         results_root = os.path.join(opt['path']['root'], 'results', opt['name'])
@@ -132,11 +145,16 @@ def check_resume(opt):
         if opt['path']['pretrain_model_G'] or opt['path']['pretrain_model_D']:
             logger.warning('pretrain_model path will be ignored when resuming training.')
 
-        state_idx = osp.basename(opt['path']['resume_state']).split('.')[0]
-        opt['path']['pretrain_model_G'] = osp.join(opt['path']['models'],
-                                                   '{}_G.pth'.format(state_idx))
+        if 'backup.state' in opt['path']['resume_state']:
+            name = 'backup'
+        else:
+            state_idx = osp.basename(opt['path']['resume_state']).split('.')[0]
+            name = '{}_{}'.format(opt['name'], state_idx)
+                
+        opt['path']['pretrain_model_G'] = osp.join(opt['path']['models'],'{}_G.pth'.format(name))
         logger.info('Set [pretrain_model_G] to ' + opt['path']['pretrain_model_G'])
         if 'gan' in opt['model']:
-            opt['path']['pretrain_model_D'] = osp.join(opt['path']['models'],
-                                                       '{}_D.pth'.format(state_idx))
+            opt['path']['pretrain_model_D'] = osp.join(opt['path']['models'], '{}_D.pth'.format(name))
             logger.info('Set [pretrain_model_D] to ' + opt['path']['pretrain_model_D'])
+    
+    

@@ -236,10 +236,10 @@ class LRHRDataset(data.Dataset):
         #  converting to tensors
         # self.opt['color'] For both LR and HR as in the the original code, kept for compatibility
         # self.opt['color_HR'] and self.opt['color_LR'] for independent control
-        if self.opt['color_HR'] or self.opt['color']: # Only change HR
-            img_HR = util.channel_convert(img_HR.shape[2], self.opt['color'], [img_HR])[0]
-        if self.opt['color_LR'] or self.opt['color']: # Only change LR
-            img_LR = util.channel_convert(img_LR.shape[2], self.opt['color'], [img_LR])[0]
+        if self.opt["color_HR"] or self.opt["color"]:  # Only change HR
+            img_HR = util.channel_convert(img_HR.shape[2], self.opt["color_HR"] if self.opt["color_HR"] else self.opt["color"], [img_HR])[0]
+        if self.opt["color_LR"] or self.opt["color"]:  # Only change LR
+            img_LR = util.channel_convert(img_LR.shape[2], self.opt["color_LR"] if self.opt["color_LR"] else self.opt["color"], [img_LR])[0]
         
         ######## Augmentations ########
         
@@ -431,9 +431,14 @@ class LRHRDataset(data.Dataset):
             
             # Apply unsharpening mask to HR images
             # img_HR1 = img_HR
-            rand_unsharp = (1 - self.opt['rand_unsharp']) if self.opt['rand_unsharp'] else 1 # Randomize for augmentation
-            if self.opt['unsharp_mask'] and np.random.rand() > rand_unsharp:
+            rand_unsharp = (1 - self.opt['hr_rand_unsharp']) if self.opt['hr_rand_unsharp'] else 1 # Randomize for augmentation
+            if self.opt['hr_unsharp_mask'] and np.random.rand() > rand_unsharp:
                 img_HR = augmentations.unsharp_mask(img_HR, znorm=self.znorm)
+
+            # Apply unsharpening mask to LR images
+            rand_unsharp = (1 - self.opt["lr_rand_unsharp"]) if self.opt["lr_rand_unsharp"] else 1  # Randomize for augmentation
+            if self.opt["lr_unsharp_mask"] and np.random.rand() > rand_unsharp:
+                img_LR = augmentations.unsharp_mask(img_LR, znorm=self.znorm)
         
         # For testing and validation
         if self.opt['phase'] != 'train':
