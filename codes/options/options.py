@@ -2,6 +2,7 @@ import os
 import os.path as osp
 import logging
 from collections import OrderedDict
+import cv2
 import json
 
 
@@ -59,6 +60,17 @@ def parse(opt_path, is_train=True):
 
         if phase == 'train' and 'subset_file' in dataset and dataset['subset_file'] is not None:
             dataset['subset_file'] = os.path.expanduser(dataset['subset_file'])
+
+        if 'lr_downscale_types' in dataset and dataset['lr_downscale_types'] is not None:
+            types = []
+            for ds_type in dataset['lr_downscale_types']:
+                if type(ds_type) == str:
+                    if ds_type.lower() == 'matlab_bicubic':
+                        ds_type = 777
+                    else:
+                        ds_type = getattr(cv2, 'INTER_' + ds_type.upper())
+                types.append(ds_type)
+            dataset['lr_downscale_types'] = types
 
     # path
     for key, path in opt['path'].items():

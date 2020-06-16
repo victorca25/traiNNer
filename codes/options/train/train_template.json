@@ -41,7 +41,7 @@
       
       //If manually configuring on the fly generation of LR: (else, it will automatically default to Matlab-like downscale algorithm (777) when/if required
       , "lr_downscale": true // false
-      , "lr_downscale_types": [1, 2, 777] // select from [0, 1, 2, 3, 4, 5, 777] where each number is: ["cv2.INTER_NEAREST", "cv2.INTER_LINEAR", "cv2.INTER_CUBIC", "cv2.INTER_AREA", "cv2.INTER_LANCZOS4", "cv2.INTER_LINEAR_EXACT", matlab.bicubic] // scale_algos //scaling interpolation options
+      , "lr_downscale_types": ["linear", "cubic", "matlab_bicubic"] // select from: ["nearest", "linear", "cubic", "area", "lanczos4", "linear_exact", "matlab_bicubic"] // scale_algos //scaling interpolation options
       
       //Rotations augmentations:
       , "use_flip": true // flip images
@@ -83,7 +83,7 @@
       
       //, "hr_crop": false // disabled
       , "lr_downscale": false
-      , "lr_downscale_types": [0, 1] // [0, 1, 2, 3, 4, 5] // ["cv2.INTER_NEAREST", "cv2.INTER_LINEAR", "cv2.INTER_CUBIC", "cv2.INTER_AREA", "cv2.INTER_LANCZOS4", "cv2.INTER_LINEAR_EXACT"] // scale_algos //scaling interpolation options
+      , "lr_downscale_types": ["nearest", "linear"] // ["nearest", "linear", "cubic", "area", "lanczos4", "linear_exact", "matlab_bicubic"] // scale_algos //scaling interpolation options
     }
   }
 
