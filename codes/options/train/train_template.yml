@@ -40,7 +40,7 @@ datasets:
 
     #If manually configuring on the fly generation of LR: (else, it will automatically default to Matlab-like downscale algorithm (777) when/if required
     lr_downscale: true # false
-    lr_downscale_types: ['linear', 'cubic', 'matlab_bicubic'] # select from: ['nearest', 'linear', 'cubic', 'area', 'lanczos4', 'linear_exact', 'matlab_bicubic'] # scale_algos #scaling interpolation options
+    lr_downscale_types: ['area', 'matlab_bicubic'] # select from: ['nearest', 'linear', 'cubic', 'area', 'lanczos4', 'linear_exact', 'matlab_bicubic'] # scale_algos #scaling interpolation options
 
     #Rotations augmentations:
     use_flip: true # flip images
