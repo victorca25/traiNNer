@@ -217,9 +217,9 @@ class LRHRDataset(data.Dataset):
             if img_HR.shape[0] < HR_size or img_HR.shape[1] < HR_size:
                 print("Warning: Image: ", HR_path, " size does not match HR size: (", HR_size,"). The image size is: ", img_HR.shape)
                 # rescale HR image to the HR_size 
-                img_HR, _ = augmentations.resize_img(np.copy(img_HR), crop_size=(HR_size,HR_size), algo=cv2.INTER_LINEAR)
+                img_HR, _ = augmentations.resize_img(np.copy(img_HR), (HR_size, HR_size), algo=cv2.INTER_LINEAR)
                 # rescale LR image to the LR_size (The original code discarded the img_LR and generated a new one on the fly from img_HR)
-                img_LR, _ = augmentations.resize_img(np.copy(img_LR), crop_size=(LR_size,LR_size), algo=cv2.INTER_LINEAR)
+                img_LR, _ = augmentations.resize_img(np.copy(img_LR), (LR_size, LR_size), algo=cv2.INTER_LINEAR)
             
             # Randomly scale LR from HR during training if :
             # - LR dataset is not provided
@@ -259,7 +259,7 @@ class LRHRDataset(data.Dataset):
             if img_HR.shape[0] != HR_size or img_HR.shape[1] != HR_size:
                 print("Image: ", HR_path, " size does not match HR size: (", HR_size,"). The image size is: ", img_HR.shape)
                 # rescale HR image to the HR_size 
-                img_HR, _ = augmentations.resize_img(np.copy(img_HR), crop_size=(HR_size,HR_size), algo=cv2.INTER_LINEAR)
+                img_HR, _ = augmentations.resize_img(np.copy(img_HR), (HR_size, HR_size), algo=cv2.INTER_LINEAR)
                 if self.opt['lr_downscale_types']: # if manually provided and scale algorithms are provided, then:
                     ds_algo = self.opt['lr_downscale_types']
                 else:
@@ -270,7 +270,7 @@ class LRHRDataset(data.Dataset):
             if img_LR.shape[0] != LR_size or img_LR.shape[0] != LR_size:
                 print("Image: ", LR_path, " size does not match LR size: (", HR_size//scale,"). The image size is: ", img_LR.shape)
                 # rescale HR image to the HR_size (should not be needed, but something went wrong before, just for sanity)
-                img_HR, _ = augmentations.resize_img(np.copy(img_HR), crop_size=(HR_size,HR_size), algo=cv2.INTER_LINEAR)
+                img_HR, _ = augmentations.resize_img(np.copy(img_HR), (HR_size, HR_size), algo=cv2.INTER_LINEAR)
                 if self.opt['lr_downscale_types']: # if manually provided and scale algorithms are provided, then:
                     ds_algo = self.opt['lr_downscale_types']
                 else:
