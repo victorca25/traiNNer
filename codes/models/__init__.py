@@ -19,12 +19,6 @@ def create_model(opt):
         # from .SRRaGAN_n2n_model import SRRaGANModel as M
     # elif model == 'ESPCN':
         # from .ESPCN_model import ESPCNModel as M
-    elif model == 'ppon':
-        from .ppon_model import PPONModel as M
-    # elif model == 'lpips':
-        # from .LPIPS_model import LPIPSModel as M
-    elif model == 'asrragan':
-        from .ASRRaGAN_model import ASRRaGANModel as M
     else:
         raise NotImplementedError('Model [{:s}] not recognized.'.format(model))
     m = M(opt)

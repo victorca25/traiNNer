@@ -76,15 +76,7 @@ class BaseModel():
         if isinstance(network, nn.DataParallel):
             network = network.module
         network.load_state_dict(torch.load(load_path), strict=strict)
-        # If loading a network with more parameters into a model with less parameters:
-        # model = ABPN_v5(input_dim=3, dim=32)
-        # model = model.to(device)
-        # pretrained_dict = torch.load(model_name, map_location=lambda storage, loc: storage)
-        # model_dict = model.state_dict()
-        # pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict}
-        # model_dict.update(pretrained_dict)
-        # model.load_state_dict(model_dict)
-        
+
     def save_training_state(self, epoch, iter_step, backup=False):
         '''Saves training state during training, which will be used for resuming'''
         state = {'epoch': epoch, 'iter': iter_step, 'schedulers': [], 'optimizers': []}

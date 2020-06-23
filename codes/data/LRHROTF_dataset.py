@@ -88,35 +88,7 @@ class LRHRDataset(data.Dataset):
                 'HR and LR datasets have different number of images - {}, {}.'.format(\
                 len(self.paths_LR), len(self.paths_HR))
             """
-            """
-            assert len(self.paths_HR) >= len(self.paths_LR), \
-                'HR dataset contains less images than LR dataset  - {}, {}.'.format(\
-                len(self.paths_LR), len(self.paths_HR))
-            """
-			
-            """ temp disable until fix
-            warned = False
-            for i in range(len(self.paths_LR)):
-                hr_name = os.path.join(opt['dataroot_HR'], os.path.relpath(self.paths_LR[i], opt['dataroot_LR']))
-                if not os.path.exists(hr_name):
-                    if not warned:
-                        warned = True
-                        print('LR dataset contains extra images. Extra images will be ignored.')
-                    print('Ignored: {}'.format(hr_name))
-            tmp = []
-            warned = False
-            for i in range(len(self.paths_HR)):
-                lr_name = os.path.join(opt['dataroot_LR'], os.path.relpath(self.paths_HR[i], opt['dataroot_HR']))
-                if not os.path.exists(lr_name):
-                    if not warned:
-                        warned = True
-                        print('LR dataset missing images from HR dataset. Will generate missing images on the fly.')
-                    print('Missing: {}'.format(lr_name))
-                    tmp.append(None)
-                else:
-                    tmp.append(lr_name)
-            self.paths_LR = tmp					
-            """
+            #"""
             assert len(self.paths_HR) >= len(self.paths_LR), \
                 'HR dataset contains less images than LR dataset  - {}, {}.'.format(\
                 len(self.paths_LR), len(self.paths_HR))
@@ -139,7 +111,7 @@ class LRHRDataset(data.Dataset):
                             tmp.append(LRimg_path)
                     else: #if the last image is missing
                         LRimg_path = None
-                        tmp.append(LRimg_path)			
+                        tmp.append(LRimg_path)
                 self.paths_LR = tmp
         
         if opt['HR_size']:
@@ -158,18 +130,8 @@ class LRHRDataset(data.Dataset):
         if HR_size:
             LR_size = HR_size // scale
         
-        HR_safecrop = self.HR_safecrop
-
-        self.znorm = False # Default case: images are in the [0,1] range
-        if self.opt['znorm']:
-            if self.opt['znorm'] == True:
-                self.znorm = True # Alternative: images are z-normalized to the [-1,1] range
-        
         ######## Read the images ########
         
-		# Init flags to check for HR-only and same-scale pair mode
-        LRHR = True
-
         # Check if LR Path is provided
         if self.paths_LR:
             #If LR is provided, check if 'rand_flip_LR_HR' is enabled
@@ -192,7 +154,7 @@ class LRHRDataset(data.Dataset):
             # If img_LR (LR_path) doesn't exist, use img_HR (HR_path)
             if LRHRchance < (1- flip_chance):
                 HR_path = self.paths_HR[index]
-                LR_path = self.paths_LR[index] 
+                LR_path = self.paths_LR[index]
                 if LR_path is None:
                     LR_path = HR_path
                 #print("HR kept")
@@ -206,8 +168,8 @@ class LRHRDataset(data.Dataset):
                 #print("HR flipped")
             
             # Read the LR and HR images from the provided paths
-            img_LR = util.read_img(self.LR_env, LR_path, znorm=self.znorm)
-            img_HR = util.read_img(self.HR_env, HR_path, znorm=self.znorm)
+            img_LR = util.read_img(self.LR_env, LR_path)
+            img_HR = util.read_img(self.HR_env, HR_path)
             
             # Even if LR dataset is provided, force to generate aug_downscale % of downscales OTF from HR
             # The code will later make sure img_LR has the correct size
@@ -216,12 +178,11 @@ class LRHRDataset(data.Dataset):
                 if np.random.rand() < aug_downscale:
                     img_LR = img_HR
             
-        # If LR is not provided, use HR and modify on the fly (HR-only)
+        # If LR is not provided, use HR and modify on the fly
         else:
             HR_path = self.paths_HR[index]
-            img_HR = util.read_img(self.HR_env, HR_path, znorm=self.znorm)
-            #img_LR = img_HR
-            LRHR = False
+            img_HR = util.read_img(self.HR_env, HR_path)
+            img_LR = img_HR
         
         ######## Modify the images ########
         
@@ -422,23 +383,22 @@ class LRHRDataset(data.Dataset):
             rand_levels = (1 - self.opt['rand_auto_levels']) if self.opt['rand_auto_levels'] else 1 # Randomize for augmentation
             if self.opt['auto_levels'] and np.random.rand() > rand_levels:
                 if self.opt['auto_levels'] == 'HR':
-                    img_HR = augmentations.simplest_cb(img_HR, znorm=self.znorm)
+                    img_HR = augmentations.simplest_cb(img_HR)
                 elif self.opt['auto_levels'] == 'LR':
-                    img_LR = augmentations.simplest_cb(img_LR, znorm=self.znorm)
+                    img_LR = augmentations.simplest_cb(img_LR)
                 elif self.opt['auto_levels'] == True or self.opt['auto_levels'] == 'Both':
-                    img_HR = augmentations.simplest_cb(img_HR, znorm=self.znorm)
-                    img_LR = augmentations.simplest_cb(img_LR, znorm=self.znorm)
+                    img_HR = augmentations.simplest_cb(img_HR)
+                    img_LR = augmentations.simplest_cb(img_LR)
             
             # Apply unsharpening mask to HR images
-            # img_HR1 = img_HR
             rand_unsharp = (1 - self.opt['hr_rand_unsharp']) if self.opt['hr_rand_unsharp'] else 1 # Randomize for augmentation
             if self.opt['hr_unsharp_mask'] and np.random.rand() > rand_unsharp:
-                img_HR = augmentations.unsharp_mask(img_HR, znorm=self.znorm)
-
+                img_HR = augmentations.unsharp_mask(img_HR)
+            
             # Apply unsharpening mask to LR images
-            rand_unsharp = (1 - self.opt["lr_rand_unsharp"]) if self.opt["lr_rand_unsharp"] else 1  # Randomize for augmentation
+            rand_unsharp = (1 - self.opt["lr_rand_unsharp"]) if self.opt["lr_rand_unsharp"] else 1 # Randomize for augmentation
             if self.opt["lr_unsharp_mask"] and np.random.rand() > rand_unsharp:
-                img_LR = augmentations.unsharp_mask(img_LR, znorm=self.znorm)
+                img_LR = augmentations.unsharp_mask(img_LR)
         
         # For testing and validation
         if self.opt['phase'] != 'train':
@@ -455,8 +415,8 @@ class LRHRDataset(data.Dataset):
             
         # Debug
         # Save img_LR and img_HR images to a directory to visualize what is the result of the on the fly augmentations
-        # DO NOT LEAVE ON DURING REAL TRAINING, but you can use this to create validation tile pairs if you want ;)
-        self.output_sample_imgs =False
+        # DO NOT LEAVE ON DURING REAL TRAINING
+        # self.output_sample_imgs = True
         if self.opt['phase'] == 'train':
             if self.output_sample_imgs:
                 import os

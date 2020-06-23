@@ -78,13 +78,11 @@ def _read_lmdb_img(env, path):
     return img
 
 
-def read_img(env, path, out_nc=3, znorm=False):
+def read_img(env, path, out_nc=3):
     # read image by cv2 (rawpy if dng) or from lmdb
     # (alt: using PIL instead of cv2)
     # out_nc: Desired number of channels
-    # return: Numpy float32, HWC, BGR, [0,1] by default 
-    #   or [-1, 1] if znorm = True (Normalization, z-score)
-    #   for use with tanh act as Generator output
+    # return: Numpy float32, HWC, BGR, [0,1]
     if env is None:  # img
         if(path[-3:] == 'dng'): # if image is a DNG
             import rawpy
@@ -102,8 +100,6 @@ def read_img(env, path, out_nc=3, znorm=False):
     if img is None:
         raise ValueError('Image [{:s}] could not be decoded.'.format(path))
     img = img.astype(np.float32) / np.iinfo(img.dtype).max
-    if znorm==True: # normalize images range to [-1, 1] (zero-normalization)
-        img = (img - 0.5) * 2 # xi' = (xi - mu)/sigma
     # print("Min. image value:",img.min()) # Debug
     # print("Max. image value:",img.max()) # Debug
     if img.ndim == 2:

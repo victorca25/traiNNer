@@ -13,7 +13,7 @@ from . import spectral_norm as SN
 
 # VGG style Discriminator
 class Discriminator_VGG(nn.Module):
-    def __init__(self, size, in_nc, base_nf, norm_type='batch', act_type='leakyrelu', mode='CNA', convtype='Conv2D', arch='ESRGAN'):
+    def __init__(self, size, in_nc, base_nf, norm_type='batch', act_type='leakyrelu', mode='CNA', convtype='Conv2D'):
         super(Discriminator_VGG, self).__init__()
 
         conv_blocks = []
@@ -36,12 +36,8 @@ class Discriminator_VGG(nn.Module):
         self.features = B.sequential(*conv_blocks)
 
         # classifier
-        if arch=='PPON':
-            self.classifier = nn.Sequential(
-                nn.Linear(cur_nc * cur_size * cur_size, 128), nn.LeakyReLU(0.2, True), nn.Linear(128, 1))
-        else: #arch='ESRGAN':
-            self.classifier = nn.Sequential(
-                nn.Linear(cur_nc * cur_size * cur_size, 100), nn.LeakyReLU(0.2, True), nn.Linear(100, 1))
+        self.classifier = nn.Sequential(
+            nn.Linear(cur_nc * cur_size * cur_size, 100), nn.LeakyReLU(0.2, True), nn.Linear(100, 1))
 
     def forward(self, x):
         x = self.features(x)
@@ -51,7 +47,7 @@ class Discriminator_VGG(nn.Module):
 
 # VGG style Discriminator with input size 96*96
 class Discriminator_VGG_96(nn.Module):
-    def __init__(self, in_nc, base_nf, norm_type='batch', act_type='leakyrelu', mode='CNA', convtype='Conv2D', arch='ESRGAN'):
+    def __init__(self, in_nc, base_nf, norm_type='batch', act_type='leakyrelu', mode='CNA', convtype='Conv2D'):
         super(Discriminator_VGG_96, self).__init__()
         # features
         # hxw, c
@@ -85,12 +81,8 @@ class Discriminator_VGG_96(nn.Module):
             conv9)
 
         # classifier
-        if arch=='PPON':
-            self.classifier = nn.Sequential(
-                nn.Linear(512 * 3 * 3, 128), nn.LeakyReLU(0.2, True), nn.Linear(128, 1))
-        else: #arch='ESRGAN':
-            self.classifier = nn.Sequential(
-                nn.Linear(512 * 3 * 3, 100), nn.LeakyReLU(0.2, True), nn.Linear(100, 1))
+        self.classifier = nn.Sequential(
+            nn.Linear(512 * 3 * 3, 100), nn.LeakyReLU(0.2, True), nn.Linear(100, 1))
 
     def forward(self, x):
         x = self.features(x)
@@ -146,7 +138,7 @@ class Discriminator_VGG_128_SN(nn.Module):
 
 # VGG style Discriminator with input size 128*128
 class Discriminator_VGG_128(nn.Module):
-    def __init__(self, in_nc, base_nf, norm_type='batch', act_type='leakyrelu', mode='CNA', convtype='Conv2D', arch='ESRGAN'):
+    def __init__(self, in_nc, base_nf, norm_type='batch', act_type='leakyrelu', mode='CNA', convtype='Conv2D'):
         super(Discriminator_VGG_128, self).__init__()
         # features
         # hxw, c
@@ -180,12 +172,8 @@ class Discriminator_VGG_128(nn.Module):
             conv9)
 
         # classifier
-        if arch=='PPON':
-            self.classifier = nn.Sequential(
-                nn.Linear(512 * 4 * 4, 128), nn.LeakyReLU(0.2, True), nn.Linear(128, 1))
-        else: #arch='ESRGAN':
-            self.classifier = nn.Sequential(
-                nn.Linear(512 * 4 * 4, 100), nn.LeakyReLU(0.2, True), nn.Linear(100, 1))
+        self.classifier = nn.Sequential(
+            nn.Linear(512 * 4 * 4, 100), nn.LeakyReLU(0.2, True), nn.Linear(100, 1))
 
     def forward(self, x):
         x = self.features(x)
@@ -195,8 +183,8 @@ class Discriminator_VGG_128(nn.Module):
 
 
 # VGG style Discriminator with input size 192*192
-class Discriminator_VGG_192(nn.Module): #vic in PPON is called Discriminator_192 
-    def __init__(self, in_nc, base_nf, norm_type='batch', act_type='leakyrelu', mode='CNA', convtype='Conv2D', arch='ESRGAN'):
+class Discriminator_VGG_192(nn.Module):
+    def __init__(self, in_nc, base_nf, norm_type='batch', act_type='leakyrelu', mode='CNA', convtype='Conv2D'):
         super(Discriminator_VGG_192, self).__init__()
         # features
         # hxw, c
@@ -235,12 +223,8 @@ class Discriminator_VGG_192(nn.Module): #vic in PPON is called Discriminator_192
             conv9, conv10, conv11)
 
         # classifier
-        if arch=='PPON':
-            self.classifier = nn.Sequential(
-                nn.Linear(512 * 3 * 3, 128), nn.LeakyReLU(0.2, True), nn.Linear(128, 1)) #vic PPON uses 128 and 128 instead of 100
-        else: #arch='ESRGAN':
-            self.classifier = nn.Sequential(
-                nn.Linear(512 * 3 * 3, 100), nn.LeakyReLU(0.2, True), nn.Linear(100, 1))
+        self.classifier = nn.Sequential(
+            nn.Linear(512 * 3 * 3, 100), nn.LeakyReLU(0.2, True), nn.Linear(100, 1))
 
     def forward(self, x):
         x = self.features(x)
@@ -250,7 +234,7 @@ class Discriminator_VGG_192(nn.Module): #vic in PPON is called Discriminator_192
 
 # VGG style Discriminator with input size 256*256
 class Discriminator_VGG_256(nn.Module):
-    def __init__(self, in_nc, base_nf, norm_type='batch', act_type='leakyrelu', mode='CNA', convtype='Conv2D', arch='ESRGAN'):
+    def __init__(self, in_nc, base_nf, norm_type='batch', act_type='leakyrelu', mode='CNA', convtype='Conv2D'):
         super(Discriminator_VGG_256, self).__init__()
         # features
         # hxw, c
@@ -289,12 +273,8 @@ class Discriminator_VGG_256(nn.Module):
             conv9, conv10, conv11)
 
         # classifier
-        if arch=='PPON':
-            self.classifier = nn.Sequential(
-                nn.Linear(512 * 4 * 4, 128), nn.LeakyReLU(0.2, True), nn.Linear(128, 1))
-        else: #arch='ESRGAN':
-            self.classifier = nn.Sequential(
-                nn.Linear(512 * 4 * 4, 100), nn.LeakyReLU(0.2, True), nn.Linear(100, 1))
+        self.classifier = nn.Sequential(
+            nn.Linear(512 * 4 * 4, 100), nn.LeakyReLU(0.2, True), nn.Linear(100, 1))
 
     def forward(self, x):
         x = self.features(x)
@@ -314,8 +294,7 @@ class VGGFeatureExtractor(nn.Module):
                  feature_layer=34,
                  use_bn=False,
                  use_input_norm=True,
-                 device=torch.device('cpu'),
-                 z_norm=False): #Note: PPON uses cuda instead of CPU
+                 device=torch.device('cpu')):
         super(VGGFeatureExtractor, self).__init__()
         if use_bn:
             model = torchvision.models.vgg19_bn(pretrained=True)
@@ -323,12 +302,8 @@ class VGGFeatureExtractor(nn.Module):
             model = torchvision.models.vgg19(pretrained=True)
         self.use_input_norm = use_input_norm
         if self.use_input_norm:
-            if z_norm: # if input in range [-1,1]
-                mean = torch.Tensor([0.485-1, 0.456-1, 0.406-1]).view(1, 3, 1, 1).to(device) 
-                std = torch.Tensor([0.229*2, 0.224*2, 0.225*2]).view(1, 3, 1, 1).to(device)
-            else: # input in range [0,1]
-                mean = torch.Tensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1).to(device)                 
-                std = torch.Tensor([0.229, 0.224, 0.225]).view(1, 3, 1, 1).to(device)
+            mean = torch.Tensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1).to(device)                 
+            std = torch.Tensor([0.229, 0.224, 0.225]).view(1, 3, 1, 1).to(device)
             self.register_buffer('mean', mean)
             self.register_buffer('std', std)
         self.features = nn.Sequential(*list(model.features.children())[:(feature_layer + 1)])
@@ -344,17 +319,13 @@ class VGGFeatureExtractor(nn.Module):
 
 # Assume input range is [0, 1]
 class ResNet101FeatureExtractor(nn.Module):
-    def __init__(self, use_input_norm=True, device=torch.device('cpu'), z_norm=False):
+    def __init__(self, use_input_norm=True, device=torch.device('cpu')):
         super(ResNet101FeatureExtractor, self).__init__()
         model = torchvision.models.resnet101(pretrained=True)
         self.use_input_norm = use_input_norm
         if self.use_input_norm:
-            if z_norm: # if input in range [-1,1]
-                mean = torch.Tensor([0.485-1, 0.456-1, 0.406-1]).view(1, 3, 1, 1).to(device)
-                std = torch.Tensor([0.229*2, 0.224*2, 0.225*2]).view(1, 3, 1, 1).to(device)
-            else: # input in range [0,1]
-                mean = torch.Tensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1).to(device)
-                std = torch.Tensor([0.229, 0.224, 0.225]).view(1, 3, 1, 1).to(device)
+            mean = torch.Tensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1).to(device)
+            std = torch.Tensor([0.229, 0.224, 0.225]).view(1, 3, 1, 1).to(device)
             self.register_buffer('mean', mean)
             self.register_buffer('std', std)
         self.features = nn.Sequential(*list(model.children())[:8])

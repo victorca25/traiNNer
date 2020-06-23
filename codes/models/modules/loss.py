@@ -412,16 +412,6 @@ class L1CosineSim(nn.Module):
         return self.l1_loss(x, y) + self.loss_lambda * cosine_term
 
 
-
-
-
-
-
-
-
-
-
-
 """        
 class LossCombo(nn.Module):
     def __init__(self, monitor_writer, *losses):
