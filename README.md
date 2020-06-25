@@ -10,6 +10,8 @@ This is a fork of victorca25's [BasicSR](https://github.com/victorca25/BasicSR/)
 ### Dependencies
 - Minimum PyTorch 1.5, PyTorch 1.6 (Preview) required if you want to use AMP for training.
 - All [BasicSR dependencies](https://github.com/victorca25/BasicSR/) as documented at victorca25's branch.
+
+### Optional Dependencies
 - [ImageMagick](https://imagemagick.org/script/download.php) for the image manipulation library. Manually install IM dev library, or just get the library via `apt-get install libmagickwand-dev`
 - Python package: [`pip install wand`](https://pypi.org/project/Wand/), to access IM from Python.
 
