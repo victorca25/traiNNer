@@ -54,7 +54,7 @@ Currently only usable with `LRHROTF` mode only.
 
 ![comparing scatter dithers](figures/quantize.png)
 
-- `kuwahara` uses Imagemagick's [Kuwahara filter](https://en.wikipedia.org/wiki/Kuwahara_filter) that basically removes all details from the image and only maintains the general shape. This theoretically helps to train inpainting, though it is recommended to be used only in short periods since normally the validation phase will act against this.
+- `imkuwahara` uses Imagemagick's [Kuwahara filter](https://en.wikipedia.org/wiki/Kuwahara_filter) that basically removes all details from the image and only maintains the general shape. This theoretically helps to train inpainting, though it is recommended to be used sparringly because of its tendency to create artifacts.
 
 ![comparing screentone](figures/kuwahara.png)
 
@@ -69,6 +69,7 @@ Currently only usable with `LRHROTF` mode only.
 - `420` will use Imagemagick's liquid scale, which in theory has no use whatsoever. However in practice, it forces the model to keep certain details while blurring out all other. Use only if one needs to get high.
 
 ## To Do list:
+- ~~Migrate to BasicSR Lite fork.~~ DONE.
 - ~~Update PyTorch 1.6 compatibility, and creation of BasicSR-AMP branch.~~ DONE.
 
 ## Additional Help 
