@@ -130,8 +130,14 @@ class LRHRDataset(data.Dataset):
         if HR_size:
             LR_size = HR_size // scale
         
+        # Get stored safecrop size
+        HR_safecrop = self.HR_safecrop
+
         ######## Read the images ########
         
+        # Init flags to check for HR-only and same-scale pair mode
+        LRHR = True
+
         # Check if LR Path is provided
         if self.paths_LR:
             #If LR is provided, check if 'rand_flip_LR_HR' is enabled
@@ -182,7 +188,8 @@ class LRHRDataset(data.Dataset):
         else:
             HR_path = self.paths_HR[index]
             img_HR = util.read_img(self.HR_env, HR_path)
-            img_LR = img_HR
+            #img_LR = img_HR
+            LRHR = False
         
         ######## Modify the images ########
         

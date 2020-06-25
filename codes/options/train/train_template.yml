@@ -89,7 +89,8 @@ path:
   root: 'D:/Code/GitHub/BasicSR'
   pretrain_model_G: '../experiments/pretrained_models/RRDB_PSNR_x4.pth'
   #pretrain_model_G: '../experiments/pretrained_models/RRDB_ESRGAN_x4.pth'
-  #resume_state: '../experiments/debug_002_RRDB_ESRGAN_x4_DIV2K/training_state/16.state'
+  #resume_state: '../experiments/debug_002_RRDB_ESRGAN_x4_DIV2K/training_state/latest.state' #load from autosaves
+  #resume_state: '../experiments/debug_002_RRDB_ESRGAN_x4_DIV2K/training_state/1000.state'   #load from savestate
 
 #Generator options:
 network_G:
