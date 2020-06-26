@@ -22,7 +22,7 @@ Implemented AMP, which will automatically cast tensors to 16-bit floating point 
 These features are configured in the training `.yml` file. Because of the nature of the changes, set training mode to `LRHROTF` beforehand. Using any other modes will behave as the original branch. 
 
 ### Load state via CPU
-- Lower end graphics card with low VRAM may have difficulty resuming from a state. If you get a out of memory error when continuing a training session, then set `load2CPU:true` so that it is loaded to the system RAM instead.
+- Lower end graphics card with low VRAM may have difficulty resuming from a state. If you get a out of memory error when continuing a training session, then set `load2CPU: true` so that it is loaded to the system RAM instead.
 
 ### Image transformation
 - Random flipping, 90 degree rotate and HR rotate are all independent from each other, and can be applied together.
