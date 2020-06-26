@@ -54,7 +54,7 @@ Currently only usable with `LRHROTF` mode only.
 
 ![comparing scatter dithers](figures/quantize.png)
 
-- `imkuwahara` uses Imagemagick's [Kuwahara filter](https://en.wikipedia.org/wiki/Kuwahara_filter) that basically removes all details from the image and only maintains the general shape. This theoretically helps to train inpainting, though it is recommended to be used sparringly because of its tendency to create artifacts.
+- `imkuwahara` uses Imagemagick's [Kuwahara filter](https://en.wikipedia.org/wiki/Kuwahara_filter) that basically reduces fine details in the image by simplifying to a general shape. This theoretically helps to train inpainting, though it is recommended to be used sparringly because of its tendency to create artifacts.
 
 ![comparing screentone](figures/kuwahara.png)
 
