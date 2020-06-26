@@ -91,15 +91,13 @@ def define_G(opt):
             act_type = 'relu'
         elif which_model == 'RRDB_net':
             act_type = 'leakyrelu'
-        elif which_model == 'ppon':
-            act_type = 'leakyrelu'
     
     if which_model == 'sr_resnet':  # SRResNet
         from models.modules.architectures import SRResNet_arch
         netG = SRResNet_arch.SRResNet(in_nc=opt_net['in_nc'], out_nc=opt_net['out_nc'], nf=opt_net['nf'], \
             nb=opt_net['nb'], upscale=opt_net['scale'], norm_type=opt_net['norm_type'], \
             act_type=act_type, mode=opt_net['mode'], upsample_mode='pixelshuffle', \
-            convtype=opt_net['convtype'], finalact=opt_net['finalact'])
+            convtype=opt_net['convtype'])
     elif which_model == 'sft_arch':  # SFT-GAN
         from models.modules.architectures import sft_arch
         netG = sft_arch.SFT_Net()
@@ -107,22 +105,7 @@ def define_G(opt):
         from models.modules.architectures import RRDBNet_arch
         netG = RRDBNet_arch.RRDBNet(in_nc=opt_net['in_nc'], out_nc=opt_net['out_nc'], nf=opt_net['nf'], \
             nb=opt_net['nb'], gc=opt_net['gc'], upscale=opt_net['scale'], norm_type=opt_net['norm_type'], \
-            act_type=act_type, mode=opt_net['mode'], upsample_mode='upconv', convtype=opt_net['convtype'], \
-            finalact=opt_net['finalact'])
-    elif which_model == 'ppon':
-        from models.modules.architectures import PPON_arch
-        netG = PPON_arch.PPON(in_nc=opt_net['in_nc'], nf=opt_net['nf'], nb=opt_net['nb'], out_nc=opt_net['out_nc'], 
-            upscale=opt_net['scale'], act_type=act_type) #(in_nc=3, nf=64, nb=24, out_nc=3)
-    elif which_model == 'asr_cnn':
-        from models.modules.architectures import ASRResNet_arch
-        netG = ASRResNet_arch.ASRCNN(upscale_factor=opt_net['scale'], spectral_norm = True, self_attention = True, max_pool=True, poolsize = 4, finalact='tanh')
-    elif which_model == 'asr_resnet':
-        from models.modules.architectures import ASRResNet_arch
-        netG = ASRResNet_arch.ASRResNet(scale_factor=opt_net['scale'], spectral_norm = True, self_attention = True, max_pool=True, poolsize = 4)
-    elif which_model == 'abpn_net':
-        from models.modules.architectures import ABPN_arch
-        netG = ABPN_arch.ABPN_v5(input_dim=3, dim=32)
-        # netG = ABPN_arch.ABPN_v5(input_dim=opt_net['in_nc'], dim=opt_net['out_nc'])
+            act_type=act_type, mode=opt_net['mode'], upsample_mode='upconv', convtype=opt_net['convtype'])
     else:
         raise NotImplementedError('Generator model [{:s}] not recognized'.format(which_model))
 
@@ -139,12 +122,6 @@ def define_D(opt):
     gpu_ids = opt['gpu_ids']
     opt_net = opt['network_D']
     which_model = opt_net['which_model_D']
-    which_model_G = opt_net['which_model_G']
-    
-    if which_model_G == 'ppon':
-        model_G = 'PPON'
-    else:
-        model_G = 'ESRGAN'
     
     if which_model == 'dis_acd':  # sft-gan, Auxiliary Classifier Discriminator
         from models.modules.architectures import sft_arch
@@ -152,44 +129,30 @@ def define_D(opt):
     elif which_model == 'discriminator_vgg_96':
         from models.modules.architectures import discriminators
         netD = discriminators.Discriminator_VGG_96(in_nc=opt_net['in_nc'], base_nf=opt_net['nf'], \
-            norm_type=opt_net['norm_type'], mode=opt_net['mode'], act_type=opt_net['act_type'], convtype=opt_net['convtype'], arch=model_G)
+            norm_type=opt_net['norm_type'], mode=opt_net['mode'], act_type=opt_net['act_type'], convtype=opt_net['convtype'])
     elif which_model == 'discriminator_vgg_128_SN':
         from models.modules.architectures import discriminators
         netD = discriminators.Discriminator_VGG_128_SN()
     elif which_model == 'discriminator_vgg_128':
         from models.modules.architectures import discriminators
         netD = discriminators.Discriminator_VGG_128(in_nc=opt_net['in_nc'], base_nf=opt_net['nf'], \
-            norm_type=opt_net['norm_type'], mode=opt_net['mode'], act_type=opt_net['act_type'], convtype=opt_net['convtype'], arch=model_G)
-    elif which_model == 'discriminator_vgg_192' or which_model == 'discriminator_192': #vic in PPON its called Discriminator_192, instead of BasicSR's Discriminator_VGG_192
+            norm_type=opt_net['norm_type'], mode=opt_net['mode'], act_type=opt_net['act_type'], convtype=opt_net['convtype'])
+    elif which_model == 'discriminator_vgg_192' or which_model == 'discriminator_192':
         from models.modules.architectures import discriminators
         netD = discriminators.Discriminator_VGG_192(in_nc=opt_net['in_nc'], base_nf=opt_net['nf'], \
-            norm_type=opt_net['norm_type'], mode=opt_net['mode'], act_type=opt_net['act_type'], convtype=opt_net['convtype'], arch=model_G)
+            norm_type=opt_net['norm_type'], mode=opt_net['mode'], act_type=opt_net['act_type'], convtype=opt_net['convtype'])
     elif which_model == 'discriminator_vgg_256' or which_model == 'discriminator_256':
         from models.modules.architectures import discriminators
         netD = discriminators.Discriminator_VGG_256(in_nc=opt_net['in_nc'], base_nf=opt_net['nf'], \
-            norm_type=opt_net['norm_type'], mode=opt_net['mode'], act_type=opt_net['act_type'], convtype=opt_net['convtype'], arch=model_G)
+            norm_type=opt_net['norm_type'], mode=opt_net['mode'], act_type=opt_net['act_type'], convtype=opt_net['convtype'])
     elif which_model == 'discriminator_vgg': # General adaptative case
         from models.modules.architectures import discriminators
         try:
             size = int(opt['datasets']['train']['HR_size'])
             netD = discriminators.Discriminator_VGG(size=size, in_nc=opt_net['in_nc'], base_nf=opt_net['nf'], \
-                norm_type=opt_net['norm_type'], mode=opt_net['mode'], act_type=opt_net['act_type'], convtype=opt_net['convtype'], arch=model_G)
+                norm_type=opt_net['norm_type'], mode=opt_net['mode'], act_type=opt_net['act_type'], convtype=opt_net['convtype'])
         except ValueError:
             raise ValueError('VGG Discriminator size [{:s}] could not be parsed from the HR patch size. Check that the image patch size is either a power of 2 or 3 multiplied by a power of 2.'.format(vgg_size))
-    elif which_model == 'adiscriminator':
-        from models.modules.architectures import ASRResNet_arch
-        netD = ASRResNet_arch.ADiscriminator(spectral_norm=opt_net['spectral_norm'], self_attention=opt_net['self_attention'], \
-            max_pool=opt_net['max_pool'], poolsize=opt_net['poolsize'])
-    elif which_model == 'adiscriminator_s':
-        from models.modules.architectures import ASRResNet_arch
-        netD = ASRResNet_arch.ADiscriminator_S(spectral_norm=opt_net['spectral_norm'], self_attention=opt_net['self_attention'], \
-            max_pool=opt_net['max_pool'], poolsize=opt_net['poolsize'] )
-    elif which_model == 'discriminator_vgg_128_fea': #VGG-like discriminator with features extraction
-        from models.modules.architectures import ASRResNet_arch
-        netD = ASRResNet_arch.Discriminator_VGG_128_fea(in_nc=opt_net['in_nc'], base_nf=opt_net['nf'], \
-            norm_type=opt_net['norm_type'], mode=opt_net['mode'], act_type=opt_net['act_type'], \
-            convtype=opt_net['convtype'], arch=model_G, spectral_norm=opt_net['spectral_norm'], self_attention=opt_net['self_attention'], \
-            max_pool=opt_net['max_pool'], poolsize=opt_net['poolsize'])
     else:
         raise NotImplementedError('Discriminator model [{:s}] not recognized'.format(which_model))
     """
@@ -199,7 +162,7 @@ def define_D(opt):
         try:
             size = int(vgg_size)
             netD = discriminators.Discriminator_VGG(size=size, in_nc=opt_net['in_nc'], base_nf=opt_net['nf'], \
-                norm_type=opt_net['norm_type'], mode=opt_net['mode'], act_type=opt_net['act_type'], convtype=opt_net['convtype'], arch=model_G)
+                norm_type=opt_net['norm_type'], mode=opt_net['mode'], act_type=opt_net['act_type'], convtype=opt_net['convtype'])
         except ValueError:
             raise ValueError('VGG Discriminator size [{:s}] could not be parsed.'.format(vgg_size))
     #"""
@@ -230,7 +193,7 @@ def define_F(opt, use_bn=False):
         netF = perceptual.ResNet101FeatureExtractor(use_input_norm=True, device=device)
     else: #VGG network (default)
         netF = perceptual.VGGFeatureExtractor(feature_layer=feature_layer, use_bn=use_bn, \
-            use_input_norm=True, device=device, z_norm=z_norm)
+            use_input_norm=True, device=device)
     
     if gpu_ids:
         netF = nn.DataParallel(netF)

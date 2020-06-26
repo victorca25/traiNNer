@@ -1,18 +1,30 @@
 import os
 import os.path as osp
 import logging
-from collections import OrderedDict
-import json
+import cv2
 
 
 def parse(opt_path, is_train=True):
-    # remove comments starting with '//'
-    json_str = ''
-    with open(opt_path, 'r') as f:
-        for line in f:
-            line = line.split('//')[0] + '\n'
-            json_str += line
-    opt = json.loads(json_str, object_pairs_hook=OrderedDict)
+    extension = osp.splitext(opt_path)[1].lower()
+    if extension == '.json':
+        import json
+        # remove comments starting with '//'
+        json_str = ''
+        with open(opt_path, 'r') as f:
+            for line in f:
+                line = line.split('//')[0] + '\n'
+                json_str += line
+        opt = json.loads(json_str)
+    elif extension == '.cson':
+        import cson
+        with open(opt_path, 'r') as f:
+            opt = cson.load(f)
+    elif extension == '.yml' or extension == '.yaml':
+        import yaml
+        with open(opt_path, 'r') as f:
+            opt = yaml.safe_load(f)
+    else:
+        raise ValueError('Unknown file extension: {}'.format(extension))
 
     opt['is_train'] = is_train
     scale = opt['scale']
@@ -77,6 +89,7 @@ def parse(opt_path, is_train=True):
             opt['train']['val_freq'] = 8
             opt['logger']['print_freq'] = 2
             opt['logger']['save_checkpoint_freq'] = 8
+            opt['logger']['backup_freq'] = 2
             opt['train']['lr_decay_iter'] = 10
     else:  # test
         results_root = os.path.join(opt['path']['root'], 'results', opt['name'])
@@ -85,6 +98,10 @@ def parse(opt_path, is_train=True):
 
     # network
     opt['network_G']['scale'] = scale
+
+    # batch multiplier
+    if not 'batch_multiplier' in opt or opt['batch_multiplier'] is None:
+        opt['batch_multiplier'] = 1
 
     # export CUDA_VISIBLE_DEVICES
     gpu_list = ','.join(str(x) for x in opt['gpu_ids'])
@@ -132,11 +149,16 @@ def check_resume(opt):
         if opt['path']['pretrain_model_G'] or opt['path']['pretrain_model_D']:
             logger.warning('pretrain_model path will be ignored when resuming training.')
 
-        state_idx = osp.basename(opt['path']['resume_state']).split('.')[0]
-        opt['path']['pretrain_model_G'] = osp.join(opt['path']['models'],
-                                                   '{}_G.pth'.format(state_idx))
+        if 'backup.state' in opt['path']['resume_state']:
+            name = 'backup'
+        else:
+            state_idx = osp.basename(opt['path']['resume_state']).split('.')[0]
+            name = '{}_{}'.format(opt['name'], state_idx)
+                
+        opt['path']['pretrain_model_G'] = osp.join(opt['path']['models'],'{}_G.pth'.format(name))
         logger.info('Set [pretrain_model_G] to ' + opt['path']['pretrain_model_G'])
         if 'gan' in opt['model']:
-            opt['path']['pretrain_model_D'] = osp.join(opt['path']['models'],
-                                                       '{}_D.pth'.format(state_idx))
+            opt['path']['pretrain_model_D'] = osp.join(opt['path']['models'], '{}_D.pth'.format(name))
             logger.info('Set [pretrain_model_D] to ' + opt['path']['pretrain_model_D'])
+    
+    

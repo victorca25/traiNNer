@@ -56,17 +56,17 @@ def rotate90(image, rate=0.25): # probably should reduce this as well
 
 def random_crop(image, crop_size=(224, 224)): 
     h, w, _ = image.shape
-    #print('Random crop size:',crop_size) #delete this
-    if h > crop_size[0] and w > crop_size[1]:
-        top = np.random.randint(0, h - crop_size[0])
-        left = np.random.randint(0, w - crop_size[1])
+    
+    if h > crop_size[1] and w > crop_size[0]:
+        top = np.random.randint(0, h - crop_size[1])
+        left = np.random.randint(0, w - crop_size[0])
 
-        bottom = top + crop_size[0]
-        right = left + crop_size[1]
+        bottom = top + crop_size[1]
+        right = left + crop_size[0]
 
         image = image[top:bottom, left:right, :] # 
     else:
-        image, _ = resize_img(image, crop_size, algo=[4])
+        image, _ = resize_img(image, crop_size, algo=cv2.INTER_LANCZOS4)
     
     return image
     
@@ -173,6 +173,28 @@ def randomscale(image,safelength,algo=None,LRimage=None):
     #cv2.imwrite('D:/tmp_test/scaledown.jpg',scaled*255) #delete this
     return scaled, interpol, LRimage
 
+def select_algo(algo=None):
+    # randomly use OpenCV2 algorithms if none are provided
+    if algo is None:
+        algo = [cv2.INTER_NEAREST, cv2.INTER_LINEAR, cv2.INTER_CUBIC, cv2.INTER_AREA, cv2.INTER_LANCZOS4, cv2.INTER_LINEAR_EXACT] #scaling interpolation options
+
+    if isinstance(algo, list):
+        interpol = random.choice(algo)
+    else:
+        interpol = algo
+
+    if type(interpol) == str:
+        if interpol.lower() == 'matlab_bicubic':
+            interpol = 777
+        elif interpol.lower() == 'im_rgb':
+            interpol = 123
+        elif interpol.lower() == 'im_liquid':
+            interpol = 420
+        else:
+            interpol = getattr(cv2, 'INTER_' + interpol.upper())
+
+    return interpol
+
 # scale image
 def scale_img(image, scale, algo=None):
     h,w,c = image.shape
@@ -180,73 +202,44 @@ def scale_img(image, scale, algo=None):
     # print("New dimension: ",newdim) # delete this
     resized=image
     # randomly use OpenCV2 algorithms if none are provided
-    if algo is None:    	
-        scale_algos = [cv2.INTER_NEAREST, cv2.INTER_LINEAR, cv2.INTER_CUBIC, cv2.INTER_AREA, cv2.INTER_LANCZOS4, cv2.INTER_LINEAR_EXACT] #scaling interpolation options
-        interpol = random.choice(scale_algos)
-        resized = cv2.resize(image, newdim, interpolation = interpol)
+    interpol = select_algo(algo)
 
-    # using matlab / imresize
+    if interpol == 777: #'matlab_bicubic'
+        resized = util.imresize_np(image, 1 / scale, True)
+    elif is_wand_available == True and interpol==420: #liquid rescale
+        resized = liquidscale(image,newdim) 
+    elif is_wand_available == True and interpol==123: #rgb scale
+        resized = rgbscale(image,newdim)
     else:
-        if isinstance(algo, list):
-            interpol = random.choice(algo)
-        elif isinstance(algo, int):
-            interpol = algo
-        if is_wand_available == True and interpol==420: #liquid rescale
-            resized = liquidscale(image,newdim) 
-        elif is_wand_available == True and interpol==123: #rgb scale
-            resized = rgbscale(image,newdim)
-        elif interpol == 777: #'matlab_bicubic'
-            resized = util.imresize_np(image, 1 / scale, True)
-            # force to 3 channels
-            # if resized.ndim == 2:
-                # resized = np.expand_dims(resized, axis=2)
-        else:
-            # use the provided OpenCV2 algorithms
-            resized = cv2.resize(image, newdim, interpolation = interpol)
+        # use the provided OpenCV2 algorithms
+        resized = cv2.resize(image, newdim, interpolation = interpol)
     
     #resized = np.clip(resized, 0, 1)
     return resized, interpol
 
 # resize image to a defined size 
-def resize_img(image, crop_size=(128, 128), algo=None):
-    w = crop_size[0]
-    h = crop_size[1]
-    newdim = (w, h)
-    
-    if algo is None:
-        scale_algos = [cv2.INTER_NEAREST, cv2.INTER_LINEAR, cv2.INTER_CUBIC, cv2.INTER_AREA, cv2.INTER_LANCZOS4, cv2.INTER_LINEAR_EXACT] #scaling interpolation options
-        interpol = random.choice(scale_algos)
-    else:
-        if isinstance(algo, list):
-            interpol = random.choice(algo)
-        elif isinstance(algo, int):
-            interpol = algo
+def resize_img(image, out_size=(128, 128), algo=None):
+    # randomly use OpenCV2 algorithms if none are provided
+    interpol = select_algo(algo)
+
     if interpol == 777: #'matlab_bicubic'
-        resized = util.imresize_np(image, 1 / scale, True)
-        # force to 3 channels
-        # if resized.ndim == 2:
-            # resized = np.expand_dims(resized, axis=2)
+        resized = util.imresize_np(image, out_size[1] / image.shape[0], True)
+    elif is_wand_available == True and interpol==420: #liquid rescale
+        resized = liquidscale(image,out_size) 
+    elif is_wand_available == True and interpol==123: #rgb scale
+        resized = rgbscale(image,out_size)
     else:
         # use the provided OpenCV2 algorithms
-        resized = cv2.resize(image, newdim, interpolation = interpol)
+        resized = cv2.resize(image, out_size, interpolation = interpol)
     
     return resized, interpol
 
-def random_resize_img(img_LR, crop_size=(128, 128), new_scale=0, algo=None):
+def random_resize_img(img_LR, crop_size=(128, 128), scale=0, algo=None):
     mu, sigma = 0, 0.3
-    if new_scale == 0:
-        new_scale = np.random.uniform(-0.5, 0.) #resize randomly from 0 to 2x
-        scale = 1+new_scale
-    else:
-        scale = new_scale
+    if scale == 0:
+        scale = np.random.uniform(0.5, 1.) #resize randomly from 0 to 2x
     
-    if algo is None:
-        scale_algos = [cv2.INTER_NEAREST, cv2.INTER_LINEAR, cv2.INTER_CUBIC, cv2.INTER_AREA, cv2.INTER_LANCZOS4, cv2.INTER_LINEAR_EXACT] #scaling interpolation options
-        interpol = random.choice(scale_algos)
-    else:
-        interpol = random.choice(algo)
-    
-    img_LR, interpol = scale_img(img_LR, scale, interpol) 
+    img_LR, interpol = scale_img(img_LR, scale, algo)
     img_LR = random_crop(img_LR, crop_size)
     
     return img_LR, interpol
@@ -634,42 +627,22 @@ def noise_img(img_LR, noise_types=['clean']):
         dither_type = random.choice(bwdith_types)
         
         if dither_type == 'binary':
-            img_bw = np.zeros(size, dtype=np.uint8)
-            for i in range(0, size[0]):
-                for j in range(0, size[1]):
-                    if img_gray[i, j] < 0.5:
-                        img_bw[i, j] = 0
-                    else:
-                        img_bw[i, j] = 1
-                        
+            img_bw = np.where(img_gray < 0.5, 0, 1).astype(np.float32)
+            
             backtorgb = cv2.cvtColor(img_bw,cv2.COLOR_GRAY2RGB)
             noise_img = backtorgb 
         
         elif dither_type == 'average':
-            re_aver = np.zeros(size, dtype=np.uint8)
-            threshold = 0
-            for i in range(0, size[0]):
-                for j in range(0, size[1]):
-                    threshold = threshold + img_gray[i, j]/(size[0]*size[1])
-
-            for i in range(0, size[0]):
-                for j in range(0, size[1]):
-                    if img_gray[i, j] < threshold:
-                        re_aver[i, j] = 0
-                    else:
-                        re_aver[i, j] = 1
+            threshold = np.average(img_gray)
+            
+            re_aver = np.where(img_gray < threshold, 0, 1).astype(np.float32)
             
             backtorgb = cv2.cvtColor(re_aver,cv2.COLOR_GRAY2RGB)
             noise_img = backtorgb
         
         elif dither_type == 'random':
-            re_rand = np.zeros(size, dtype=np.uint8)
-            for i in range(0, size[0]):
-                for j in range(0, size[1]):
-                    if img_gray[i, j] < np.random.uniform(0, 1):
-                        re_rand[i, j] = 0
-                    else:
-                        re_rand[i, j] = 1
+            re_rand = (img_gray > np.random.random(size)).astype(np.float32)
+            
             backtorgb = cv2.cvtColor(re_rand,cv2.COLOR_GRAY2RGB)
             noise_img = backtorgb
             
@@ -800,7 +773,7 @@ def noise_img(img_LR, noise_types=['clean']):
         #Convert back to RGB
         noise_img = cv2.cvtColor(noise_img, cv2.COLOR_BGR2RGB)
 
-    elif is_wand_available == True and noise_type == 'kuwahara': # inpainting training
+    elif is_wand_available == True and noise_type == 'imkuwahara': # inpainting training
         img = cv2.cvtColor(img_LR, cv2.COLOR_BGR2RGB)
         with Image.from_array(img) as imgin:
             imgin.kuwahara(radius=2, sigma=1)
@@ -1330,7 +1303,7 @@ if __name__ == '__main__':
         crop_size=(128, 128)
     
     if args.scale:
-        crop_size = args.scale
+        scale = args.scale
     else:
         scale = 4
         

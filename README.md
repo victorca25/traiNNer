@@ -10,6 +10,8 @@ This is a fork of victorca25's [BasicSR](https://github.com/victorca25/BasicSR/)
 ### Dependencies
 - Minimum PyTorch 1.5, PyTorch 1.6 (Preview) required if you want to use AMP for training.
 - All [BasicSR dependencies](https://github.com/victorca25/BasicSR/) as documented at victorca25's branch.
+
+### Optional Dependencies
 - [ImageMagick](https://imagemagick.org/script/download.php) for the image manipulation library. Manually install IM dev library, or just get the library via `apt-get install libmagickwand-dev`
 - Python package: [`pip install wand`](https://pypi.org/project/Wand/), to access IM from Python.
 
@@ -52,7 +54,7 @@ Currently only usable with `LRHROTF` mode only.
 
 ![comparing scatter dithers](figures/quantize.png)
 
-- `kuwahara` uses Imagemagick's [Kuwahara filter](https://en.wikipedia.org/wiki/Kuwahara_filter) that basically removes all details from the image and only maintains the general shape. This theoretically helps to train inpainting, though it is recommended to be used only in short periods since normally the validation phase will act against this.
+- `imkuwahara` uses Imagemagick's [Kuwahara filter](https://en.wikipedia.org/wiki/Kuwahara_filter) that basically removes all details from the image and only maintains the general shape. This theoretically helps to train inpainting, though it is recommended to be used sparringly because of its tendency to create artifacts.
 
 ![comparing screentone](figures/kuwahara.png)
 
@@ -67,6 +69,7 @@ Currently only usable with `LRHROTF` mode only.
 - `420` will use Imagemagick's liquid scale, which in theory has no use whatsoever. However in practice, it forces the model to keep certain details while blurring out all other. Use only if one needs to get high.
 
 ## To Do list:
+- ~~Migrate to BasicSR Lite fork.~~ DONE.
 - ~~Update PyTorch 1.6 compatibility, and creation of BasicSR-AMP branch.~~ DONE.
 
 ## Additional Help 
@@ -79,6 +82,7 @@ If you have any questions, we have a [discord server](https://discord.gg/cpAUpDK
 - Big thanks to *victorca25* for encouraging the creation of this fork.
 - Thanks to *Twittman* for sharing how Fatality's training tiles and screentones were generated.
 - Thanks to [BlueAmulet](https://github.com/BlueAmulet) for his various bug fixes to BasicSR.
+- Thanks to [JoeyBallentine](https://github.com/JoeyBallentine) for his fixes as well.
 - Code architecture is inspired by [pytorch-cyclegan](https://github.com/junyanz/pytorch-CycleGAN-and-pix2pix).
 - Thanks to *Wai Ho Kwok*, who contributes to the initial version.
 
