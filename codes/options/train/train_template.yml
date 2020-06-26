@@ -40,7 +40,7 @@ datasets:
 
     #If manually configuring on the fly generation of LR: (else, it will automatically default to Matlab-like downscale algorithm (777) when/if required
     lr_downscale: true # false
-    lr_downscale_types: ['area', 'matlab_bicubic'] # select from: ['nearest', 'linear', 'cubic', 'area', 'lanczos4', 'linear_exact', 'matlab_bicubic'] # scale_algos #scaling interpolation options
+    lr_downscale_types: ['area', 'matlab_bicubic'] # select from: ['nearest', 'linear', 'cubic', 'area', 'lanczos4', 'linear_exact', 'matlab_bicubic','im_rgb','im_liquid'] # scale_algos #scaling interpolation options
 
     #Rotations augmentations:
     use_flip: true # flip images
@@ -51,9 +51,10 @@ datasets:
     lr_blur: false # true | false
     lr_blur_types:  ['gaussian', 'clean', 'clean', 'clean'] # select from: ['average', 'box', 'gaussian', 'bilateral', 'clean'] # #blur options #median and motion aren't working yet
     lr_noise: false # true | false
-    lr_noise_types: ['gaussian', 'clean', 'clean', 'clean', 'clean'] # select from: ['gaussian', 'JPEG', 'quantize', 'poisson', 'dither', 's&p', 'speckle', 'clean']
+    # LR noise types select from: ['imdither','imrandither','imquantize','imkuwahara','imtonephoto','imtonecomic','gaussian', 'JPEG', 'quantize', 'poisson', 'dither', 's&p', 'speckle', 'clean']
+    lr_noise_types: ['imdither', 'imrandither', 'clean', 'clean', 'clean']
     lr_noise2: false # true | false
-    lr_noise_types2: ['dither', 'dither', 'clean', 'clean'] # select from: ['gaussian', 'JPEG', 'quantize', 'poisson', 'dither', 's&p', 'speckle', 'clean']
+    lr_noise_types2: ['jpeg', 'clean', 'clean', 'clean'] 
     hr_noise: false # true | false
     hr_noise_types: ['gaussian', 'clean', 'clean', 'clean', 'clean'] # select from: ['gaussian', 'JPEG', 'quantize', 'poisson', 'dither', 's&p', 'speckle', 'clean']
 
@@ -83,14 +84,14 @@ datasets:
 
     #hr_crop: false # disabled
     lr_downscale: false
-    lr_downscale_types: ['nearest', 'linear'] # ['nearest', 'linear', 'cubic', 'area', 'lanczos4', 'linear_exact', 'matlab_bicubic'] # scale_algos #scaling interpolation options
+    lr_downscale_types: ['nearest', 'linear'] # ['nearest', 'linear', 'cubic', 'area', 'lanczos4', 'linear_exact', 'matlab_bicubic','im_rgb','im_liquid'] # scale_algos #scaling interpolation options
 
 path:
   root: 'D:/Code/GitHub/BasicSR'
   pretrain_model_G: '../experiments/pretrained_models/RRDB_PSNR_x4.pth'
   #pretrain_model_G: '../experiments/pretrained_models/RRDB_ESRGAN_x4.pth'
-  #resume_state: '../experiments/debug_002_RRDB_ESRGAN_x4_DIV2K/training_state/latest.state' #load from autosaves
-  #resume_state: '../experiments/debug_002_RRDB_ESRGAN_x4_DIV2K/training_state/1000.state'   #load from savestate
+  #resume_state: '../experiments/4x_template/training_state/latest.state' #load from autosaves
+  #resume_state: '../experiments/4x_template/training_state/1000.state'   #load from savestate
 
 #Generator options:
 network_G:
