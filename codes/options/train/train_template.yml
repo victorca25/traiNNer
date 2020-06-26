@@ -93,6 +93,9 @@ path:
   #resume_state: '../experiments/4x_template/training_state/latest.state' #load from autosaves
   #resume_state: '../experiments/4x_template/training_state/1000.state'   #load from savestate
 
+#set to true if memory error when resuming training state
+load2CPU: false
+
 #Generator options:
 network_G:
   #ESRGAN:
