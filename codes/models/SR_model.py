@@ -150,5 +150,5 @@ class SRModel(BaseModel):
             logger.info('Loading pretrained model for G [{:s}] ...'.format(load_path_G))
             self.load_network(load_path_G, self.netG)
 
-    def save(self, iter_step):
-        self.save_network(self.netG, 'G', iter_step)
+    def save(self, iter_step, name=None):
+        self.save_network(self.netG, 'G', iter_step, name)

@@ -59,11 +59,11 @@ class BaseModel():
         n = sum(map(lambda x: x.numel(), network.parameters()))
         return s, n
 
-    def save_network(self, network, network_label, iter_step, name, backup=False):
-        if backup:
-            save_filename = 'backup_{}.pth'.format(network_label)
-        else:
+    def save_network(self, network, network_label, iter_step, name=None):
+        if name:
             save_filename = '{}_{}_{}.pth'.format(name, iter_step, network_label)
+        else:
+            save_filename = '{}_{}.pth'.format(iter_step, network_label)
         save_path = os.path.join(self.opt['path']['models'], save_filename)
         if isinstance(network, nn.DataParallel):
             network = network.module

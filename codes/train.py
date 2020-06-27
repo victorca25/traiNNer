@@ -141,7 +141,7 @@ def main():
 
             # save & overwrite backup models & training states
             if opt['logger']['backup_freq'] and current_step % opt['logger']['backup_freq'] == 0:
-                model.save(current_step, opt['name'], True)
+                model.save('backup')
                 model.save_training_state(epoch + (n >= len(train_loader)), current_step, True)
                 logger.info('Backup models and training states saved.')
             
