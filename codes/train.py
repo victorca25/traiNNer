@@ -133,6 +133,9 @@ def main():
                         tb_logger.add_scalar(k, v, current_step)
                 logger.info(message)
 
+            # update learning rate
+            model.update_learning_rate()
+
             # save models and training states (changed to save models before validation)
             if current_step % opt['logger']['save_checkpoint_freq'] == 0:
                 model.save(current_step, opt['name'])
@@ -144,9 +147,6 @@ def main():
                 model.save('backup')
                 model.save_training_state(epoch + (n >= len(train_loader)), current_step, True)
                 logger.info('Backup models and training states saved.')
-            
-            # update learning rate
-            model.update_learning_rate()
 
             # validation
             if current_step % opt['train']['val_freq'] == 0:
