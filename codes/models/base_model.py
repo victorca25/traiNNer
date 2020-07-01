@@ -1,6 +1,8 @@
 import os
+import random
 import torch
 import torch.nn as nn
+import numpy as np
 from collections import Counter
 
 
@@ -84,6 +86,10 @@ class BaseModel():
             state['schedulers'].append(s.state_dict())
         for o in self.optimizers:
             state['optimizers'].append(o.state_dict())
+        state['python_rng'] = random.getstate()
+        state['numpy_rng'] = np.random.get_state()
+        state['torch_rng'] = torch.get_rng_state()
+        state['cuda_rng'] = torch.cuda.get_rng_state()
         save_filename = '{}.state'.format('backup' if backup else iter_step)
         save_path = os.path.join(self.opt['path']['training_state'], save_filename)
         torch.save(state, save_path)
@@ -101,6 +107,11 @@ class BaseModel():
             if isinstance(self.schedulers[i].milestones, Counter) and isinstance(s['milestones'], list):
                 s['milestones'] = Counter(s['milestones'])
             self.schedulers[i].load_state_dict(s)
+        if 'python_rng' in resume_state: # Allow old state files to load
+            random.setstate(resume_state['python_rng'])
+            np.random.set_state(resume_state['numpy_rng'])
+            torch.set_rng_state(resume_state['torch_rng'])
+            torch.cuda.set_rng_state(resume_state['cuda_rng'])
 
     def update_schedulers(self, train_opt):
         '''Update scheduler parameters if they are changed in the JSON configuration'''
