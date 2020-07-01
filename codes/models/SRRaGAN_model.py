@@ -223,23 +223,18 @@ class SRRaGANModel(BaseModel):
             
             # optimizers
             # G
-            wd_G = train_opt['weight_decay_G'] if train_opt['weight_decay_G'] else 0
-            
             optim_params = []
             for k, v in self.netG.named_parameters():  # can optimize for a part of the model
                 if v.requires_grad:
                     optim_params.append(v)
                 else:
                     logger.warning('Params [{:s}] will not optimize.'.format(k))
-            self.optimizer_G = torch.optim.Adam(optim_params, lr=train_opt['lr_G'], \
-                weight_decay=wd_G, betas=(train_opt['beta1_G'], 0.999))
+            self.optimizer_G = networks.define_optim(train_opt, optim_params, 'G')
             self.optimizers.append(self.optimizer_G)
             
             # D
             if self.cri_gan:
-                wd_D = train_opt['weight_decay_D'] if train_opt['weight_decay_D'] else 0
-                self.optimizer_D = torch.optim.Adam(self.netD.parameters(), lr=train_opt['lr_D'], \
-                    weight_decay=wd_D, betas=(train_opt['beta1_D'], 0.999))
+                self.optimizer_D = networks.define_optim(train_opt, self.netD.parameters(), 'D')
                 self.optimizers.append(self.optimizer_D)
 
             # schedulers

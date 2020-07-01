@@ -37,11 +37,8 @@ network_D:
 
 train:
   lr_G: !!float 1e-4
-  weight_decay_G: 0
-  beta1_G: 0.9
   lr_D: !!float 1e-4
-  weight_decay_D: 0
-  beta1_D: 0.9
+
   lr_scheme: 'MultiStepLR'
   lr_steps: [50000, 100000, 150000, 200000]
   lr_gamma: 0.5

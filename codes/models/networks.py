@@ -1,5 +1,6 @@
 import functools
 import logging
+import inspect
 import torch
 import torch.nn as nn
 from torch.nn import init
@@ -71,6 +72,47 @@ def init_weights(net, init_type='kaiming', scale=1, std=0.02):
         net.apply(weights_init_orthogonal)
     else:
         raise NotImplementedError('initialization method [{:s}] not implemented'.format(init_type))
+
+
+def define_optim(opt, params, network_label, **kwargs):
+    optim_type = opt['optim_{}'.format(network_label)]
+    if optim_type is None: # default to Adam if not specified
+        optim_type = 'Adam'
+
+    # get optimizer
+    optim = None
+    if hasattr(torch.optim, optim_type):
+        optim = getattr(torch.optim, optim_type)
+    else:
+        try:
+            import torch_optimizer
+            if hasattr(torch_optimizer, optim_type):
+                optim = getattr(torch_optimizer, optim_type)
+        except ModuleNotFoundError:
+            pass
+    if optim is None:
+        raise NotImplementedError('Optimizer type [{:s}] is not recognized.'.format(optim_type))
+
+    # read arguments from opt
+    args = {}
+    parameters = inspect.signature(optim).parameters
+    for arg in parameters.keys():
+        if arg == 'params':
+            args['params'] = params
+        elif arg in kwargs:
+            args[arg] = kwargs[arg]
+        elif arg == 'betas':
+            if 'beta1_{}'.format(network_label) in opt or 'beta2_{}'.format(network_label) in opt:
+                beta1 = opt['beta1_{}'.format(network_label)] or 0.9
+                beta2 = opt['beta2_{}'.format(network_label)] or 0.999
+                args[arg] = (beta1, beta2)
+        else:
+            value = opt['{}_{}'.format(arg, network_label)]
+            if value is not None:
+                args[arg] = value
+            elif arg == 'lr':
+                raise TypeError('Optimizer missing required argument: {:s}_{:s}'.format(arg, network_label))
+    return optim(**args)
 
 
 ####################
