@@ -37,7 +37,8 @@ datasets:
     #rand_flip_LR_HR: false # true # flip LR and HR during training.
     #flip_chance: 0.05 # Example: 0.05 = 5% chance of LR and HR flipping during training.
     #aug_downscale: 0.2 # Example: 0.6 = 60% chance of generating LR on the fly, even if LR dataset exists
-
+    #hr_downscale: true // randomly downscale HR as well
+    
     #If manually configuring on the fly generation of LR: (else, it will automatically default to Matlab-like downscale algorithm (777) when/if required
     lr_downscale: true # false
     lr_downscale_types: ['area', 'matlab_bicubic'] # select from: ['nearest', 'linear', 'cubic', 'area', 'lanczos4', 'linear_exact', 'matlab_bicubic','im_rgb','im_liquid'] # scale_algos #scaling interpolation options
