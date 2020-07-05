@@ -19,10 +19,11 @@ class LRDataset(data.Dataset):
 
     def __getitem__(self, index):
         LR_path = None
+        LR_nc = self.opt['LR_nc']
 
         # get LR image
         LR_path = self.paths_LR[index]
-        img_LR = util.read_img(self.LR_env, LR_path)
+        img_LR = util.read_img(self.LR_env, LR_path, LR_nc)
         H, W, C = img_LR.shape
 
         # change color space if necessary

@@ -45,10 +45,12 @@ class LRHRDataset(data.Dataset):
         HR_path, LR_path = None, None
         scale = self.opt['scale']
         HR_size = self.opt['HR_size']
+        LR_nc = self.opt['LR_nc']
+        HR_nc = self.opt['HR_nc']
 
         # get HR image
         HR_path = self.paths_HR[index]
-        img_HR = util.read_img(self.HR_env, HR_path)
+        img_HR = util.read_img(self.HR_env, HR_path, HR_nc)
         # modcrop in the validation / test phase
         if self.opt['phase'] != 'train':
             img_HR = util.modcrop(img_HR, scale)
@@ -59,7 +61,7 @@ class LRHRDataset(data.Dataset):
         # get LR image
         if self.paths_LR:
             LR_path = self.paths_LR[index]
-            img_LR = util.read_img(self.LR_env, LR_path)
+            img_LR = util.read_img(self.LR_env, LR_path, LR_nc)
         else:  # down-sampling on-the-fly
             # randomly scale during training
             if self.opt['phase'] == 'train':

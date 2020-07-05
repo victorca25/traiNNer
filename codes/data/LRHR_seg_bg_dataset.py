@@ -43,18 +43,20 @@ class LRHRSeg_BG_Dataset(data.Dataset):
         HR_path, LR_path = None, None
         scale = self.opt['scale']
         HR_size = self.opt['HR_size']
+        LR_nc = self.opt['LR_nc']
+        HR_nc = self.opt['HR_nc']
 
         # get HR image
         if self.opt['phase'] == 'train' and \
                 random.choice(list(range(self.ratio))) == 0:  # read background images
             bg_index = random.randint(0, len(self.paths_HR_bg) - 1)
             HR_path = self.paths_HR_bg[bg_index]
-            img_HR = util.read_img(self.HR_env_bg, HR_path)
+            img_HR = util.read_img(self.HR_env_bg, HR_path, HR_nc)
             seg = torch.FloatTensor(8, img_HR.shape[0], img_HR.shape[1]).fill_(0)
             seg[0, :, :] = 1  # background
         else:
             HR_path = self.paths_HR[index]
-            img_HR = util.read_img(self.HR_env, HR_path)
+            img_HR = util.read_img(self.HR_env, HR_path, HR_nc)
             seg = torch.load(HR_path.replace('/img/', '/bicseg/').replace('.png', '.pth'))
             # read segmentatin files, you should change it to your settings.
 
@@ -67,7 +69,7 @@ class LRHRSeg_BG_Dataset(data.Dataset):
         # get LR image
         if self.paths_LR:
             LR_path = self.paths_LR[index]
-            img_LR = util.read_img(self.LR_env, LR_path)
+            img_LR = util.read_img(self.LR_env, LR_path, LR_nc)
         else:  # down-sampling on-the-fly
             # randomly scale during training
             if self.opt['phase'] == 'train':
