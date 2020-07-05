@@ -72,6 +72,12 @@ class BaseModel():
         state_dict = network.state_dict()
         for key, param in state_dict.items():
             state_dict[key] = param.cpu()
+        if iter_step == 'backup':
+            if os.path.exists(save_path):
+                lbk_path = os.path.join(self.opt['path']['models'], 'backup-old_{}.pth'.format(network_label))
+                if os.path.exists(lbk_path):
+                    os.remove(lbk_path)
+                os.rename(save_path, lbk_path)
         torch.save(state_dict, save_path)
 
     def load_network(self, load_path, network, strict=True):
@@ -92,6 +98,12 @@ class BaseModel():
         state['cuda_rng'] = torch.cuda.get_rng_state()
         save_filename = '{}.state'.format('backup' if backup else iter_step)
         save_path = os.path.join(self.opt['path']['training_state'], save_filename)
+        if backup:
+            if os.path.exists(save_path):
+                lbk_path = os.path.join(self.opt['path']['training_state'], 'backup-old.state')
+                if os.path.exists(lbk_path):
+                    os.remove(lbk_path)
+                os.rename(save_path, lbk_path)
         torch.save(state, save_path)
 
     def resume_training(self, resume_state):
