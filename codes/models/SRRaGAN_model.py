@@ -293,7 +293,8 @@ class SRRaGANModel(BaseModel):
     def optimize_parameters(self, gen, step):
         self.log_dict.clear()
         self.optimizer_G.zero_grad()
-        self.optimizer_D.zero_grad()
+        if self.cri_gan:
+            self.optimizer_D.zero_grad()
 
         bm = self.opt['batch_multiplier']
         for _ in range(bm):
