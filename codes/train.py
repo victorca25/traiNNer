@@ -154,8 +154,6 @@ def main():
                 avg_ssim = 0.0
                 avg_lpips = 0.0
                 idx = 0
-                val_sr_imgs_list = []
-                val_gt_imgs_list = []
                 for val_data in val_loader:
                     idx += 1
                     img_name = os.path.splitext(os.path.basename(val_data['LR_path'][0]))[0]
@@ -183,8 +181,6 @@ def main():
 
                     # calculate PSNR, SSIM and LPIPS distance
                     crop_size = opt['scale']
-                    gt_img = gt_img / 255.
-                    sr_img = sr_img / 255.
 
                     # For training models with only one channel ndim==2, if RGB ndim==3, etc.
                     if gt_img.ndim == 2:
@@ -196,18 +192,16 @@ def main():
                     else: # Default: RGB images
                         cropped_sr_img = sr_img[crop_size:-crop_size, crop_size:-crop_size, :]
                     
-                    val_gt_imgs_list.append(cropped_gt_img) # If calculating only once for all images
-                    val_sr_imgs_list.append(cropped_sr_img) # If calculating only once for all images
-                    
                     # LPIPS only works for RGB images
-                    avg_psnr += util.calculate_psnr(cropped_sr_img * 255, cropped_gt_img * 255)
-                    avg_ssim += util.calculate_ssim(cropped_sr_img * 255, cropped_gt_img * 255)
-                    #avg_lpips += lpips.calculate_lpips([cropped_sr_img], [cropped_gt_img]) # If calculating for each image
+                    avg_psnr += util.calculate_psnr(cropped_sr_img, cropped_gt_img)
+                    avg_ssim += util.calculate_ssim(cropped_sr_img, cropped_gt_img)
+                    avg_lpips += lpips.calculate_lpips(cropped_sr_img, cropped_gt_img)
+                    del cropped_gt_img, cropped_sr_img, gt_img, sr_img
 
                 avg_psnr = avg_psnr / idx
                 avg_ssim = avg_ssim / idx
-                #avg_lpips = avg_lpips / idx # If calculating for each image
-                avg_lpips = lpips.calculate_lpips(val_sr_imgs_list,val_gt_imgs_list) # If calculating only once for all images
+                avg_lpips = avg_lpips / idx
+                lpips.cleanup()
 
                 # log
                 # logger.info('# Validation # PSNR: {:.5g}, SSIM: {:.5g}'.format(avg_psnr, avg_ssim))
