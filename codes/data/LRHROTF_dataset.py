@@ -79,6 +79,8 @@ class LRHRDataset(data.Dataset):
                 self.LR_env, self.paths_LR = util.get_image_paths(opt['data_type'], LR_images_paths)
 
         assert self.paths_HR, 'Error: HR path is empty.'
+        # print('paths_HR:',self.paths_HR)
+        # print('paths_LR:',self.paths_LR)
         if self.paths_LR and self.paths_HR:
             # Modify to allow using HR and LR folders with different amount of images
             # - If an LR image pair is not found, downscale HR on the fly, else, use the LR
@@ -101,7 +103,6 @@ class LRHRDataset(data.Dataset):
                     _, HRtail = os.path.split(self.paths_HR[idx])
                     if i < len(self.paths_LR):
                         LRhead, LRtail = os.path.split(self.paths_LR[i])
-                        
                         if LRtail == HRtail:
                             LRimg_path = os.path.join(LRhead, LRtail)
                             tmp.append(LRimg_path)
@@ -141,49 +142,61 @@ class LRHRDataset(data.Dataset):
         # Check if LR Path is provided
         if self.paths_LR:
             #If LR is provided, check if 'rand_flip_LR_HR' is enabled
-            if self.opt['rand_flip_LR_HR'] and self.opt['phase'] == 'train':
-                LRHRchance = random.uniform(0, 1)
-                if self.opt['flip_chance']:
-                    flip_chance = self.opt['flip_chance']
-                else:
-                    flip_chance = 0.05
+            # if self.opt['rand_flip_LR_HR'] and self.opt['phase'] == 'train':
+                # LRHRchance = random.uniform(0, 1)
+                # if self.opt['flip_chance']:
+                    # flip_chance = self.opt['flip_chance']
+                # else:
+                    # flip_chance = 0.05
                 #print("Random Flip Enabled")
             # Normal case, no flipping:
-            else:
-                LRHRchance = 0.
-                flip_chance = 0.
+            # else:
+                # LRHRchance = 0.
+                # flip_chance = 0.
                 #print("No Random Flip")
 
             # get HR and LR images
             # If enabled, random chance that LR and HR images are flipped
             # Normal case, no flipping
             # If img_LR (LR_path) doesn't exist, use img_HR (HR_path)
-            if LRHRchance < (1- flip_chance):
-                HR_path = self.paths_HR[index]
-                LR_path = self.paths_LR[index]
-                if LR_path is None:
-                    LR_path = HR_path
+            # if LRHRchance < (1- flip_chance):
+                # HR_path = self.paths_HR[index]
+                # LR_path = self.paths_LR[index]
+                # if LR_path is None:
+                    # LR_path = HR_path
                 #print("HR kept")
             # Flipped case:
             # If img_HR (LR_path) doesn't exist, use img_HR (LR_path)
-            else:
-                HR_path = self.paths_LR[index]
-                LR_path = self.paths_HR[index]
-                if HR_path is None:
-                    HR_path = LR_path
+            # else:
+                # HR_path = self.paths_LR[index]
+                # LR_path = self.paths_HR[index]
+                # if HR_path is None:
+                    # HR_path = LR_path
                 #print("HR flipped")
             
             # Read the LR and HR images from the provided paths
-            img_LR = util.read_img(self.LR_env, LR_path)
+            HR_path = self.paths_HR[index]
+            LR_path = self.paths_LR[index]
+            # print('HR Path:',HR_path)
+            # print('LR Path:',LR_path)
             img_HR = util.read_img(self.HR_env, HR_path)
-            
+            if LR_path is None:
+                img_LR = None
+            else:				
+                img_LR = util.read_img(self.LR_env, LR_path)
+			
             # Even if LR dataset is provided, force to generate aug_downscale % of downscales OTF from HR
             # The code will later make sure img_LR has the correct size
             if self.opt['aug_downscale']:
                 aug_downscale = self.opt['aug_downscale']
                 if np.random.rand() < aug_downscale:
-                    img_LR = img_HR
-            
+                    img_LR = None
+
+            # print('img_LR',img_LR)		
+			# If LR missing then revert to generate LR
+            if img_LR is None:
+                LRHR = False			
+					
         # If LR is not provided, use HR and modify on the fly
         else:
             HR_path = self.paths_HR[index]
@@ -438,23 +451,23 @@ class LRHRDataset(data.Dataset):
                 #print(debugpath)
                 if not os.path.exists(debugpath):
                     os.makedirs(debugpath)
-                if not os.path.exists(debugpath+'LR/'):
-                    os.makedirs(debugpath+'LR/')
-                if not os.path.exists(debugpath+'HR/'):
-                    os.makedirs(debugpath+'HR/')						
-                if self.opt['znorm']: # Back from [-1,1] range to [0,1] range for OpenCV2
-                    img_LRn = (img_LR + 1.0) / 2.0
-                    img_HRn = (img_HR + 1.0) / 2.0
-                    # img_HRn1 = (img_HR1 + 1.0) / 2.0
-                else: # Already in the [0,1] range for OpenCV2
-                    img_LRn = img_LR
-                    img_HRn = img_HR
+                # if not os.path.exists(debugpath+'LR/'):
+                    # os.makedirs(debugpath+'LR/')
+                # if not os.path.exists(debugpath+'HR/'):
+                    # os.makedirs(debugpath+'HR/')						
+                # if self.opt['znorm']: # Back from [-1,1] range to [0,1] range for OpenCV2
+                    # img_LRn = (img_LR + 1.0) / 2.0
+                    # img_HRn = (img_HR + 1.0) / 2.0
+                    # # img_HRn1 = (img_HR1 + 1.0) / 2.0
+                # else: # Already in the [0,1] range for OpenCV2
+                    # img_LRn = img_LR
+                    # img_HRn = img_HR
                     # img_HRn1 = img_HR1
                 
                 import uuid
                 hex = uuid.uuid4().hex
-                cv2.imwrite(debugpath+'LR/'+im_name+hex+'.png',img_LRn*255) #random name to save + had to multiply by 255, else getting all black image
-                cv2.imwrite(debugpath+'HR/'+im_name+hex+'.png',img_HRn*255) #random name to save + had to multiply by 255, else getting all black image
+                cv2.imwrite(debugpath+im_name+hex+'_LR.png',img_LR*255) #random name to save + had to multiply by 255, else getting all black image
+                cv2.imwrite(debugpath+im_name+hex+'_HR.png',img_HR*255) #random name to save + had to multiply by 255, else getting all black image
                 # cv2.imwrite(debugpath+"\\"+im_name+hex+'_HR1.png',img_HRn1*255) #random name to save + had to multiply by 255, else getting all black image
             
         ######## Convert images to PyTorch Tensors ########

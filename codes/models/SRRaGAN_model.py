@@ -8,18 +8,6 @@ import torch
 import torch.nn as nn
 from torch.optim import lr_scheduler
 
-try :
-    from torch.cuda.amp import autocast, GradScaler
-    use_amp = True
-    print('Using Automatic Mixed Precision.')
-except:
-    use_amp = False
-    class autocast():
-        def __enter__(self):
-            return self
-        def __exit__(self,x,y,z):
-            return self
-
 import models.networks as networks
 from .base_model import BaseModel
 from models.modules.LPIPS import perceptual_loss as models #import models.modules.LPIPS as models
@@ -29,6 +17,18 @@ from models.modules.losses.ssim2 import SSIM, MS_SSIM #implementation for use wi
 logger = logging.getLogger('base')
 
 import models.lr_schedulerR as lr_schedulerR
+
+try :
+    from torch.cuda.amp import autocast, GradScaler
+    use_amp = True
+    logger.info('Using Automatic Mixed Precision.')
+except:
+    use_amp = False
+    class autocast():
+        def __enter__(self):
+            return self
+        def __exit__(self,x,y,z):
+            return self
 
 """ #debug
 def save_images(image, num_rep, sufix):
@@ -46,7 +46,7 @@ class SRRaGANModel(BaseModel):
         train_opt = opt['train']
         if use_amp:
             self.scaler = GradScaler()
-            print('Creating GradScaler for AMP.')
+            logger.info('Creating GradScaler for AMP.')
 
         
         # define networks and load pretrained models
@@ -497,7 +497,7 @@ class SRRaGANModel(BaseModel):
                         l_g_gan = self.l_gan_w * (self.cri_gan(pred_d_real - torch.mean(pred_g_fake), False) +
                                                   self.cri_gan(pred_g_fake - torch.mean(pred_d_real), True)) / 2
                         l_g_total += l_g_gan
-                    self.log_dict['l_g_gan'] += l_g_gan.item()
+                        self.log_dict['l_g_gan'] += l_g_gan.item()
                     if use_amp:
                         self.scaler.scale(l_g_total).backward()
                     else:
@@ -507,8 +507,8 @@ class SRRaGANModel(BaseModel):
                 for p in self.netD.parameters():
                     p.requires_grad = True
 
+                l_d_total = 0
                 with autocast():
-                    l_d_total = 0
                     pred_d_real = self.netD(self.var_ref)
                     pred_d_fake = self.netD(self.fake_H.detach())  # detach to avoid BP to G
                     l_d_real = self.cri_gan(pred_d_real - torch.mean(pred_d_fake), True) / bm
