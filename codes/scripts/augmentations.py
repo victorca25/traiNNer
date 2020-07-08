@@ -409,6 +409,7 @@ def subimage(image, center, angle, tilesize): # directly rotatecrops  from a cen
 
     mapping = np.array([[v_x[0],-v_x[1], s_x+nudge_x],
                         [v_x[1],v_x[0], s_y+nudge_y]])
+    #interType=cv2.INTER_NEAREST
     if angle==0:
         interType=cv2.INTER_NEAREST
     else:
