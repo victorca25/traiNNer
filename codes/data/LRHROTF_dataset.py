@@ -208,8 +208,9 @@ class LRHRDataset(data.Dataset):
             img_HR = util.channel_convert(img_HR.shape[2], self.opt["color_HR"] if self.opt["color_HR"] else self.opt["color"], [img_HR])[0]
         if self.opt["color_LR"] or self.opt["color"]:  # Only change LR
             img_LR = util.channel_convert(img_LR.shape[2], self.opt["color_LR"] if self.opt["color_LR"] else self.opt["color"], [img_LR])[0]
-        
-        ######## Augmentations ########
+       
+     
+		######## Augmentations ########
         
         #Augmentations during training
         if self.opt['phase'] == 'train':

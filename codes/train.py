@@ -79,7 +79,10 @@ def main():
         if phase == 'train':
             train_set = create_dataset(dataset_opt)
             train_loader = create_dataloader(train_set, dataset_opt)
+            print('Train_loader:',len(train_loader))
             train_size = int(len(train_loader) / opt['batch_multiplier'])
+            if train_size < 1:
+                train_size = 1
             logger.info('Number of train images: {:,d}, iters: {:,d}'.format(
                 len(train_set), train_size))
             total_iters = int(opt['train']['niter'])
