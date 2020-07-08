@@ -19,10 +19,10 @@ This is a fork of victorca25's [BasicSR](https://github.com/victorca25/BasicSR/)
 Implemented AMP, which will automatically cast tensors to 16-bit floating point depending on usage. The reason for this is for the newer Volta/Turing card to take advantage of their Tensor Cores. Testing this feature shows a speed-up of about ~50% during training. You can read more about AMP at [nvidia's dev site](https://developer.nvidia.com/automatic-mixed-precision).
 
 ## Features
-These features are configured in the training `.json` file. Because of the nature of the changes, set training mode to `LRHROTF` beforehand. Using any other modes will behave as the original branch. 
+These features are configured in the training `.yml` file. Because of the nature of the changes, set training mode to `LRHROTF` beforehand. Using any other modes will behave as the original branch. 
 
 ### Load state via CPU
-- Lower end graphics card with low VRAM may have difficulty resuming from a state. If you get a out of memory error when continuing a training session, then set `"load2CPU":true` so that it is loaded to the system RAM instead.
+- Lower end graphics card with low VRAM may have difficulty resuming from a state. If you get a out of memory error when continuing a training session, then set `load2CPU: true` so that it is loaded to the system RAM instead.
 
 ### Image transformation
 - Random flipping, 90 degree rotate and HR rotate are all independent from each other, and can be applied together.
@@ -32,9 +32,9 @@ These features are configured in the training `.json` file. Because of the natur
 ### Revamped HR transform workflow
 Currently only usable with `LRHROTF` mode only.
 - When training with no LR data sources set, transformations are done only on the HR tile and LR tile are only auto-generated at the last step. 
-- If `hr_downscale": true` is set, large dataset images are randomly downscaled before cropping to the training tile size. This also applies to the LR dataset if same-scale training is used.
+- If `hr_downscale: true` is set, large dataset images are randomly downscaled before cropping to the training tile size. This also applies to the LR dataset if same-scale training is used.
 - If dataset image is smaller than training tile size, then it is automatically padded to the proper size with a random colour. This is different from original branch which scales the tile up, thus potentially compromising image quality.
-- If `"hr_rrot": true` is set, a different image rotate function is used which does not scale up the result. This function is used in conjunction with cropping, so the image tile is built directly from the dataset image.
+- If `hr_rrot: true` is set, a different image rotate function is used which does not scale up the result. This function is used in conjunction with cropping, so the image tile is built directly from the dataset image.
 
 ![Advanced transforms](figures/new_rotatescale.png)
 
@@ -54,7 +54,7 @@ Currently only usable with `LRHROTF` mode only.
 
 ![comparing scatter dithers](figures/quantize.png)
 
-- `imkuwahara` uses Imagemagick's [Kuwahara filter](https://en.wikipedia.org/wiki/Kuwahara_filter) that basically removes all details from the image and only maintains the general shape. This theoretically helps to train inpainting, though it is recommended to be used sparringly because of its tendency to create artifacts.
+- `imkuwahara` uses Imagemagick's [Kuwahara filter](https://en.wikipedia.org/wiki/Kuwahara_filter) that basically reduces fine details in the image by simplifying to a general shape. This theoretically helps to train inpainting, though it is recommended to be used sparringly because of its tendency to create artifacts.
 
 ![comparing screentone](figures/kuwahara.png)
 
