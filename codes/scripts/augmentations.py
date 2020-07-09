@@ -333,7 +333,7 @@ def minmax(v): #for Floyd-Steinberg dithering noise
     return v
 
 def noise_img(img_LR, noise_types=['clean']):
-    noise_type = random.choice(noise_types) 
+    noise_type = random.choice(noise_types).lower()
     
     if noise_type == 'poisson': #note: Poisson noise is not additive like Gaussian, it's dependant on the image values: https://tomroelandts.com/articles/gaussian-noise-is-added-poisson-noise-is-applied
         vals = len(np.unique(img_LR))
@@ -381,7 +381,7 @@ def noise_img(img_LR, noise_types=['clean']):
         
         noise_img = img_LR + gauss
         
-    elif noise_type == 'JPEG': # JPEG Compression        
+    elif noise_type == 'jpeg': # JPEG Compression
         compression = np.random.uniform(10, 50) #randomize quality between 10 and 50%
         encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), compression] #encoding parameters
         # encode
@@ -541,7 +541,10 @@ def noise_img(img_LR, noise_types=['clean']):
     
     elif noise_type == 'clean': # Pass clean image, without noise
         noise_img = img_LR
-        
+    
+    else:
+        raise NotImplementedError('Noise type [{:s}] is not recognized.'.format(noise_type))
+    
     #img_LR = np.clip(noise_img, 0, 1)
     return noise_img, noise_type
 
