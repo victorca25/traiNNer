@@ -102,7 +102,7 @@ class SFTGAN_ACD_Model(BaseModel):
 
             self.log_dict = OrderedDefaultDict()
         # print network
-        self.print_network()
+        #self.print_network()
 
     def feed_data(self, data, need_HR=True):
         # LR
