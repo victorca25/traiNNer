@@ -128,6 +128,8 @@ class LRHRDataset(data.Dataset):
         img_HR, img_LR = None, None
         scale = self.opt['scale']
         HR_size = self.opt['HR_size']
+        LR_nc = self.opt['LR_nc']
+        HR_nc = self.opt['HR_nc']
         if HR_size:
             LR_size = HR_size // scale
         

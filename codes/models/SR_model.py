@@ -35,15 +35,13 @@ class SRModel(BaseModel):
             self.l_pix_w = train_opt['pixel_weight']
 
             # optimizers
-            wd_G = train_opt['weight_decay_G'] if train_opt['weight_decay_G'] else 0
             optim_params = []
             for k, v in self.netG.named_parameters():  # can optimize for a part of the model
                 if v.requires_grad:
                     optim_params.append(v)
                 else:
                     logger.warning('Params [{:s}] will not optimize.'.format(k))
-            self.optimizer_G = torch.optim.Adam(
-                optim_params, lr=train_opt['lr_G'], weight_decay=wd_G)
+            self.optimizer_G = networks.define_optim(train_opt, optim_params, 'G')
             self.optimizers.append(self.optimizer_G)
 
             # schedulers
@@ -150,5 +148,5 @@ class SRModel(BaseModel):
             logger.info('Loading pretrained model for G [{:s}] ...'.format(load_path_G))
             self.load_network(load_path_G, self.netG)
 
-    def save(self, iter_step):
-        self.save_network(self.netG, 'G', iter_step)
+    def save(self, iter_step, name=None):
+        self.save_network(self.netG, 'G', iter_step, name)

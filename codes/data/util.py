@@ -78,7 +78,7 @@ def _read_lmdb_img(env, path):
     return img
 
 
-def read_img(env, path, out_nc=3):
+def read_img(env, path, out_nc):
     # read image by cv2 (rawpy if dng) or from lmdb
     # (alt: using PIL instead of cv2)
     # out_nc: Desired number of channels
