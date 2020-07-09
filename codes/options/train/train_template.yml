@@ -131,6 +131,9 @@ train:
   lr_G: !!float 1e-4 # 2e-4 # starting lr_G #Test, default: 1e-4
   lr_D: !!float 1e-4 # 4e-4 # starting lr_D #Test, default: 1e-4
 
+  # ESRGAN-FS Augmentations
+  use_frequency_separation: true
+
   #Scheduler options:
   #For MultiStepLR (ESRGAN, default):
   lr_scheme: 'MultiStepLR'

@@ -2,6 +2,7 @@ from __future__ import absolute_import
 
 import os
 import logging
+import filters
 from utils.util import OrderedDefaultDict
 
 import torch
@@ -46,10 +47,19 @@ class SRRaGANModel(BaseModel):
         if self.is_train:
             # G pixel loss
             #"""
+            # ESRGAN-FS Changes
+            if train_opt['use_frequency_separation']:
+                self.filter_low = filters.FilterLow().to(self.device)
+                self.filter_high = filters.FilterHigh().to(self.device)
+                self.use_frequency_separation = train_opt['use_frequency_separation']
+            else:
+                logger.info('Remove frequency separation.')
+                self.use_frequency_separation = None
+
             if train_opt['pixel_weight']:
                 if train_opt['pixel_criterion']:
                     l_pix_type = train_opt['pixel_criterion']
-                else: #default to cb
+                else: # default to cb
                     l_pix_type = 'cb'
                     
                 if l_pix_type == 'l1':
@@ -331,7 +341,10 @@ class SRRaGANModel(BaseModel):
 
                 if step % self.D_update_ratio == 0 and step > self.D_init_iters:
                     if self.cri_pix:  # pixel loss
-                        l_g_pix = self.l_pix_w * self.cri_pix(self.fake_H, self.var_H) / bm
+                        if self.use_frequency_separation:
+                            l_g_pix = self.l_pix_w * self.cri_pix(self.filter_low(self.fake_H), self.filter_low(self.var_H)) / bm
+                        else:
+                            l_g_pix = self.l_pix_w * self.cri_pix(self.fake_H, self.var_H) / bm
                         l_g_total += l_g_pix
                         self.log_dict['l_g_pix'] += l_g_pix.item()
                     if self.cri_ssim: # structural loss
@@ -345,6 +358,10 @@ class SRRaGANModel(BaseModel):
                         l_g_fea = self.l_fea_w * self.cri_fea(fake_fea, real_fea) / bm
                         l_g_total += l_g_fea
                         self.log_dict['l_g_fea'] += l_g_fea.item()
+                    if self.use_frequency_separation: # ESRGAN-FS aug
+                        pred_g_fake = self.netD(self.filter_high(self.fake_H))
+                    else:
+                        pred_g_fake = self.netD(self.fake_H)
                     if self.cri_hfen:  # HFEN loss 
                         l_g_HFEN = self.l_hfen_w * self.cri_hfen(self.fake_H, self.var_H) / bm
                         l_g_total += l_g_HFEN
@@ -359,9 +376,12 @@ class SRRaGANModel(BaseModel):
                         l_g_total += l_g_lpips
                         self.log_dict['l_g_lpips'] += l_g_lpips.item()
                     # G gan + cls loss
-                    pred_g_fake = self.netD(self.fake_H)
-                    pred_d_real = self.netD(self.var_ref).detach()
-
+                    if self.use_frequency_separation:
+                        pred_g_fake = self.netD(self.filter_high(self.fake_H))
+                        pred_d_real = self.netD(self.filter_high(self.var_ref)).detach()
+                    else:
+                        pred_g_fake = self.netD(self.fake_H)
+                        pred_d_real = self.netD(self.var_ref).detach()
                     l_g_gan = self.l_gan_w * (self.cri_gan(pred_d_real - torch.mean(pred_g_fake), False) +
                                               self.cri_gan(pred_g_fake - torch.mean(pred_d_real), True)) / (bm * 2)
                     l_g_total += l_g_gan
@@ -374,8 +394,12 @@ class SRRaGANModel(BaseModel):
                     p.requires_grad = True
 
                 l_d_total = 0
-                pred_d_real = self.netD(self.var_ref)
-                pred_d_fake = self.netD(self.fake_H.detach())  # detach to avoid BP to G
+                if self.use_frequency_separation:
+                    pred_d_real = self.netD(self.filter_high(self.var_ref))
+                    pred_d_fake = self.netD(self.filter_high(self.fake_H.detach())) # detach to avoid BP to G
+                else:
+                    pred_d_real = self.netD(self.var_ref)
+                    pred_d_fake = self.netD(self.fake_H.detach())  # detach to avoid BP to G
                 l_d_real = self.cri_gan(pred_d_real - torch.mean(pred_d_fake), True) / bm
                 l_d_fake = self.cri_gan(pred_d_fake - torch.mean(pred_d_real), False) / bm
                 self.log_dict['l_d_real'] += l_d_real.item()

@@ -7,6 +7,7 @@ import random
 import numpy as np
 from collections import OrderedDict
 import logging
+import filters
 
 import torch
 
@@ -30,7 +31,16 @@ def main():
     opt = option.parse(parser.parse_args().opt, is_train=True)
     opt = option.dict_to_nonedict(opt)  # Convert to NoneDict, which return None for missing key.
     use_simple_logging = parser.parse_args().simple
-    
+
+    # ESRGAN-FS
+    filter_low = filters.FilterLow(gaussian=False)
+    l1_loss = torch.nn.L1Loss()
+    mse_loss = torch.nn.MSELoss()
+    if torch.cuda.is_available():
+        filter_low = filter_low.cuda()
+        l1_loss = l1_loss.cuda()
+        mse_loss = mse_loss.cuda()
+
     # train from scratch OR resume training
     if opt['path']['resume_state']:
         if os.path.isdir(opt['path']['resume_state']):
@@ -151,6 +161,9 @@ def main():
             # validation
             if current_step % opt['train']['val_freq'] == 0:
                 avg_psnr = 0.0
+                val_pix_err_f = 0.0
+                val_pix_err_nf = 0.0
+                val_mean_color_err = 0.0
                 avg_ssim = 0.0
                 avg_lpips = 0.0
                 idx = 0
@@ -197,10 +210,17 @@ def main():
                     avg_ssim += util.calculate_ssim(cropped_sr_img, cropped_gt_img)
                     avg_lpips += lpips.calculate_lpips(cropped_sr_img, cropped_gt_img)
                     del cropped_gt_img, cropped_sr_img, gt_img, sr_img
+                    # ESRGAN-FS
+                    val_pix_err_f += l1_loss(filter_low(visuals['SR']), filter_low(visuals['HR']))
+                    val_pix_err_nf += l1_loss(visuals['SR'], visuals['HR'])
+                    val_mean_color_err += mse_loss(visuals['SR'].mean(2).mean(1), visuals['HR'].mean(2).mean(1))
 
                 avg_psnr = avg_psnr / idx
                 avg_ssim = avg_ssim / idx
                 avg_lpips = avg_lpips / idx
+                val_pix_err_f = val_pix_err_f / idx
+                val_pix_err_nf = val_pix_err_nf / idx
+                val_mean_color_err = val_mean_color_err / idx
                 lpips.cleanup()
 
                 # log
@@ -216,6 +236,9 @@ def main():
                     tb_logger.add_scalar('psnr', avg_psnr, current_step)
                     tb_logger.add_scalar('ssim', avg_ssim, current_step)
                     tb_logger.add_scalar('lpips', avg_lpips, current_step)
+                    tb_logger.add_scalar('val_pix_err_f', val_pix_err_f, current_step)
+                    tb_logger.add_scalar('val_pix_err_nf', val_pix_err_nf, current_step)
+                    tb_logger.add_scalar('val_mean_color_err', val_mean_color_err, current_step)
         epoch += 1
 
     logger.info('Saving the final model.')
