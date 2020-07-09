@@ -532,8 +532,8 @@ class SRRaGANModel(BaseModel):
                     l_d_total.backward()
 
                 # D outputs
-                self.log_dict['D_real'] = torch.mean(pred_d_real.detach()).item() / bm
-                self.log_dict['D_fake'] = torch.mean(pred_d_fake.detach()).item() / bm
+                self.log_dict['D_real'] += torch.mean(pred_d_real.detach()).item() / bm
+                self.log_dict['D_fake'] += torch.mean(pred_d_fake.detach()).item() / bm
             else:
                 with autocast():
                     if self.cri_pix:  # pixel loss

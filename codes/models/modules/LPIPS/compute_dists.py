@@ -10,7 +10,7 @@ model = None
 def calculate_lpips(img1_im, img2_im, use_gpu=False, net='squeeze', spatial=False):
     '''calculate Perceptual Metric using LPIPS 
     img1_im, img2_im: BGR image from [0,255]
-    img1, img2: RGB image from [-1,1]
+    img1, img2: BGR image from [-1,1]
     '''
     global model
     
