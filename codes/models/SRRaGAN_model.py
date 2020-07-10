@@ -471,17 +471,21 @@ class SRRaGANModel(BaseModel):
                         if self.cri_pix:  # pixel loss
                             l_g_pix = self.l_pix_w * self.cri_pix(self.fake_H, self.var_H)
                             l_g_total += l_g_pix
+                            self.log_dict['l_g_pix'] += l_g_pix.item()
                         if self.cri_fea:  # feature loss
                             real_fea = self.netF(self.var_H).detach()
                             fake_fea = self.netF(self.fake_H)
                             l_g_fea = self.l_fea_w * self.cri_fea(fake_fea, real_fea)
                             l_g_total += l_g_fea
+                            self.log_dict['l_g_fea'] += l_g_fea.item()
                         if self.cri_hfen:  # HFEN loss 
                             l_g_HFEN = self.l_hfen_w * self.cri_hfen(self.fake_H, self.var_H)
                             l_g_total += l_g_HFEN
+                            self.log_dict['l_g_HFEN'] += l_g_HFEN.item()
                         if self.cri_tv: #TV loss
                             l_g_tv = self.cri_tv(self.fake_H) #note: the weight is already multiplied inside the function, doesn't need to be here
                             l_g_total += l_g_tv
+                            self.log_dict['l_g_tv'] += l_g_tv.item()
                     if self.cri_lpips: #LPIPS loss                
                             # If "spatial = False" .forward() returns a scalar value, if "spatial = True", returns a map (5 layers for vgg and alex or 7 for squeeze)
                             #NOTE: .mean() is only to make the resulting loss into a scalar if "spatial = True", the mean distance is approximately the same as the non-spatial distance: https://github.com/richzhang/PerceptualSimilarity/blob/master/test_network.py
@@ -490,16 +494,21 @@ class SRRaGANModel(BaseModel):
                             #l_g_lpips = self.cri_lpips.forward(self.fake_H, self.var_H, normalize=True) # If "spatial = False" should return a scalar value
                             #print(l_g_lpips)
                         l_g_total += l_g_lpips
+                        self.log_dict['l_g_lpips'] += l_g_lpips.item()
                     if self.cri_ssim: # structural loss / must be in fp32
                         l_g_ssim = 1.-(self.l_ssim_w *self.cri_ssim(self.fake_H, self.var_H)) #using ssim2.py
-                        if torch.isnan(l_g_ssim).any():
-                            l_g_total = l_g_total
-                        else:
+                        if not torch.isnan(l_g_ssim).any():
                             l_g_total += l_g_ssim
+                            self.log_dict['l_g_ssim'] += l_g_ssim.item()
                     with autocast():						
                         # G gan + cls loss
-                        pred_g_fake = self.netD(self.fake_H)
-                        pred_d_real = self.netD(self.var_ref).detach()
+                        if self.use_frequency_separation:
+                            pred_g_fake = self.netD(self.filter_high(self.fake_H))
+                            pred_d_real = self.netD(self.filter_high(self.var_ref)).detach()
+                        else:
+                            pred_g_fake = self.netD(self.fake_H)
+                            pred_d_real = self.netD(self.var_ref).detach()
+							
                         l_g_gan = self.l_gan_w * (self.cri_gan(pred_d_real - torch.mean(pred_g_fake), False) +
                                                   self.cri_gan(pred_g_fake - torch.mean(pred_d_real), True)) / 2
                         l_g_total += l_g_gan
@@ -515,8 +524,12 @@ class SRRaGANModel(BaseModel):
 
                 l_d_total = 0
                 with autocast():
-                    pred_d_real = self.netD(self.var_ref)
-                    pred_d_fake = self.netD(self.fake_H.detach())  # detach to avoid BP to G
+                    if self.use_frequency_separation:
+                        pred_d_real = self.netD(self.filter_high(self.var_ref))
+                        pred_d_fake = self.netD(self.filter_high(self.fake_H.detach())) # detach to avoid BP to G
+                    else:					
+                        pred_d_real = self.netD(self.var_ref)
+                        pred_d_fake = self.netD(self.fake_H.detach())  # detach to avoid BP to G
                     l_d_real = self.cri_gan(pred_d_real - torch.mean(pred_d_fake), True) / bm
                     l_d_fake = self.cri_gan(pred_d_fake - torch.mean(pred_d_real), False) / bm
                     self.log_dict['l_d_real'] += l_d_real.item()
