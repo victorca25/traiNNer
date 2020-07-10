@@ -593,7 +593,7 @@ def noise_img(img_LR, noise_types=['clean']):
         
         noise_img = img_LR + gauss
         
-    elif noise_type == 'jpeg': # JPEG Compression
+    elif noise_type in ['jpeg','JPEG']: # JPEG Compression, caps spelling supported until everyone changes
         compression = np.random.uniform(10, 50) #randomize quality between 10 and 50%
         encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), compression] #encoding parameters
         # encode

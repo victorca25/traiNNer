@@ -52,12 +52,12 @@ datasets:
     lr_blur: false # true | false
     lr_blur_types:  ['gaussian', 'clean', 'clean', 'clean'] # select from: ['average', 'box', 'gaussian', 'bilateral', 'clean'] # #blur options #median and motion aren't working yet
     lr_noise: false # true | false
-    # LR noise types select from: ['imdither','imrandither','imquantize','imkuwahara','imtonephoto','imtonecomic','gaussian', 'JPEG', 'quantize', 'poisson', 'dither', 's&p', 'speckle', 'clean']
+    # LR noise types select from: ['imdither','imrandither','imquantize','imkuwahara','imtonephoto','imtonecomic','gaussian', 'jpeg', 'quantize', 'poisson', 'dither', 's&p', 'speckle', 'clean']
     lr_noise_types: ['imdither', 'imrandither', 'clean', 'clean', 'clean']
     lr_noise2: false # true | false
     lr_noise_types2: ['jpeg', 'clean', 'clean', 'clean'] 
     hr_noise: false # true | false
-    hr_noise_types: ['gaussian', 'clean', 'clean', 'clean', 'clean'] # select from: ['gaussian', 'JPEG', 'quantize', 'poisson', 'dither', 's&p', 'speckle', 'clean']
+    hr_noise_types: ['gaussian', 'clean', 'clean', 'clean', 'clean'] # select from: ['gaussian', 'jpeg', 'quantize', 'poisson', 'dither', 's&p', 'speckle', 'clean']
 
     #Color augmentations
     #lr_fringes: true # true | false
