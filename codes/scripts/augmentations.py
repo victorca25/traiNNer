@@ -827,7 +827,7 @@ def noise_img(img_LR, noise_types=['clean']):
             noise_img = np.array(imgout).astype(np.float32) / 255.0
         noise_img = cv2.cvtColor(noise_img, cv2.COLOR_BGR2RGB)
         
-    elif noise_type == 'clean': # Pass clean image, without noise
+    else: # Pass clean noiseless image, removed 'clean' condition so that noise_img intializes
         noise_img = img_LR
     
     else:
