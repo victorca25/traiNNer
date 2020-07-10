@@ -43,11 +43,11 @@ datasets:
     lr_downscale: true # false
     lr_downscale_types: ['area', 'matlab_bicubic'] # select from: ['nearest', 'linear', 'cubic', 'area', 'lanczos4', 'linear_exact', 'matlab_bicubic','im_rgb','im_liquid'] # scale_algos #scaling interpolation options
 
-    #Rotations augmentations:
+    #Rotations & scaling augmentations:
     use_flip: true # flip images
     use_rot: true # rotate images in 90 degree angles
     hr_rrot: false # rotate images in random degress between -45 and 45
-
+    hr_downscale: false # randomly downscale HR image before tile cropping
     #Noise and blur augmentations:
     lr_blur: false # true | false
     lr_blur_types:  ['gaussian', 'clean', 'clean', 'clean'] # select from: ['average', 'box', 'gaussian', 'bilateral', 'clean'] # #blur options #median and motion aren't working yet
