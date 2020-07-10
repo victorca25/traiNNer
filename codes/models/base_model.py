@@ -1,6 +1,8 @@
 import os
+import random
 import torch
 import torch.nn as nn
+import numpy as np
 from collections import Counter
 
 
@@ -59,17 +61,23 @@ class BaseModel():
         n = sum(map(lambda x: x.numel(), network.parameters()))
         return s, n
 
-    def save_network(self, network, network_label, iter_step, name, backup=False):
-        if backup:
-            save_filename = 'backup_{}.pth'.format(network_label)
-        else:
+    def save_network(self, network, network_label, iter_step, name=None):
+        if name:
             save_filename = '{}_{}_{}.pth'.format(name, iter_step, network_label)
+        else:
+            save_filename = '{}_{}.pth'.format(iter_step, network_label)
         save_path = os.path.join(self.opt['path']['models'], save_filename)
         if isinstance(network, nn.DataParallel):
             network = network.module
         state_dict = network.state_dict()
         for key, param in state_dict.items():
             state_dict[key] = param.cpu()
+        if iter_step == 'backup':
+            if os.path.exists(save_path):
+                lbk_path = os.path.join(self.opt['path']['models'], 'backup-old_{}.pth'.format(network_label))
+                if os.path.exists(lbk_path):
+                    os.remove(lbk_path)
+                os.rename(save_path, lbk_path)
         torch.save(state_dict, save_path)
 
     def load_network(self, load_path, network, strict=True):
@@ -84,8 +92,18 @@ class BaseModel():
             state['schedulers'].append(s.state_dict())
         for o in self.optimizers:
             state['optimizers'].append(o.state_dict())
+        state['python_rng'] = random.getstate()
+        state['numpy_rng'] = np.random.get_state()
+        state['torch_rng'] = torch.get_rng_state()
+        state['cuda_rng'] = torch.cuda.get_rng_state()
         save_filename = '{}.state'.format('backup' if backup else iter_step)
         save_path = os.path.join(self.opt['path']['training_state'], save_filename)
+        if backup:
+            if os.path.exists(save_path):
+                lbk_path = os.path.join(self.opt['path']['training_state'], 'backup-old.state')
+                if os.path.exists(lbk_path):
+                    os.remove(lbk_path)
+                os.rename(save_path, lbk_path)
         torch.save(state, save_path)
 
     def resume_training(self, resume_state):
@@ -101,6 +119,11 @@ class BaseModel():
             if isinstance(self.schedulers[i].milestones, Counter) and isinstance(s['milestones'], list):
                 s['milestones'] = Counter(s['milestones'])
             self.schedulers[i].load_state_dict(s)
+        if 'python_rng' in resume_state: # Allow old state files to load
+            random.setstate(resume_state['python_rng'])
+            np.random.set_state(resume_state['numpy_rng'])
+            torch.set_rng_state(resume_state['torch_rng'])
+            torch.cuda.set_rng_state(resume_state['cuda_rng'])
 
     def update_schedulers(self, train_opt):
         '''Update scheduler parameters if they are changed in the JSON configuration'''

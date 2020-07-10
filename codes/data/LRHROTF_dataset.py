@@ -128,6 +128,8 @@ class LRHRDataset(data.Dataset):
         img_HR, img_LR = None, None
         scale = self.opt['scale']
         HR_size = self.opt['HR_size']
+        LR_nc = self.opt['LR_nc']
+        HR_nc = self.opt['HR_nc']
         if HR_size:
             LR_size = HR_size // scale
         
@@ -179,11 +181,11 @@ class LRHRDataset(data.Dataset):
             LR_path = self.paths_LR[index]
             # print('HR Path:',HR_path)
             # print('LR Path:',LR_path)
-            img_HR = util.read_img(self.HR_env, HR_path)
+            img_HR = util.read_img(self.HR_env, HR_path, HR_nc)
             if LR_path is None:
                 img_LR = None
             else:				
-                img_LR = util.read_img(self.LR_env, LR_path)
+                img_LR = util.read_img(self.LR_env, LR_path, LR_nc)
 			
             # Even if LR dataset is provided, force to generate aug_downscale % of downscales OTF from HR
             # The code will later make sure img_LR has the correct size
@@ -200,7 +202,7 @@ class LRHRDataset(data.Dataset):
         # If LR is not provided, use HR and modify on the fly
         else:
             HR_path = self.paths_HR[index]
-            img_HR = util.read_img(self.HR_env, HR_path)
+            img_HR = util.read_img(self.HR_env, HR_path, HR_nc)
             #img_LR = img_HR
             LRHR = False
         

@@ -71,7 +71,7 @@ def main():
     logger.info('Random seed: {}'.format(seed))
     util.set_random_seed(seed)
 
-    torch.backends.cudnn.benckmark = True
+    torch.backends.cudnn.benchmark = True
     # torch.backends.cudnn.deterministic = True
 
     # create train and val dataloader
@@ -136,6 +136,9 @@ def main():
                         tb_logger.add_scalar(k, v, current_step)
                 logger.info(message)
 
+            # update learning rate
+            model.update_learning_rate()
+
             # save models and training states (changed to save models before validation)
             if current_step % opt['logger']['save_checkpoint_freq'] == 0:
                 model.save(current_step, opt['name'])
@@ -144,12 +147,9 @@ def main():
 
             # save & overwrite backup models & training states
             if opt['logger']['backup_freq'] and current_step % opt['logger']['backup_freq'] == 0:
-                model.save(current_step, opt['name'], True)
-                model.save_training_state(epoch + (n >= len(train_loader)), current_step, True)
+                model.save('backup')
+                model.save_training_state(epoch + (n >= train_size), current_step, True)
                 logger.info('Backup models and training states saved.')
-            
-            # update learning rate
-            model.update_learning_rate()
 
             # validation
             if current_step % opt['train']['val_freq'] == 0:
@@ -157,8 +157,6 @@ def main():
                 avg_ssim = 0.0
                 avg_lpips = 0.0
                 idx = 0
-                val_sr_imgs_list = []
-                val_gt_imgs_list = []
                 for val_data in val_loader:
                     idx += 1
                     img_name = os.path.splitext(os.path.basename(val_data['LR_path'][0]))[0]
@@ -186,8 +184,6 @@ def main():
 
                     # calculate PSNR, SSIM and LPIPS distance
                     crop_size = opt['scale']
-                    gt_img = gt_img / 255.
-                    sr_img = sr_img / 255.
 
                     # For training models with only one channel ndim==2, if RGB ndim==3, etc.
                     if gt_img.ndim == 2:
@@ -199,18 +195,16 @@ def main():
                     else: # Default: RGB images
                         cropped_sr_img = sr_img[crop_size:-crop_size, crop_size:-crop_size, :]
                     
-                    val_gt_imgs_list.append(cropped_gt_img) # If calculating only once for all images
-                    val_sr_imgs_list.append(cropped_sr_img) # If calculating only once for all images
-                    
                     # LPIPS only works for RGB images
-                    avg_psnr += util.calculate_psnr(cropped_sr_img * 255, cropped_gt_img * 255)
-                    avg_ssim += util.calculate_ssim(cropped_sr_img * 255, cropped_gt_img * 255)
-                    #avg_lpips += lpips.calculate_lpips([cropped_sr_img], [cropped_gt_img]) # If calculating for each image
+                    avg_psnr += util.calculate_psnr(cropped_sr_img, cropped_gt_img)
+                    avg_ssim += util.calculate_ssim(cropped_sr_img, cropped_gt_img)
+                    avg_lpips += lpips.calculate_lpips(cropped_sr_img, cropped_gt_img)
+                    del cropped_gt_img, cropped_sr_img, gt_img, sr_img
 
                 avg_psnr = avg_psnr / idx
                 avg_ssim = avg_ssim / idx
-                #avg_lpips = avg_lpips / idx # If calculating for each image
-                avg_lpips = lpips.calculate_lpips(val_sr_imgs_list,val_gt_imgs_list) # If calculating only once for all images
+                avg_lpips = avg_lpips / idx
+                lpips.cleanup()
 
                 #-avg_psnr = avg_psnr / idx
                 #-avg_ssim = avg_ssim / idx

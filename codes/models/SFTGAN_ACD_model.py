@@ -77,7 +77,6 @@ class SFTGAN_ACD_Model(BaseModel):
 
             # optimizers
             # G
-            wd_G = train_opt['weight_decay_G'] if train_opt['weight_decay_G'] else 0
             optim_params_SFT = []
             optim_params_other = []
             for k, v in self.netG.named_parameters():  # can optimize for a part of the model
@@ -85,16 +84,12 @@ class SFTGAN_ACD_Model(BaseModel):
                     optim_params_SFT.append(v)
                 else:
                     optim_params_other.append(v)
-            self.optimizer_G_SFT = torch.optim.Adam(optim_params_SFT, lr=train_opt['lr_G']*5, \
-                weight_decay=wd_G, betas=(train_opt['beta1_G'], 0.999))
-            self.optimizer_G_other = torch.optim.Adam(optim_params_other, lr=train_opt['lr_G'], \
-                weight_decay=wd_G, betas=(train_opt['beta1_G'], 0.999))
+            self.optimizer_G_SFT = networks.define_optim(train_opt, optim_params_SFT, 'G', lr=train_opt['lr_G']*5)
+            self.optimizer_G_other = networks.define_optim(train_opt, optim_params_other, 'G')
             self.optimizers.append(self.optimizer_G_SFT)
             self.optimizers.append(self.optimizer_G_other)
             # D
-            wd_D = train_opt['weight_decay_D'] if train_opt['weight_decay_D'] else 0
-            self.optimizer_D = torch.optim.Adam(self.netD.parameters(), lr=train_opt['lr_D'], \
-                weight_decay=wd_D, betas=(train_opt['beta1_D'], 0.999))
+            self.optimizer_D = networks.define_optim(train_opt, self.netD.parameters(), 'D')
             self.optimizers.append(self.optimizer_D)
 
             # schedulers
@@ -258,6 +253,6 @@ class SFTGAN_ACD_Model(BaseModel):
             logger.info('Loading pretrained model for D [{:s}] ...'.format(load_path_D))
             self.load_network(load_path_D, self.netD)
 
-    def save(self, iter_step):
-        self.save_network(self.netG, 'G', iter_step)
-        self.save_network(self.netD, 'D', iter_step)
+    def save(self, iter_step, name=None):
+        self.save_network(self.netG, 'G', iter_step, name)
+        self.save_network(self.netD, 'D', iter_step, name)
