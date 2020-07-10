@@ -472,14 +472,14 @@ class SRRaGANModel(BaseModel):
                         if self.cri_tv: #TV loss
                             l_g_tv = self.cri_tv(self.fake_H) #note: the weight is already multiplied inside the function, doesn't need to be here
                             l_g_total += l_g_tv
-                        if self.cri_lpips: #LPIPS loss                
+                    if self.cri_lpips: #LPIPS loss                
                             # If "spatial = False" .forward() returns a scalar value, if "spatial = True", returns a map (5 layers for vgg and alex or 7 for squeeze)
                             #NOTE: .mean() is only to make the resulting loss into a scalar if "spatial = True", the mean distance is approximately the same as the non-spatial distance: https://github.com/richzhang/PerceptualSimilarity/blob/master/test_network.py
                             #l_g_lpips = self.cri_lpips.forward(self.fake_H,self.var_H).mean() # -> If normalize is False (default), assumes the images are already between [-1,+1]
-                            l_g_lpips = self.cri_lpips.forward(self.fake_H, self.var_H, normalize=True).mean() # -> # If normalize is True, assumes the images are between [0,1] and then scales them between [-1,+1]
+                        l_g_lpips = self.cri_lpips.forward(self.fake_H, self.var_H, normalize=True).mean() # -> # If normalize is True, assumes the images are between [0,1] and then scales them between [-1,+1]
                             #l_g_lpips = self.cri_lpips.forward(self.fake_H, self.var_H, normalize=True) # If "spatial = False" should return a scalar value
                             #print(l_g_lpips)
-                            l_g_total += l_g_lpips
+                        l_g_total += l_g_lpips
                     if self.cri_ssim: # structural loss / must be in fp32
                         l_g_ssim = 1.-(self.l_ssim_w *self.cri_ssim(self.fake_H, self.var_H)) #using ssim2.py
                         if torch.isnan(l_g_ssim).any():
@@ -555,11 +555,11 @@ class SRRaGANModel(BaseModel):
                         l_g_tv = self.cri_tv(self.fake_H) / bm #note: the weight is already multiplied inside the function, doesn't need to be here
                         l_g_total += l_g_tv
                         self.log_dict['l_g_tv'] += l_g_tv.item()
-                    if self.cri_lpips: #LPIPS loss                
+                if self.cri_lpips: #LPIPS loss                
                         # If "spatial = False" .forward() returns a scalar value, if "spatial = True", returns a map (5 layers for vgg and alex or 7 for squeeze)
-                        l_g_lpips = self.cri_lpips.forward(self.fake_H, self.var_H, normalize=True).mean() / bm # -> # If normalize is True, assumes the images are between [0,1] and then scales them between [-1,+1]
-                        l_g_total += l_g_lpips
-                        self.log_dict['l_g_lpips'] += l_g_lpips.item()
+                    l_g_lpips = self.cri_lpips.forward(self.fake_H, self.var_H, normalize=True).mean() / bm # -> # If normalize is True, assumes the images are between [0,1] and then scales them between [-1,+1]
+                    l_g_total += l_g_lpips
+                    self.log_dict['l_g_lpips'] += l_g_lpips.item()
                 
                 if self.cri_ssim: # structural loss (Structural Dissimilarity)
                     l_g_ssim = (1. - (self.l_ssim_w * self.cri_ssim(self.fake_H, self.var_H))) / bm #using ssim2.py
