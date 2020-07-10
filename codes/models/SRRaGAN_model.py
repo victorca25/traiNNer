@@ -339,39 +339,39 @@ class SRRaGANModel(BaseModel):
                 for p in self.netD.parameters():
                     p.requires_grad = False
 
-                if step % self.D_update_ratio == 0 and step > self.D_init_iters:
-                    if self.cri_pix:  # pixel loss
-                        if self.use_frequency_separation:
-                            l_g_pix = self.l_pix_w * self.cri_pix(self.filter_low(self.fake_H), self.filter_low(self.var_H)) / bm
-                        else:
-                            l_g_pix = self.l_pix_w * self.cri_pix(self.fake_H, self.var_H) / bm
-                        l_g_total += l_g_pix
-                        self.log_dict['l_g_pix'] += l_g_pix.item()
-                    if self.cri_ssim: # structural loss
-                        l_g_ssim = (1. - (self.l_ssim_w * self.cri_ssim(self.fake_H, self.var_H))) / bm #using ssim2.py
-                        if not torch.isnan(l_g_ssim).any():
-                            l_g_total += l_g_ssim
-                            self.log_dict['l_g_ssim'] += l_g_ssim.item()
-                    if self.cri_fea:  # feature loss
-                        real_fea = self.netF(self.var_H).detach()
-                        fake_fea = self.netF(self.fake_H)
-                        l_g_fea = self.l_fea_w * self.cri_fea(fake_fea, real_fea) / bm
-                        l_g_total += l_g_fea
-                        self.log_dict['l_g_fea'] += l_g_fea.item()
-                    if self.cri_hfen:  # HFEN loss 
-                        l_g_HFEN = self.l_hfen_w * self.cri_hfen(self.fake_H, self.var_H) / bm
-                        l_g_total += l_g_HFEN
-                        self.log_dict['l_g_HFEN'] += l_g_HFEN.item()
-                    if self.cri_tv: #TV loss
-                        l_g_tv = self.cri_tv(self.fake_H) / bm #note: the weight is already multiplied inside the function, doesn't need to be here
-                        l_g_total += l_g_tv
-                        self.log_dict['l_g_tv'] += l_g_tv.item()
-                    if self.cri_lpips: #LPIPS loss                
-                        # If "spatial = False" .forward() returns a scalar value, if "spatial = True", returns a map (5 layers for vgg and alex or 7 for squeeze)
-                        l_g_lpips = self.cri_lpips.forward(self.fake_H, self.var_H, normalize=True).mean() / bm # -> # If normalize is True, assumes the images are between [0,1] and then scales them between [-1,+1]
-                        l_g_total += l_g_lpips
-                        self.log_dict['l_g_lpips'] += l_g_lpips.item()
-                    # G gan + cls loss
+            if not self.cri_gan or (step % self.D_update_ratio == 0 and step > self.D_init_iters):
+                if self.cri_pix:  # pixel loss
+                    if self.use_frequency_separation:
+                        l_g_pix = self.l_pix_w * self.cri_pix(self.filter_low(self.fake_H), self.filter_low(self.var_H)) / bm
+                    else:
+                        l_g_pix = self.l_pix_w * self.cri_pix(self.fake_H, self.var_H) / bm
+                    l_g_total += l_g_pix
+                    self.log_dict['l_g_pix'] += l_g_pix.item()
+                if self.cri_ssim: # structural loss (Structural Dissimilarity)
+                    l_g_ssim = (1. - (self.l_ssim_w * self.cri_ssim(self.fake_H, self.var_H))) / bm #using ssim2.py
+                    if not torch.isnan(l_g_ssim).any(): #at random, l_g_ssim is returning NaN for ms-ssim, which breaks the model. Temporary hack, until I find out what's going on.
+                        l_g_total += l_g_ssim
+                        self.log_dict['l_g_ssim'] += l_g_ssim.item()
+                if self.cri_fea:  # feature loss
+                    real_fea = self.netF(self.var_H).detach()
+                    fake_fea = self.netF(self.fake_H)
+                    l_g_fea = self.l_fea_w * self.cri_fea(fake_fea, real_fea) / bm
+                    l_g_total += l_g_fea
+                    self.log_dict['l_g_fea'] += l_g_fea.item()
+                if self.cri_hfen:  # HFEN loss
+                    l_g_HFEN = self.l_hfen_w * self.cri_hfen(self.fake_H, self.var_H) / bm
+                    l_g_total += l_g_HFEN
+                    self.log_dict['l_g_HFEN'] += l_g_HFEN.item()
+                if self.cri_tv: #TV loss
+                    l_g_tv = self.cri_tv(self.fake_H) / bm #note: the weight is already multiplied inside the function, doesn't need to be here
+                    l_g_total += l_g_tv
+                    self.log_dict['l_g_tv'] += l_g_tv.item()
+                if self.cri_lpips: #LPIPS loss
+                    # If "spatial = False" .forward() returns a scalar value, if "spatial = True", returns a map (5 layers for vgg and alex or 7 for squeeze)
+                    l_g_lpips = self.cri_lpips.forward(self.fake_H, self.var_H, normalize=True).mean() / bm # -> # If normalize is True, assumes the images are between [0,1] and then scales them between [-1,+1]
+                    l_g_total += l_g_lpips
+                    self.log_dict['l_g_lpips'] += l_g_lpips.item()
+                if self.cri_gan: # G gan + cls loss
                     if self.use_frequency_separation: # ESRGAN-FS / Frequency Separation
                         pred_g_fake = self.netD(self.filter_high(self.fake_H))
                         pred_d_real = self.netD(self.filter_high(self.var_ref)).detach()
@@ -383,8 +383,9 @@ class SRRaGANModel(BaseModel):
                     l_g_total += l_g_gan
                     self.log_dict['l_g_gan'] += l_g_gan.item()
 
-                    l_g_total.backward()
+                l_g_total.backward()
 
+            if self.cri_gan:
                 # D
                 for p in self.netD.parameters():
                     p.requires_grad = True
@@ -420,37 +421,6 @@ class SRRaGANModel(BaseModel):
                 # D outputs
                 self.log_dict['D_real'] += torch.mean(pred_d_real.detach()).item() / bm
                 self.log_dict['D_fake'] += torch.mean(pred_d_fake.detach()).item() / bm
-            else:
-                if self.cri_pix:  # pixel loss
-                    l_g_pix = self.l_pix_w * self.cri_pix(self.fake_H, self.var_H) / bm
-                    l_g_total += l_g_pix
-                    self.log_dict['l_g_pix'] += l_g_pix.item()
-                if self.cri_ssim: # structural loss (Structural Dissimilarity)
-                    l_g_ssim = (1. - (self.l_ssim_w * self.cri_ssim(self.fake_H, self.var_H))) / bm #using ssim2.py
-                    if not torch.isnan(l_g_ssim).any(): #at random, l_g_ssim is returning NaN for ms-ssim, which breaks the model. Temporary hack, until I find out what's going on.
-                        l_g_total += l_g_ssim
-                        self.log_dict['l_g_ssim'] += l_g_ssim.item()
-                if self.cri_fea:  # feature loss
-                    real_fea = self.netF(self.var_H).detach()
-                    fake_fea = self.netF(self.fake_H)
-                    l_g_fea = self.l_fea_w * self.cri_fea(fake_fea, real_fea) / bm
-                    l_g_total += l_g_fea
-                    self.log_dict['l_g_fea'] += l_g_fea.item()
-                if self.cri_hfen:  # HFEN loss 
-                    l_g_HFEN = self.l_hfen_w * self.cri_hfen(self.fake_H, self.var_H) / bm
-                    l_g_total += l_g_HFEN
-                    self.log_dict['l_g_HFEN'] += l_g_HFEN.item()
-                if self.cri_tv: #TV loss
-                    l_g_tv = self.cri_tv(self.fake_H) / bm #note: the weight is already multiplied inside the function, doesn't need to be here
-                    l_g_total += l_g_tv
-                    self.log_dict['l_g_tv'] += l_g_tv.item()
-                if self.cri_lpips: #LPIPS loss                
-                    # If "spatial = False" .forward() returns a scalar value, if "spatial = True", returns a map (5 layers for vgg and alex or 7 for squeeze)
-                    l_g_lpips = self.cri_lpips.forward(self.fake_H, self.var_H, normalize=True).mean() / bm # -> # If normalize is True, assumes the images are between [0,1] and then scales them between [-1,+1]
-                    l_g_total += l_g_lpips
-                    self.log_dict['l_g_lpips'] += l_g_lpips.item()
-                    
-                l_g_total.backward()
 
         if self.cri_gan:
             if step % self.D_update_ratio == 0 and step > self.D_init_iters:
