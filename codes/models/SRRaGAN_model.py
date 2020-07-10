@@ -358,10 +358,6 @@ class SRRaGANModel(BaseModel):
                         l_g_fea = self.l_fea_w * self.cri_fea(fake_fea, real_fea) / bm
                         l_g_total += l_g_fea
                         self.log_dict['l_g_fea'] += l_g_fea.item()
-                    if self.use_frequency_separation: # ESRGAN-FS aug
-                        pred_g_fake = self.netD(self.filter_high(self.fake_H))
-                    else:
-                        pred_g_fake = self.netD(self.fake_H)
                     if self.cri_hfen:  # HFEN loss 
                         l_g_HFEN = self.l_hfen_w * self.cri_hfen(self.fake_H, self.var_H) / bm
                         l_g_total += l_g_HFEN
@@ -376,7 +372,7 @@ class SRRaGANModel(BaseModel):
                         l_g_total += l_g_lpips
                         self.log_dict['l_g_lpips'] += l_g_lpips.item()
                     # G gan + cls loss
-                    if self.use_frequency_separation:
+                    if self.use_frequency_separation: # ESRGAN-FS / Frequency Separation
                         pred_g_fake = self.netD(self.filter_high(self.fake_H))
                         pred_d_real = self.netD(self.filter_high(self.var_ref)).detach()
                     else:
