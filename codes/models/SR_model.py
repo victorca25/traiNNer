@@ -54,7 +54,7 @@ class SRModel(BaseModel):
 
             self.log_dict = OrderedDefaultDict()
         # print network
-        self.print_network()
+        #self.print_network()
 
     def feed_data(self, data, need_HR=True):
         self.var_L = data['LR'].to(self.device)  # LR

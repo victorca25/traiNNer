@@ -2,6 +2,7 @@ from __future__ import absolute_import
 
 import os
 import logging
+import filters
 from utils.util import OrderedDefaultDict
 
 import torch
@@ -67,10 +68,19 @@ class SRRaGANModel(BaseModel):
                 
             # G pixel loss
             #"""
+            # ESRGAN-FS Changes
+            if train_opt['use_frequency_separation']:
+                self.filter_low = filters.FilterLow().to(self.device)
+                self.filter_high = filters.FilterHigh().to(self.device)
+                self.use_frequency_separation = train_opt['use_frequency_separation']
+            else:
+                logger.info('Remove frequency separation.')
+                self.use_frequency_separation = None
+
             if train_opt['pixel_weight']:
                 if train_opt['pixel_criterion']:
                     l_pix_type = train_opt['pixel_criterion']
-                else: #default to cb
+                else: # default to cb
                     l_pix_type = 'cb'
                     
                 if l_pix_type == 'l1':
@@ -537,7 +547,10 @@ class SRRaGANModel(BaseModel):
             else:
                 with autocast():
                     if self.cri_pix:  # pixel loss
-                        l_g_pix = self.l_pix_w * self.cri_pix(self.fake_H, self.var_H) / bm
+                        if self.use_frequency_separation:
+                            l_g_pix = self.l_pix_w * self.cri_pix(self.filter_low(self.fake_H), self.filter_low(self.var_H)) / bm
+                        else:
+                            l_g_pix = self.l_pix_w * self.cri_pix(self.fake_H, self.var_H) / bm
                         l_g_total += l_g_pix
                         self.log_dict['l_g_pix'] += l_g_pix.item()
                 
@@ -547,6 +560,10 @@ class SRRaGANModel(BaseModel):
                         l_g_fea = self.l_fea_w * self.cri_fea(fake_fea, real_fea) / bm
                         l_g_total += l_g_fea
                         self.log_dict['l_g_fea'] += l_g_fea.item()
+                    if self.use_frequency_separation: # ESRGAN-FS aug
+                        pred_g_fake = self.netD(self.filter_high(self.fake_H))
+                    else:
+                        pred_g_fake = self.netD(self.fake_H)
                     if self.cri_hfen:  # HFEN loss 
                         l_g_HFEN = self.l_hfen_w * self.cri_hfen(self.fake_H, self.var_H) / bm
                         l_g_total += l_g_HFEN
@@ -560,7 +577,6 @@ class SRRaGANModel(BaseModel):
                     l_g_lpips = self.cri_lpips.forward(self.fake_H, self.var_H, normalize=True).mean() / bm # -> # If normalize is True, assumes the images are between [0,1] and then scales them between [-1,+1]
                     l_g_total += l_g_lpips
                     self.log_dict['l_g_lpips'] += l_g_lpips.item()
-                
                 if self.cri_ssim: # structural loss (Structural Dissimilarity)
                     l_g_ssim = (1. - (self.l_ssim_w * self.cri_ssim(self.fake_H, self.var_H))) / bm #using ssim2.py
                     if not torch.isnan(l_g_ssim).any(): #at random, l_g_ssim is returning NaN for ms-ssim, which breaks the model. Temporary hack, until I find out what's going on.
