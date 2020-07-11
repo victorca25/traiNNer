@@ -25,13 +25,6 @@ try :
     logger.info('Loaded AMP library')
 except:
     load_amp = False
-    class autocast():
-        def __init__(self,enabled=False):
-            return None
-        def __enter__(self):
-            return self
-        def __exit__(self,x,y,z):
-            return self
 
 """ #debug
 def save_images(image, num_rep, sufix):
@@ -469,9 +462,13 @@ class SRRaGANModel(BaseModel):
                 # G
                 for p in self.netD.parameters():
                     p.requires_grad = False
+            if self.use_amp:
+                cast = autocast
+            else:
+                cast = nocast
 
             if not self.cri_gan or (step % self.D_update_ratio == 0 and step > self.D_init_iters):
-                with autocast(enabled=self.use_amp):
+                with cast():
                     if self.cri_pix:  # pixel loss
                         if self.use_frequency_separation:
                             l_g_pix = self.l_pix_w * self.cri_pix(self.filter_low(self.fake_H), self.filter_low(self.var_H)) / bm
@@ -527,7 +524,7 @@ class SRRaGANModel(BaseModel):
                     p.requires_grad = True
 
                 l_d_total = 0
-                with autocast(enabled=self.use_amp):
+                with cast():
                     if self.use_frequency_separation:
                         pred_d_real = self.netD(self.filter_high(self.var_ref))
                         pred_d_fake = self.netD(self.filter_high(self.fake_H.detach())) # detach to avoid BP to G
@@ -658,3 +655,11 @@ class SRRaGANModel(BaseModel):
         self.save_network(self.netG, 'G', iter_step, name)
         if self.cri_gan:
             self.save_network(self.netD, 'D', iter_step, name)
+
+class nocast():
+    def __init__(self,enabled=False):
+        return None
+    def __enter__(self):
+        return self
+    def __exit__(self,x,y,z):
+        return self
