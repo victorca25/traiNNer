@@ -21,11 +21,13 @@ import models.lr_schedulerR as lr_schedulerR
 
 try :
     from torch.cuda.amp import autocast, GradScaler
-    use_amp = True
-    logger.info('Using Automatic Mixed Precision.')
+    load_amp = True
+    logger.info('Loaded AMP library')
 except:
-    use_amp = False
+    load_amp = False
     class autocast():
+        def __init__(self,enabled=False):
+            return None
         def __enter__(self):
             return self
         def __exit__(self,x,y,z):
@@ -45,9 +47,11 @@ class SRRaGANModel(BaseModel):
     def __init__(self, opt):
         super(SRRaGANModel, self).__init__(opt)
         train_opt = opt['train']
-        if use_amp:
+        self.use_amp = opt['use_amp'] and load_amp
+
+        if self.use_amp:
             self.scaler = GradScaler()
-            logger.info('Creating GradScaler for AMP.')
+            logger.info('Using Automatic Mixed Precision')
 
         
         # define networks and load pretrained models
@@ -466,52 +470,56 @@ class SRRaGANModel(BaseModel):
                 for p in self.netD.parameters():
                     p.requires_grad = False
 
-                        l_g_lpips = self.cri_lpips.forward(self.fake_H, self.var_H, normalize=True).mean() # -> # If normalize is True, assumes the images are between [0,1] and then scales them between [-1,+1]
             if not self.cri_gan or (step % self.D_update_ratio == 0 and step > self.D_init_iters):
-                if self.cri_pix:  # pixel loss
-                    if self.use_frequency_separation:
-                        l_g_pix = self.l_pix_w * self.cri_pix(self.filter_low(self.fake_H), self.filter_low(self.var_H)) / bm
-                    else:
-                        l_g_pix = self.l_pix_w * self.cri_pix(self.fake_H, self.var_H) / bm
-                    l_g_total += l_g_pix
-                    self.log_dict['l_g_pix'] += l_g_pix.item()
-                if self.cri_ssim: # structural loss (Structural Dissimilarity)
-                    l_g_ssim = (1. - (self.l_ssim_w * self.cri_ssim(self.fake_H, self.var_H))) / bm #using ssim2.py
-                    if not torch.isnan(l_g_ssim).any(): #at random, l_g_ssim is returning NaN for ms-ssim, which breaks the model. Temporary hack, until I find out what's going on.
-                        l_g_total += l_g_ssim
-                        self.log_dict['l_g_ssim'] += l_g_ssim.item()
-                if self.cri_fea:  # feature loss
-                    real_fea = self.netF(self.var_H).detach()
-                    fake_fea = self.netF(self.fake_H)
-                    l_g_fea = self.l_fea_w * self.cri_fea(fake_fea, real_fea) / bm
-                    l_g_total += l_g_fea
-                    self.log_dict['l_g_fea'] += l_g_fea.item()
-                if self.cri_hfen:  # HFEN loss
-                    l_g_HFEN = self.l_hfen_w * self.cri_hfen(self.fake_H, self.var_H) / bm
-                    l_g_total += l_g_HFEN
-                    self.log_dict['l_g_HFEN'] += l_g_HFEN.item()
-                if self.cri_tv: #TV loss
-                    l_g_tv = self.cri_tv(self.fake_H) / bm #note: the weight is already multiplied inside the function, doesn't need to be here
-                    l_g_total += l_g_tv
-                    self.log_dict['l_g_tv'] += l_g_tv.item()
+                with autocast(enabled=self.use_amp):
+                    if self.cri_pix:  # pixel loss
+                        if self.use_frequency_separation:
+                            l_g_pix = self.l_pix_w * self.cri_pix(self.filter_low(self.fake_H), self.filter_low(self.var_H)) / bm
+                        else:
+                            l_g_pix = self.l_pix_w * self.cri_pix(self.fake_H, self.var_H) / bm
+                        l_g_total += l_g_pix
+                        self.log_dict['l_g_pix'] += l_g_pix.item()
+
+                    if self.cri_fea:  # feature loss
+                        real_fea = self.netF(self.var_H).detach()
+                        fake_fea = self.netF(self.fake_H)
+                        l_g_fea = self.l_fea_w * self.cri_fea(fake_fea, real_fea) / bm
+                        l_g_total += l_g_fea
+                        self.log_dict['l_g_fea'] += l_g_fea.item()
+                    if self.cri_hfen:  # HFEN loss
+                        l_g_HFEN = self.l_hfen_w * self.cri_hfen(self.fake_H, self.var_H) / bm
+                        l_g_total += l_g_HFEN
+                        self.log_dict['l_g_HFEN'] += l_g_HFEN.item()
+                    if self.cri_tv: #TV loss
+                        l_g_tv = self.cri_tv(self.fake_H) / bm #note: the weight is already multiplied inside the function, doesn't need to be here
+                        l_g_total += l_g_tv
+                        self.log_dict['l_g_tv'] += l_g_tv.item()
+                    if self.cri_gan: # G gan + cls loss
+                        if self.use_frequency_separation: # ESRGAN-FS / Frequency Separation
+                            pred_g_fake = self.netD(self.filter_high(self.fake_H))
+                            pred_d_real = self.netD(self.filter_high(self.var_ref)).detach()
+                        else:
+                            pred_g_fake = self.netD(self.fake_H)
+                            pred_d_real = self.netD(self.var_ref).detach()
+                        l_g_gan = self.l_gan_w * (self.cri_gan(pred_d_real - torch.mean(pred_g_fake), False) +
+                                              self.cri_gan(pred_g_fake - torch.mean(pred_d_real), True)) / (bm * 2)
+                        l_g_total += l_g_gan
+                        self.log_dict['l_g_gan'] += l_g_gan.item()
                 if self.cri_lpips: #LPIPS loss
                     # If "spatial = False" .forward() returns a scalar value, if "spatial = True", returns a map (5 layers for vgg and alex or 7 for squeeze)
                     l_g_lpips = self.cri_lpips.forward(self.fake_H, self.var_H, normalize=True).mean() / bm # -> # If normalize is True, assumes the images are between [0,1] and then scales them between [-1,+1]
                     l_g_total += l_g_lpips
                     self.log_dict['l_g_lpips'] += l_g_lpips.item()
-                if self.cri_gan: # G gan + cls loss
-                    if self.use_frequency_separation: # ESRGAN-FS / Frequency Separation
-                        pred_g_fake = self.netD(self.filter_high(self.fake_H))
-                        pred_d_real = self.netD(self.filter_high(self.var_ref)).detach()
-                    else:
-                        pred_g_fake = self.netD(self.fake_H)
-                        pred_d_real = self.netD(self.var_ref).detach()
-                    l_g_gan = self.l_gan_w * (self.cri_gan(pred_d_real - torch.mean(pred_g_fake), False) +
-                                              self.cri_gan(pred_g_fake - torch.mean(pred_d_real), True)) / (bm * 2)
-                    l_g_total += l_g_gan
-                    self.log_dict['l_g_gan'] += l_g_gan.item()
+                if self.cri_ssim: # structural loss (Structural Dissimilarity)
+                    l_g_ssim = (1. - (self.l_ssim_w * self.cri_ssim(self.fake_H, self.var_H))) / bm #using ssim2.py
+                    if not torch.isnan(l_g_ssim).any(): #at random, l_g_ssim is returning NaN for ms-ssim, which breaks the model. Temporary hack, until I find out what's going on.
+                        l_g_total += l_g_ssim
+                        self.log_dict['l_g_ssim'] += l_g_ssim.item()
 
-                l_g_total.backward()
+                if self.use_amp:
+                    self.scaler.scale(l_g_total).backward()
+                else:
+                    l_g_total.backward()
 
             if self.cri_gan:
                 # D
@@ -519,45 +527,50 @@ class SRRaGANModel(BaseModel):
                     p.requires_grad = True
 
                 l_d_total = 0
-                if self.use_frequency_separation:
-                    pred_d_real = self.netD(self.filter_high(self.var_ref))
-                    pred_d_fake = self.netD(self.filter_high(self.fake_H.detach())) # detach to avoid BP to G
+                with autocast(enabled=self.use_amp):
+                    if self.use_frequency_separation:
+                        pred_d_real = self.netD(self.filter_high(self.var_ref))
+                        pred_d_fake = self.netD(self.filter_high(self.fake_H.detach())) # detach to avoid BP to G
+                    else:
+                        pred_d_real = self.netD(self.var_ref)
+                        pred_d_fake = self.netD(self.fake_H.detach())  # detach to avoid BP to G
+                    l_d_real = self.cri_gan(pred_d_real - torch.mean(pred_d_fake), True) / bm
+                    l_d_fake = self.cri_gan(pred_d_fake - torch.mean(pred_d_real), False) / bm
+                    self.log_dict['l_d_real'] += l_d_real.item()
+                    self.log_dict['l_d_fake'] += l_d_fake.item()
+
+                    l_d_total = (l_d_real + l_d_fake) / 2
+
+                    if self.opt['train']['gan_type'] == 'wgan-gp':
+                        batch_size = self.var_ref.size(0)
+                        if self.random_pt.size(0) != batch_size:
+                            self.random_pt.resize_(batch_size, 1, 1, 1)
+                        self.random_pt.uniform_()  # Draw random interpolation points
+                        interp = self.random_pt * self.fake_H.detach() + (1 - self.random_pt) * self.var_ref
+                        interp.requires_grad = True
+                        interp_crit = self.netD(interp)
+                        l_d_gp = self.l_gp_w * self.cri_gp(interp, interp_crit) / bm
+                        l_d_total += l_d_gp
+                        self.log_dict['l_d_gp'] += l_d_gp.item()
+
+                if self.use_amp:
+                    self.scaler.scale(l_d_total).backward()
                 else:
-                    pred_d_real = self.netD(self.var_ref)
-                    pred_d_fake = self.netD(self.fake_H.detach())  # detach to avoid BP to G
-                l_d_real = self.cri_gan(pred_d_real - torch.mean(pred_d_fake), True) / bm
-                l_d_fake = self.cri_gan(pred_d_fake - torch.mean(pred_d_real), False) / bm
-                self.log_dict['l_d_real'] += l_d_real.item()
-                self.log_dict['l_d_fake'] += l_d_fake.item()
-
-                l_d_total = (l_d_real + l_d_fake) / 2
-
-                if self.opt['train']['gan_type'] == 'wgan-gp':
-                    batch_size = self.var_ref.size(0)
-                    if self.random_pt.size(0) != batch_size:
-                        self.random_pt.resize_(batch_size, 1, 1, 1)
-                    self.random_pt.uniform_()  # Draw random interpolation points
-                    interp = self.random_pt * self.fake_H.detach() + (1 - self.random_pt) * self.var_ref
-                    interp.requires_grad = True
-                    interp_crit = self.netD(interp)
-                    l_d_gp = self.l_gp_w * self.cri_gp(interp, interp_crit) / bm
-                    l_d_total += l_d_gp
-                    self.log_dict['l_d_gp'] += l_d_gp.item()
-
-                l_d_total.backward()
+                    l_d_total.backward()
 
                 # D outputs
                 self.log_dict['D_real'] += torch.mean(pred_d_real.detach()).item() / bm
                 self.log_dict['D_fake'] += torch.mean(pred_d_fake.detach()).item() / bm
 
-        if use_amp:             # Use AMP stepper
+        if self.use_amp:        # Use AMP stepper
             if self.cri_gan:
                 if step % self.D_update_ratio == 0 and step > self.D_init_iters:
                     self.scaler.step(self.optimizer_G)
                 self.scaler.step(self.optimizer_D)
             else:
                 self.scaler.step(self.optimizer_G)
-            self.scaler.update() # Update GradScaler
+            self.scaler.update()   # Update GradScaler
+
         else:                   # Use normal stepper
             if self.cri_gan:
                 if step % self.D_update_ratio == 0 and step > self.D_init_iters:

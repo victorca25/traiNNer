@@ -4,6 +4,7 @@ model: 'srragan' # srragan | sr | srgan
 scale: 4
 batch_multiplier: 1
 gpu_ids: [0]
+use_amp: false # set to true if you have a Volta/Turing GPU or better.
 
 #Dataset options:
 datasets:
