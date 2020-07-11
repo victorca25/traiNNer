@@ -429,6 +429,10 @@ class SRRaGANModel(BaseModel):
         self.optimizer_G.zero_grad()
         if self.cri_gan:
             self.optimizer_D.zero_grad()
+        if self.use_amp:
+            cast = autocast
+        else:
+            cast = nocast
 
         bm = self.opt['batch_multiplier']
         for _ in range(bm):
@@ -462,10 +466,6 @@ class SRRaGANModel(BaseModel):
                 # G
                 for p in self.netD.parameters():
                     p.requires_grad = False
-            if self.use_amp:
-                cast = autocast
-            else:
-                cast = nocast
 
             if not self.cri_gan or (step % self.D_update_ratio == 0 and step > self.D_init_iters):
                 with cast():
