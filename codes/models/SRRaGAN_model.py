@@ -657,7 +657,7 @@ class SRRaGANModel(BaseModel):
             self.save_network(self.netD, 'D', iter_step, name)
 
 class nocast():
-    def __init__(self,enabled=False):
+    def __init__(self):
         return None
     def __enter__(self):
         return self
