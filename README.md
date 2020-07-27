@@ -79,7 +79,7 @@ So the Lambda in [transforms.py](torchvision/transforms/transforms.py) may not w
 The following are the performance tests as executed by jbohnslav. 
 * Most transformations are between 1.5X and ~4X faster in OpenCV. Large image resizes are up to 10 times faster in OpenCV.
 * To reproduce the following benchmarks, download the [Cityscapes dataset](https://www.cityscapes-dataset.com/). 
-* An example benchmarking file can be found in the notebook **bencharming_v2.ipynb** I wrapped the Cityscapes default directories with a HDF5 file for even faster reading. 
+* An example benchmarking file that jbohnslav used can be found in the notebook **benchmarking_v2.ipynb** where the Cityscapes default directories are wrapped with a HDF5 file for even faster reading (Note: this file has not been updated or tested for a very long time, but can serve as a reference).
 
 ![resize](benchmarks/benchmarking_Resize.png)
 ![random crop](benchmarks/benchmarking_Random_crop_quarter_size.png)
