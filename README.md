@@ -58,9 +58,11 @@ New transforms:
 Should be 1.5 to 10 times faster than PIL. See benchmarks
 
 #### Example: Composing transformations
-   ```transform = transforms.Compose([
-            transforms.RandomAffine(degrees=10, translate=(0.1, 0.1), scale=(0.9, 1.1), shear=(-10, 0),
-            transforms.Resize(size=(350, 350), interpolation=cv2.INTER_LINEAR),
+
+   ```
+         transform = transforms.Compose([
+            transforms.RandomAffine(degrees=10, translate=(0.1, 0.1), scale=(0.9, 1.1), shear=(-10, 0)),
+            transforms.Resize(size=(350, 350), interpolation="BILINEAR"),
             transforms.ToTensor(),
             transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
             ])
