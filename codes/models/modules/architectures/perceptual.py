@@ -1,7 +1,11 @@
 import math
 import torch
 import torch.nn as nn
-import torchvision
+#import torchvision
+import torchvision.models.vgg as vgg
+import torchvision.models.resnet as resnet
+from collections import namedtuple
+
 
 
 ####################
@@ -19,9 +23,9 @@ class VGGFeatureExtractor(nn.Module):
                  z_norm=False): #Note: PPON uses cuda instead of CPU
         super(VGGFeatureExtractor, self).__init__()
         if use_bn:
-            model = torchvision.models.vgg19_bn(pretrained=True)
+            model = vgg.vgg19_bn(pretrained=True)
         else:
-            model = torchvision.models.vgg19(pretrained=True)
+            model = vgg.vgg19(pretrained=True)
         self.use_input_norm = use_input_norm
         if self.use_input_norm:
             if z_norm: # if input in range [-1,1]
@@ -43,11 +47,104 @@ class VGGFeatureExtractor(nn.Module):
         output = self.features(x)
         return output
 
+''' 
+#from DSGAN, can add VGG16 as an option to VGGFeatureExtractor(), also the VGG for faces
+#add the PerceptualLoss() class that can work with PerceptualLossVGG19, PerceptualLossVGG16
+#and PerceptualLossLPIPS()
+class PerceptualLossVGG19(nn.Module):
+    def __init__(self):
+        super(PerceptualLossVGG19, self).__init__()
+        vgg = vgg.vgg19(pretrained=True)
+        loss_network = nn.Sequential(*list(vgg.features)[:36]).eval()
+        if torch.cuda.is_available():
+            loss_network = loss_network.cuda()
+        for param in loss_network.parameters():
+            param.requires_grad = False
+        self.loss_network = loss_network
+        self.mse_loss = nn.MSELoss()
+
+    def forward(self, x, y):
+        return self.mse_loss(self.loss_network(x), self.loss_network(y))
+
+class PerceptualLossVGG16(nn.Module):
+    def __init__(self):
+        super(PerceptualLossVGG16, self).__init__()
+        vgg = vgg.vgg16(pretrained=True)
+        loss_network = nn.Sequential(*list(vgg.features)[:31]).eval()
+        for param in loss_network.parameters():
+            param.requires_grad = False
+        self.loss_network = loss_network
+        self.mse_loss = nn.MSELoss()
+
+    def forward(self, x, y):
+        return self.mse_loss(self.loss_network(x), self.loss_network(y))
+
+class PerceptualLossLPIPS(nn.Module):
+    def __init__(self):
+        super(PerceptualLossLPIPS, self).__init__()
+        self.loss_network = ps.PerceptualLoss(use_gpu=torch.cuda.is_available())
+
+    def forward(self, x, y):
+        return self.loss_network.forward(x, y, normalize=True).mean()
+
+class PerceptualLoss(nn.Module):
+    def __init__(self, rotations=False, flips=False):
+        super(PerceptualLoss, self).__init__()
+        self.loss = PerceptualLossLPIPS()
+        self.rotations = rotations
+        self.flips = flips
+
+    def forward(self, x, y):
+        if self.rotations:
+            k_rot = random.choice([-1, 0, 1])
+            x = torch.rot90(x, k_rot, [2, 3])
+            y = torch.rot90(y, k_rot, [2, 3])
+        if self.flips:
+            if random.choice([True, False]):
+                x = torch.flip(x, (2,))
+                y = torch.flip(y, (2,))
+            if random.choice([True, False]):
+                x = torch.flip(x, (3,))
+                y = torch.flip(y, (3,))
+        return self.loss(x, y)
+
+#from EDSR/MDSR to combine:
+class VGG(nn.Module):
+    def __init__(self, conv_index, rgb_range=1):
+        super(VGG, self).__init__()
+        vgg_features = models.vgg19(pretrained=True).features
+        modules = [m for m in vgg_features]
+        if conv_index.find('22') >= 0:
+            self.vgg = nn.Sequential(*modules[:8])
+        elif conv_index.find('54') >= 0:
+            self.vgg = nn.Sequential(*modules[:35])
+
+        vgg_mean = (0.485, 0.456, 0.406)
+        vgg_std = (0.229 * rgb_range, 0.224 * rgb_range, 0.225 * rgb_range)
+        self.sub_mean = common.MeanShift(rgb_range, vgg_mean, vgg_std)
+        for p in self.parameters():
+            p.requires_grad = False
+
+    def forward(self, sr, hr):
+        def _forward(x):
+            x = self.sub_mean(x)
+            x = self.vgg(x)
+            return x
+            
+        vgg_sr = _forward(sr)
+        with torch.no_grad():
+            vgg_hr = _forward(hr.detach())
+
+        loss = F.mse_loss(vgg_sr, vgg_hr)
+
+        return loss
+'''
+
 # Assume input range is [0, 1]
 class ResNet101FeatureExtractor(nn.Module):
     def __init__(self, use_input_norm=True, device=torch.device('cpu'), z_norm=False):
         super(ResNet101FeatureExtractor, self).__init__()
-        model = torchvision.models.resnet101(pretrained=True)
+        model = resnet.resnet101(pretrained=True)
         self.use_input_norm = use_input_norm
         if self.use_input_norm:
             if z_norm: # if input in range [-1,1]
@@ -130,3 +227,52 @@ class MINCFeatureExtractor(nn.Module):
     def forward(self, x):
         output = self.features(x)
         return output
+
+
+####################
+# Sliced VGG Network
+####################
+
+
+class slicedVGG19(nn.Module):
+    def __init__(self, requires_grad=False):
+        super(slicedVGG19, self).__init__()
+        vgg_pretrained_features = vgg.vgg19(pretrained=True).features
+        self.slice1 = nn.Sequential()
+        self.slice2 = nn.Sequential()
+        self.slice3 = nn.Sequential()
+        self.slice4 = nn.Sequential()
+        self.slice5 = nn.Sequential()
+        for x in range(4):
+            self.slice1.add_module(str(x), vgg_pretrained_features[x])
+        for x in range(4, 9):
+            self.slice2.add_module(str(x), vgg_pretrained_features[x])
+        for x in range(9, 18):
+            self.slice3.add_module(str(x), vgg_pretrained_features[x])
+        for x in range(18, 27):
+            self.slice4.add_module(str(x), vgg_pretrained_features[x])
+        for x in range(27, 36):
+            self.slice5.add_module(str(x), vgg_pretrained_features[x])
+        if not requires_grad:
+            for param in self.parameters():
+                param.requires_grad = False
+
+    def forward(self, X):
+        h = self.slice1(X)
+        h_relu1_2 = h
+        h = self.slice2(h)
+        h_relu2_2 = h
+        h = self.slice3(h)
+        h_relu3_4 = h
+        h = self.slice4(h)
+        h_relu4_4 = h
+        h = self.slice5(h)
+        h_relu5_4 = h
+
+        vgg_outputs = namedtuple(
+            "VggOutputs", ['relu1_2', 'relu2_2',
+                           'relu3_4', 'relu4_4', 'relu5_4'])
+        out = vgg_outputs(h_relu1_2, h_relu2_2,
+                          h_relu3_4, h_relu4_4, h_relu5_4)
+
+        return out

@@ -73,11 +73,17 @@ def parse(opt_path, is_train=True):
         opt['path']['val_images'] = os.path.join(experiments_root, 'val_images')
 
         # change some options for debug mode
-        if 'debug' in opt['name']:
+        if 'debug_nochkp' in opt['name']:
+            opt['train']['val_freq'] = 8
+            opt['logger']['print_freq'] = 2
+            opt['logger']['save_checkpoint_freq'] = 10000000
+            opt['train']['lr_decay_iter'] = 10
+        elif 'debug' in opt['name']:
             opt['train']['val_freq'] = 8
             opt['logger']['print_freq'] = 2
             opt['logger']['save_checkpoint_freq'] = 8
             opt['train']['lr_decay_iter'] = 10
+
     else:  # test
         results_root = os.path.join(opt['path']['root'], 'results', opt['name'])
         opt['path']['results_root'] = results_root

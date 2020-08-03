@@ -77,8 +77,17 @@ def main():
     logger.info('Random seed: {}'.format(seed))
     util.set_random_seed(seed)
 
-    torch.backends.cudnn.benckmark = True
+    # if the model does not change and input sizes remain the same during training then there may be benefit 
+    # from setting torch.backends.cudnn.benchmark = True, otherwise it may stall training
+    torch.backends.cudnn.benchmark = True
     # torch.backends.cudnn.deterministic = True
+
+    """
+    Initialize Metrics
+    # will be used in the validation step, no need to save them, just display them and 
+    send to Tensorboard log if enabled
+    """
+    #metrics = Metrics(opt...)
 
     # create train and val dataloader
     for phase, dataset_opt in opt['datasets'].items():
@@ -173,8 +182,14 @@ def main():
                     model.feed_data(val_data)
                     model.test()
 
-                    visuals = model.get_current_visuals()
                     
+                    """
+                    Get Visuals
+                    # change to use the tensor2np function, add denorm bool from opt
+                    """
+                    
+                    visuals = model.get_current_visuals()
+
                     if opt['datasets']['train']['znorm']: # If the image range is [-1,1]
                         sr_img = util.tensor2img(visuals['SR'],min_max=(-1, 1))  # uint8
                         gt_img = util.tensor2img(visuals['HR'],min_max=(-1, 1))  # uint8
@@ -195,6 +210,14 @@ def main():
                     save_img_path = os.path.join(img_dir, '{:s}_{:d}.png'.format(\
                         img_name, current_step))
                     util.save_img(sr_img, save_img_path)
+
+                    """
+                    Get Metrics
+                    # change to use the metrics class, should be initialized in the begining
+                    # can use logger.info in the metrics() forward (or here) 
+                    # and later for each metric, in metrics_dict, add to tensorboard
+                    """
+                    #metrics_dict = metrics(sr_img, gt_img) ...
 
                     # calculate PSNR, SSIM and LPIPS distance
                     crop_size = opt['scale']

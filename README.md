@@ -1,5 +1,8 @@
 # BasicSR [[ESRGAN]](https://github.com/xinntao/ESRGAN) [[SFTGAN]](https://github.com/xinntao/SFTGAN) [[PPON]](https://github.com/Zheng222/PPON)
 
+WARNING: This is a development branch to merge many changes and rewrite the codebase, some things may change, some things may break, create an issue if you find anything.
+
+
 :black_square_button: TODO
 
 - [ ] Test TV loss/regularization (needs to balance loss weight with other losses). 

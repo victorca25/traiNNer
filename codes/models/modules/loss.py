@@ -5,6 +5,9 @@ import numbers
 from torch.nn import functional as F
 import numpy as np
 
+#from models.modules.architectures import perceptual
+from models.modules.architectures.perceptual import slicedVGG19
+
 def LoG(imgHF): #Laplacian of Gaussian
     # The LoG operator calculates the second spatial derivative of an image. 
     # This means that in areas where the image has a constant intensity (i.e. 
@@ -184,6 +187,9 @@ class GradientPenaltyLoss(nn.Module):
         return loss
 
 
+#This has to be changed to the new version
+#"relative" is not used anymore, now uses the RelativeL1 loss class, will need to add RelativeL2 or
+# modify RelativeL1 to add L2 as an option
 class HFENLoss(nn.Module): # Edge loss with pre_smooth
     # In order to further penalize the diferences in fine details, such as edges, 
     # a gradient-domain L1 loss can be used, where each gradient ∇(·) is computed 
@@ -192,14 +198,15 @@ class HFENLoss(nn.Module): # Edge loss with pre_smooth
     # edges, but is sensitive to noise, so the image can be pre-smoothed with a
     # Gaussian filter first to make edge-detection work better. The recommended 
     # parameter of σ = 1.5 for Gaussian kernel size can be used.
-    def __init__(self, loss_f='L1', device='cuda:0', pre_smooth=True, relative=False):
+    def __init__(self, loss_f=None, device='cuda:0', pre_smooth=False, relative=False):
         super(HFENLoss, self).__init__()
-        self.device = device
-        self.loss_f = loss_f #loss function
+        self.device = device #tmp #TODO 'cpu'
+        #self.loss_f = loss_f #loss function
         self.pre_smooth = pre_smooth
         self.relative = relative
         self.laplacian = False
 
+        """
         if loss_f=='l2':
             self.criterion = nn.MSELoss(reduction='sum').to(device)
         elif loss_f=='elastic':
@@ -208,6 +215,8 @@ class HFENLoss(nn.Module): # Edge loss with pre_smooth
             self.criterion = CharbonnierLoss().to(device)
         else: #if loss_f=='l1':
             self.criterion = nn.L1Loss(reduction='sum').to(device)
+        """
+        self.criterion = loss_f #(reduction='sum') ?
 
     def forward(self, input, target, eps=0.01):
         c = input.shape[1]
@@ -311,7 +320,9 @@ class TVLoss(nn.Module):
         w_x = x.size()[3]
         count_h = self.tensor_size(x[:, :, 1:, :])
         count_w = self.tensor_size(x[:, :, :, 1:])
-        
+
+        #change this, if len(img_shape) == 3 just unsqueeze img and squeeze again before return (careful for grayscale images)
+
         if len(img_shape) == 3 or len(img_shape) == 4:
             if self.p == 1:
                 # loss = torch.sum(torch.abs(x[:,:,:-1,:] - x[:,:,1:,:])) + torch.sum(torch.abs(x[:,:,:,:-1] - x[:,:,:,1:]))
@@ -325,7 +336,7 @@ class TVLoss(nn.Module):
                 # Alternative calculation 2: https://kornia.readthedocs.io/en/latest/_modules/kornia/losses/total_variation.html#total_variation
                 pixel_dif1 = x[..., 1:, :] - x[..., :-1, :]
                 pixel_dif2 = x[..., :, 1:] - x[..., :, :-1]
-                reduce_axes = (-3, -2, -1)
+                reduce_axes = (-3, -2, -1) #keep batch
                 loss = self.tvloss_weight*(pixel_dif1.abs().sum(dim=reduce_axes) + pixel_dif2.abs().sum(dim=reduce_axes)) # Calculates the TV loss for each image in the batch
                 loss = loss.sum() / batch_size # averages the TV loss all the images in the batch 
                 return loss
@@ -346,7 +357,7 @@ class TVLoss(nn.Module):
                 # Alternative calculation 2: https://kornia.readthedocs.io/en/latest/_modules/kornia/losses/total_variation.html#total_variation
                 pixel_dif1 = x[..., 1:, :] - x[..., :-1, :]
                 pixel_dif2 = x[..., :, 1:] - x[..., :, :-1]
-                reduce_axes = (-3, -2, -1)
+                reduce_axes = (-3, -2, -1) #keep batch
                 loss = self.tvloss_weight*(torch.pow(pixel_dif1,2).sum(dim=reduce_axes) + torch.pow(pixel_dif2,2).sum(dim=reduce_axes)) # Calculates the TV loss for each image in the batch
                 loss = loss.sum() / batch_size # averages the TV loss all the images in the batch 
                 return loss
@@ -363,7 +374,7 @@ class TVLoss(nn.Module):
 class ElasticLoss(nn.Module):
     def __init__(self, a=0.2, reduction='mean'): #a=0.5 default
         super(ElasticLoss, self).__init__()
-        self.alpha = torch.FloatTensor([a, 1 - a]).to('cuda:0')
+        self.alpha = torch.FloatTensor([a, 1 - a]) #.to('cuda:0')
         self.reduction = reduction
 
     def forward(self, input, target):
@@ -371,24 +382,27 @@ class ElasticLoss(nn.Module):
             input = (input,)
 
         for i in range(len(input)):
-            l2 = nn.functional.mse_loss(input[i].squeeze(), target.squeeze()).mul(self.alpha[0], reduction=self.reduction)
-            l1 = nn.functional.l1_loss(input[i].squeeze(), target.squeeze()).mul(self.alpha[1], reduction=self.reduction)
+            l2 = nn.functional.mse_loss(input[i].squeeze(), target.squeeze(), reduction=self.reduction).mul(self.alpha[0])
+            #l2 = F.mse_loss(input[i].squeeze(), target.squeeze()).mul(self.weights[0])
+            l1 = nn.functional.l1_loss(input[i].squeeze(), target.squeeze(), reduction=self.reduction).mul(self.alpha[1])
+            #l1 = F.l1_loss(input[i].squeeze(), target.squeeze()).mul(self.weights[1])
             loss = l1 + l2
 
         return loss
 
+#change to RelativeNorm and set criterion as an input argument, could be any basic criterion
 class RelativeL1(nn.Module):
     # Comparing to the regular L1, introducing the division by |c|+epsilon 
     # better models the human vision system’s sensitivity to variations
     # in the dark areas. (where epsilon = 0.01, to prevent values of 0 in the
     # denominator)
-    def __init__(self):
+    def __init__(self, eps=.01, reduction='mean'):
         super().__init__()
-        self.criterion = torch.nn.L1Loss()
+        self.criterion = torch.nn.L1Loss(reduction=reduction)
+        self.eps = eps
 
     def forward(self, input, target):
-        base = target +.01
-
+        base = target + self.eps
         return self.criterion(input/base, target/base)
 
 
@@ -401,10 +415,10 @@ class RelativeL1(nn.Module):
 # low values do not contribute much totheL1loss, but they may however cause noticeable 
 # color shifts. More in the paper: https://arxiv.org/pdf/1803.02266.pdf
 class L1CosineSim(nn.Module):
-    def __init__(self, loss_lambda=5):
+    def __init__(self, loss_lambda=5, reduction='mean'):
         super(L1CosineSim, self).__init__()
         self.similarity = torch.nn.CosineSimilarity(dim=1, eps=1e-20)
-        self.l1_loss = nn.L1Loss()
+        self.l1_loss = nn.L1Loss(reduction=reduction)
         self.loss_lambda = loss_lambda
 
     def forward(self, x, y):
@@ -412,55 +426,21 @@ class L1CosineSim(nn.Module):
         return self.l1_loss(x, y) + self.loss_lambda * cosine_term
 
 
+# Clip L1 loss
+# From: https://github.com/HolmesShuan/AIM2020-Real-Super-Resolution/
+# ClipL1 Loss combines Clip function and L1 loss. self.clip_min sets the gradients of 
+# well-trained pixels to zeros and clip_max works as a noise filter.
+# data range [0, 255]: (clip_min=0.0, clip_max=10.0), 
+# for [0,1] set clip_min to 1/255=0.003921.
+class ClipL1(nn.Module):
+    
+    def __init__(self, clip_min=0.0, clip_max=10.0):
+        super(ClipL1, self).__init__()
+        self.clip_max = clip_max
+        self.clip_min = clip_min
+
+    def forward(self, sr, hr):
+        loss = torch.mean(torch.clamp(torch.abs(sr-hr), self.clip_min, self.clip_max))
+        return loss
 
 
-
-
-
-
-
-
-
-
-"""        
-class LossCombo(nn.Module):
-    def __init__(self, monitor_writer, *losses):
-        super().__init__()
-        self.monitor_writer = monitor_writer
-        pass
-
-        self.losses = []
-        self.losses_names = []
-        self.factors = []
-
-        for name, loss, factor in losses:
-            self.losses.append(loss)
-            self.losses_names.append(name)
-            self.factors.append(factor)
-
-            self.add_module(name, loss)
-
-    def multi_gpu(self):
-        pass
-        #self.losses = [nn.DataParallel(x) for x in self.losses]
-
-    def forward(self, input, target, additional_losses):
-        loss_results = []
-        for idx, loss in enumerate(self.losses):
-            loss_results.append(loss(input, target))
-
-        for name, loss_result, factor in zip(self.losses_names, loss_results, self.factors):
-            #print(loss_result)
-            self.monitor_writer.add_scalar(name, loss_result*factor)
-
-        for name, loss_result, factor in additional_losses:
-            loss_result = loss_result.mean()
-            #print(loss_result)
-            self.monitor_writer.add_scalar(name, loss_result*factor)
-
-
-        total_loss = sum([factor*loss_result for factor, loss_result in zip(self.factors, loss_results)]) + sum([factor*loss_result.mean() for name, loss_result, factor in additional_losses])
-        self.monitor_writer.add_scalar("total_loss", total_loss)
-
-        return total_loss
-"""
