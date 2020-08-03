@@ -14,6 +14,8 @@ from models.modules.losses.ssim2 import SSIM, MS_SSIM #implementation for use wi
 from models.modules.LPIPS import perceptual_loss as ps
 import models.networks as networks
 
+from dataops.diffaug import DiffAugment
+
 #TODO TMP: 
 channels = 3
 
@@ -217,10 +219,12 @@ class PerceptualLoss(nn.Module):
 
 
 class Adversarial(nn.Module):
-    def __init__(self, train_opt=None, device = 'cpu'):
+    def __init__(self, train_opt=None, device = 'cpu', diffaug = False, dapolicy = ''):
         super(Adversarial, self).__init__()
 
         self.device = device
+        self.diffaug = diffaug
+        self.dapolicy = dapolicy
         self.gan_type = train_opt['gan_type']
         
         self.cri_gan = GANLoss(train_opt['gan_type'], 1.0, 0.0).to(self.device)
@@ -234,15 +238,20 @@ class Adversarial(nn.Module):
 
 
     def forward(self, fake, real, netD=None, stage='discriminator'): # (fake_H,self.var_ref)
+
+        if self.diffaug:
+            real = DiffAugment(real, policy=self.dapolicy)
+            fake = DiffAugment(fake, policy=self.dapolicy)
         
         if stage == 'generator':
             # updating generator
             #For the Generator only if GAN is enabled, everything else can happen any time
             # G gan + cls loss
-            pred_g_fake = netD(fake)
             pred_g_real = netD(real).detach() # detach to avoid backpropagation to D
+            pred_g_fake = netD(fake)
             l_g_gan = self.l_gan_w * (self.cri_gan(pred_g_real - torch.mean(pred_g_fake), False) +
                                         self.cri_gan(pred_g_fake - torch.mean(pred_g_real), True)) / 2
+            
             #l_g_gan: generator gan loss
             #l_g_total += l_g_gan
             #l_g_total.backward()
@@ -282,7 +291,6 @@ class Adversarial(nn.Module):
             #l_d_gan: discriminator gan loss
             #l_d_total.backward()
             #self.optimizers.optimizer_D.step()
-
             return l_d_total, gan_logs
 
 
@@ -301,7 +309,7 @@ class GeneratorLoss(nn.Module):
         feature_criterion = check_loss_names(feature_criterion=train_opt['feature_criterion'], feature_network=feature_network)
         
         hfen_weight = train_opt['hfen_weight'] if train_opt['hfen_weight'] else 0
-        hfen_criterion = check_loss_names(hfen_criterion=train_opt['hfen_cr
+        hfen_criterion = check_loss_names(hfen_criterion=train_opt['hfen_criterion'])
 
         tv_weight = train_opt['tv_weight'] if train_opt['tv_weight'] else 0
         tv_type = check_loss_names(tv_type=train_opt['tv_type'], tv_norm=train_opt['tv_norm'])

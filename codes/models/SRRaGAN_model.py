@@ -74,7 +74,10 @@ class SRRaGANModel(BaseModel):
             # Discriminator loss:
             if train_opt['gan_type'] and train_opt['gan_weight']:
                 self.cri_gan = True
-                self.adversarial = losses.Adversarial(train_opt=train_opt, device=self.device)
+                diffaug = train_opt['diffaug'] if train_opt['diffaug'] else None
+                if diffaug:
+                    dapolicy = train_opt['dapolicy'] if train_opt['dapolicy'] else 'color,translation,cutout' #original
+                self.adversarial = losses.Adversarial(train_opt=train_opt, device=self.device, diffaug = diffaug, dapolicy = dapolicy)
                 # D_update_ratio and D_init_iters are for WGAN
                 self.D_update_ratio = train_opt['D_update_ratio'] if train_opt['D_update_ratio'] else 1
                 self.D_init_iters = train_opt['D_init_iters'] if train_opt['D_init_iters'] else 0
@@ -325,6 +328,7 @@ class SRRaGANModel(BaseModel):
                 logger.info('Network D structure: {}, with parameters: {:,d}'.format(net_struc_str, n))
                 logger.info(s)
 
+            #TODO: feature network is not being trained, is it necessary to visualize? Maybe just name?
             if self.generatorlosses.cri_fea:  # F, Perceptual Network
                 #s, n = self.get_network_description(self.netF)
                 s, n = self.get_network_description(self.generatorlosses.netF) #TODO
