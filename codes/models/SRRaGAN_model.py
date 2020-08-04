@@ -25,6 +25,9 @@ import models.lr_schedulerR as lr_schedulerR
 
 from . import losses
 
+#TMP
+from dataops.mixup import mixaug
+
 """ #debug
 def save_images(image, num_rep, sufix):
     from utils import util
@@ -58,10 +61,19 @@ class SRRaGANModel(BaseModel):
 
         # define losses, optimizer and scheduler
         if self.is_train:
-            # Define if the generator will have a final capping mechanism in the output
-            self.outm = None
-            if train_opt['finalcap']:
-                self.outm = train_opt['finalcap']
+            # define if the generator will have a final capping mechanism in the output
+            self.outm = train_opt['finalcap'] if train_opt['finalcap'] else None
+            # define if mixup or cutmix will be used (for now only possible if training without discriminator)
+            self.mixup = train_opt['mixup'] if train_opt['mixup'] else None
+            # setup mixup augmentations
+            if self.mixup: 
+                #TODO: cutblur and cutout need model to be modified so LR and HR have the same dimensions (1x)
+                self.mixopts = train_opt['mixopts'] if train_opt['mixopts'] else ["blend", "rgb", "mixup", "cutmix", "cutmixup"] #, "cutout", "cutblur"]
+                self.mixprob = train_opt['mixprob'] if train_opt['mixprob'] else [1.0, 1.0, 1.0, 1.0, 1.0] #, 1.0, 1.0]
+                self.mixalpha = train_opt['mixalpha'] if train_opt['mixalpha'] else [0.6, 1.0, 1.2, 0.7, 0.7] #, 0.001, 0.7]
+                self.aux_mixprob = train_opt['aux_mixprob'] if train_opt['aux_mixprob'] else 1.0
+                self.aux_mixalpha = train_opt['aux_mixalpha'] if train_opt['aux_mixalpha'] else 1.2
+                self.mix_p = train_opt['mix_p'] if train_opt['mix_p'] else None
                 
             """
             Initialize losses
@@ -186,23 +198,25 @@ class SRRaGANModel(BaseModel):
         self.optimizer_G.zero_grad()
 
         ### Network forward, generate SR
-
+        # mixup augmentations
+        if self.mixup:
+            self.var_H, self.var_L, mask, aug = mixaug(
+                self.var_H, self.var_L,
+                self.mixopts, self.mixprob, self.mixalpha,
+                self.aux_mixprob, self.aux_mixalpha, self.mix_p
+                )
+                
         if self.outm: #if the model has the final activation option
             self.fake_H = self.netG(self.var_L, outm=self.outm)
         else: #regular models without the final activation option
             self.fake_H = self.netG(self.var_L)
+
+        # mixup augmentations
+        if aug == "cutout":
+            self.fake_H, self.var_H = self.fake_H*mask, self.var_H*mask
+
         l_g_total = 0
 
-        # move this frequency separation into the loss class, as well as DiffAugment
-        #if frequency separations:
-            #LF_pair = self.filter_low(self.fake_H), self.filter_low(self.var_H) #for Content/pixel losses 
-            #HF_pair = self.filter_high(self.fake_H), self.filter_high(self.var_ref) #for Discriminator
-        #else:
-            #LF_pair = None
-            #HF_pair = None
-        # Do these have to be self.LF_pair and self.HF_pair? Test, but probably not, they are not used elsewhere
-
-        
         """ # Debug
         print ("SR min. val: ", torch.min(self.fake_H))
         print ("SR max. val: ", torch.max(self.fake_H))
@@ -266,7 +280,6 @@ class SRRaGANModel(BaseModel):
             l_g_total.backward()
             self.optimizer_G.step()
         
-
     def test(self):
         self.netG.eval()
         with torch.no_grad():

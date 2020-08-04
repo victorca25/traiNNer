@@ -210,6 +210,8 @@
     , "pixel_weight": 1e-2 // 1e-2 | 1
     , "feature_criterion": "l1" //"l1" | "l2" | "cb" | "elastic" //feature loss (VGG feature network)
     , "feature_weight": 1
+    //, "cx_weight": 0.5
+    //, "cx_type": "contextual"
     //, "dis_feature_criterion": "l1" //"l1" | "l2" | "cb" | "elastic" //discriminator feature loss (only for asrragan)
     //, "dis_feature_weight": 1 //(only for asrragan)
     //, "hfen_criterion": "l1" //hfen: "l1" | "l2" | "rel_l1" | "rel_l2" //helps in deblurring and finding edges, lines
@@ -218,15 +220,15 @@
     //, "tv_weight": 1e-6
     //, "tv_norm": 2 // 1 for l1 (default) or 2 for l2. Change "tv_weight" so the l_g_tv is around 1e-02
     //, "ssim_type": "ms-ssim" //"ssim" | "ms-ssim" //helps to maintain luminance, contrast and covariance between SR and HR
-	//, "ssim_weight": 1
-    , "gan_type": "vanilla" //"vanilla" | basic 
-    , "gan_weight": 5e-3 //*
+	  //, "ssim_weight": 1
     //, "lpips_weight": 1 //perceptual loss
     //, "lpips_type": "net-lin" // net-lin | net *
     //, "lpips_net": "squeeze" // "vgg" | "alex" | "squeeze" 
     //, "spl_weight": 1e-3 //SPL loss function. note: needs to add a cap in the generator (finalcap) or it becomes unstable
     //, "spl_type": "spl" //"spl" | "gpl" | "cpl" //
-	
+    
+    , "gan_type": "vanilla" //"vanilla" | basic 
+    , "gan_weight": 5e-3 //*
     //for wgan-gp
     // , "D_update_ratio": 1
     // , "D_init_iters": 0
@@ -239,7 +241,20 @@
     //, "phase3_s": 5000000 //207000 //-1 to skip. Need to coordinate with the LR steps. //POBranch: η = 5e−3,  lr = 1e−4 and halved at every 250 epochs (3.45e+4iterations) 34.5k
     //, "phase4_s": 100100
 
-  //Other training options:
+    //Differentiable Augmentation for Data-Efficient GAN Training
+    , "diffaug": true
+    , "dapolicy": "color,transl_zoom,flip,rotate,cutout" //smart "all" (translation, zoom_in and zoom_out are exclusive)
+
+    // Mixup augmentations
+    , "mixup": true //"mixup" // "mixup" | "cutmix"
+    , "mixopts": ["blend", "rgb", "mixup", "cutmix", "cutmixup"] //, "cutout", "cutblur"]
+    , "mixprob": [1.0, 1.0, 1.0, 1.0, 1.0] //#, 1.0, 1.0]
+    , "mixalpha": [0.6, 1.0, 1.2, 0.7, 0.7] //#, 0.001, 0.7]
+    , "aux_mixprob": 1.0
+    , "aux_mixalpha": 1.2
+    //, "mix_p": 1.2
+    
+    //Other training options:
     //, "finalcap": "tanh" // Test. Cap Generator outputs to fit in: [-1, 1] range ("tanh"), rescale tanh to [0,1] range ("scaltanh"), cap ("sigmoid") or clamp ("clamp") to [0,1] range. Default = None. Coordinate with znorm.
     , "manual_seed": 0
     , "niter": 5e5
