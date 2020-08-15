@@ -202,7 +202,7 @@ def check_loss_names(pixel_criterion=None, feature_criterion=None, feature_netwo
 
 
 class PerceptualLoss(nn.Module):
-    def __init__(self, criterion=None, network=None, normalize=True rotations=False, flips=False):
+    def __init__(self, criterion=None, network=None, normalize=True, rotations=False, flips=False):
         super(PerceptualLoss, self).__init__()
         self.criterion = criterion
         self.network = network

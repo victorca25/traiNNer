@@ -5,6 +5,7 @@ import torch.nn as nn
 import torchvision.models.vgg as vgg
 import torchvision.models.resnet as resnet
 
+from collections import OrderedDict
 
 
 ####################
@@ -73,15 +74,15 @@ class VGG_Model(nn.Module):
         super(VGG_Model, self).__init__()
         #vgg = vgg16(pretrained=True)
         if net == 'vgg19':
-            vgg = vgg19(pretrained=True)
+            vgg_net = vgg.vgg19(pretrained=True)
             vgg_layer = vgg_layer19
             self.vgg_layer_inv = vgg_layer_inv19
         elif net == 'vgg16':
-            vgg = vgg16(pretrained=True)
+            vgg_net = vgg.vgg16(pretrained=True)
             vgg_layer = vgg_layer16
             self.vgg_layer_inv = vgg_layer_inv16
-        self.vgg_model = vgg.features
-        vgg_dict = vgg.state_dict()
+        self.vgg_model = vgg_net.features
+        vgg_dict = vgg_net.state_dict()
         vgg_f_dict = self.vgg_model.state_dict()
         vgg_dict = {k: v for k, v in vgg_dict.items() if k in vgg_f_dict}
         vgg_f_dict.update(vgg_dict)
