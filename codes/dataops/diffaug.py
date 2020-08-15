@@ -1,8 +1,3 @@
-#Differentiable Augmentation for Data-Efficient GAN Training
-#Original from: https://github.com/mit-han-lab/data-efficient-gans/blob/master/DiffAugment_pytorch.py
-#https://arxiv.org/pdf/2006.02595.pdf
-
-
 import numpy as np
 import random
 
@@ -10,13 +5,18 @@ import torch
 import torch.nn.functional as F
 
 def DiffAugment(x, policy='', channels_first=True):
+    '''
+    Differentiable Augmentation for Data-Efficient GAN Training
+    https://arxiv.org/pdf/2006.02595.pdf
+    https://github.com/mit-han-lab/data-efficient-gans/blob/master/DiffAugment_pytorch.py
+    '''
     if policy:
         if not channels_first: #BHWC -> BCHW
             #https://github.com/fxia22/stn.pytorch/issues/7
             x = x.permute(0, 3, 1, 2)
         for p in policy.split(','):
             #can condition here to only use one of the functions in "p"
-            #zoom_in, zoom_out and rand_translation should be exclusive, maybe belong to the same group?
+            #zoom_in, zoom_out and rand_translation should be mutually exclusive
             if (p == 'zoom' or p == 'transl_zoom') and len(AUGMENT_FNS[p]) > 1:
               f = random.choice(AUGMENT_FNS[p])
               x = f(x)
@@ -27,7 +27,6 @@ def DiffAugment(x, policy='', channels_first=True):
             x = x.permute(0, 2, 3, 1)
         x = x.contiguous()
     return x
-
 
 def rand_brightness(x):
     x = x + (torch.rand(x.size(0), 1, 1, 1, dtype=x.dtype, device=x.device) - 0.5)
@@ -74,7 +73,6 @@ def rand_cutout(x, ratio=0.5):
     # TODO: can test other erasing options, like random noise or image mean
     x = x * mask.unsqueeze(1)
     return x
-
 
 def rand_vflip(img: torch.Tensor, img2: torch.Tensor = None, prob: float = 0.5) -> torch.Tensor:
     """Vertically flip the given the Image Tensor randomly.
@@ -150,9 +148,6 @@ def rand_90(img: torch.Tensor, img2: torch.Tensor = None, prob: float = 0.5) -> 
     else:
         return img
 
-#Need to check that the Zooms are also differentiable 
-#Note: one paper uses 'reflect' on zoom out, other uses 'constant', validate
-#This zoom_out can also be used without the downscale and change with a crop
 def zoom_out(img: torch.Tensor, anisotropic=False, padding='constant'): #scale=2 #'reflect'
     ''' Random zoom in of Tensor image
     Args:
@@ -179,7 +174,7 @@ def zoom_out(img: torch.Tensor, anisotropic=False, padding='constant'): #scale=2
     padded_img = F.pad(input=img, pad= paddings, mode=padding, value=0) #<, >, ^, v, #test: 'reflect', 'constant'
 
     #Downscale back to the original size
-    #Change to use the Pytorch native resize instead
+    #TODO: Change to use the Pytorch native resize function instead
     img = F.interpolate(padded_img, size=(h, w), mode='bilinear', align_corners=False)
 
     return img
@@ -192,6 +187,7 @@ def zoom_in(img: torch.Tensor, anisotropic=False): #scale=2
     Returns:
       Tensor: Zoomed image Tensor.
     '''
+
     b, c, h, w = img.shape
     #for isotropic scaling, scale_h = scale_w, anisotropic would be different
     if anisotropic:
@@ -208,26 +204,23 @@ def zoom_in(img: torch.Tensor, anisotropic=False): #scale=2
     delta_h = h - new_h
     delta_w = w - new_w
 
-    #This should probably be a random_crop function
+    #TODO: This could be made into a "random_crop" function
     h_delta = int(np.random.random() * delta_h)
     w_delta = int(np.random.random() * delta_w)
-    cropped = img[:, :, h_delta:(h_delta + new_h), w_delta:(w_delta + new_w)] #.clone()
-    #cropped = img[:, :, h_delta:(h_delta + new_h), h_delta:(h_delta + new_w)] #.clone()
+    cropped = img[:, :, h_delta:(h_delta + new_h), w_delta:(w_delta + new_w)]
     
     #Upscale back to the original size
-    #Change to use the Pytorch native resize instead
+    #TODO: Change to use the Pytorch native resize function instead
     img = F.interpolate(cropped, size=(h, w), mode='bilinear', align_corners=False)
     
     return img
-
 
 AUGMENT_FNS = {
     'color': [rand_brightness, rand_saturation, rand_contrast],
     'translation': [rand_translation], #should not combine with zoom, use one or the other
     'zoom': [zoom_in, zoom_out], #only one zoom should be used per run
-    'flip': [rand_hflip], #, rand_vflip], #note: vflip can change image statistics
+    'flip': [rand_hflip], #, rand_vflip], #note: vflip can change image statistics, use with care
     'rotate': [rand_90], #, rand_n90
     'cutout': [rand_cutout], 
     'transl_zoom': [rand_translation, zoom_in, zoom_out], #if using the three of them, use this instead of 'translation' and 'zoom'
 }
-

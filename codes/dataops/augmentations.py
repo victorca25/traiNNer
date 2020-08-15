@@ -4,12 +4,12 @@ import argparse
 import os
 import os.path
 import sys
-sys.path.append('../data')
-sys.path.append('../')
 
-import util as util
 import numpy as np
 import cv2
+import dataops.common as util
+from dataops.minisom import MiniSom
+from dataops.debug import *
 
 IMAGE_EXTENSIONS = ['.png', '.jpg']
 
@@ -62,10 +62,10 @@ def random_crop_pairs(img_HR, img_LR, HR_size, scale):
     rnd_h = random.randint(0, max(0, H - LR_size))
     rnd_w = random.randint(0, max(0, W - LR_size))
     #print ("LR rnd: ",rnd_h, rnd_w)
-    img_LR = img_LR[rnd_h:rnd_h + LR_size, rnd_w:rnd_w + LR_size, :]
+    img_LR = img_LR[rnd_h:rnd_h + LR_size, rnd_w:rnd_w + LR_size, ...]
     rnd_h_HR, rnd_w_HR = int(rnd_h * scale), int(rnd_w * scale)
     #print ("HR rnd: ",rnd_h_HR, rnd_w_HR)
-    img_HR = img_HR[rnd_h_HR:rnd_h_HR + HR_size, rnd_w_HR:rnd_w_HR + HR_size, :]
+    img_HR = img_HR[rnd_h_HR:rnd_h_HR + HR_size, rnd_w_HR:rnd_w_HR + HR_size, ...]
     
     return img_HR, img_LR
 
@@ -131,7 +131,7 @@ def random_erasing(image_origin, p=0.5, s=(0.02, 0.4), r=(0.3, 3), modes=[0,1,2]
 
 # scale image
 def scale_img(image, scale, algo=None):
-    h,w,c = image.shape
+    h, w = image.shape[0], image.shape[1]
     newdim = (int(w/scale), int(h/scale))
     
     # randomly use OpenCV2 algorithms if none are provided
@@ -159,11 +159,7 @@ def scale_img(image, scale, algo=None):
     return resized, interpol
 
 # resize image to a defined size 
-def resize_img(image, crop_size=(128, 128), algo=None):
-    w = crop_size[0]
-    h = crop_size[1]
-    newdim = (w, h)
-    
+def resize_img(image, newdim=(128, 128), algo=None):
     if algo is None:
         scale_algos = [cv2.INTER_NEAREST, cv2.INTER_LINEAR, cv2.INTER_CUBIC, cv2.INTER_AREA, cv2.INTER_LANCZOS4, cv2.INTER_LINEAR_EXACT] #scaling interpolation options
         interpol = random.choice(scale_algos)
@@ -401,7 +397,6 @@ def noise_img(img_LR, noise_types=['clean']):
         noise_img = noise_img.astype(np.float32) / 255.
         
     elif noise_type == 'quantize': # Color quantization / palette
-        from minisom import MiniSom
         pixels = np.reshape(img_LR, (img_LR.shape[0]*img_LR.shape[1], 3)) 
         
         N = int(np.random.uniform(2, 8))
