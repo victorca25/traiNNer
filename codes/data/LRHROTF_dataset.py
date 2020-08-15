@@ -4,12 +4,11 @@ import numpy as np
 import cv2
 import torch
 import torch.utils.data as data
-import data.util as util
+import dataops.common as util
 
-import sys
-sys.path.append('../codes/scripts')
-sys.path.append('../codes/data')
-import augmentations
+import dataops.augmentations as augmentations
+from dataops.debug import tmp_vis, describe_numpy, describe_tensor
+
 
 class LRHRDataset(data.Dataset):
     '''
@@ -120,12 +119,13 @@ class LRHRDataset(data.Dataset):
         if HR_size:
             LR_size = HR_size // scale
         
-        self.znorm = False # Default case: images are in the [0,1] range
-        if self.opt['znorm']:
-            if self.opt['znorm'] == True:
-                self.znorm = True # Alternative: images are z-normalized to the [-1,1] range
+        # Default case: tensor will result in the [0,1] range
+        # Alternative: tensor will be z-normalized to the [-1,1] range
+        znorm = self.opt['znorm'] if self.opt['znorm'] else False
         
         ######## Read the images ########
+        #TODO: check cases where default of 3 channels will be troublesome
+        image_channels = self.opt['image_channels'] if self.opt['image_channels'] else 3
         
         # Check if LR Path is provided
         if self.paths_LR:
@@ -161,10 +161,10 @@ class LRHRDataset(data.Dataset):
                 if HR_path is None:
                     HR_path = LR_path
                 #print("HR flipped")
-            
+
             # Read the LR and HR images from the provided paths
-            img_LR = util.read_img(self.LR_env, LR_path, znorm=self.znorm)
-            img_HR = util.read_img(self.HR_env, HR_path, znorm=self.znorm)
+            img_LR = util.read_img(self.LR_env, LR_path, out_nc=image_channels)
+            img_HR = util.read_img(self.HR_env, HR_path, out_nc=image_channels)
             
             # Even if LR dataset is provided, force to generate aug_downscale % of downscales OTF from HR
             # The code will later make sure img_LR has the correct size
@@ -176,7 +176,7 @@ class LRHRDataset(data.Dataset):
         # If LR is not provided, use HR and modify on the fly
         else:
             HR_path = self.paths_HR[index]
-            img_HR = util.read_img(self.HR_env, HR_path, znorm=self.znorm)
+            img_HR = util.read_img(self.HR_env, HR_path, out_nc=image_channels)
             img_LR = img_HR
         
         ######## Modify the images ########
@@ -192,11 +192,14 @@ class LRHRDataset(data.Dataset):
         #  converting to tensors
         # self.opt['color'] For both LR and HR as in the the original code, kept for compatibility
         # self.opt['color_HR'] and self.opt['color_LR'] for independent control
-        if self.opt['color_HR'] or self.opt['color']: # Only change HR
+        if self.opt['color']: # Change both
             img_HR = util.channel_convert(img_HR.shape[2], self.opt['color'], [img_HR])[0]
-        if self.opt['color_LR'] or self.opt['color']: # Only change LR
             img_LR = util.channel_convert(img_LR.shape[2], self.opt['color'], [img_LR])[0]
-        
+        if self.opt['color_HR']: # Only change HR
+            img_HR = util.channel_convert(img_HR.shape[2], self.opt['color_HR'], [img_HR])[0] 
+        if self.opt['color_LR']: # Only change LR
+            img_LR = util.channel_convert(img_LR.shape[2], self.opt['color_LR'], [img_LR])[0]
+
         ######## Augmentations ########
         
         #Augmentations during training
@@ -209,8 +212,11 @@ class LRHRDataset(data.Dataset):
             
             # Check that HR and LR have the same dimensions ratio, else, generate new LR from HR
             if img_HR.shape[0]//img_LR.shape[0] != img_HR.shape[1]//img_LR.shape[1]:
-                print("Warning: img_LR dimensions ratio does not match img_HR dimensions ratio for: ", HR_path)
-                img_LR = img_HR
+                #TODO: disabled to test cx loss 
+                #print("Warning: img_LR dimensions ratio does not match img_HR dimensions ratio for: ", HR_path)
+                #TODO: temporary change to test contextual loss with unaligned LR-HR pairs, forcing them to have the correct scale
+                img_HR, _ = augmentations.resize_img(np.copy(img_HR), newdim=(img_LR.shape[1]*scale,img_LR.shape[0]*scale), algo=cv2.INTER_LINEAR)
+                #img_LR = img_HR
             
             # Random Crop (reduce computing cost and adjust images to correct size first)
             if img_HR.shape[0] > HR_size or img_HR.shape[1] > HR_size:
@@ -222,9 +228,9 @@ class LRHRDataset(data.Dataset):
             if img_HR.shape[0] < HR_size or img_HR.shape[1] < HR_size:
                 print("Warning: Image: ", HR_path, " size does not match HR size: (", HR_size,"). The image size is: ", img_HR.shape)
                 # rescale HR image to the HR_size 
-                img_HR, _ = augmentations.resize_img(np.copy(img_HR), crop_size=(HR_size,HR_size), algo=cv2.INTER_LINEAR)
+                img_HR, _ = augmentations.resize_img(np.copy(img_HR), newdim=(HR_size,HR_size), algo=cv2.INTER_LINEAR)
                 # rescale LR image to the LR_size (The original code discarded the img_LR and generated a new one on the fly from img_HR)
-                img_LR, _ = augmentations.resize_img(np.copy(img_LR), crop_size=(LR_size,LR_size), algo=cv2.INTER_LINEAR)
+                img_LR, _ = augmentations.resize_img(np.copy(img_LR), newdim=(LR_size,LR_size), algo=cv2.INTER_LINEAR)
             
             # Randomly scale LR from HR during training if :
             # - LR dataset is not provided
@@ -239,10 +245,6 @@ class LRHRDataset(data.Dataset):
                     #if not self.opt['aug_downscale']: #only print the warning if not being forced to use HR images instead of LR dataset (which is a known case)
                     print("LR image is too large, auto generating new LR for: ", LR_path)
                 img_LR, scale_interpol_algo = augmentations.scale_img(img_LR, scale, algo=ds_algo)
-                if self.znorm:
-                    np.clip(img_LR, -1., 1., out=img_LR) # The generated LR sometimes get slightly out of the [-1,1] range
-                else: 
-                    np.clip(img_LR, 0., 1., out=img_LR) # The generated LR sometimes get slightly out of the [0,1] range
             #"""
             
             # Rotations. 'use_flip' = 180 or 270 degrees (mirror), 'use_rot' = 90 degrees, 'HR_rrot' = random rotations +-45 degrees
@@ -267,7 +269,7 @@ class LRHRDataset(data.Dataset):
             if img_HR.shape[0] != HR_size or img_HR.shape[1] != HR_size:
                 print("Image: ", HR_path, " size does not match HR size: (", HR_size,"). The image size is: ", img_HR.shape)
                 # rescale HR image to the HR_size 
-                img_HR, _ = augmentations.resize_img(np.copy(img_HR), crop_size=(HR_size,HR_size), algo=cv2.INTER_LINEAR)
+                img_HR, _ = augmentations.resize_img(np.copy(img_HR), newdim=(HR_size,HR_size), algo=cv2.INTER_LINEAR)
                 if self.opt['lr_downscale_types']: # if manually provided and scale algorithms are provided, then:
                     ds_algo = self.opt['lr_downscale_types']
                 else:
@@ -278,7 +280,7 @@ class LRHRDataset(data.Dataset):
             if img_LR.shape[0] != LR_size or img_LR.shape[0] != LR_size:
                 print("Image: ", LR_path, " size does not match LR size: (", HR_size//scale,"). The image size is: ", img_LR.shape)
                 # rescale HR image to the HR_size (should not be needed, but something went wrong before, just for sanity)
-                img_HR, _ = augmentations.resize_img(np.copy(img_HR), crop_size=(HR_size,HR_size), algo=cv2.INTER_LINEAR)
+                img_HR, _ = augmentations.resize_img(np.copy(img_HR), newdim=(HR_size,HR_size), algo=cv2.INTER_LINEAR)
                 if self.opt['lr_downscale_types']: # if manually provided and scale algorithms are provided, then:
                     ds_algo = self.opt['lr_downscale_types']
                 else:
@@ -344,18 +346,23 @@ class LRHRDataset(data.Dataset):
             rand_levels = (1 - self.opt['rand_auto_levels']) if self.opt['rand_auto_levels'] else 1 # Randomize for augmentation
             if self.opt['auto_levels'] and np.random.rand() > rand_levels:
                 if self.opt['auto_levels'] == 'HR':
-                    img_HR = augmentations.simplest_cb(img_HR, znorm=self.znorm)
+                    #img_HR = augmentations.simplest_cb(img_HR, znorm=znorm) #TODO: now images are processed in the [0,255] range
+                    img_HR = augmentations.simplest_cb(img_HR)
                 elif self.opt['auto_levels'] == 'LR':
-                    img_LR = augmentations.simplest_cb(img_LR, znorm=self.znorm)
+                    #img_LR = augmentations.simplest_cb(img_LR, znorm=znorm) #TODO: now images are processed in the [0,255] range
+                    img_LR = augmentations.simplest_cb(img_LR)
                 elif self.opt['auto_levels'] == True or self.opt['auto_levels'] == 'Both':
-                    img_HR = augmentations.simplest_cb(img_HR, znorm=self.znorm)
-                    img_LR = augmentations.simplest_cb(img_LR, znorm=self.znorm)
+                    #img_HR = augmentations.simplest_cb(img_HR, znorm=znorm) #TODO: now images are processed in the [0,255] range
+                    img_HR = augmentations.simplest_cb(img_HR)
+                    #img_LR = augmentations.simplest_cb(img_LR, znorm=znorm) #TODO: now images are processed in the [0,255] range
+                    img_LR = augmentations.simplest_cb(img_LR)
             
             # Apply unsharpening mask to HR images
             # img_HR1 = img_HR
             rand_unsharp = (1 - self.opt['rand_unsharp']) if self.opt['rand_unsharp'] else 1 # Randomize for augmentation
             if self.opt['unsharp_mask'] and np.random.rand() > rand_unsharp:
-                img_HR = augmentations.unsharp_mask(img_HR, znorm=self.znorm)
+                #img_HR = augmentations.unsharp_mask(img_HR, znorm=znorm) #TODO: now images are processed in the [0,255] range
+                img_HR = augmentations.unsharp_mask(img_HR)
         
         # For testing and validation
         if self.opt['phase'] != 'train':
@@ -370,7 +377,7 @@ class LRHRDataset(data.Dataset):
         # if self.opt['color_LR']: # Only change LR
             # img_LR = util.channel_convert(img_LR.shape[2], self.opt['color'], [img_LR])[0]
             
-        # Debug
+        # Debug #TODO: use the debugging functions to visualize or save images instead
         # Save img_LR and img_HR images to a directory to visualize what is the result of the on the fly augmentations
         # DO NOT LEAVE ON DURING REAL TRAINING
         # self.output_sample_imgs = True
@@ -388,49 +395,37 @@ class LRHRDataset(data.Dataset):
                 if not os.path.exists(debugpath):
                     os.makedirs(debugpath)
                 
-                if self.opt['znorm']: # Back from [-1,1] range to [0,1] range for OpenCV2
-                    img_LRn = (img_LR + 1.0) / 2.0
-                    img_HRn = (img_HR + 1.0) / 2.0
-                    # img_HRn1 = (img_HR1 + 1.0) / 2.0
-                else: # Already in the [0,1] range for OpenCV2
-                    img_LRn = img_LR
-                    img_HRn = img_HR
-                    # img_HRn1 = img_HR1
-                
                 import uuid
                 hex = uuid.uuid4().hex
-                cv2.imwrite(debugpath+"\\"+im_name+hex+'_LR.png',img_LRn*255) #random name to save + had to multiply by 255, else getting all black image
-                cv2.imwrite(debugpath+"\\"+im_name+hex+'_HR.png',img_HRn*255) #random name to save + had to multiply by 255, else getting all black image
-                # cv2.imwrite(debugpath+"\\"+im_name+hex+'_HR1.png',img_HRn1*255) #random name to save + had to multiply by 255, else getting all black image
+                cv2.imwrite(debugpath+"\\"+im_name+hex+'_LR.png',img_LR) #random name to save
+                cv2.imwrite(debugpath+"\\"+im_name+hex+'_HR.png',img_HR) #random name to save
+                # cv2.imwrite(debugpath+"\\"+im_name+hex+'_HR1.png',img_HRn1) #random name to save
             
         ######## Convert images to PyTorch Tensors ########
         
-        """
+        """ # for debugging
         if (img_HR.min() < -1):
-            print("HR.min :", img_HR.min())
+            describe_numpy(img_HR, all=True)
             print(HR_path)
         if (img_HR.max() > 1):
-            print("HR.max :", img_HR.max())
+            describe_numpy(img_HR, all=True)
             print(HR_path)
         if (img_LR.min() < -1):
-            print("LR.min :", img_LR.min())
+            describe_numpy(img_LR, all=True)
             print(LR_path)
         if (img_LR.max() > 1):
-            print("LR.max :", img_LR.max())
+            describe_numpy(img_LR, all=True)
             print(LR_path)
         #"""
         
-        # BGR to RGB, HWC to CHW, numpy to tensor
-        if img_HR.shape[2] == 3:
-            img_HR = img_HR[:, :, [2, 1, 0]]
-            img_LR = img_LR[:, :, [2, 1, 0]]        
-        # BGRA to RGBA, HWC to CHW, numpy to tensor
-        elif img_LR.shape[2] == 4:
-            img_HR = img_HR[:, :, [2, 1, 0, 3]]
-            img_LR = img_LR[:, :, [2, 1, 0, 3]]
-
-        img_HR = torch.from_numpy(np.ascontiguousarray(np.transpose(img_HR, (2, 0, 1)))).float()
-        img_LR = torch.from_numpy(np.ascontiguousarray(np.transpose(img_LR, (2, 0, 1)))).float()
+        # check for grayscale images #TODO: should not be needed anymore
+        if len(img_HR.shape) < 3:
+            img_HR = img_HR[..., np.newaxis]
+        if len(img_LR.shape) < 3:
+            img_LR = img_LR[..., np.newaxis]
+        
+        img_HR = util.np2tensor(img_HR, normalize=znorm, add_batch=False)
+        img_LR = util.np2tensor(img_LR, normalize=znorm, add_batch=False)
         
         if LR_path is None:
             LR_path = HR_path
