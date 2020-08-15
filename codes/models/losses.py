@@ -8,16 +8,14 @@ import torch.nn.functional as F
 import math
 from collections import OrderedDict
 
-from models.modules.loss import GANLoss, GradientPenaltyLoss, HFENLoss, TVLoss, CharbonnierLoss, ElasticLoss, RelativeL1, L1CosineSim, ContextualLoss, ClipL1
-from models.modules.losses import spl_loss as spl
-from models.modules.losses.ssim2 import SSIM, MS_SSIM #implementation for use with any PyTorch
+from models.modules.loss import *
+from models.modules.ssim import SSIM, MS_SSIM
 from models.modules.LPIPS import perceptual_loss as ps
 import models.networks as networks
-
 from dataops.diffaug import DiffAugment
 
-#TODO TMP: 
-channels = 3
+from dataops.debug import *
+
 
 
 #loss builder
@@ -51,26 +49,30 @@ def get_loss_fn(loss_type=None, weight=0, recurrent=False, reduction='mean', net
         loss_function = ClipL1()
         loss_type = 'pix-'+loss_type
     # SSIM losses
-    #TODO: pass SSIM options, maybe from opt_train. Specialy channel
+    #TODO: pass SSIM options from opt_train
     elif loss_type == 'ssim' or loss_type == 'SSIM': #l_ssim_type
-        loss_function =  SSIM(win_size=11, win_sigma=1.5, size_average=True, data_range=1., channel=channels) # TODO channels
+        image_channels = opt['image_channels'] if opt['image_channels'] else 3
+        loss_function =  SSIM(window_size=11, window_sigma=1.5, size_average=True, data_range=1., channels=image_channels)
     elif loss_type == 'ms-ssim' or loss_type == 'MSSSIM': #l_ssim_type
-        loss_function =  MS_SSIM(win_size=11, win_sigma=1.5, size_average=True, data_range=1., channel=channels) # TODO channels
+        image_channels = opt['image_channels'] if opt['image_channels'] else 3
+        loss_function =  MS_SSIM(window_size=11, window_sigma=1.5, size_average=True, data_range=1., channels=image_channels, normalize='relu')
     # HFEN loss
     elif loss_type.find('hfen') >= 0:
         hfen_loss_f = get_loss_fn(loss_type.split('-')[1], recurrent=True, reduction='sum')
         #print(hfen_loss_f)
-        #TODO device will not be needed
-        loss_function = HFENLoss(loss_f=hfen_loss_f, device='cpu')
+        #TODO: can pass function options from opt_train
+        loss_function = HFENLoss(loss_f=hfen_loss_f)
     # SPL losses
+    # Gradient Profile Loss
     elif loss_type == 'gpl':
-        # Gradient Profile Loss
-        #TODO fix parameters to training variables (spl_norm, yuv_norm)
-        loss_function = spl.GPLoss(spl_norm=False)
+        #TODO fix parameters to training variables (spl_denorm, yuv_denorm)
+        #currently won't work in range [-1,1]
+        loss_function = GPLoss(spl_denorm=False)
+    # Color Profile Loss
     elif loss_type == 'cpl':
-        # Color Profile Loss
-        #TODO fix parameters to training variables (spl_norm, yuv_norm)
-        loss_function = spl.CPLoss(rgb=True,yuv=True,yuvgrad=True,spl_norm=False,yuv_norm=False)
+        #TODO fix parameters to training variables (spl_denorm, yuv_denorm)
+        #currently won't work in range [-1,1]
+        loss_function = CPLoss(rgb=True,yuv=True,yuvgrad=True,spl_denorm=False,yuv_denorm=False)
     # TV regularization
     elif loss_type.find('tv') >= 0:
         tv_type = loss_type.split('-')[0]
@@ -80,17 +82,18 @@ def get_loss_fn(loss_type=None, weight=0, recurrent=False, reduction='mean', net
         elif tv_norm == 'l2':
             tv_norm = 2
         if tv_type == 'tv':
-            loss_function = TVLoss(0.5, p=tv_norm)
-        #4D diagonal tv, incorporate from the diagonal gradient calculation
+            loss_function = TVLoss(tv_type = 'tv', p = tv_norm)
         elif tv_type == 'dtv': 
-            #loss_function = DTVLoss(0.5, p=tv_norm)
-            loss_function = TVLoss(0.5, p=tv_norm) #TMP, while the DTV is added
+            loss_function = TVLoss(tv_type = 'dtv', p = tv_norm) #DTV
     #Feature loss
     #fea-vgg19-l1, fea-vgg16-l2, fea-lpips-... ("vgg" | "alex" | "squeeze" / net-lin | net )
+    #TODO: pass rotation, flips and other options, from opt_train, else defaults
     elif loss_type.find('fea') >= 0:
         if loss_type.split('-')[1] == 'lpips':
             #TODO: make lpips behave more like regular feature networks
-            loss_function = PerceptualLoss(criterion='lpips', network=network, rotations=False, flips=False)
+            # lpips needs normalize = true if images are in [0,1] range
+            norm = opt['datasets']['train']['znorm'] if opt['datasets']['train']['znorm'] else False
+            loss_function = PerceptualLoss(criterion='lpips', network=network, normalize=(not norm), rotations=False, flips=False)
         else: #if loss_type.split('-')[1][:3] == 'vgg': #if vgg16, vgg19, resnet, etc
             fea_loss_f = get_loss_fn(loss_type.split('-')[2], recurrent=True, reduction='mean') #sum? also worked on accidental test, but larger loss magnitudes
             #TODO
@@ -98,9 +101,19 @@ def get_loss_fn(loss_type=None, weight=0, recurrent=False, reduction='mean', net
             #TMP #loss_type.split('-')[1] # = vgg16, vgg19, resnet, ...
             #network = define_F(use_bn=False, feat_network = loss_type.split('-')[1])
             loss_function = PerceptualLoss(criterion=fea_loss_f, network=network, rotations=False, flips=False)
-        #TODO: pass rotation and flips options, maybe from opt_train
     elif loss_type == 'contextual':
-        loss_function = ContextualLoss(band_width = 0.1, loss_type = 'cosine', use_vgg = True, vgg_layer = 'relu3_4')
+        #TODO: pass options, from opt_train, else defaults
+        #layers = {"conv_1_1": 1.0, "conv_3_2": 1.0} #fixed
+        layers = {"conv_3_2": 1.0, "conv_4_2": 1.0} #original
+        #layers = {"pool_3": 1.0} #alt 
+        #layers = {'conv_1_2' : 1.0, 'conv_2_2' : 1.0, 'conv_3_2': 0.5} #zoom-learn-zoom
+        #layers = {"conv_5_2": 1.0} #coarse, semi-aligned
+        loss_function = Contextual_Loss(layers, max_1d_size=64, distance_type = 'cosine', calc_type = 'regular')
+        #loss_function = Contextual_Loss(layers, max_1d_size=32, distance_type = 0, crop_quarter=True) # for L1, L2
+    elif loss_type == 'fft':
+        loss_function = FFTloss()
+    elif loss_type == 'overflow':
+        loss_function = OFLoss()   
     else:
         loss_function = None
         #raise NotImplementedError('Loss type [{:s}] not recognized.'.format(loss_type))
@@ -111,11 +124,10 @@ def get_loss_fn(loss_type=None, weight=0, recurrent=False, reduction='mean', net
         else:
             loss = {
                     'name': loss_type,
-                    'weight': float(weight),
+                    'weight': float(weight), #TODO: check if float is needed
                     'function': loss_function.to(device)}
             return loss
                     
-
 
 def check_loss_names(pixel_criterion=None, feature_criterion=None, feature_network=None, hfen_criterion=None, tv_type=None, tv_norm=None, lpips_criterion=None, lpips_network = None):
     """
@@ -146,6 +158,7 @@ def check_loss_names(pixel_criterion=None, feature_criterion=None, feature_netwo
         return feature_criterion
 
     #//, "dis_feature_criterion": "l1" //"l1" | "l2" | "cb" | "elastic" //discriminator feature loss (only for asrragan)
+    #TODO
 
     #//, "hfen_criterion": "l1" //hfen: "l1" | "l2" | "rel_l1" | "rel_l2" //helps in deblurring and finding edges, lines
     if hfen_criterion:
@@ -183,19 +196,19 @@ def check_loss_names(pixel_criterion=None, feature_criterion=None, feature_netwo
     
     if lpips_criterion and lpips_network:
         if lpips_criterion.split('-')[0] != 'fea':
-            return 'fea-lpips-'+lpips_criterion+'-'+lpips_network
+            return 'fea-lpips-{}-{}'.format(lpips_criterion,lpips_network)
 
     return None
 
 
 class PerceptualLoss(nn.Module):
-    def __init__(self, criterion=None, network=None, rotations=False, flips=False):
+    def __init__(self, criterion=None, network=None, normalize=True rotations=False, flips=False):
         super(PerceptualLoss, self).__init__()
         self.criterion = criterion
-        #self.loss = PerceptualLossLPIPS()
         self.network = network
         self.rotations = rotations
         self.flips = flips
+        self.normalize = normalize
 
     def forward(self, x, y):
         if self.rotations:
@@ -210,7 +223,7 @@ class PerceptualLoss(nn.Module):
                 x = torch.flip(x, (3,))
                 y = torch.flip(y, (3,))
         if self.criterion == 'lpips':
-            return self.network(x, y, normalize=True).mean()
+            return self.network(x, y, normalize=self.normalize).mean()
         else:
             fea_x = self.network(x)
             fea_y = self.network(y).detach()
@@ -237,11 +250,18 @@ class Adversarial(nn.Module):
             self.l_gp_w = train_opt['gp_weigth']
 
 
-    def forward(self, fake, real, netD=None, stage='discriminator'): # (fake_H,self.var_ref)
+    def forward(self, fake, real, netD=None, stage='discriminator', fsfilter = None): # (fake_H,self.var_ref)
+
+        if fsfilter: # filter
+            real = fsfilter(real)
+            fake = fsfilter(fake)
 
         if self.diffaug:
             real = DiffAugment(real, policy=self.dapolicy)
             fake = DiffAugment(fake, policy=self.dapolicy)
+
+        #tmp_vis(real) # to visualize the batch for debugging
+        #tmp_vis(fake) # to visualize the batch for debugging
         
         if stage == 'generator':
             # updating generator
@@ -250,11 +270,7 @@ class Adversarial(nn.Module):
             pred_g_real = netD(real).detach() # detach to avoid backpropagation to D
             pred_g_fake = netD(fake)
             l_g_gan = self.l_gan_w * (self.cri_gan(pred_g_real - torch.mean(pred_g_fake), False) +
-                                        self.cri_gan(pred_g_fake - torch.mean(pred_g_real), True)) / 2
-            
-            #l_g_gan: generator gan loss
-            #l_g_total += l_g_gan
-            #l_g_total.backward()
+                                        self.cri_gan(pred_g_fake - torch.mean(pred_g_real), True)) / 2            
             return l_g_gan
 
         else: # elif stage == 'discriminator':
@@ -274,7 +290,6 @@ class Adversarial(nn.Module):
                     'D_fake': torch.mean(pred_d_fake.detach()).item()
                     }
 
-            #if self.opt['train']['gan_type'] == 'wgan-gp': #TODO
             if self.gan_type == 'wgan-gp':
                 batch_size = real.size(0)
                 if self.random_pt.size(0) != batch_size:
@@ -288,9 +303,6 @@ class Adversarial(nn.Module):
                 # attach gradient penalty loss to log
                 gan_logs['l_d_gp'] = l_d_gp.item()
             
-            #l_d_gan: discriminator gan loss
-            #l_d_total.backward()
-            #self.optimizers.optimizer_D.step()
             return l_d_total, gan_logs
 
 
@@ -299,6 +311,8 @@ class GeneratorLoss(nn.Module):
         super(GeneratorLoss, self).__init__()
 
         train_opt = opt['train']
+
+        #TODO: these checks can be moved to options.py when everything is stable
 
         pixel_weight = train_opt['pixel_weight'] if train_opt['pixel_weight'] else 0
         pixel_criterion = train_opt['pixel_criterion'] if train_opt['pixel_criterion'] else None # 'skip'
@@ -324,6 +338,10 @@ class GeneratorLoss(nn.Module):
 
         spl_weight = train_opt['spl_weight'] if train_opt['spl_weight'] else 0
         spl_type = train_opt['spl_type'] if train_opt['spl_type'] else None
+        gpl_type = None
+        gpl_weight = -1
+        cpl_type = None
+        cpl_weight = -1
         if spl_type == 'spl':
             cpl_type = 'cpl'
             cpl_weight = spl_weight
@@ -339,18 +357,18 @@ class GeneratorLoss(nn.Module):
         cx_weight = train_opt['cx_weight'] if train_opt['cx_weight'] else 0
         cx_type = train_opt['cx_type'] if train_opt['cx_type'] else None
 
+        fft_weight = train_opt['fft_weight'] if train_opt['fft_weight'] else 0
+        fft_type = train_opt['fft_type'] if train_opt['fft_type'] else None
+
+        of_weight = train_opt['of_weight'] if train_opt['of_weight'] else 0
+        of_type = train_opt['of_type'] if train_opt['of_type'] else None
+
         '''
-        #old
+        #TODO
         //, "dis_feature_criterion": "l1" //"l1" | "l2" | "cb" | "elastic" //discriminator feature loss (only for asrragan)
         //, "dis_feature_weight": 1 //(only for asrragan)
 
-        #new
-        #TODO
         '''  
-
-        #fixed
-        # TODO      
-        
 
         self.loss_list = []
 
@@ -363,7 +381,7 @@ class GeneratorLoss(nn.Module):
             self.loss_list.append(cri_hfen)
 
         if ssim_weight > 0 and ssim_type:
-            cri_ssim = get_loss_fn(ssim_type, ssim_weight)
+            cri_ssim = get_loss_fn(ssim_type, ssim_weight, opt = train_opt)
             self.loss_list.append(cri_ssim)
         
         if tv_weight > 0 and tv_type:
@@ -375,6 +393,7 @@ class GeneratorLoss(nn.Module):
             self.loss_list.append(cri_cx)
 
         if feature_weight > 0 and feature_criterion:
+            #TODO: can move the self.netF to the loss class instead, like lpips, change where the network is printed from
             self.netF = networks.define_F(opt, use_bn=False).to(device)
             cri_fea = get_loss_fn(feature_criterion, feature_weight, network=self.netF)
             self.loss_list.append(cri_fea)
@@ -387,46 +406,59 @@ class GeneratorLoss(nn.Module):
             #self.netF = networks.define_F(opt, use_bn=False).to(device)
             # TODO: fix use_gpu 
             lpips_network  = ps.PerceptualLoss(model=lpips_type, net=lpips_network, use_gpu=torch.cuda.is_available(), model_path=None, spatial=lpips_spatial) #.to(self.device) 
-            cri_lpips = get_loss_fn(lpips_criterion, lpips_weight, network=lpips_network)
+            cri_lpips = get_loss_fn(lpips_criterion, lpips_weight, network=lpips_network, opt = opt)
             self.loss_list.append(cri_lpips)
-            #self.cri_lpips = True #self.cri_fea
-        #else: 
-            #self.cri_fea = None #self.cri_fea
-            
-        '''
-            if train_opt['lpips_weight']:
-                if z_norm == True: # if images are in [-1,1] range
-                    self.lpips_norm = False # images are already in the [-1,1] range
-                else:
-                    self.lpips_norm = True # normalize images from [0,1] range to [-1,1]
-                    
-                self.l_lpips_w = train_opt['lpips_weight']
-                # Can use original off-the-shelf uncalibrated networks 'net' or Linearly calibrated models (LPIPS) 'net-lin'
-                if train_opt['lpips_type']:
-                    lpips_type = train_opt['lpips_type']
-                else: # Default use linearly calibrated models, better results
-                    lpips_type = 'net-lin'
-                # Can set net = 'alex', 'squeeze' or 'vgg' or Low-level metrics 'L2' or 'ssim'
-                if train_opt['lpips_net']:
-                    lpips_net = train_opt['lpips_net']
-                else: # Default use VGG for feature extraction
-                    lpips_net = 'vgg'
-                self.cri_lpips = 
-        '''
 
-        #self.log_dict = OrderedDict()
+        if  cpl_weight > 0 and cpl_type:
+            cri_cpl = get_loss_fn(cpl_type, cpl_weight) 
+            self.loss_list.append(cri_cpl)
+
+        if  gpl_weight > 0 and gpl_type:
+            cri_gpl = get_loss_fn(gpl_type, gpl_weight) 
+            self.loss_list.append(cri_gpl)
+
+        if fft_weight > 0 and fft_type:
+            cri_fft = get_loss_fn(fft_type, fft_weight, device = device)
+            self.loss_list.append(cri_fft)
+
+        if of_weight > 0 and of_type:
+            cri_of = get_loss_fn(of_type, of_weight, device = device)
+            self.loss_list.append(cri_of)
 
 
-    def forward(self, sr, hr, log_dict): 
+    def forward(self, sr, hr, log_dict, fsfilter = None):
+        if fsfilter: #low-pass filter
+            hr_f = fsfilter(hr)
+            sr_f = fsfilter(sr)
+        
+        # to visualize the batch for debugging
+        #tmp_vis(sr)
+        #tmp_vis(hr)
+        #tmp_vis(sr_f)
+        #tmp_vis(hr_f)
+
         loss_results = []
         for i, l in enumerate(self.loss_list):
             if l['function']:
-                if l['name'].find('tv') >= 0:
-                    effective_loss = l['weight']*l['function'](sr) # fake_H
-                elif l['name'].find('ssim') >= 0:
-                    effective_loss = 1 - l['weight']*l['function'](sr, hr) # (fake_H, var_H)
-                else:    
-                    effective_loss = l['weight']*l['function'](sr, hr) # (fake_H, var_H)
+                if fsfilter: # branch selecting the ones that should use LPF
+                    if l['name'].find('tv') >= 0 or l['name'].find('overflow') >= 0:
+                        #Note: Using sr_f here means it will only preserve total variation / denoise on 
+                        # the LF, which may or may not be a valid proposition, test!
+                        effective_loss = l['weight']*l['function'](sr_f) # fake_H
+                    elif l['name'].find('pix') >= 0 or l['name'].find('hfen') >= 0 \
+                        or l['name'].find('cpl') >= 0 or l['name'].find('gpl') >= 0:
+                        effective_loss = l['weight']*l['function'](sr_f, hr_f) # (fake_H, var_H)
+                    elif l['name'].find('ssim') >= 0:
+                        effective_loss = 1 - l['weight']*l['function'](sr_f, hr_f) # (fake_H, var_H)
+                    else:
+                        effective_loss = l['weight']*l['function'](sr, hr) # (fake_H, var_H)
+                else:
+                    if l['name'].find('tv') >= 0 or l['name'].find('overflow') >= 0:
+                        effective_loss = l['weight']*l['function'](sr) # fake_H
+                    elif l['name'].find('ssim') >= 0:
+                        effective_loss = 1 - l['weight']*l['function'](sr, hr) # (fake_H, var_H)
+                    else:
+                        effective_loss = l['weight']*l['function'](sr, hr) # (fake_H, var_H)
                 #print(l['name'],effective_loss)
                 loss_results.append(effective_loss)
                 log_dict[l['name']] = effective_loss.item()

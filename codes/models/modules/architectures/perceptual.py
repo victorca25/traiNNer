@@ -4,7 +4,6 @@ import torch.nn as nn
 #import torchvision
 import torchvision.models.vgg as vgg
 import torchvision.models.resnet as resnet
-from collections import namedtuple
 
 
 
@@ -47,98 +46,65 @@ class VGGFeatureExtractor(nn.Module):
         output = self.features(x)
         return output
 
-''' 
-#from DSGAN, can add VGG16 as an option to VGGFeatureExtractor(), also the VGG for faces
-#add the PerceptualLoss() class that can work with PerceptualLossVGG19, PerceptualLossVGG16
-#and PerceptualLossLPIPS()
-class PerceptualLossVGG19(nn.Module):
-    def __init__(self):
-        super(PerceptualLossVGG19, self).__init__()
-        vgg = vgg.vgg19(pretrained=True)
-        loss_network = nn.Sequential(*list(vgg.features)[:36]).eval()
-        if torch.cuda.is_available():
-            loss_network = loss_network.cuda()
-        for param in loss_network.parameters():
-            param.requires_grad = False
-        self.loss_network = loss_network
-        self.mse_loss = nn.MSELoss()
 
-    def forward(self, x, y):
-        return self.mse_loss(self.loss_network(x), self.loss_network(y))
+# VGG 19 layers to listen to
+vgg_layer19 = {
+    'conv_1_1': 0, 'conv_1_2': 2, 'pool_1': 4, 'conv_2_1': 5, 'conv_2_2': 7, 'pool_2': 9, 'conv_3_1': 10, 'conv_3_2': 12, 'conv_3_3': 14, 'conv_3_4': 16, 'pool_3': 18, 'conv_4_1': 19, 'conv_4_2': 21, 'conv_4_3': 23, 'conv_4_4': 25, 'pool_4': 27, 'conv_5_1': 28, 'conv_5_2': 30, 'conv_5_3': 32, 'conv_5_4': 34, 'pool_5': 36
+}
+vgg_layer_inv19 = {
+    0: 'conv_1_1', 2: 'conv_1_2', 4: 'pool_1', 5: 'conv_2_1', 7: 'conv_2_2', 9: 'pool_2', 10: 'conv_3_1', 12: 'conv_3_2', 14: 'conv_3_3', 16: 'conv_3_4', 18: 'pool_3', 19: 'conv_4_1', 21: 'conv_4_2', 23: 'conv_4_3', 25: 'conv_4_4', 27: 'pool_4', 28: 'conv_5_1', 30: 'conv_5_2', 32: 'conv_5_3', 34: 'conv_5_4', 36: 'pool_5'
+}
+# VGG 16 layers to listen to
+vgg_layer16 = {
+    'conv_1_1': 0, 'conv_1_2': 2, 'pool_1': 4, 'conv_2_1': 5, 'conv_2_2': 7, 'pool_2': 9, 'conv_3_1': 10, 'conv_3_2': 12, 'conv_3_3': 14, 'pool_3': 16, 'conv_4_1': 17, 'conv_4_2': 19, 'conv_4_3': 21, 'pool_4': 23, 'conv_5_1': 24, 'conv_5_2': 26, 'conv_5_3': 28, 'pool_5': 30
+}
+vgg_layer_inv16 = {
+    0: 'conv_1_1', 2: 'conv_1_2', 4: 'pool_1', 5: 'conv_2_1', 7: 'conv_2_2', 9: 'pool_2', 10: 'conv_3_1', 12: 'conv_3_2', 14: 'conv_3_3', 16: 'pool_3', 17: 'conv_4_1', 19: 'conv_4_2', 21: 'conv_4_3', 23: 'pool_4', 24: 'conv_5_1', 26: 'conv_5_2', 28: 'conv_5_3', 30: 'pool_5'
+}
 
-class PerceptualLossVGG16(nn.Module):
-    def __init__(self):
-        super(PerceptualLossVGG16, self).__init__()
-        vgg = vgg.vgg16(pretrained=True)
-        loss_network = nn.Sequential(*list(vgg.features)[:31]).eval()
-        for param in loss_network.parameters():
-            param.requires_grad = False
-        self.loss_network = loss_network
-        self.mse_loss = nn.MSELoss()
-
-    def forward(self, x, y):
-        return self.mse_loss(self.loss_network(x), self.loss_network(y))
-
-class PerceptualLossLPIPS(nn.Module):
-    def __init__(self):
-        super(PerceptualLossLPIPS, self).__init__()
-        self.loss_network = ps.PerceptualLoss(use_gpu=torch.cuda.is_available())
-
-    def forward(self, x, y):
-        return self.loss_network.forward(x, y, normalize=True).mean()
-
-class PerceptualLoss(nn.Module):
-    def __init__(self, rotations=False, flips=False):
-        super(PerceptualLoss, self).__init__()
-        self.loss = PerceptualLossLPIPS()
-        self.rotations = rotations
-        self.flips = flips
-
-    def forward(self, x, y):
-        if self.rotations:
-            k_rot = random.choice([-1, 0, 1])
-            x = torch.rot90(x, k_rot, [2, 3])
-            y = torch.rot90(y, k_rot, [2, 3])
-        if self.flips:
-            if random.choice([True, False]):
-                x = torch.flip(x, (2,))
-                y = torch.flip(y, (2,))
-            if random.choice([True, False]):
-                x = torch.flip(x, (3,))
-                y = torch.flip(y, (3,))
-        return self.loss(x, y)
-
-#from EDSR/MDSR to combine:
-class VGG(nn.Module):
-    def __init__(self, conv_index, rgb_range=1):
-        super(VGG, self).__init__()
-        vgg_features = models.vgg19(pretrained=True).features
-        modules = [m for m in vgg_features]
-        if conv_index.find('22') >= 0:
-            self.vgg = nn.Sequential(*modules[:8])
-        elif conv_index.find('54') >= 0:
-            self.vgg = nn.Sequential(*modules[:35])
-
-        vgg_mean = (0.485, 0.456, 0.406)
-        vgg_std = (0.229 * rgb_range, 0.224 * rgb_range, 0.225 * rgb_range)
-        self.sub_mean = common.MeanShift(rgb_range, vgg_mean, vgg_std)
-        for p in self.parameters():
+#TODO: move the normalization into the function like VGGFeatureExtractor()
+class VGG_Model(nn.Module):
+    """
+        A VGG model with listerners in the layers. 
+        Will return a dictionary of outputs that correspond to the 
+        layers set in "listen_list".
+    """
+    def __init__(self, listen_list=None, net='vgg19'):
+        super(VGG_Model, self).__init__()
+        #vgg = vgg16(pretrained=True)
+        if net == 'vgg19':
+            vgg = vgg19(pretrained=True)
+            vgg_layer = vgg_layer19
+            self.vgg_layer_inv = vgg_layer_inv19
+        elif net == 'vgg16':
+            vgg = vgg16(pretrained=True)
+            vgg_layer = vgg_layer16
+            self.vgg_layer_inv = vgg_layer_inv16
+        self.vgg_model = vgg.features
+        vgg_dict = vgg.state_dict()
+        vgg_f_dict = self.vgg_model.state_dict()
+        vgg_dict = {k: v for k, v in vgg_dict.items() if k in vgg_f_dict}
+        vgg_f_dict.update(vgg_dict)
+        # no grad
+        for p in self.vgg_model.parameters():
             p.requires_grad = False
+        if listen_list == []:
+            self.listen = []
+        else:
+            self.listen = set()
+            for layer in listen_list:
+                self.listen.add(vgg_layer[layer])
+        self.features = OrderedDict()
 
-    def forward(self, sr, hr):
-        def _forward(x):
-            x = self.sub_mean(x)
-            x = self.vgg(x)
-            return x
-            
-        vgg_sr = _forward(sr)
-        with torch.no_grad():
-            vgg_hr = _forward(hr.detach())
+    def forward(self, x):
+        for index, layer in enumerate(self.vgg_model):
+            x = layer(x)
+            if index in self.listen:
+                self.features[self.vgg_layer_inv[index]] = x
+        return self.features
 
-        loss = F.mse_loss(vgg_sr, vgg_hr)
 
-        return loss
-'''
+
 
 # Assume input range is [0, 1]
 class ResNet101FeatureExtractor(nn.Module):
@@ -229,50 +195,3 @@ class MINCFeatureExtractor(nn.Module):
         return output
 
 
-####################
-# Sliced VGG Network
-####################
-
-
-class slicedVGG19(nn.Module):
-    def __init__(self, requires_grad=False):
-        super(slicedVGG19, self).__init__()
-        vgg_pretrained_features = vgg.vgg19(pretrained=True).features
-        self.slice1 = nn.Sequential()
-        self.slice2 = nn.Sequential()
-        self.slice3 = nn.Sequential()
-        self.slice4 = nn.Sequential()
-        self.slice5 = nn.Sequential()
-        for x in range(4):
-            self.slice1.add_module(str(x), vgg_pretrained_features[x])
-        for x in range(4, 9):
-            self.slice2.add_module(str(x), vgg_pretrained_features[x])
-        for x in range(9, 18):
-            self.slice3.add_module(str(x), vgg_pretrained_features[x])
-        for x in range(18, 27):
-            self.slice4.add_module(str(x), vgg_pretrained_features[x])
-        for x in range(27, 36):
-            self.slice5.add_module(str(x), vgg_pretrained_features[x])
-        if not requires_grad:
-            for param in self.parameters():
-                param.requires_grad = False
-
-    def forward(self, X):
-        h = self.slice1(X)
-        h_relu1_2 = h
-        h = self.slice2(h)
-        h_relu2_2 = h
-        h = self.slice3(h)
-        h_relu3_4 = h
-        h = self.slice4(h)
-        h_relu4_4 = h
-        h = self.slice5(h)
-        h_relu5_4 = h
-
-        vgg_outputs = namedtuple(
-            "VggOutputs", ['relu1_2', 'relu2_2',
-                           'relu3_4', 'relu4_4', 'relu5_4'])
-        out = vgg_outputs(h_relu1_2, h_relu2_2,
-                          h_relu3_4, h_relu4_4, h_relu5_4)
-
-        return out
