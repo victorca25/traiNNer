@@ -159,7 +159,7 @@ def main():
                 logger.info('Models and training states saved.')
             
             # validation
-            if current_step % opt['train']['val_freq'] == 0:
+            if val_loader and current_step % opt['train']['val_freq'] == 0:
                 avg_psnr_c = 0.0
                 avg_psnr_s = 0.0
                 avg_psnr_p = 0.0

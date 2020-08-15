@@ -76,7 +76,7 @@ def parse(opt_path, is_train=True):
         if 'debug_nochkp' in opt['name']:
             opt['train']['val_freq'] = 8
             opt['logger']['print_freq'] = 2
-            opt['logger']['save_checkpoint_freq'] = 10000000
+            opt['logger']['save_checkpoint_freq'] = 1000 #10000000
             opt['train']['lr_decay_iter'] = 10
         elif 'debug' in opt['name']:
             opt['train']['val_freq'] = 8

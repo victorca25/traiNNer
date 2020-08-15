@@ -2,7 +2,64 @@ import math
 from collections import Counter
 from collections import defaultdict
 import torch
+from torch.optim import lr_scheduler
 from torch.optim.lr_scheduler import _LRScheduler
+
+
+def get_schedulers(optimizers=None, schedulers=None, train_opt=None):
+    # schedulers
+    if train_opt['lr_scheme'] == 'MultiStepLR':
+        for optimizer in optimizers:
+            schedulers.append(lr_scheduler.MultiStepLR(optimizer, \
+                train_opt['lr_steps'], train_opt['lr_gamma']))
+    
+    elif train_opt['lr_scheme'] == 'MultiStepLR_Restart':
+        for optimizer in optimizers:
+            schedulers.append(
+                MultiStepLR_Restart(optimizer, train_opt['lr_steps'],
+                                    restarts=train_opt['restarts'],
+                                    weights=train_opt['restart_weights'],
+                                    gamma=train_opt['lr_gamma'],
+                                    clear_state=train_opt['clear_state']))
+    
+    elif train_opt['lr_scheme'] == 'StepLR':
+        for optimizer in optimizers:
+            schedulers.append(lr_scheduler.StepLR(optimizer, \
+                train_opt['lr_step_size'], train_opt['lr_gamma']))
+    
+    elif train_opt['lr_scheme'] == 'StepLR_Restart':
+        for optimizer in optimizers:
+            schedulers.append(
+                StepLR_Restart(optimizer, step_sizes=train_opt['lr_step_sizes'],
+                                    restarts=train_opt['restarts'],
+                                    weights=train_opt['restart_weights'],
+                                    gamma=train_opt['lr_gamma'],
+                                    clear_state=train_opt['clear_state']))
+    
+    elif train_opt['lr_scheme'] == 'CosineAnnealingLR_Restart':
+        for optimizer in optimizers:
+            schedulers.append(
+                CosineAnnealingLR_Restart(
+                    optimizer, train_opt['T_period'], eta_min=train_opt['eta_min'],
+                    restarts=train_opt['restarts'], weights=train_opt['restart_weights']))
+    
+    elif train_opt['lr_scheme'] == 'ReduceLROnPlateau':
+        for optimizer in optimizers:
+            schedulers.append(
+                #lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.2, threshold=0.01, patience=5)
+                lr_scheduler.ReduceLROnPlateau(
+                    optimizer, mode=train_opt['plateau_mode'], factor=train_opt['plateau_factor'], 
+                    threshold=train_opt['plateau_threshold'], patience=train_opt['plateau_patience']))
+    else:
+        raise NotImplementedError('Learning rate scheme ("lr_scheme") not defined or not recognized.')
+
+    return schedulers
+
+
+
+
+
+
 
 class MultiStepLR_Restart(_LRScheduler):
     def __init__(self, optimizer, milestones, restarts=None, weights=None, gamma=0.1,
@@ -83,6 +140,9 @@ class CosineAnnealingLR_Restart(_LRScheduler):
                 (1 + math.cos(math.pi * ((self.last_epoch - self.last_restart) - 1) / self.T_max)) *
                 (group['lr'] - self.eta_min) + self.eta_min
                 for group in self.optimizer.param_groups]
+
+
+
 
 
 if __name__ == "__main__":

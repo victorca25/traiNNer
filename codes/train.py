@@ -11,10 +11,10 @@ import logging
 import torch
 
 import options.options as option
-from utils import util
+from utils import util, metrics
 from data import create_dataloader, create_dataset
 from models import create_model
-from models.modules.LPIPS import compute_dists as lpips
+from dataops.common import tensor2np
 
 def get_pytorch_ver():
     #print(torch.__version__)
@@ -82,13 +82,6 @@ def main():
     torch.backends.cudnn.benchmark = True
     # torch.backends.cudnn.deterministic = True
 
-    """
-    Initialize Metrics
-    # will be used in the validation step, no need to save them, just display them and 
-    send to Tensorboard log if enabled
-    """
-    #metrics = Metrics(opt...)
-
     # create train and val dataloader
     for phase, dataset_opt in opt['datasets'].items():
         if phase == 'train':
@@ -119,6 +112,7 @@ def main():
         current_step = resume_state['iter']
         model.resume_training(resume_state)  # handle optimizers and schedulers
         model.update_schedulers(opt['train']) # updated schedulers in case JSON configuration has changed
+        del resume_state
     else:
         current_step = 0
         start_epoch = 0
@@ -131,6 +125,7 @@ def main():
             if current_step > total_iters:
                 break
             
+            #TODO review this 
             if pytorch_ver=="pre": #Order for PyTorch ver < 1.1.0
                 # update learning rate
                 model.update_learning_rate(current_step-1)
@@ -166,15 +161,11 @@ def main():
                 logger.info('Models and training states saved.')
             
             # validation
-            if current_step % opt['train']['val_freq'] == 0:
-                avg_psnr = 0.0
-                avg_ssim = 0.0
-                avg_lpips = 0.0
-                idx = 0
+            if val_loader and current_step % opt['train']['val_freq'] == 0:
                 val_sr_imgs_list = []
                 val_gt_imgs_list = []
+                val_metrics = metrics.MetricsDict(metrics=opt['train']['metrics'] if opt['train']['metrics'] else None)
                 for val_data in val_loader:
-                    idx += 1
                     img_name = os.path.splitext(os.path.basename(val_data['LR_path'][0]))[0]
                     img_dir = os.path.join(opt['path']['val_images'], img_name)
                     util.mkdir(img_dir)
@@ -182,29 +173,12 @@ def main():
                     model.feed_data(val_data)
                     model.test()
 
-                    
                     """
                     Get Visuals
-                    # change to use the tensor2np function, add denorm bool from opt
                     """
-                    
                     visuals = model.get_current_visuals()
-
-                    if opt['datasets']['train']['znorm']: # If the image range is [-1,1]
-                        sr_img = util.tensor2img(visuals['SR'],min_max=(-1, 1))  # uint8
-                        gt_img = util.tensor2img(visuals['HR'],min_max=(-1, 1))  # uint8
-                    else: # Default: Image range is [0,1]
-                        sr_img = util.tensor2img(visuals['SR'])  # uint8
-                        gt_img = util.tensor2img(visuals['HR'])  # uint8
-                        
-                    # sr_img = util.tensor2img(visuals['SR'])  # uint8
-                    # gt_img = util.tensor2img(visuals['HR'])  # uint8
-                    
-                    # print("Min. SR value:",sr_img.min()) # Debug
-                    # print("Max. SR value:",sr_img.max()) # Debug
-                    
-                    # print("Min. GT value:",gt_img.min()) # Debug
-                    # print("Max. GT value:",gt_img.max()) # Debug
+                    sr_img = tensor2np(visuals['SR'], denormalize=opt['datasets']['train']['znorm'])
+                    gt_img = tensor2np(visuals['HR'], denormalize=opt['datasets']['train']['znorm'])
                     
                     # Save SR images for reference
                     save_img_path = os.path.join(img_dir, '{:s}_{:d}.png'.format(\
@@ -213,53 +187,29 @@ def main():
 
                     """
                     Get Metrics
-                    # change to use the metrics class, should be initialized in the begining
-                    # can use logger.info in the metrics() forward (or here) 
-                    # and later for each metric, in metrics_dict, add to tensorboard
+                    # TODO: test using tensor based metrics (batch) instead of numpy.
                     """
-                    #metrics_dict = metrics(sr_img, gt_img) ...
-
-                    # calculate PSNR, SSIM and LPIPS distance
                     crop_size = opt['scale']
-                    gt_img = gt_img / 255.
-                    sr_img = sr_img / 255.
+                    val_metrics.calculate_metrics(sr_img, gt_img, crop_size = crop_size)  #, only_y=True)
 
-                    # For training models with only one channel ndim==2, if RGB ndim==3, etc.
-                    if gt_img.ndim == 2:
-                        cropped_gt_img = gt_img[crop_size:-crop_size, crop_size:-crop_size]
-                    else:
-                        cropped_gt_img = gt_img[crop_size:-crop_size, crop_size:-crop_size, :]
-                    if sr_img.ndim == 2:
-                        cropped_sr_img = sr_img[crop_size:-crop_size, crop_size:-crop_size]
-                    else: # Default: RGB images
-                        cropped_sr_img = sr_img[crop_size:-crop_size, crop_size:-crop_size, :]
-                    
-                    val_gt_imgs_list.append(cropped_gt_img) # If calculating only once for all images
-                    val_sr_imgs_list.append(cropped_sr_img) # If calculating only once for all images
-                    
-                    # LPIPS only works for RGB images
-                    avg_psnr += util.calculate_psnr(cropped_sr_img * 255, cropped_gt_img * 255)
-                    avg_ssim += util.calculate_ssim(cropped_sr_img * 255, cropped_gt_img * 255)
-                    #avg_lpips += lpips.calculate_lpips([cropped_sr_img], [cropped_gt_img]) # If calculating for each image
-
-                avg_psnr = avg_psnr / idx
-                avg_ssim = avg_ssim / idx
-                #avg_lpips = avg_lpips / idx # If calculating for each image
-                avg_lpips = lpips.calculate_lpips(val_sr_imgs_list,val_gt_imgs_list) # If calculating only once for all images
+                avg_metrics = val_metrics.get_averages()
+                del val_metrics
 
                 # log
-                # logger.info('# Validation # PSNR: {:.5g}, SSIM: {:.5g}'.format(avg_psnr, avg_ssim))
-                logger.info('# Validation # PSNR: {:.5g}, SSIM: {:.5g}, LPIPS: {:.5g}'.format(avg_psnr, avg_ssim, avg_lpips))
+                logger_m = ''
+                for r in avg_metrics:
+                    #print(r)
+                    formatted_res = r['name'].upper()+': {:.5g}, '.format(r['average'])
+                    logger_m += formatted_res
+
+                logger.info('# Validation # '+logger_m[:-2])
                 logger_val = logging.getLogger('val')  # validation logger
-                # logger_val.info('<epoch:{:3d}, iter:{:8,d}> psnr: {:.5g}, ssim: {:.5g}'.format(
-                    # epoch, current_step, avg_psnr, avg_ssim))
-                logger_val.info('<epoch:{:3d}, iter:{:8,d}> psnr: {:.5g}, ssim: {:.5g}, lpips: {:.5g}'.format(
-                    epoch, current_step, avg_psnr, avg_ssim, avg_lpips))
+                logger_val.info('<epoch:{:3d}, iter:{:8,d}> '.format(epoch, current_step)+logger_m[:-2])
+                
                 # tensorboard logger
                 if opt['use_tb_logger'] and 'debug' not in opt['name']:
-                    tb_logger.add_scalar('psnr', avg_psnr, current_step)
-                    tb_logger.add_scalar('ssim', avg_ssim, current_step)
-                    tb_logger.add_scalar('lpips', avg_lpips, current_step)
+                    for r in avg_metrics:
+                        tb_logger.add_scalar(r['name'], r['average'], current_step)
 
     logger.info('Saving the final model.')
     model.save('latest')
