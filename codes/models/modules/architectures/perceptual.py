@@ -63,14 +63,13 @@ vgg_layer_inv16 = {
     0: 'conv_1_1', 2: 'conv_1_2', 4: 'pool_1', 5: 'conv_2_1', 7: 'conv_2_2', 9: 'pool_2', 10: 'conv_3_1', 12: 'conv_3_2', 14: 'conv_3_3', 16: 'pool_3', 17: 'conv_4_1', 19: 'conv_4_2', 21: 'conv_4_3', 23: 'pool_4', 24: 'conv_5_1', 26: 'conv_5_2', 28: 'conv_5_3', 30: 'pool_5'
 }
 
-#TODO: move the normalization into the function like VGGFeatureExtractor()
 class VGG_Model(nn.Module):
     """
         A VGG model with listerners in the layers. 
         Will return a dictionary of outputs that correspond to the 
         layers set in "listen_list".
     """
-    def __init__(self, listen_list=None, net='vgg19'):
+    def __init__(self, listen_list=None, net='vgg19', use_input_norm=True, z_norm=False):
         super(VGG_Model, self).__init__()
         #vgg = vgg16(pretrained=True)
         if net == 'vgg19':
@@ -82,6 +81,22 @@ class VGG_Model(nn.Module):
             vgg_layer = vgg_layer16
             self.vgg_layer_inv = vgg_layer_inv16
         self.vgg_model = vgg_net.features
+        self.use_input_norm = use_input_norm
+        # image normalization
+        if self.use_input_norm:
+            if z_norm: # if input in range [-1,1]
+                mean = torch.tensor(
+                    [[[0.485-1]], [[0.456-1]], [[0.406-1]]], requires_grad=False)
+                std = torch.tensor(
+                    [[[0.229*2]], [[0.224*2]], [[0.225*2]]], requires_grad=False)
+            else: # input in range [0,1]
+                mean = torch.tensor(
+                    [[[0.485]], [[0.456]], [[0.406]]], requires_grad=False)
+                std = torch.tensor(
+                    [[[0.229]], [[0.224]], [[0.225]]], requires_grad=False)
+            self.register_buffer('mean', mean)
+            self.register_buffer('std', std)
+
         vgg_dict = vgg_net.state_dict()
         vgg_f_dict = self.vgg_model.state_dict()
         vgg_dict = {k: v for k, v in vgg_dict.items() if k in vgg_f_dict}
@@ -98,6 +113,9 @@ class VGG_Model(nn.Module):
         self.features = OrderedDict()
 
     def forward(self, x):
+        if self.use_input_norm:
+            x = (x - self.mean.detach()) / self.std.detach()
+
         for index, layer in enumerate(self.vgg_model):
             x = layer(x)
             if index in self.listen:

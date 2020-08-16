@@ -429,3 +429,99 @@ class MINCFeatureExtractor(nn.Module):
     def forward(self, x):
         output = self.features(x)
         return output
+
+
+#TODO
+# moved from models.modules.architectures.ASRResNet_arch, did not bring the self-attention layer
+# VGG style Discriminator with input size 128*128, with feature_maps extraction and self-attention
+class Discriminator_VGG_128_fea(nn.Module):
+    def __init__(self, in_nc, base_nf, norm_type='batch', act_type='leakyrelu', mode='CNA', convtype='Conv2D', \
+         arch='ESRGAN', spectral_norm=False, self_attention = False, max_pool=False, poolsize = 4):
+        super(Discriminator_VGG_128_fea, self).__init__()
+        # features
+        # hxw, c
+        # 128, 64
+        
+        # Self-Attention configuration
+        '''#TODO
+        self.self_attention = self_attention
+        self.max_pool = max_pool
+        self.poolsize = poolsize
+        '''
+        
+        # Remove BatchNorm2d if using spectral_norm
+        if spectral_norm:
+            norm_type = None
+        
+        self.conv0 = B.conv_block(in_nc, base_nf, kernel_size=3, norm_type=None, act_type=act_type, \
+            mode=mode)
+        self.conv1 = B.conv_block(base_nf, base_nf, kernel_size=4, stride=2, norm_type=norm_type, \
+            act_type=act_type, mode=mode, spectral_norm=spectral_norm)
+        # 64, 64
+        self.conv2 = B.conv_block(base_nf, base_nf*2, kernel_size=3, stride=1, norm_type=norm_type, \
+            act_type=act_type, mode=mode, spectral_norm=spectral_norm)
+        self.conv3 = B.conv_block(base_nf*2, base_nf*2, kernel_size=4, stride=2, norm_type=norm_type, \
+            act_type=act_type, mode=mode, spectral_norm=spectral_norm)
+        # 32, 128
+        self.conv4 = B.conv_block(base_nf*2, base_nf*4, kernel_size=3, stride=1, norm_type=norm_type, \
+            act_type=act_type, mode=mode, spectral_norm=spectral_norm)
+        self.conv5 = B.conv_block(base_nf*4, base_nf*4, kernel_size=4, stride=2, norm_type=norm_type, \
+            act_type=act_type, mode=mode, spectral_norm=spectral_norm)
+        # 16, 256
+        
+        '''#TODO
+        if self.self_attention:
+            self.FSA = SelfAttentionBlock(in_dim = base_nf*4, max_pool=self.max_pool, poolsize = self.poolsize, spectral_norm=spectral_norm)
+        '''
+
+        self.conv6 = B.conv_block(base_nf*4, base_nf*8, kernel_size=3, stride=1, norm_type=norm_type, \
+            act_type=act_type, mode=mode, spectral_norm=spectral_norm)
+        self.conv7 = B.conv_block(base_nf*8, base_nf*8, kernel_size=4, stride=2, norm_type=norm_type, \
+            act_type=act_type, mode=mode, spectral_norm=spectral_norm)
+        # 8, 512
+        self.conv8 = B.conv_block(base_nf*8, base_nf*8, kernel_size=3, stride=1, norm_type=norm_type, \
+            act_type=act_type, mode=mode, spectral_norm=spectral_norm)
+        self.conv9 = B.conv_block(base_nf*8, base_nf*8, kernel_size=4, stride=2, norm_type=norm_type, \
+            act_type=act_type, mode=mode, spectral_norm=spectral_norm)
+        # 4, 512
+        # self.features = B.sequential(conv0, conv1, conv2, conv3, conv4, conv5, conv6, conv7, conv8,\
+            # conv9)
+
+        # classifier
+        if arch=='PPON':
+            self.classifier = nn.Sequential(
+                nn.Linear(512 * 4 * 4, 128), nn.LeakyReLU(0.2, True), nn.Linear(128, 1))
+        else: #arch='ESRGAN':
+            self.classifier = nn.Sequential(
+                nn.Linear(512 * 4 * 4, 100), nn.LeakyReLU(0.2, True), nn.Linear(100, 1))
+
+    #TODO: modify to a listening dictionary like VGG_Model(), can select what maps to use
+    def forward(self, x, return_maps=False):
+        feature_maps = []
+        # x = self.features(x)
+        x = self.conv0(x)
+        feature_maps.append(x)
+        x = self.conv1(x)
+        feature_maps.append(x)
+        x = self.conv2(x)
+        feature_maps.append(x)
+        x = self.conv3(x)
+        feature_maps.append(x)
+        x = self.conv4(x)
+        feature_maps.append(x)
+        x = self.conv5(x)
+        feature_maps.append(x)
+        x = self.conv6(x)
+        feature_maps.append(x)
+        x = self.conv7(x)
+        feature_maps.append(x)
+        x = self.conv8(x)
+        feature_maps.append(x)
+        x = self.conv9(x)
+        feature_maps.append(x)
+        
+        x = x.view(x.size(0), -1)
+        x = self.classifier(x)
+        if return_maps:
+            return [x, feature_maps]
+        return x

@@ -482,17 +482,6 @@ class Contextual_Loss(nn.Module):
         
         if use_vgg:
             self.vgg_model = VGG_Model(listen_list=listen_list, net=net)
-            #TODO: move this to the VGG_Model()
-            self.register_buffer(
-                name='vgg_mean',
-                tensor=torch.tensor(
-                    [[[0.485]], [[0.456]], [[0.406]]], requires_grad=False)
-            )
-            self.register_buffer(
-                name='vgg_std',
-                tensor=torch.tensor(
-                    [[[0.229]], [[0.224]], [[0.225]]], requires_grad=False)
-            )
 
         if calc_type == 'bilateral':
             self.calculate_loss = self.bilateral_CX_Loss
@@ -507,10 +496,6 @@ class Contextual_Loss(nn.Module):
         if hasattr(self, 'vgg_model'):
             assert images.shape[1] == 3 and gt.shape[1] == 3,\
                 'VGG model takes 3 channel images.'
-
-            # normalization
-            images = images.sub(self.vgg_mean.detach()).div(self.vgg_std.detach())
-            gt = gt.sub(self.vgg_mean.detach()).div(self.vgg_std.detach())
             
             loss = 0
             vgg_images = self.vgg_model(images)

@@ -185,8 +185,8 @@ def define_D(opt):
         netD = ASRResNet_arch.ADiscriminator_S(spectral_norm=opt_net['spectral_norm'], self_attention=opt_net['self_attention'], \
             max_pool=opt_net['max_pool'], poolsize=opt_net['poolsize'] )
     elif which_model == 'discriminator_vgg_128_fea': #VGG-like discriminator with features extraction
-        from models.modules.architectures import ASRResNet_arch
-        netD = ASRResNet_arch.Discriminator_VGG_128_fea(in_nc=opt_net['in_nc'], base_nf=opt_net['nf'], \
+        from models.modules.architectures import discriminators
+        netD = discriminators.Discriminator_VGG_128_fea(in_nc=opt_net['in_nc'], base_nf=opt_net['nf'], \
             norm_type=opt_net['norm_type'], mode=opt_net['mode'], act_type=opt_net['act_type'], \
             convtype=opt_net['convtype'], arch=model_G, spectral_norm=opt_net['spectral_norm'], self_attention=opt_net['self_attention'], \
             max_pool=opt_net['max_pool'], poolsize=opt_net['poolsize'])

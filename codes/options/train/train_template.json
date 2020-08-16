@@ -160,7 +160,7 @@
   // Discriminator options:
   , "network_D": {
     // ESRGAN (default)| PPON:
-    "which_model_D": "discriminator_vgg" // discriminator_vgg_128 | discriminator_vgg
+    "which_model_D": "discriminator_vgg" // discriminator_vgg_128 | discriminator_vgg | discriminator_vgg_128_fea (feature extraction)
     , "norm_type": "batch"
     , "act_type": "leakyrelu"
     , "mode": "CNA" // "CNA" | "NAC"
@@ -168,16 +168,6 @@
     , "in_nc": 3
     
     // ASRGAN (feature extraction):
-    //"which_model_D": "discriminator_vgg_128_fea" // discriminator_vgg_128_fea
-    //, "norm_type": "batch"
-    //, "act_type": "leakyrelu"
-    //, "mode": "CNA" // "CNA" | "NAC"
-    //, "nf": 64
-    //, "in_nc": 3
-    //, "spectral_norm": true
-    //, "self_attention": true
-    //, "max_pool": true
-    //, "poolsize": 4
   }
 
   // Schedulers options:
@@ -219,8 +209,6 @@
     //, "cx_weight": 0.5
     //, "cx_type": "contextual"
     //, "cx_vgg_layers": {}
-    //, "dis_feature_criterion": "l1" //"l1" | "l2" | "cb" | "elastic" //discriminator feature loss (only for asrragan)
-    //, "dis_feature_weight": 1 //(only for asrragan)
     //, "hfen_criterion": "l1" //hfen: "l1" | "l2" | "rel_l1" | "rel_l2" //helps in deblurring and finding edges, lines
     //, "hfen_weight": 1e-6
     //, "tv_type": "4D" // "normal" | "4D" //helps in denoising, reducing upscale artefacts
@@ -241,11 +229,15 @@
 
     , "gan_type": "vanilla" //"vanilla" | "wgan-gp" | "lsgan" 
     , "gan_weight": 5e-3 //* test: 7e-3
-    //for wgan-gp
+    // for wgan-gp
     // , "D_update_ratio": 1
     // , "D_init_iters": 0
     // , "gp_weigth": 10
-    
+    // if using the discriminator_vgg_128_fea feature maps to calculate feature loss
+    , "gan_featmaps": true // true | false
+    , "dis_feature_criterion": "cb" //"l1" | "l2" | "cb" | "elastic" //discriminator feature loss
+    , "dis_feature_weight": 1e-2 //1
+
     // For PPON:
     //, "train_phase": 1 //Training starting phase, can skip the first phases
     //, "phase1_s": 100 //5000 //100 //5000 //138000 //-1 to skip. Need to coordinate with the LR steps. //COBranch: lr =  2e−4, decreased by the factor of 2 for every 1000 epochs (1.38e+5 iterations) 138k

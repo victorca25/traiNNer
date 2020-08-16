@@ -239,6 +239,11 @@ class Adversarial(nn.Module):
         self.diffaug = diffaug
         self.dapolicy = dapolicy
         self.gan_type = train_opt['gan_type']
+        self.use_featmaps = train_opt['gan_featmaps'] if train_opt['gan_featmaps'] else None
+        if self.use_featmaps:
+            dis_feature_criterion = train_opt['dis_feature_criterion'] if train_opt['dis_feature_criterion'] else 'l1'
+            dis_feature_weight = train_opt['dis_feature_weight'] if train_opt['dis_feature_weight'] else 0.0001
+            self.cri_disfea = get_loss_fn(dis_feature_criterion, dis_feature_weight) 
         
         self.cri_gan = GANLoss(train_opt['gan_type'], 1.0, 0.0).to(self.device)
         self.l_gan_w = train_opt['gan_weight']
@@ -267,10 +272,32 @@ class Adversarial(nn.Module):
             # updating generator
             #For the Generator only if GAN is enabled, everything else can happen any time
             # G gan + cls loss
-            pred_g_real = netD(real).detach() # detach to avoid backpropagation to D
-            pred_g_fake = netD(fake)
+            #TODO: test. if is a list, its [pred_g_real, feats_d_real], else its just pred_g_real
+            #pred_g_real = netD(real).detach() # detach to avoid backpropagation to D
+            pred_g_real = netD(real, return_maps=self.use_featmaps)
+            if isinstance(pred_g_real, list) and self.use_featmaps:
+                feats_d_real = pred_g_real[1]
+                pred_g_real = pred_g_real[0].detach() # detach to avoid backpropagation to D
+            else: # normal gan (needs to detach pred_g_real)
+                pred_g_real = pred_g_real.detach() # detach to avoid backpropagation to D
+            #TODO: test. if is a list, its [pred_g_fake, feats_d_fake], else its just pred_g_fake
+            # pred_g_fake = netD(fake)
+            pred_g_fake = netD(fake, return_maps=self.use_featmaps)
+            if isinstance(pred_g_fake, list) and self.use_featmaps:
+                feats_d_fake = pred_g_fake[1]
+                pred_g_fake = pred_g_fake[0]
+
             l_g_gan = self.l_gan_w * (self.cri_gan(pred_g_real - torch.mean(pred_g_fake), False) +
                                         self.cri_gan(pred_g_fake - torch.mean(pred_g_real), True)) / 2            
+            
+            # SRPGAN-like Features Perceptual loss, extracted from the discriminator
+            if self.use_featmaps:
+                l_g_disfea = 0
+                for hr_feat_map, sr_feat_map in zip(feats_d_fake, feats_d_real):
+                    l_g_disfea += self.cri_disfea['function'](sr_feat_map, hr_feat_map)
+                l_g_disfea = (self.cri_disfea['weight']*l_g_disfea)/len(sr_feat_map)
+                l_g_gan += l_g_disfea
+            
             return l_g_gan
 
         else: # elif stage == 'discriminator':
