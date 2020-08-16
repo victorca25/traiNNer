@@ -272,21 +272,22 @@ class Adversarial(nn.Module):
             # updating generator
             #For the Generator only if GAN is enabled, everything else can happen any time
             # G gan + cls loss
-            #TODO: test. if is a list, its [pred_g_real, feats_d_real], else its just pred_g_real
-            #pred_g_real = netD(real).detach() # detach to avoid backpropagation to D
-            pred_g_real = netD(real, return_maps=self.use_featmaps)
-            if isinstance(pred_g_real, list) and self.use_featmaps:
-                feats_d_real = pred_g_real[1]
-                pred_g_real = pred_g_real[0].detach() # detach to avoid backpropagation to D
-            else: # normal gan (needs to detach pred_g_real)
-                pred_g_real = pred_g_real.detach() # detach to avoid backpropagation to D
-            #TODO: test. if is a list, its [pred_g_fake, feats_d_fake], else its just pred_g_fake
-            # pred_g_fake = netD(fake)
-            pred_g_fake = netD(fake, return_maps=self.use_featmaps)
-            if isinstance(pred_g_fake, list) and self.use_featmaps:
-                feats_d_fake = pred_g_fake[1]
-                pred_g_fake = pred_g_fake[0]
-
+            if self.use_featmaps: # extrating feature maps from discriminator
+                pred_g_real = netD(real, return_maps=self.use_featmaps)
+                #TODO: test. if is a list, its [pred_g_real, feats_d_real], else its just pred_g_real
+                if isinstance(pred_g_real, list):
+                    feats_d_real = pred_g_real[1]
+                    pred_g_real = pred_g_real[0].detach() # detach to avoid backpropagation to D
+                
+                pred_g_fake = netD(fake, return_maps=self.use_featmaps)
+                #TODO: test. if is a list, its [pred_g_fake, feats_d_fake], else its just pred_g_fake
+                if isinstance(pred_g_fake, list) and self.use_featmaps:
+                    feats_d_fake = pred_g_fake[1]
+                    pred_g_fake = pred_g_fake[0]
+            else: # normal gan
+                pred_g_real = netD(real).detach() # detach to avoid backpropagation to D
+                pred_g_fake = netD(fake)
+            
             l_g_gan = self.l_gan_w * (self.cri_gan(pred_g_real - torch.mean(pred_g_fake), False) +
                                         self.cri_gan(pred_g_fake - torch.mean(pred_g_real), True)) / 2            
             
