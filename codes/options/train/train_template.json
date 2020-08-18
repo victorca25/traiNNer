@@ -275,6 +275,6 @@
   , "logger": {
     "print_freq": 200
     , "save_checkpoint_freq": 5e3
-    //, "overwrite_chkp": true
+    , "overwrite_chkp": false
   }
 }

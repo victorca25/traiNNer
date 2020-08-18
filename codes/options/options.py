@@ -44,7 +44,7 @@ def parse(opt_path, is_train=True):
             elif type(HR_images_paths) is str:
                 dataset['dataroot_HR_bg'] = os.path.expanduser(HR_images_paths)
         if 'dataroot_LR' in dataset and dataset['dataroot_LR'] is not None:
-            LR_images_paths = dataset['dataroot_LR']        
+            LR_images_paths = dataset['dataroot_LR']
             if type(LR_images_paths) is list:
                 dataset['dataroot_LR'] = []
                 for path in LR_images_paths:
@@ -71,10 +71,11 @@ def parse(opt_path, is_train=True):
         opt['path']['training_state'] = os.path.join(experiments_root, 'training_state')
         opt['path']['log'] = experiments_root
         opt['path']['val_images'] = os.path.join(experiments_root, 'val_images')
-        opt['train']['overwrite_val_imgs'] = opt['train']['overwrite_val_imgs'] \
-            if opt['train']['overwrite_val_imgs'] else None
-        opt['logger']['overwrite_chkp'] = opt['logger']['overwrite_chkp'] \
-            if opt['logger']['overwrite_chkp'] else None
+        if 'overwrite_val_imgs' in path and path['overwrite_val_imgs'] is not None:
+            opt['train']['overwrite_val_imgs'] = path['overwrite_val_imgs']
+        # opt['logger']['overwrite_chkp'] = opt['logger']['overwrite_chkp'] \
+        #     if opt['logger']['overwrite_chkp'] else None
+        
 
         # change some options for debug mode
         if 'debug_nochkp' in opt['name']:
