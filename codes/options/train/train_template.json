@@ -166,8 +166,6 @@
     , "mode": "CNA" // "CNA" | "NAC"
     , "nf": 64
     , "in_nc": 3
-    
-    // ASRGAN (feature extraction):
   }
 
   // Schedulers options:
@@ -211,6 +209,8 @@
     //, "cx_vgg_layers": {}
     //, "hfen_criterion": "l1" //hfen: "l1" | "l2" | "rel_l1" | "rel_l2" //helps in deblurring and finding edges, lines
     //, "hfen_weight": 1e-6
+    //, "grad_type": "grad-4d-l1" //2d | 4d / - any of the pixel crit, ie "grad-2d-l1"
+    //, "grad_weight": 4e-3 //4e-1
     //, "tv_type": "4D" // "normal" | "4D" //helps in denoising, reducing upscale artefacts
     //, "tv_weight": 1e-5 //Change "tv_weight" so the l_g_tv is around 1e-02 - 1e-01
     //, "tv_norm": 1 // 1 for l1 (default) or 2 for l2.
@@ -234,9 +234,9 @@
     // , "D_init_iters": 0
     // , "gp_weigth": 10
     // if using the discriminator_vgg_128_fea feature maps to calculate feature loss
-    , "gan_featmaps": true // true | false
-    , "dis_feature_criterion": "cb" //"l1" | "l2" | "cb" | "elastic" //discriminator feature loss
-    , "dis_feature_weight": 1e-2 //1
+    //, "gan_featmaps": true // true | false
+    //, "dis_feature_criterion": "cb" //"l1" | "l2" | "cb" | "elastic" //discriminator feature loss
+    //, "dis_feature_weight": 1e-2 //1
 
     // For PPON:
     //, "train_phase": 1 //Training starting phase, can skip the first phases
@@ -268,11 +268,13 @@
     , "manual_seed": 0
     , "niter": 5e5
     , "val_freq": 1000 //5e3
+    //, "overwrite_val_imgs": true
     , "metrics": "psnr,ssim,lpips" //select from: "psnr,ssim,lpips" or a combination separated by comma ","
   }
 
   , "logger": {
     "print_freq": 200
     , "save_checkpoint_freq": 5e3
+    //, "overwrite_chkp": true
   }
 }
