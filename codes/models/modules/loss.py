@@ -201,6 +201,24 @@ class TVLoss(nn.Module):
             raise ValueError("Expected input tensor to be of ndim 3 or 4, but got " + str(len(img_shape)))
     
 
+class GradientLoss(nn.Module):
+    def __init__(self, loss_f = None, reduction='mean', gradientdir='2d'): #2d or 4d
+        super(GradientLoss, self).__init__()
+        self.criterion = loss_f
+        self.gradientdir = gradientdir
+    
+    def forward(self, input, target):
+        if self.gradientdir == '4d':
+            inputdy, inputdx, inputdp, inputdn = get_4dim_image_gradients(input)
+            targetdy, targetdx, targetdp, targetdn = get_4dim_image_gradients(target) 
+            return (self.criterion(inputdx, targetdx) + self.criterion(inputdy, targetdy) + \
+                    self.criterion(inputdp, targetdp) + self.criterion(inputdn, targetdn))/4
+        else: #'2d'
+            inputdy, inputdx = get_image_gradients(input)
+            targetdy, targetdx = get_image_gradients(target) 
+            return (self.criterion(inputdx, targetdx) + self.criterion(inputdy, targetdy))/2
+
+
 class ElasticLoss(nn.Module):
     def __init__(self, a=0.2, reduction='mean'): #a=0.5 default
         super(ElasticLoss, self).__init__()

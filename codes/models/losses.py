@@ -62,6 +62,12 @@ def get_loss_fn(loss_type=None, weight=0, recurrent=False, reduction='mean', net
         #print(hfen_loss_f)
         #TODO: can pass function options from opt_train
         loss_function = HFENLoss(loss_f=hfen_loss_f)
+    # Gradient loss
+    elif loss_type.find('grad') >= 0:
+        gradientdir = loss_type.split('-')[1]
+        grad_loss_f = get_loss_fn(loss_type.split('-')[2], recurrent=True)
+        #TODO: can pass function options from opt_train
+        loss_function = GradientLoss(loss_f=grad_loss_f, gradientdir=gradientdir)
     # SPL losses
     # Gradient Profile Loss
     elif loss_type == 'gpl':
@@ -136,47 +142,24 @@ def check_loss_names(pixel_criterion=None, feature_criterion=None, feature_netwo
     """
 
     if pixel_criterion:
-        pixel_criterion = 'pix-'+pixel_criterion
-        return pixel_criterion
+        return 'pix-{}'.format(pixel_criterion.lower())
 
     #, "feature_criterion": "l1" //"l1" | "l2" | "cb" | "elastic" //feature loss (VGG feature network)
     if feature_criterion:
-        if feature_criterion == 'l1' or feature_criterion == 'L1':
-            feature_criterion = 'fea-'+feature_network+'-l1'
-        elif feature_criterion == 'l2' or feature_criterion == 'L2':
-            feature_criterion = 'fea-'+feature_network+'-l2'
-        elif feature_criterion == 'cb':
-            feature_criterion = 'fea-'+feature_network+'-cb'
-        elif feature_criterion == 'elastic':
-            feature_criterion = 'fea-'+feature_network+'-elastic'
-        elif feature_criterion == 'relativel1' or feature_criterion == 'relativel2': #TODO
-            feature_criterion = 'fea-'+feature_network+'-relativel1'
-        #elif feature_criterion == 'relativel2':
-            #feature_criterion = 'fea-'+feature_network+'-relativel2'
-        elif feature_criterion == 'l1cosinesim':
-            feature_criterion = 'fea-'+feature_network+'-l1cosinesim'
-        return feature_criterion
+        return 'fea-{}-{}'.format(feature_network.lower(), feature_criterion.lower())
 
     #//, "dis_feature_criterion": "l1" //"l1" | "l2" | "cb" | "elastic" //discriminator feature loss (only for asrragan)
     #TODO
 
     #//, "hfen_criterion": "l1" //hfen: "l1" | "l2" | "rel_l1" | "rel_l2" //helps in deblurring and finding edges, lines
     if hfen_criterion:
-        if hfen_criterion == 'l1' or hfen_criterion == 'L1':
-            hfen_criterion = 'hfen-l1'
-        elif hfen_criterion == 'l2' or hfen_criterion == 'L2':
-            hfen_criterion = 'hfen-l2'
-        elif hfen_criterion == 'rel_l1' or hfen_criterion == 'rel_l2': #TODO, rel_l2 not available, easy to do
+        if hfen_criterion == 'rel_l1' or hfen_criterion == 'rel_l2': #TODO, rel_l2 not available, easy to do
             hfen_criterion = 'hfen-relativel1'
         #elif hfen_criterion == 'rel_l2':
             #hfen_criterion = 'hfen-relativel2'
-        elif hfen_criterion == 'cb': 
-            hfen_criterion = 'hfen-cb'
-        elif hfen_criterion == 'elastic':
-            hfen_criterion = 'hfen-elastic'
-        elif hfen_criterion == 'l1cosinesim': 
-            hfen_criterion = 'hfen-l1cosinesim'
-        return hfen_criterion
+            return hfen_criterion
+        else:
+            return 'hfen-{}'.format(hfen_criterion.lower())
 
     #//, "tv_type": "normal" //helps in denoising, reducing upscale artefacts
     if tv_type and tv_norm:
@@ -191,7 +174,7 @@ def check_loss_names(pixel_criterion=None, feature_criterion=None, feature_netwo
         elif tv_type == '4D':
             tv_type = 'dtv'
         #final combined type
-        tv_type = tv_type+'-'+tv_norm
+        tv_type = '{}-{}'.format(tv_type, tv_norm)
         return tv_type
     
     if lpips_criterion and lpips_network:
@@ -353,6 +336,10 @@ class GeneratorLoss(nn.Module):
         hfen_weight = train_opt['hfen_weight'] if train_opt['hfen_weight'] else 0
         hfen_criterion = check_loss_names(hfen_criterion=train_opt['hfen_criterion'])
 
+        grad_weight = train_opt['grad_weight'] if train_opt['grad_weight'] else 0
+        grad_type = train_opt['grad_type'] if train_opt['grad_type'] else None
+        #grad_type = "grad-{}".format(grad_type)
+
         tv_weight = train_opt['tv_weight'] if train_opt['tv_weight'] else 0
         tv_type = check_loss_names(tv_type=train_opt['tv_type'], tv_norm=train_opt['tv_norm'])
 
@@ -407,6 +394,10 @@ class GeneratorLoss(nn.Module):
         if hfen_weight > 0 and hfen_criterion:
             cri_hfen = get_loss_fn(hfen_criterion, hfen_weight)
             self.loss_list.append(cri_hfen)
+        
+        if grad_weight > 0 and grad_type:
+            cri_grad = get_loss_fn(grad_type, grad_weight, device = device)
+            self.loss_list.append(cri_grad)
 
         if ssim_weight > 0 and ssim_type:
             cri_ssim = get_loss_fn(ssim_type, ssim_weight, opt = train_opt)
@@ -474,17 +465,18 @@ class GeneratorLoss(nn.Module):
                         # the LF, which may or may not be a valid proposition, test!
                         effective_loss = l['weight']*l['function'](sr_f) # fake_H
                     elif l['name'].find('pix') >= 0 or l['name'].find('hfen') >= 0 \
-                        or l['name'].find('cpl') >= 0 or l['name'].find('gpl') >= 0:
+                            or l['name'].find('cpl') >= 0 or l['name'].find('gpl') >= 0 \
+                            or l['name'].find('gradient') >= 0:
                         effective_loss = l['weight']*l['function'](sr_f, hr_f) # (fake_H, var_H)
                     elif l['name'].find('ssim') >= 0:
-                        effective_loss = 1 - l['weight']*l['function'](sr_f, hr_f) # (fake_H, var_H)
+                        effective_loss = l['weight']*(1 - l['function'](sr_f, hr_f)) # (fake_H, var_H)
                     else:
                         effective_loss = l['weight']*l['function'](sr, hr) # (fake_H, var_H)
                 else:
                     if l['name'].find('tv') >= 0 or l['name'].find('overflow') >= 0:
                         effective_loss = l['weight']*l['function'](sr) # fake_H
                     elif l['name'].find('ssim') >= 0:
-                        effective_loss = 1 - l['weight']*l['function'](sr, hr) # (fake_H, var_H)
+                        effective_loss = l['weight']*(1 - l['function'](sr, hr)) # (fake_H, var_H)
                     else:
                         effective_loss = l['weight']*l['function'](sr, hr) # (fake_H, var_H)
                 #print(l['name'],effective_loss)
