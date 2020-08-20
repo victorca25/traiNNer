@@ -12,7 +12,7 @@ class LRDataset(data.Dataset):
         self.opt = opt
         self.paths_LR = None
         self.LR_env = None  # environment for lmdb
-        self.znorm = False
+        self.znorm = opt.get('znorm', False) # Alternative: images are z-normalized to the [-1,1] range
 
         # read image list from lmdb or image files
         self.LR_env, self.paths_LR = util.get_image_paths(opt['data_type'], opt['dataroot_LR'])
@@ -20,14 +20,11 @@ class LRDataset(data.Dataset):
 
     def __getitem__(self, index):
         LR_path = None
-        if self.opt['znorm']:
-            if self.opt['znorm'] == True:
-                self.znorm = True # Alternative: images are z-normalized to the [-1,1] range
 
         # get LR image
         LR_path = self.paths_LR[index]
         #img_LR = util.read_img(self.LR_env, LR_path)
-        img_LR = util.read_img(self.LR_env, LR_path, znorm=self.znorm)
+        img_LR = util.read_img(self.LR_env, LR_path)
         H, W, C = img_LR.shape
 
         # change color space if necessary
@@ -35,11 +32,7 @@ class LRDataset(data.Dataset):
             img_LR = util.channel_convert(C, self.opt['color'], [img_LR])[0]
 
         # BGR to RGB, HWC to CHW, numpy to tensor
-        if img_LR.shape[2] == 3:
-            img_LR = img_LR[:, :, [2, 1, 0]]
-        elif img_LR.shape[2] == 4:
-            img_LR = img_LR[:, :, [2, 1, 0, 3]]
-        img_LR = torch.from_numpy(np.ascontiguousarray(np.transpose(img_LR, (2, 0, 1)))).float()
+        img_LR = util.np2tensor(img_LR, normalize=self.znorm, add_batch=False)
 
         return {'LR': img_LR, 'LR_path': LR_path}
 

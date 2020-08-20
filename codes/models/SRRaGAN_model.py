@@ -116,6 +116,16 @@ class SRRaGANModel(BaseModel):
 
             #Keep log in loss class instead?
             self.log_dict = OrderedDict()
+
+            # for using virtual batch
+            batch_size = opt["datasets"]["train"]["batch_size"]
+            virtual_batch = opt["datasets"]["train"].get("virtual_batch_size", None)
+            self.virtual_batch = virtual_batch if virtual_batch \
+                >= batch_size else batch_size
+            self.accumulations = self.virtual_batch // batch_size
+            self.optimizer_G.zero_grad()
+            if self. cri_gan:
+                self.optimizer_D.zero_grad()
         
         # print network
         """ 
@@ -124,17 +134,6 @@ class SRRaGANModel(BaseModel):
             could be an selector between traditional print_network() and summary()
         """
         #self.print_network() #TODO
-
-        # for using virtual batch
-        self.virtual_batch = opt["datasets"]["train"]["virtual_batch_size"] \
-                if opt["datasets"]["train"]["virtual_batch_size"] \
-                and opt["datasets"]["train"]["virtual_batch_size"] \
-                >= opt["datasets"]["train"]["batch_size"] \
-                else opt["datasets"]["train"]["batch_size"]
-        self.accumulations = self.virtual_batch // opt["datasets"]["train"]["batch_size"]
-        self.optimizer_G.zero_grad()
-        if self. cri_gan:
-            self.optimizer_D.zero_grad()
 
     def feed_data(self, data, need_HR=True):
         # LR images

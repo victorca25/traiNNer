@@ -108,12 +108,7 @@ def get_loss_fn(loss_type=None, weight=0, recurrent=False, reduction='mean', net
             #network = define_F(use_bn=False, feat_network = loss_type.split('-')[1])
             loss_function = PerceptualLoss(criterion=fea_loss_f, network=network, rotations=False, flips=False)
     elif loss_type == 'contextual':
-        #TODO: pass options, from opt_train, else defaults
-        #layers = {"conv_1_1": 1.0, "conv_3_2": 1.0} #fixed
-        layers = {"conv_3_2": 1.0, "conv_4_2": 1.0} #original
-        #layers = {"pool_3": 1.0} #alt 
-        #layers = {'conv_1_2' : 1.0, 'conv_2_2' : 1.0, 'conv_3_2': 0.5} #zoom-learn-zoom
-        #layers = {"conv_5_2": 1.0} #coarse, semi-aligned
+        layers = opt.get('cx_vgg_layers', {"conv_3_2": 1.0, "conv_4_2": 1.0})
         loss_function = Contextual_Loss(layers, max_1d_size=64, distance_type = 'cosine', calc_type = 'regular')
         #loss_function = Contextual_Loss(layers, max_1d_size=32, distance_type = 0, crop_quarter=True) # for L1, L2
     elif loss_type == 'fft':
@@ -408,7 +403,7 @@ class GeneratorLoss(nn.Module):
             self.loss_list.append(cri_tv)
 
         if cx_weight > 0 and cx_type:
-            cri_cx = get_loss_fn(cx_type, cx_weight, device = device)
+            cri_cx = get_loss_fn(cx_type, cx_weight, device = device, opt = train_opt)
             self.loss_list.append(cri_cx)
 
         if feature_weight > 0 and feature_criterion:

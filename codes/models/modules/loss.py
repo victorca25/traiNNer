@@ -23,15 +23,17 @@ class CharbonnierLoss(nn.Module):
 
     def forward(self, x, y):
         b, c, h, w = y.size()
-        diff = x - y
-        loss = torch.sum(torch.sqrt(diff * diff + self.eps))
-        #loss = torch.sum(torch.sqrt((x - y).pow(2) + self.eps **2)) / x.shape[0]
+        loss = torch.sum(torch.sqrt((x - y).pow(2) + self.eps**2))
         return loss/(c*b*h*w)
     
 
-# Define GAN loss: [vanilla | lsgan | wgan-gp]
+# Define GAN loss: [vanilla | lsgan | wgan-gp | srpgan/nsgan | hinge]
 # https://tuatini.me/creating-and-shipping-deep-learning-models-into-production/
 class GANLoss(nn.Module):
+    r"""
+    Adversarial loss
+    https://arxiv.org/abs/1711.10337
+    """
     def __init__(self, gan_type, real_label_val=1.0, fake_label_val=0.0):
         super(GANLoss, self).__init__()
         self.gan_type = gan_type.lower()
@@ -42,8 +44,10 @@ class GANLoss(nn.Module):
             self.loss = nn.BCEWithLogitsLoss()
         elif self.gan_type == 'lsgan':
             self.loss = nn.MSELoss()
-        elif self.gan_type == 'srpgan':
-            self.loss = nn.BCELoss() #0.001 * F.binary_cross_entropy(d_sr_out, torch.ones_like(d_sr_out))
+        elif self.gan_type == 'srpgan' or self.gan_type == 'nsgan':
+            self.loss = nn.BCELoss()
+        elif self.gan_type == 'hinge':
+            self.loss = nn.ReLU()
         elif self.gan_type == 'wgan-gp':
 
             def wgan_loss(input, target):
@@ -62,10 +66,17 @@ class GANLoss(nn.Module):
         else:
             return torch.empty_like(input).fill_(self.fake_label_val) #torch.zeros_like(d_sr_out)
 
-    def forward(self, input, target_is_real):
-        target_label = self.get_target_label(input, target_is_real)
-        loss = self.loss(input, target_label)
-        return loss
+    def forward(self, input, target_is_real, is_disc = None):
+        if self.gan_type == 'hinge': #TODO: test
+            if is_disc:
+                input = -input if target_is_real else input
+                return self.loss(1 + input).mean()
+            else:
+                return (-input).mean()
+        else:
+            target_label = self.get_target_label(input, target_is_real)
+            loss = self.loss(input, target_label)
+            return loss
 
 
 class GradientPenaltyLoss(nn.Module):

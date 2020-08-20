@@ -15,6 +15,11 @@ from collections import OrderedDict
 
 # Assume input range is [0, 1]
 class VGGFeatureExtractor(nn.Module):
+    r"""
+    Perceptual loss, VGG-based
+    https://arxiv.org/abs/1603.08155
+    https://github.com/dxyang/StyleTransfer/blob/master/utils.py
+    """
     def __init__(self,
                  feature_layer=34,
                  use_bn=False,
