@@ -206,7 +206,7 @@
     , "feature_weight": 1
     //, "cx_weight": 0.5
     //, "cx_type": "contextual"
-    //, "cx_vgg_layers": {}
+    //, "cx_vgg_layers": {"conv_3_2": 1.0, "conv_4_2": 1.0}
     //, "hfen_criterion": "l1" //hfen: "l1" | "l2" | "rel_l1" | "rel_l2" //helps in deblurring and finding edges, lines
     //, "hfen_weight": 1e-6
     //, "grad_type": "grad-4d-l1" //2d | 4d / - any of the pixel crit, ie "grad-2d-l1"
