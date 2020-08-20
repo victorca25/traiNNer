@@ -45,12 +45,11 @@ def main():
         dataset_dir = os.path.join(opt['path']['results_root'], test_set_name)
         util.mkdir(dataset_dir)
 
-        if need_HR:
-            test_results = OrderedDict()
-            test_results['psnr'] = []
-            test_results['ssim'] = []
-            test_results['psnr_y'] = []
-            test_results['ssim_y'] = []
+        test_results = OrderedDict()
+        test_results['psnr'] = []
+        test_results['ssim'] = []
+        test_results['psnr_y'] = []
+        test_results['ssim_y'] = []
 
         for data in test_loader:
             need_HR = False if test_loader.dataset.opt['dataroot_HR'] is None else True
