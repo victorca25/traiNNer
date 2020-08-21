@@ -225,6 +225,10 @@
     //, "of_type": "overflow" //overflow loss function to force the images back into the [0, 1] range
     //, "fft_weight": 1e-1
     //, "fft_type": "fft"
+    //, "color_weight": 1e-1 // Loss based on the UV channels of YUV color space, helps preserve color consistency
+    //, "color_criterion": "l1cosinesim" // l1cosinesim naturally helps color consistency, so it is the best to use here, but others can be used as well
+    //, "avg_weight": 1e-1 // Averaging downscale loss
+    //, "avg_criterion": "l1"
 
 
     , "gan_type": "vanilla" //"vanilla" | "wgan-gp" | "lsgan" 

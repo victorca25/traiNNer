@@ -114,7 +114,15 @@ def get_loss_fn(loss_type=None, weight=0, recurrent=False, reduction='mean', net
     elif loss_type == 'fft':
         loss_function = FFTloss()
     elif loss_type == 'overflow':
-        loss_function = OFLoss()   
+        loss_function = OFLoss()  
+    elif loss_type == 'color':
+        color_loss_f = get_loss_fn(loss_type.split('-')[1], recurrent=True)
+        ds_f = torch.nn.AvgPool2d(kernel_size=opt['scale'])
+        loss_function = color_loss(criterion=color_loss_f, ds_f=ds_f) 
+    elif loss_type == 'avg':
+        avg_loss_f = get_loss_fn(loss_type.split('-')[1], recurrent=True)
+        ds_f = torch.nn.AvgPool2d(kernel_size=opt['scale'])
+        loss_function = avg_loss(criterion=avg_loss_f, ds_f=ds_f) 
     else:
         loss_function = None
         #raise NotImplementedError('Loss type [{:s}] not recognized.'.format(loss_type))
@@ -346,6 +354,12 @@ class GeneratorLoss(nn.Module):
         lpips_type = train_opt['lpips_type'] if train_opt['lpips_type'] else 'net-lin'
         lpips_criterion = check_loss_names(lpips_criterion=train_opt['lpips_type'], lpips_network=lpips_network)
 
+        color_weight = train_opt['color_weight'] if train_opt['color_weight'] else 0
+        color_criterion = train_opt['color_criterion'] if train_opt['color_criterion'] else None
+
+        avg_weight = train_opt['avg_weight'] if train_opt['avg_weight'] else 0
+        avg_criterion = train_opt['avg_criterion'] if train_opt['avg_criterion'] else None
+
         spl_weight = train_opt['spl_weight'] if train_opt['spl_weight'] else 0
         spl_type = train_opt['spl_type'] if train_opt['spl_type'] else None
         gpl_type = None
@@ -438,6 +452,14 @@ class GeneratorLoss(nn.Module):
         if of_weight > 0 and of_type:
             cri_of = get_loss_fn(of_type, of_weight, device = device)
             self.loss_list.append(cri_of)
+
+        if color_weight > 0 and color_criterion:
+            cri_color = get_loss_fn(color_criterion, color_weight) 
+            self.loss_list.append(cri_color)
+
+        if avg_weight > 0 and avg_criterion:
+            cri_avg = get_loss_fn(avg_criterion, avg_weight) 
+            self.loss_list.append(cri_avg)
 
 
     def forward(self, sr, hr, log_dict, fsfilter = None):
