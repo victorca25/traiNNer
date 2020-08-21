@@ -118,11 +118,11 @@ def get_loss_fn(loss_type=None, weight=0, recurrent=False, reduction='mean', net
     elif loss_type == 'color':
         color_loss_f = get_loss_fn(loss_type.split('-')[1], recurrent=True)
         ds_f = torch.nn.AvgPool2d(kernel_size=opt['scale'])
-        loss_function = color_loss(criterion=color_loss_f, ds_f=ds_f) 
+        loss_function = ColorLoss(criterion=color_loss_f, ds_f=ds_f) 
     elif loss_type == 'avg':
         avg_loss_f = get_loss_fn(loss_type.split('-')[1], recurrent=True)
         ds_f = torch.nn.AvgPool2d(kernel_size=opt['scale'])
-        loss_function = avg_loss(criterion=avg_loss_f, ds_f=ds_f) 
+        loss_function = AverageLoss(criterion=avg_loss_f, ds_f=ds_f) 
     else:
         loss_function = None
         #raise NotImplementedError('Loss type [{:s}] not recognized.'.format(loss_type))
