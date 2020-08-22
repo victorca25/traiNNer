@@ -121,21 +121,18 @@ class LRHRDataset(data.Dataset):
         
         # Default case: tensor will result in the [0,1] range
         # Alternative: tensor will be z-normalized to the [-1,1] range
-        znorm = self.opt['znorm'] if self.opt['znorm'] else False
+        znorm  = self.opt.get('znorm', False)
         
         ######## Read the images ########
         #TODO: check cases where default of 3 channels will be troublesome
-        image_channels = self.opt['image_channels'] if self.opt['image_channels'] else 3
+        image_channels  = self.opt.get('image_channels', 3)
         
         # Check if LR Path is provided
         if self.paths_LR:
             #If LR is provided, check if 'rand_flip_LR_HR' is enabled
             if self.opt['rand_flip_LR_HR'] and self.opt['phase'] == 'train':
                 LRHRchance = random.uniform(0, 1)
-                if self.opt['flip_chance']:
-                    flip_chance = self.opt['flip_chance']
-                else:
-                    flip_chance = 0.05
+                flip_chance  = self.opt.get('flip_chance', 0.05)
                 #print("Random Flip Enabled")
             # Normal case, no flipping:
             else:
@@ -239,8 +236,7 @@ class LRHRDataset(data.Dataset):
             if img_LR.shape[0] != LR_size or img_LR.shape[1] != LR_size:
                 ds_algo = 777 # default to matlab-like bicubic downscale
                 if self.opt['lr_downscale']: # if manually set and scale algorithms are provided, then:
-                    if self.opt['lr_downscale_types']:
-                        ds_algo = self.opt['lr_downscale_types']
+                    ds_algo  = self.opt.get('lr_downscale_types', 777)
                 else: # else, if for some reason img_LR is too large, default to matlab-like bicubic downscale
                     #if not self.opt['aug_downscale']: #only print the warning if not being forced to use HR images instead of LR dataset (which is a known case)
                     print("LR image is too large, auto generating new LR for: ", LR_path)
@@ -281,11 +277,8 @@ class LRHRDataset(data.Dataset):
                 print("Image: ", LR_path, " size does not match LR size: (", HR_size//scale,"). The image size is: ", img_LR.shape)
                 # rescale HR image to the HR_size (should not be needed, but something went wrong before, just for sanity)
                 img_HR, _ = augmentations.resize_img(np.copy(img_HR), newdim=(HR_size,HR_size), algo=cv2.INTER_LINEAR)
-                if self.opt['lr_downscale_types']: # if manually provided and scale algorithms are provided, then:
-                    ds_algo = self.opt['lr_downscale_types']
-                else:
-                    ## using matlab imresize to generate LR pair
-                    ds_algo = 777
+                # if manually provided and scale algorithms are provided, then use it, else use matlab imresize to generate LR pair
+                ds_algo  = self.opt.get('lr_downscale_types', 777)
                 img_LR, _ = augmentations.scale_img(img_HR, scale, algo=ds_algo)
             
             
