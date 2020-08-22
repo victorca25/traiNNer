@@ -821,28 +821,3 @@ class Contextual_Loss(nn.Module):
         if torch.isnan(CX_loss):
             raise ValueError('NaN in computing CX_loss')
         return CX_loss
-
-
-# Color loss 
-class ColorLoss(torch.nn.Module):
-    def __init__(self, loss_f = torch.nn.L1Loss, reduction='mean', ds_f=None):
-        super(ColorLoss, self).__init__()
-        self.ds_f = ds_f
-        self.criterion = loss_f(reduction=reduction)
-
-    def forward(self, input, target):
-        input_uv = ds_f(rgb_to_yuv(input, consts='uv'))
-        target_uv = ds_f(rgb_to_yuv(target, consts='uv'))
-        return self.criterion(input_uv, target_uv)
-
-# Averaging Downscale loss 
-class AverageLoss(torch.nn.Module):
-    def __init__(self, loss_f = torch.nn.L1Loss, reduction='mean', ds_f=None):
-        super(ColorLoss, self).__init__()
-        self.ds_f = ds_f
-        self.criterion = loss_f(reduction=reduction)
-
-    def forward(self, input, target):
-        input_ds = ds_f(input, 'uv')
-        target_ds = ds_f(target, 'uv')
-        return self.criterion(input_uv, target_uv)
