@@ -25,29 +25,29 @@ def get_loss_fn(loss_type=None, weight=0, recurrent=False, reduction='mean', net
     # pixel / content losses
     if loss_type == 'MSE' or loss_type == 'l2':
         loss_function = nn.MSELoss(reduction=reduction)
-        loss_type = 'pix-'+loss_type
+        loss_type = 'pix-{}'.format(loss_type)
     elif loss_type == 'L1' or loss_type == 'l1':
         loss_function = nn.L1Loss(reduction=reduction)
-        loss_type = 'pix-'+loss_type
+        loss_type = 'pix-{}'.format(loss_type)
     elif loss_type == 'cb':
         loss_function = CharbonnierLoss()
-        loss_type = 'pix-'+loss_type
+        loss_type = 'pix-{}'.format(loss_type)
     elif loss_type == 'elastic':
         loss_function = ElasticLoss(reduction=reduction)
-        loss_type = 'pix-'+loss_type
+        loss_type = 'pix-{}'.format(loss_type)
     elif loss_type == 'relativel1':
         loss_function = RelativeL1(reduction=reduction)
-        loss_type = 'pix-'+loss_type
+        loss_type = 'pix-{}'.format(loss_type)
     #TODO
     #elif loss_type == 'relativel2':
         #loss_function = RelativeL2(reduction=reduction)
-        #loss_type = 'pix-'+loss_type
+        #loss_type = 'pix-{}'.format(loss_type)
     elif loss_type == 'l1cosinesim' or loss_type == 'L1CosineSim':
         loss_function = L1CosineSim(reduction=reduction)
-        loss_type = 'pix-'+loss_type
+        loss_type = 'pix-{}'.format(loss_type)
     elif loss_type == 'clipl1':
         loss_function = ClipL1()
-        loss_type = 'pix-'+loss_type
+        loss_type = 'pix-{}'.format(loss_type)
     # SSIM losses
     #TODO: pass SSIM options from opt_train
     elif loss_type == 'ssim' or loss_type == 'SSIM': #l_ssim_type
@@ -98,7 +98,7 @@ def get_loss_fn(loss_type=None, weight=0, recurrent=False, reduction='mean', net
         if loss_type.split('-')[1] == 'lpips':
             #TODO: make lpips behave more like regular feature networks
             # lpips needs normalize = true if images are in [0,1] range
-            norm = opt['datasets']['train']['znorm'] if opt['datasets']['train']['znorm'] else False
+            norm = opt['datasets']['train'].get('znorm', False)
             loss_function = PerceptualLoss(criterion='lpips', network=network, normalize=(not norm), rotations=False, flips=False)
         else: #if loss_type.split('-')[1][:3] == 'vgg': #if vgg16, vgg19, resnet, etc
             fea_loss_f = get_loss_fn(loss_type.split('-')[2], recurrent=True, reduction='mean') #sum? also worked on accidental test, but larger loss magnitudes
@@ -217,10 +217,10 @@ class Adversarial(nn.Module):
         self.diffaug = diffaug
         self.dapolicy = dapolicy
         self.gan_type = train_opt['gan_type']
-        self.use_featmaps = train_opt['gan_featmaps'] if train_opt['gan_featmaps'] else None
+        self.use_featmaps  = train_opt.get('gan_featmaps', None)
         if self.use_featmaps:
-            dis_feature_criterion = train_opt['dis_feature_criterion'] if train_opt['dis_feature_criterion'] else 'l1'
-            dis_feature_weight = train_opt['dis_feature_weight'] if train_opt['dis_feature_weight'] else 0.0001
+            dis_feature_criterion  = train_opt.get('dis_feature_criterion', 'l1')
+            dis_feature_weight  = train_opt.get('dis_feature_weight', 0.0001)
             self.cri_disfea = get_loss_fn(dis_feature_criterion, dis_feature_weight) 
         
         self.cri_gan = GANLoss(train_opt['gan_type'], 1.0, 0.0).to(self.device)
@@ -319,35 +319,33 @@ class GeneratorLoss(nn.Module):
         train_opt = opt['train']
 
         #TODO: these checks can be moved to options.py when everything is stable
+        # parsing the losses options
+        pixel_weight  = train_opt.get('pixel_weight', 0)
+        pixel_criterion  = train_opt.get('pixel_criterion', None) # 'skip'
 
-        pixel_weight = train_opt['pixel_weight'] if train_opt['pixel_weight'] else 0
-        pixel_criterion = train_opt['pixel_criterion'] if train_opt['pixel_criterion'] else None # 'skip'
-
-        feature_weight = train_opt['feature_weight'] if train_opt['feature_weight'] else 0
-        feature_network = train_opt['feature_network'] if train_opt['feature_network'] else 'vgg19'  # TODO 
-        #feature_criterion = train_opt['feature_criterion'] if train_opt['feature_criterion'] else None # 'skip'
+        feature_weight  = train_opt.get('feature_weight', 0)
+        feature_network  = train_opt.get('feature_network', 'vgg19') # TODO 
         feature_criterion = check_loss_names(feature_criterion=train_opt['feature_criterion'], feature_network=feature_network)
         
-        hfen_weight = train_opt['hfen_weight'] if train_opt['hfen_weight'] else 0
+        hfen_weight  = train_opt.get('hfen_weight', 0)
         hfen_criterion = check_loss_names(hfen_criterion=train_opt['hfen_criterion'])
 
-        grad_weight = train_opt['grad_weight'] if train_opt['grad_weight'] else 0
-        grad_type = train_opt['grad_type'] if train_opt['grad_type'] else None
-        #grad_type = "grad-{}".format(grad_type)
+        grad_weight  = train_opt.get('grad_weight', 0)
+        grad_type  = train_opt.get('grad_type', None) 
 
-        tv_weight = train_opt['tv_weight'] if train_opt['tv_weight'] else 0
+        tv_weight  = train_opt.get('tv_weight', 0)
         tv_type = check_loss_names(tv_type=train_opt['tv_type'], tv_norm=train_opt['tv_norm'])
 
-        ssim_weight = train_opt['ssim_weight'] if train_opt['ssim_weight'] else 0
-        ssim_type = train_opt['ssim_type'] if train_opt['ssim_type'] else None
-        
-        lpips_weight = train_opt['lpips_weight'] if train_opt['lpips_weight'] else 0
-        lpips_network = train_opt['lpips_net'] if train_opt['lpips_net'] else 'vgg'
-        lpips_type = train_opt['lpips_type'] if train_opt['lpips_type'] else 'net-lin'
+        ssim_weight  = train_opt.get('ssim_weight', 0)
+        ssim_type  = train_opt.get('ssim_type', None)
+
+        lpips_weight  = train_opt.get('lpips_weight', 0)
+        lpips_network  = train_opt.get('lpips_net', 'vgg')
+        lpips_type  = train_opt.get('lpips_type', 'net-lin')
         lpips_criterion = check_loss_names(lpips_criterion=train_opt['lpips_type'], lpips_network=lpips_network)
 
-        spl_weight = train_opt['spl_weight'] if train_opt['spl_weight'] else 0
-        spl_type = train_opt['spl_type'] if train_opt['spl_type'] else None
+        spl_weight  = train_opt.get('spl_weight', 0)
+        spl_type  = train_opt.get('spl_type', None)
         gpl_type = None
         gpl_weight = -1
         cpl_type = None
@@ -364,22 +362,16 @@ class GeneratorLoss(nn.Module):
             gpl_type = 'gpl'
             gpl_weight = spl_weight
 
-        cx_weight = train_opt['cx_weight'] if train_opt['cx_weight'] else 0
-        cx_type = train_opt['cx_type'] if train_opt['cx_type'] else None
+        cx_weight  = train_opt.get('cx_weight', 0)
+        cx_type  = train_opt.get('cx_type', None)
 
-        fft_weight = train_opt['fft_weight'] if train_opt['fft_weight'] else 0
-        fft_type = train_opt['fft_type'] if train_opt['fft_type'] else None
+        fft_weight  = train_opt.get('fft_weight', 0)
+        fft_type  = train_opt.get('fft_type', None)
 
-        of_weight = train_opt['of_weight'] if train_opt['of_weight'] else 0
-        of_type = train_opt['of_type'] if train_opt['of_type'] else None
+        of_weight  = train_opt.get('of_weight', 0)
+        of_type  = train_opt.get('of_type', None)
 
-        '''
-        #TODO
-        //, "dis_feature_criterion": "l1" //"l1" | "l2" | "cb" | "elastic" //discriminator feature loss (only for asrragan)
-        //, "dis_feature_weight": 1 //(only for asrragan)
-
-        '''  
-
+        # building the loss
         self.loss_list = []
 
         if pixel_weight > 0 and pixel_criterion:

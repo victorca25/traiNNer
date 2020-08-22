@@ -1,6 +1,7 @@
 import os
 import torch
 import torch.nn as nn
+from collections import Counter
 
 
 class BaseModel():
@@ -106,8 +107,11 @@ class BaseModel():
         for i, o in enumerate(resume_optimizers):
             self.optimizers[i].load_state_dict(o)
         for i, s in enumerate(resume_schedulers):
+            if isinstance(self.schedulers[i].milestones, Counter) and isinstance(s['milestones'], list):
+                s['milestones'] = Counter(s['milestones'])
             self.schedulers[i].load_state_dict(s)
 
+    #TODO: check all these updates 
     def update_schedulers(self, train_opt):
         '''Update scheduler parameters if they are changed in the JSON configuration'''
         if train_opt['lr_scheme'] == 'StepLR':
@@ -144,7 +148,10 @@ class BaseModel():
                         raise ValueError('lr_steps should be a list of'
                              ' increasing integers. Got {}', train_opt['lr_steps'])
                     print("Updating lr_steps from ",self.schedulers[i].milestones ," to", train_opt['lr_steps'])
-                    self.schedulers[i].milestones = train_opt['lr_steps']
+                    if isinstance(self.schedulers[i].milestones, Counter):
+                        self.schedulers[i].milestones = Counter(train_opt['lr_steps'])
+                    else:
+                        self.schedulers[i].milestones = train_opt['lr_steps']
                 #common
                 if self.schedulers[i].gamma !=train_opt['lr_gamma'] and train_opt['lr_gamma'] is not None:
                     print("Updating lr_gamma from ",self.schedulers[i].gamma," to", train_opt['lr_gamma'])
@@ -155,6 +162,11 @@ class BaseModel():
                     if not list(train_opt['lr_steps']) == sorted(train_opt['lr_steps']):
                         raise ValueError('lr_steps should be a list of'
                              ' increasing integers. Got {}', train_opt['lr_steps'])
+                    print("Updating lr_steps from ",self.schedulers[i].milestones ," to", train_opt['lr_steps'])
+                    if isinstance(self.schedulers[i].milestones, Counter):
+                        self.schedulers[i].milestones = Counter(train_opt['lr_steps'])
+                    else:
+                        self.schedulers[i].milestones = train_opt['lr_steps']
                 if self.schedulers[i].restarts != train_opt['restarts'] and train_opt['restarts'] is not None:
                     print("Updating restarts from ",self.schedulers[i].restarts," to", train_opt['restarts'])
                     self.schedulers[i].restarts = train_opt['restarts']
@@ -168,4 +180,3 @@ class BaseModel():
                 if self.schedulers[i].gamma !=train_opt['lr_gamma'] and train_opt['lr_gamma'] is not None:
                     print("Updating lr_gamma from ",self.schedulers[i].gamma," to", train_opt['lr_gamma'])
                     self.schedulers[i].gamma =train_opt['lr_gamma']
-        
