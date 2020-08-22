@@ -126,7 +126,11 @@ def rgb_to_yuv(input: torch.Tensor, consts='yuv'):
         y: torch.Tensor = Wr * r + Wg * g + Wb * b
         u: torch.Tensor = (b - y) * Uc + delta #cb
         v: torch.Tensor = (r - y) * Vc + delta #cr
-    return torch.stack((y, u, v), -3) 
+
+    if consts == 'uv': #returns only UV channels
+        return torch.stack((u, v), -2) 
+    else:
+        return torch.stack((y, u, v), -3) 
 
 def ycbcr_to_rgb(input: torch.Tensor):
     return yuv_to_rgb(input, consts == 'ycbcr')

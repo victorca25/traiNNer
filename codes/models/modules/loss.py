@@ -802,8 +802,8 @@ class ColorLoss(torch.nn.Module):
         self.criterion = loss_f(reduction=reduction)
 
     def forward(self, input, target):
-        input_uv = ds_f(rgb_to_yuv(input, 'uv'))
-        target_uv = ds_f(rgb_to_yuv(target, 'uv'))
+        input_uv = ds_f(rgb_to_yuv(input, consts='uv'))
+        target_uv = ds_f(rgb_to_yuv(target, consts='uv'))
         return self.criterion(input_uv, target_uv)
 
 # Averaging Downscale loss 
