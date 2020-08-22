@@ -341,24 +341,24 @@ class ColorLoss(torch.nn.Module):
     def __init__(self, loss_f = torch.nn.L1Loss, reduction='mean', ds_f=None):
         super(ColorLoss, self).__init__()
         self.ds_f = ds_f
-        self.criterion = loss_f(reduction=reduction)
+        self.criterion = loss_f
 
     def forward(self, input, target):
-        input_uv = ds_f(rgb_to_yuv(input, consts='uv'))
-        target_uv = ds_f(rgb_to_yuv(target, consts='uv'))
+        input_uv = rgb_to_yuv(self.ds_f(input), consts='uv')
+        target_uv = rgb_to_yuv(self.ds_f(target), consts='uv')
         return self.criterion(input_uv, target_uv)
 
 #TODO: testing
 # Averaging Downscale loss 
 class AverageLoss(torch.nn.Module):
     def __init__(self, loss_f = torch.nn.L1Loss, reduction='mean', ds_f=None):
-        super(ColorLoss, self).__init__()
+        super(AverageLoss, self).__init__()
         self.ds_f = ds_f
-        self.criterion = loss_f(reduction=reduction)
+        self.criterion = loss_f
 
     def forward(self, input, target):
-        input_ds = ds_f(input, 'uv')
-        target_ds = ds_f(target, 'uv')
+        input_uv = rgb_to_yuv(self.ds_f(input), consts='uv')
+        target_uv = rgb_to_yuv(self.ds_f(target), consts='uv')
         return self.criterion(input_uv, target_uv)
 
 

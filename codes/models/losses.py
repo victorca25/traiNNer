@@ -115,14 +115,14 @@ def get_loss_fn(loss_type=None, weight=0, recurrent=False, reduction='mean', net
         loss_function = FFTloss()
     elif loss_type == 'overflow':
         loss_function = OFLoss()  
-    elif loss_type == 'color':
+    elif loss_type.find('color') >= 0:
         color_loss_f = get_loss_fn(loss_type.split('-')[1], recurrent=True)
         ds_f = torch.nn.AvgPool2d(kernel_size=opt['scale'])
-        loss_function = ColorLoss(criterion=color_loss_f, ds_f=ds_f) 
-    elif loss_type == 'avg':
+        loss_function = ColorLoss(loss_f=color_loss_f, ds_f=ds_f) 
+    elif loss_type.find('avg') >= 0:
         avg_loss_f = get_loss_fn(loss_type.split('-')[1], recurrent=True)
         ds_f = torch.nn.AvgPool2d(kernel_size=opt['scale'])
-        loss_function = AverageLoss(criterion=avg_loss_f, ds_f=ds_f) 
+        loss_function = AverageLoss(loss_f=avg_loss_f, ds_f=ds_f) 
     else:
         loss_function = None
         #raise NotImplementedError('Loss type [{:s}] not recognized.'.format(loss_type))
@@ -447,11 +447,11 @@ class GeneratorLoss(nn.Module):
             self.loss_list.append(cri_of)
 
         if color_weight > 0 and color_criterion:
-            cri_color = get_loss_fn(color_criterion, color_weight) 
+            cri_color = get_loss_fn(color_criterion, color_weight, opt = opt) 
             self.loss_list.append(cri_color)
 
         if avg_weight > 0 and avg_criterion:
-            cri_avg = get_loss_fn(avg_criterion, avg_weight) 
+            cri_avg = get_loss_fn(avg_criterion, avg_weight, opt = opt) 
             self.loss_list.append(cri_avg)
 
 
