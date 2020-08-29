@@ -8,6 +8,7 @@ Some of the new things in the branch:
 - The filters and image manipulations used by the different functions (HFEN, SSIM/MS-SSIM, SPL, TV/DTV, etc) are now consolidated in filters.py and colors.py
 - Reusable loss builder to reduce the changes needed when using a new model and adding new losses only once for all models
 - Metrics builder to include only the selected ones during validation
+- Automatic Mixed Precision (AMP: https://pytorch.org/docs/master/amp.html) is now properly integrated. (Code updated to work with Pytorch 1.6.0 and 1.3.0).
 - Added the Contextual Loss (https://arxiv.org/abs/1803.02077, https://arxiv.org/abs/1803.04626) option: 'cx_type', Differential Augmentations for efficient gan training (https://arxiv.org/pdf/2006.10738) option: 'diffaug', batch augmentations (based on https://arxiv.org/abs/2004.00448) option: 'mixup', ESRGAN+ improvements to the ESRGAN network (https://arxiv.org/pdf/2001.08073) options: 'gaussian' and 'plus', adapted frequency filtering per loss function (https://arxiv.org/pdf/1911.07850), enabled using the feature maps from the discriminator in training for feature similarity (https://arxiv.org/abs/1712.05927), additional fixes and general code refactoring.
 - Other changes: added graceful interruption of training to continue from where it was interrupted, virtual batch option, "strict" model loading flag
 

@@ -1,4 +1,3 @@
-
 from __future__ import absolute_import
 
 import os
@@ -19,6 +18,23 @@ from . import schedulers
 
 from dataops.batchaug import BatchAug
 from dataops.filters import FilterHigh, FilterLow #, FilterX
+
+load_amp = (hasattr(torch.cuda, "amp") and hasattr(torch.cuda.amp, "autocast"))
+if load_amp:
+    from torch.cuda.amp import autocast, GradScaler
+    logger.info('AMP library available')
+else:
+    logger.info('AMP library not available')
+
+class nullcast():
+    #nullcontext:
+    #https://github.com/python/cpython/commit/0784a2e5b174d2dbf7b144d480559e650c5cf64c
+    def __init__(self):
+        pass
+    def __enter__(self):
+        pass
+    def __exit__(self, *excinfo):
+        pass
 
 
 class SRRaGANModel(BaseModel):
@@ -117,16 +133,29 @@ class SRRaGANModel(BaseModel):
             #Keep log in loss class instead?
             self.log_dict = OrderedDict()
 
-            # for using virtual batch
+            """
+            If using virtual batch
+            """
             batch_size = opt["datasets"]["train"]["batch_size"]
-            virtual_batch = opt["datasets"]["train"].get("virtual_batch_size", None)
+            virtual_batch = opt["datasets"]["train"].get('virtual_batch_size', None)
             self.virtual_batch = virtual_batch if virtual_batch \
                 >= batch_size else batch_size
             self.accumulations = self.virtual_batch // batch_size
             self.optimizer_G.zero_grad()
             if self. cri_gan:
                 self.optimizer_D.zero_grad()
-        
+            
+            """
+            Configure AMP
+            """
+            self.amp = load_amp and opt.get('use_amp', False)
+            if self.amp:
+                self.cast = autocast
+                self.amp_scaler =  GradScaler()
+                logger.info('AMP enabled')
+            else:
+                self.cast = nullcast
+
         # print network
         """ 
         TODO:
@@ -165,77 +194,98 @@ class SRRaGANModel(BaseModel):
                 self.aux_mixprob, self.aux_mixalpha, self.mix_p
                 )
         
-        ### Network forward, generate SR        
-        if self.outm: #if the model has the final activation option
-            self.fake_H = self.netG(self.var_L, outm=self.outm)
-        else: #regular models without the final activation option
-            self.fake_H = self.netG(self.var_L)
-         
+        ### Network forward, generate SR
+        with self.cast():
+            if self.outm: #if the model has the final activation option
+                self.fake_H = self.netG(self.var_L, outm=self.outm)
+            else: #regular models without the final activation option
+                self.fake_H = self.netG(self.var_L)
+        #/with self.cast():
+
         # batch (mixup) augmentations
         # cutout-ed pixels are discarded when calculating loss by masking removed pixels
         if aug == "cutout":
             self.fake_H, self.var_H = self.fake_H*mask, self.var_H*mask
         
         l_g_total = 0
-
         """
         Calculate and log losses
         """
         loss_results = []
-        # training generator and discriminator
-        if self.cri_gan:
-            # update generator alternatively
-            if step % self.D_update_ratio == 0 and step > self.D_init_iters:
+        # training generator and discriminator        
+        # update generator (on its own if only training generator or alternatively if training GAN)
+        if (self.cri_gan is not True) or (step % self.D_update_ratio == 0 and step > self.D_init_iters):
+            with self.cast(): # Casts operations to mixed precision if enabled, else nullcontext
                 # regular losses
                 loss_results, self.log_dict = self.generatorlosses(self.fake_H, self.var_H, self.log_dict, self.f_low)
                 l_g_total += sum(loss_results)/self.accumulations
 
-                # adversarial loss
-                l_g_gan = self.adversarial(
-                    self.fake_H, self.var_ref, netD=self.netD, 
-                    stage='generator', fsfilter = self.f_high) # (sr, hr)
-                self.log_dict['l_g_gan'] = l_g_gan.item()
-                
-                l_g_total += l_g_gan/self.accumulations
+                if self.cri_gan:
+                    # adversarial loss
+                    l_g_gan = self.adversarial(
+                        self.fake_H, self.var_ref, netD=self.netD, 
+                        stage='generator', fsfilter = self.f_high) # (sr, hr)
+                    self.log_dict['l_g_gan'] = l_g_gan.item()
+                    l_g_total += l_g_gan/self.accumulations
+
+            #/with self.cast():
+            
+            if self.amp:
+                # call backward() on scaled loss to create scaled gradients.
+                self.amp_scaler.scale(l_g_total).backward()
+            else:
                 l_g_total.backward()
 
-                # only step and clear gradient if virtual batch has completed
-                if (step + 1) % self.accumulations == 0:
+            # only step and clear gradient if virtual batch has completed
+            if (step + 1) % self.accumulations == 0:
+                if self.amp:
+                    # unscale gradients of the optimizer's params, call 
+                    # optimizer.step() if no infs/NaNs in gradients, else, skipped
+                    self.amp_scaler.step(self.optimizer_G)
+                    # Update GradScaler scale for next iteration.
+                    self.amp_scaler.update() 
+                    #TODO: remove. for debugging AMP
+                    #print("AMP Scaler state dict: ", self.amp_scaler.state_dict())
+                else:
                     self.optimizer_G.step()
-                    self.optimizer_G.zero_grad()
+                self.optimizer_G.zero_grad()
 
+        if self.cri_gan:
             # update discriminator
             # unfreeze discriminator
             for p in self.netD.parameters():
                 p.requires_grad = True
             l_d_total = 0
             
-            l_d_total, gan_logs = self.adversarial(
-                self.fake_H, self.var_ref, netD=self.netD, 
-                stage='discriminator', fsfilter = self.f_high) # (sr, hr)
+            with self.cast(): # Casts operations to mixed precision if enabled, else nullcontext
+                l_d_total, gan_logs = self.adversarial(
+                    self.fake_H, self.var_ref, netD=self.netD, 
+                    stage='discriminator', fsfilter = self.f_high) # (sr, hr)
 
-            for g_log in gan_logs:
-                self.log_dict[g_log] = gan_logs[g_log]
+                for g_log in gan_logs:
+                    self.log_dict[g_log] = gan_logs[g_log]
 
-            l_d_total /= self.accumulations
-            l_d_total.backward()
+                l_d_total /= self.accumulations
+            #/with autocast():
+            
+            if self.amp:
+                # call backward() on scaled loss to create scaled gradients.
+                self.amp_scaler.scale(l_d_total).backward()
+            else:
+                l_d_total.backward()
 
             # only step and clear gradient if virtual batch has completed
             if (step + 1) % self.accumulations == 0:
-                self.optimizer_D.step()
+                if self.amp:
+                    # unscale gradients of the optimizer's params, call 
+                    # optimizer.step() if no infs/NaNs in gradients, else, skipped
+                    self.amp_scaler.step(self.optimizer_D)
+                    # Update GradScaler scale for next iteration.
+                    self.amp_scaler.update()
+                else:
+                    self.optimizer_D.step()
                 self.optimizer_D.zero_grad()
-                
-        # only training generator
-        else:
-            loss_results, self.log_dict = self.generatorlosses(self.fake_H, self.var_H, self.log_dict, self.f_low)
-            l_g_total += sum(loss_results)/self.accumulations
-            l_g_total.backward()
 
-            # only step and clear gradient if virtual batch has completed
-            if (step + 1) % self.accumulations == 0:
-                self.optimizer_G.step()
-                self.optimizer_G.zero_grad()
-        
     def test(self):
         self.netG.eval()
         with torch.no_grad():

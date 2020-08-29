@@ -702,7 +702,9 @@ class Contextual_Loss(nn.Module):
             T_features_i = T_features[i].view(1, 1, C, H*W).permute(3, 2, 0, 1).contiguous() # 1CHW --> 11CP, with P=H*W
             I_features_i = I_features[i].unsqueeze(0)
             dist = F.conv2d(I_features_i, T_features_i).permute(0, 2, 3, 1).contiguous()
-            cosine_dist.append(dist) # back to 1CHW
+            #cosine_dist.append(dist) # back to 1CHW
+            #TODO: temporary hack to workaround AMP bug:
+            cosine_dist.append(dist.to(torch.float32)) # back to 1CHW
         cosine_dist = torch.cat(cosine_dist, dim=0)
         cosine_dist = (1 - cosine_dist) / 2
         cosine_dist = cosine_dist.clamp(min=0.0)

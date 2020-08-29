@@ -15,18 +15,6 @@ from utils import util, metrics
 from data import create_dataloader, create_dataset
 from models import create_model
 from dataops.common import tensor2np
-
-def get_pytorch_ver():
-    #print(torch.__version__)
-    pytorch_ver = torch.__version__
-    if pytorch_ver == "0.4.0":
-        return "pre"
-    elif pytorch_ver == "0.4.1":
-        return "pre"
-    elif pytorch_ver == "1.0.0":
-        return "pre"
-    else: #"1.1.0", "1.1.1", "1.2.0", "1.2.1" and beyond
-        return "post"
         
 def main():
     # options
@@ -34,7 +22,6 @@ def main():
     parser.add_argument('-opt', type=str, required=True, help='Path to option JSON file.')
     opt = option.parse(parser.parse_args().opt, is_train=True)
     opt = option.dict_to_nonedict(opt)  # Convert to NoneDict, which return None for missing key.
-    pytorch_ver = get_pytorch_ver()
     
     # train from scratch OR resume training
     if opt['path']['resume_state']:
@@ -125,23 +112,10 @@ def main():
                 current_step += 1
                 if current_step > total_iters:
                     break
-                
-                #TODO review this 
-                if pytorch_ver=="pre": #Order for PyTorch ver < 1.1.0
-                    # update learning rate
-                    model.update_learning_rate(current_step-1)
-                    # training
-                    model.feed_data(train_data)
-                    model.optimize_parameters(current_step)
-                elif pytorch_ver=="post": #Order for PyTorch ver > 1.1.0
-                    # training
-                    model.feed_data(train_data)
-                    model.optimize_parameters(current_step)
-                    # update learning rate
-                    model.update_learning_rate(current_step-1)
-                else:
-                    print('Error identifying PyTorch version. ', torch.__version__)
-                    break
+
+                # training
+                model.feed_data(train_data)
+                model.optimize_parameters(current_step)
 
                 # log
                 if current_step % opt['logger']['print_freq'] == 0:
@@ -154,6 +128,9 @@ def main():
                         if opt['use_tb_logger'] and 'debug' not in opt['name']:
                             tb_logger.add_scalar(k, v, current_step)
                     logger.info(message)
+
+                # update learning rate
+                model.update_learning_rate()
 
                 # save models and training states (changed to save models before validation)
                 if current_step % opt['logger']['save_checkpoint_freq'] == 0:

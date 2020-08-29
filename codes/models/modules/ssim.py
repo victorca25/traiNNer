@@ -172,12 +172,13 @@ def ssim(X, Y, win=None, window_size=3, data_range=None, K=(0.01,0.03), compensa
 
     #TODO: not in the original paper, hasn't been necessary to use
     #To prevent negative SSIM, make sure sigmas are >= 0
+    #important: this is not required in normal cases, but for AMP to work, this must be enabled
     #option 1:
     #sigma1_sq = torch.max(torch.zeros(sigma1_sq.shape).type(X.type()), sigma1_sq)
     #sigma2_sq = torch.max(torch.zeros(sigma2_sq.shape).type(X.type()), sigma2_sq)
     #option 2:
-    #sigma1_sq[sigma1_sq < 0] = 0
-    #sigma2_sq[sigma2_sq < 0] = 0
+    sigma1_sq[sigma1_sq < 0] = 0
+    sigma2_sq[sigma2_sq < 0] = 0
 
     cs_map = (2 * sigma12 + C2) / (sigma1_sq + sigma2_sq + C2) # contrast sensitivity
     # SSIM score is the product of the luminance and contrast-structure measures.
@@ -280,8 +281,10 @@ class SSIM(nn.Module):
         if len(X.shape) != 4:
             raise ValueError('Input images must 4-d tensor.')
 
-        if not X.type() == Y.type():
-            raise ValueError('Input images must have the same dtype.')
+        # workaround for AMP, can have mixed precision
+        # if not X.type() == Y.type():
+        #     raise ValueError('Input images must have the same dtype.')
+        #     Y = Y.type(X.type())
 
         if not X.shape == Y.shape:
             raise ValueError('Input images must have the same dimensions.')
@@ -505,8 +508,10 @@ class MS_SSIM(nn.Module):
         if len(X.shape) != 4:
             raise ValueError('Input images must 4-d tensor.')
 
-        if not X.type() == Y.type():
-            raise ValueError('Input images must have the same dtype.')
+        # workaround for AMP, can have mixed precision
+        # if not X.type() == Y.type():
+        #     raise ValueError('Input images must have the same dtype.')
+        #     Y = Y.type(X.type())
 
         if not X.shape == Y.shape:
             raise ValueError('Input images must have the same dimensions.')
