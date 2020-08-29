@@ -220,6 +220,8 @@
     //, "lpips_weight": 1 //perceptual loss
     //, "lpips_type": "net-lin" // net-lin | net *
     //, "lpips_net": "squeeze" // "vgg" | "alex" | "squeeze" 
+    
+    // Experimental losses
     //, "spl_weight": 1e-1 //1e-2 //SPL loss function. note: needs to add a cap in the generator (finalcap; For [0,1] range -> "finalcap": "clamp") or the overflow loss or it can become unstable.
     //, "spl_type": "spl" //"spl" | "gpl" | "cpl" //
     //, "of_weight": 2e-1
