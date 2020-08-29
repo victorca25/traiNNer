@@ -231,7 +231,7 @@
     //, "avg_weight": 5 // Averaging downscale loss
     //, "avg_criterion": "avg-l1"
 
-
+    // Adversarial loss:
     , "gan_type": "vanilla" //"vanilla" | "wgan-gp" | "lsgan" 
     , "gan_weight": 5e-3 //* test: 7e-3
     // for wgan-gp
