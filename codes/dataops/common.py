@@ -146,7 +146,7 @@ def bgra2rgb(img):
     '''
     if img.shape[2] == 4:
         #b, g, r, a = cv2.split((img*255).astype(np.uint8))
-        b, g, r, a = cv2.split((img))
+        b, g, r, a = cv2.split((img.astype(np.uint8)))
         b = cv2.bitwise_and(b, b, mask=a)
         g = cv2.bitwise_and(g, g, mask=a)
         r = cv2.bitwise_and(r, r, mask=a)

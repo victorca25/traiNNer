@@ -1,7 +1,9 @@
 import os
+from shutil import copyfile
 import torch
 import torch.nn as nn
 from collections import Counter
+
 
 
 class BaseModel():
@@ -64,6 +66,9 @@ class BaseModel():
         else:
             save_filename = '{}_{}.pth'.format(iter_step, network_label)
         save_path = os.path.join(self.opt['path']['models'], save_filename)
+        if os.path.exists(save_path):
+            prev_path = os.path.join(self.opt['path']['models'], 'previous_{}.pth'.format(network_label))
+            copyfile(save_path, prev_path)
         if isinstance(network, nn.DataParallel):
             network = network.module
         state_dict = network.state_dict()
@@ -95,10 +100,13 @@ class BaseModel():
         for o in self.optimizers:
             state['optimizers'].append(o.state_dict())
         if latest:
-            save_filename = 'latest.state'.format(iter_step)
+            save_filename = 'latest.state'
         else:
             save_filename = '{}.state'.format(iter_step)
         save_path = os.path.join(self.opt['path']['training_state'], save_filename)
+        if os.path.exists(save_path):
+            prev_path = os.path.join(self.opt['path']['training_state'], 'previous.state')
+            copyfile(save_path, prev_path)
         torch.save(state, save_path)
 
     def resume_training(self, resume_state):
