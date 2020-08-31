@@ -70,6 +70,7 @@ def main():
     # torch.backends.cudnn.deterministic = True
 
     # create train and val dataloader
+    val_loader = False
     for phase, dataset_opt in opt['datasets'].items():
         if phase == 'train':
             train_set = create_dataset(dataset_opt)

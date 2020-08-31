@@ -39,6 +39,7 @@ def parse(opt_path, is_train=True):
 
     opt['is_train'] = is_train
     scale = opt['scale']
+    bm = opt.get('batch_multiplier', None)
 
     # datasets
     for phase, dataset in opt['datasets'].items():
@@ -79,6 +80,9 @@ def parse(opt_path, is_train=True):
                 if dataset['dataroot_LR'].endswith('lmdb'):
                     is_lmdb = True
         dataset['data_type'] = 'lmdb' if is_lmdb else 'img'
+
+        if phase == 'train' and bm:
+            dataset['virtual_batch_size'] = bm * dataset["batch_size"]
 
         if phase == 'train' and 'subset_file' in dataset and dataset['subset_file'] is not None:
             dataset['subset_file'] = os.path.expanduser(dataset['subset_file'])
