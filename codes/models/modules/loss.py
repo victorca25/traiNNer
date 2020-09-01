@@ -596,6 +596,7 @@ class Contextual_Loss(nn.Module):
         device=tensor.device
         if indices is None:
             indices = torch.randperm(S)[:n].contiguous().type_as(tensor).long()
+            indices = indices.clamp(indices.min(), indices.max()-1)
             indices = indices.view(1, 1, -1).expand(N, C, -1)
         indices = indices.to(device)
 

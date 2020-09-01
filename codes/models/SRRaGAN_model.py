@@ -44,10 +44,7 @@ class SRRaGANModel(BaseModel):
 
         # set if data should be normalized (-1,1) or not (0,1)
         if self.is_train:
-            if opt['datasets']['train']['znorm']:
-                z_norm = opt['datasets']['train']['znorm']
-            else:
-                z_norm = False
+            z_norm = opt['datasets']['train'].get('znorm', False)
         
         # define networks and load pretrained models
         self.netG = networks.define_G(opt).to(self.device)  # G
@@ -64,30 +61,30 @@ class SRRaGANModel(BaseModel):
             Setup network cap
             """
             # define if the generator will have a final capping mechanism in the output
-            self.outm = train_opt['finalcap'] if train_opt['finalcap'] else None
+            self.outm = train_opt.get('finalcap', None)
 
             """
             Setup batch augmentations
             """
-            self.mixup = train_opt['mixup'] if train_opt['mixup'] else None
+            self.mixup = train_opt.get('mixup', None)
             if self.mixup: 
                 #TODO: cutblur and cutout need model to be modified so LR and HR have the same dimensions (1x)
-                self.mixopts = train_opt['mixopts'] if train_opt['mixopts'] else ["blend", "rgb", "mixup", "cutmix", "cutmixup"] #, "cutout", "cutblur"]
-                self.mixprob = train_opt['mixprob'] if train_opt['mixprob'] else [1.0, 1.0, 1.0, 1.0, 1.0] #, 1.0, 1.0]
-                self.mixalpha = train_opt['mixalpha'] if train_opt['mixalpha'] else [0.6, 1.0, 1.2, 0.7, 0.7] #, 0.001, 0.7]
-                self.aux_mixprob = train_opt['aux_mixprob'] if train_opt['aux_mixprob'] else 1.0
-                self.aux_mixalpha = train_opt['aux_mixalpha'] if train_opt['aux_mixalpha'] else 1.2
-                self.mix_p = train_opt['mix_p'] if train_opt['mix_p'] else None
+                self.mixopts = train_opt.get('mixopts', ["blend", "rgb", "mixup", "cutmix", "cutmixup"]) #, "cutout", "cutblur"]
+                self.mixprob = train_opt.get('mixprob', [1.0, 1.0, 1.0, 1.0, 1.0]) #, 1.0, 1.0]
+                self.mixalpha = train_opt.get('mixalpha', [0.6, 1.0, 1.2, 0.7, 0.7]) #, 0.001, 0.7]
+                self.aux_mixprob = train_opt.get('aux_mixprob', 1.0)
+                self.aux_mixalpha = train_opt.get('aux_mixalpha', 1.2)
+                self.mix_p = train_opt.get('mix_p', None)
             
             """
             Setup frequency separation
             """
-            self.fs = train_opt['fs'] if train_opt['fs'] else None
+            self.fs = train_opt.get('fs', None)
             self.f_low = None
             self.f_high = None
             if self.fs:
-                lpf_type = train_opt['lpf_type'] if train_opt['lpf_type'] else "average"
-                hpf_type = train_opt['hpf_type'] if train_opt['hpf_type'] else "average"
+                lpf_type = train_opt.get('lpf_type', "average")
+                hpf_type = train_opt.get('hpf_type', "average")
                 self.f_low = FilterLow(filter_type=lpf_type).to(self.device)
                 self.f_high = FilterHigh(filter_type=hpf_type).to(self.device)
 
@@ -103,14 +100,14 @@ class SRRaGANModel(BaseModel):
             # Discriminator loss:
             if train_opt['gan_type'] and train_opt['gan_weight']:
                 self.cri_gan = True
-                diffaug = train_opt['diffaug'] if train_opt['diffaug'] else None
+                diffaug = train_opt.get('diffaug', None)
                 dapolicy = None
                 if diffaug: #TODO: this if should not be necessary
-                    dapolicy = train_opt['dapolicy'] if train_opt['dapolicy'] else 'color,translation,cutout' #original
+                    dapolicy = train_opt.get('dapolicy', 'color,translation,cutout') #original
                 self.adversarial = losses.Adversarial(train_opt=train_opt, device=self.device, diffaug = diffaug, dapolicy = dapolicy)
                 # D_update_ratio and D_init_iters are for WGAN
-                self.D_update_ratio = train_opt['D_update_ratio'] if train_opt['D_update_ratio'] else 1
-                self.D_init_iters = train_opt['D_init_iters'] if train_opt['D_init_iters'] else 0
+                self.D_update_ratio = train_opt.get('D_update_ratio', 1)
+                self.D_init_iters = train_opt.get('D_init_iters', 0)
             else:
                 self.cri_gan = False
  
@@ -171,7 +168,7 @@ class SRRaGANModel(BaseModel):
             # HR images
             self.var_H = data['HR'].to(self.device)
             # discriminator references
-            input_ref = data['ref'] if 'ref' in data else data['HR']
+            input_ref = data.get('ref', data['HR'])
             self.var_ref = input_ref.to(self.device)
 
     def feed_data_batch(self, data, need_HR=True):
@@ -368,7 +365,7 @@ class SRRaGANModel(BaseModel):
         load_path_G = self.opt['path']['pretrain_model_G']
         if load_path_G is not None:
             logger.info('Loading pretrained model for G [{:s}] ...'.format(load_path_G))
-            strict = self.opt['path']['strict'] if self.opt['path']['strict'] else None
+            strict = self.opt['path'].get('strict', None)
             self.load_network(load_path_G, self.netG, strict)
         if self.opt['is_train'] and self.opt['train']['gan_weight']:
             load_path_D = self.opt['path']['pretrain_model_D']

@@ -143,7 +143,7 @@ def main():
                 if val_loader and current_step % opt['train']['val_freq'] == 0:
                     val_sr_imgs_list = []
                     val_gt_imgs_list = []
-                    val_metrics = metrics.MetricsDict(metrics=opt['train']['metrics'] if opt['train']['metrics'] else None)
+                    val_metrics = metrics.MetricsDict(metrics=opt['train'].get('metrics', None))
                     for val_data in val_loader:
                         img_name = os.path.splitext(os.path.basename(val_data['LR_path'][0]))[0]
                         img_dir = os.path.join(opt['path']['val_images'], img_name)
