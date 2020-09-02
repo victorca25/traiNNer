@@ -131,7 +131,8 @@ def main():
                     logger.info(message)
 
                 # update learning rate
-                model.update_learning_rate()
+                if model.optGstep and model.optDstep:
+                    model.update_learning_rate()
 
                 # save models and training states (changed to save models before validation)
                 if current_step % opt['logger']['save_checkpoint_freq'] == 0:

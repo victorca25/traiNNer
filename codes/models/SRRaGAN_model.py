@@ -114,12 +114,15 @@ class SRRaGANModel(BaseModel):
             """
             Prepare optimizers
             """
+            self.optGstep = False
+            self.optDstep = False
             if self.cri_gan:
                 self.optimizers, self.optimizer_G, self.optimizer_D = optimizers.get_optimizers(
                     self.cri_gan, self.netD, self.netG, train_opt, logger, self.optimizers)
             else:
                 self.optimizers, self.optimizer_G = optimizers.get_optimizers(
                     None, None, self.netG, train_opt, logger, self.optimizers)
+                self.optDstep = True
 
             """
             Prepare schedulers
@@ -246,6 +249,7 @@ class SRRaGANModel(BaseModel):
                 else:
                     self.optimizer_G.step()
                 self.optimizer_G.zero_grad()
+                self.optGstep = True
 
         if self.cri_gan:
             # update discriminator
@@ -282,6 +286,7 @@ class SRRaGANModel(BaseModel):
                 else:
                     self.optimizer_D.step()
                 self.optimizer_D.zero_grad()
+                self.optDstep = True
 
     def test(self):
         self.netG.eval()

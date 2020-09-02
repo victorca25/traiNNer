@@ -98,11 +98,11 @@ def parse(opt_path, is_train=True):
         opt['path']['training_state'] = os.path.join(experiments_root, 'training_state')
         opt['path']['log'] = experiments_root
         opt['path']['val_images'] = os.path.join(experiments_root, 'val_images')
-        if 'overwrite_val_imgs' in path and path['overwrite_val_imgs'] is not None:
-            opt['train']['overwrite_val_imgs'] = path['overwrite_val_imgs']
-        # opt['logger']['overwrite_chkp'] = opt['logger']['overwrite_chkp'] \
-        #     if opt['logger']['overwrite_chkp'] else None
-        
+        opt['train']['overwrite_val_imgs'] = opt['train'].get('overwrite_val_imgs', None)
+        opt['logger']['overwrite_chkp'] = opt['logger'].get('overwrite_chkp', None)
+        fsa = opt['train'].get('use_frequency_separation', None)
+        if fsa and not opt['train'].get('fs', None):
+            opt['train']['fs'] = fsa
 
         # change some options for debug mode
         if 'debug_nochkp' in opt['name']:
