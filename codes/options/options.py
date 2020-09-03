@@ -23,18 +23,30 @@ def parse(opt_path, is_train=True):
                 json_str += line
         opt = json.loads(json_str, object_pairs_hook=OrderedDict)
     elif ext == '.yml' or ext == '.yaml':
+        import yaml
+        import re
         with open(opt_path, mode='r') as f:
-            import yaml
             try:
-                from yaml import CLoader as Loader
+                from yaml import CLoader as Loader #CSafeLoader
             except ImportError:
-                from yaml import Loader
+                from yaml import Loader #SafeLoader
             _mapping_tag = yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG
 
             def dict_constructor(loader, node):
                 return OrderedDict(loader.construct_pairs(node))
 
             Loader.add_constructor(_mapping_tag, dict_constructor)
+            # compiled resolver to correctly parse scientific notation numbers
+            Loader.add_implicit_resolver(
+                u'tag:yaml.org,2002:float',
+                re.compile(u'''^(?:
+                [-+]?(?:[0-9][0-9_]*)\\.[0-9_]*(?:[eE][-+]?[0-9]+)?
+                |[-+]?(?:[0-9][0-9_]*)(?:[eE][-+]?[0-9]+)
+                |\\.[0-9_]+(?:[eE][-+]?[0-9]+)?
+                |[-+]?[0-9][0-9_]*(?::[0-5]?[0-9])+\\.[0-9_]*
+                |[-+]?\\.(?:inf|Inf|INF)
+                |\\.(?:nan|NaN|NAN))$''', re.X),
+                list(u'-+0123456789.'))
             opt = yaml.load(f, Loader=Loader)
 
     opt['is_train'] = is_train

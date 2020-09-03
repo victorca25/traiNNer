@@ -196,18 +196,18 @@ train:
     
     # Losses:
     pixel_criterion: cb # "l1" | "l2" | "cb" | "elastic" | "relativel1" | "l1cosinesim" | "clipl1" #pixel loss
-    pixel_weight: !!float 1e-2 # 1e-2 | 1
+    pixel_weight: 1e-2 # 1e-2 | 1
     feature_criterion: cb # "l1" | "l2" | "cb" | "elastic" #feature loss (VGG feature network)
     feature_weight: 1
     # cx_weight: 0.5
     # cx_type: contextual
     # cx_vgg_layers: {conv_3_2: 1, conv_4_2: 1}
     # hfen_criterion: l1 # hfen: "l1" | "l2" | "rel_l1" | "rel_l2" #helps in deblurring and finding edges, lines
-    # hfen_weight: !!float 1e-6 
+    # hfen_weight: 1e-6 
     # grad_type: grad-4d-l1 # 2d | 4d / - any of the pixel crit, ie "grad-2d-l1"
-    # grad_weight: !!float 4e-1 # 4e-1
+    # grad_weight: 4e-1 # 4e-1
     # tv_type: 4D # "normal" | "4D" #helps in denoising, reducing upscale artefacts
-    # tv_weight: !!float 1e-5 # Change "tv_weight" so the l_g_tv is around 1e-02 - 1e-01
+    # tv_weight: 1e-5 # Change "tv_weight" so the l_g_tv is around 1e-02 - 1e-01
     # tv_norm: 1 # 1 for l1 (default) or 2 for l2.
     # ssim_type: ssim # "ssim" | "ms-ssim" #helps to maintain luminance, contrast and covariance between SR and HR
     # ssim_weight: 1
@@ -229,7 +229,7 @@ train:
     
     # Adversarial loss:
     gan_type: vanilla # "vanilla" | "wgan-gp" | "lsgan" 
-    gan_weight: !!float 5e-3 # * test: 7e-3
+    gan_weight: 5e-3 # * test: 7e-3
     # for wgan-gp
     # D_update_ratio: 1
     # D_init_iters: 0
@@ -267,12 +267,12 @@ train:
     # Other training options:
     # finalcap: clamp # Test. Cap Generator outputs to fit in: [-1, 1] range ("tanh"), rescale tanh to [0,1] range ("scaltanh"), cap ("sigmoid") or clamp ("clamp") to [0,1] range. Default = None. Coordinate with znorm. Required for SPL if using image range [0,1]
     manual_seed: 0
-    niter: !!float 5e5
-    val_freq: 1000 # !!float 5e3
+    niter: 5e5
+    val_freq: 1000 # 5e3
     # overwrite_val_imgs: true
     metrics: 'psnr,ssim,lpips' # select from: "psnr,ssim,lpips" or a combination separated by comma ","
 
 logger:
     print_freq: 200
-    save_checkpoint_freq: !!float 5e3
+    save_checkpoint_freq: 5e3
     overwrite_chkp: false

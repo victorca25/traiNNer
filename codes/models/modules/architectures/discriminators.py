@@ -533,6 +533,7 @@ class Discriminator_VGG_128_fea(nn.Module):
 class NLayerDiscriminator(nn.Module):
     r"""
     PatchGAN discriminator
+    https://arxiv.org/pdf/1611.07004v3.pdf
     https://arxiv.org/pdf/1803.07422.pdf
 
     """
