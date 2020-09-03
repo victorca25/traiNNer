@@ -190,6 +190,12 @@ def define_D(opt):
             norm_type=opt_net['norm_type'], mode=opt_net['mode'], act_type=opt_net['act_type'], \
             convtype=opt_net['convtype'], arch=model_G, spectral_norm=opt_net['spectral_norm'], self_attention=opt_net['self_attention'], \
             max_pool=opt_net['max_pool'], poolsize=opt_net['poolsize'])
+    elif which_model == 'patchgan' or which_model == 'NLayerDiscriminator':
+        from models.modules.architectures import discriminators
+        netD = discriminators.NLayerDiscriminator(input_nc=opt_net['in_nc'], ndf=opt_net['nf'], n_layers=opt_net['nlayer'])
+    elif which_model == 'pixelgan' or which_model == 'PixelDiscriminator':
+        from models.modules.architectures import discriminators
+        netD = discriminators.PixelDiscriminator(input_nc=opt_net['in_nc'], ndf=opt_net['nf'])
     else:
         raise NotImplementedError('Discriminator model [{:s}] not recognized'.format(which_model))
     """

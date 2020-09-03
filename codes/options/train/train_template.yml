@@ -155,12 +155,13 @@ network_G:
 # Discriminator options:
 network_D:
     # ESRGAN (default)| PPON:
-    which_model_D: discriminator_vgg # discriminator_vgg_128 | discriminator_vgg | discriminator_vgg_128_fea (feature extraction)
+    which_model_D: discriminator_vgg # discriminator_vgg_128 | discriminator_vgg | discriminator_vgg_128_fea (feature extraction) | patchgan
     norm_type: batch
     act_type: leakyrelu
     mode: CNA # CNA | NAC
     nf: 64
     in_nc: 3
+    nlayer: 3 # only for patchgan
 
 # Schedulers options:
 train:
