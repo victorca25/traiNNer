@@ -202,6 +202,21 @@ class LRHRDataset(data.Dataset):
         #Augmentations during training
         if self.opt['phase'] == 'train':
             
+            # Note: this is NOT recommended, HR should not be exposed to degradation, as it will 
+            # degrade the model's results, only added because it exist as an option in downstream forks
+            # HR downscale
+            if self.opt['hr_downscale']: 
+                ds_algo  = self.opt.get('hr_downscale_types', 777)
+                hr_downscale_amt  = self.opt.get('hr_downscale_types', 2)
+                if isinstance(hr_downscale_amt, list):
+                    hr_downscale_amt = random.choice(hr_downscale_amt)
+                # will ignore if 1 or if result is smaller than hr size
+                if hr_downscale_amt > 1 and img_HR.shape[0]//hr_downscale_amt >= HR_size and img_HR.shape[1]//hr_downscale_amt >= HR_size:
+                    img_HR, hr_scale_interpol_algo = augmentations.scale_img(img_HR, hr_downscale_amt, algo=ds_algo)
+                    # Downscales LR to match new size of HR if scale does not match after
+                    if img_LR is not None and (img_HR.shape[0] // scale != img_LR.shape[0] or img_HR.shape[1] // scale != img_LR.shape[1]):
+                        img_LR, lr_scale_interpol_algo = augmentations.scale_img(img_LR, hr_downscale_amt, algo=ds_algo)
+
             # Validate there's an img_LR, if not, use img_HR
             if img_LR is None:
                 img_LR = img_HR
@@ -223,7 +238,8 @@ class LRHRDataset(data.Dataset):
             
             # Or if the HR images are too small, Resize to the HR_size size and fit LR pair to LR_size too
             if img_HR.shape[0] < HR_size or img_HR.shape[1] < HR_size:
-                print("Warning: Image: ", HR_path, " size does not match HR size: (", HR_size,"). The image size is: ", img_HR.shape)
+                #TODO: temp disabled to test
+                #print("Warning: Image: ", HR_path, " size does not match HR size: (", HR_size,"). The image size is: ", img_HR.shape)
                 # rescale HR image to the HR_size 
                 img_HR, _ = augmentations.resize_img(np.copy(img_HR), newdim=(HR_size,HR_size), algo=cv2.INTER_LINEAR)
                 # rescale LR image to the LR_size (The original code discarded the img_LR and generated a new one on the fly from img_HR)
@@ -263,7 +279,8 @@ class LRHRDataset(data.Dataset):
             # Final checks
             # if the resulting HR image size so far is too large or too small, resize HR to the correct size and downscale to generate a new LR on the fly
             if img_HR.shape[0] != HR_size or img_HR.shape[1] != HR_size:
-                print("Image: ", HR_path, " size does not match HR size: (", HR_size,"). The image size is: ", img_HR.shape)
+                #TODO: temp disabled to test
+                #print("Image: ", HR_path, " size does not match HR size: (", HR_size,"). The image size is: ", img_HR.shape)
                 # rescale HR image to the HR_size 
                 img_HR, _ = augmentations.resize_img(np.copy(img_HR), newdim=(HR_size,HR_size), algo=cv2.INTER_LINEAR)
                 if self.opt['lr_downscale_types']: # if manually provided and scale algorithms are provided, then:
@@ -274,7 +291,8 @@ class LRHRDataset(data.Dataset):
                 img_LR, _ = augmentations.scale_img(img_HR, scale, algo=ds_algo)
             # if the resulting LR so far does not have the correct dimensions, also generate a new HR-LR image pair on the fly
             if img_LR.shape[0] != LR_size or img_LR.shape[0] != LR_size:
-                print("Image: ", LR_path, " size does not match LR size: (", HR_size//scale,"). The image size is: ", img_LR.shape)
+                #TODO: temp disabled to test
+                #print("Image: ", LR_path, " size does not match LR size: (", HR_size//scale,"). The image size is: ", img_LR.shape)
                 # rescale HR image to the HR_size (should not be needed, but something went wrong before, just for sanity)
                 img_HR, _ = augmentations.resize_img(np.copy(img_HR), newdim=(HR_size,HR_size), algo=cv2.INTER_LINEAR)
                 # if manually provided and scale algorithms are provided, then use it, else use matlab imresize to generate LR pair
