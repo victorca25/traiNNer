@@ -1,0 +1,7 @@
+torchvision
+PyYAML
+torch
+numpy
+opencv-python
+tensorboardX
+lmdb

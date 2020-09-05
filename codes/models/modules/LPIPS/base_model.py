@@ -6,7 +6,7 @@ from IPython import embed
 
 class BaseModel():
     def __init__(self):
-        pass;
+        pass
         
     def name(self):
         return 'BaseModel'
