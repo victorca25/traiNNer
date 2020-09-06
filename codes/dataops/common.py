@@ -106,9 +106,10 @@ def read_img(env, path, out_nc=3, fix_channels=True):
             # img = (255*plt.imread(path)[:,:,:3]).astype('uint8')
     else:
         img = _read_lmdb_img(env, path)
-    
-    if not img:
-        raise ValueError(f"Failed to read image: {path}")
+
+    #TODO: review
+    # if not img:
+    #     raise ValueError(f"Failed to read image: {path}")
 
     if fix_channels:
         img = fix_img_channels(img, out_nc)

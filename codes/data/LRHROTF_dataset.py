@@ -32,13 +32,49 @@ class LRHRDataset(data.Dataset):
                 self.paths_HR = sorted([os.path.join(opt['dataroot_HR'], line.rstrip('\n')) \
                         for line in f])
             if opt['dataroot_LR'] is not None:
-                raise NotImplementedError('Now subset only supports generating LR on-the-fly.')
+                raise NotImplementedError('Subset only supports generating LR on-the-fly.')
         else:  # read image list from lmdb or image files
             # Check if dataroot_HR is a list of directories or a single directory. Note: lmdb will not currently work with a list
             HR_images_paths = opt['dataroot_HR']
-            if type(HR_images_paths) is list:
+            # if receiving a single path in str format, convert to list
+            if type(HR_images_paths) is str:
+                HR_images_paths = [HR_images_paths]
+
+            # Check if dataroot_LR is a list of directories or a single directory. Note: lmdb will not currently work with a list
+            LR_images_paths = opt['dataroot_LR']
+            if not LR_images_paths:
+                LR_images_paths = []
+            # if receiving a single path in str format, convert to list
+            if type(LR_images_paths) is str:
+                LR_images_paths = [LR_images_paths]
+            
+            self.paths_HR = []
+            self.paths_LR = []
+
+            # special case when dealing with duplicate HR_images_paths or LR_images_paths
+            # LMDB will not be supported with this option
+            if len(HR_images_paths) != len(set(HR_images_paths)) or \
+                len(LR_images_paths) != len(set(LR_images_paths)):
+
+                # only resolve when the two path lists coincide in the number of elements, 
+                # they have to be ordered specifically as they will be used in the options file
+                assert len(HR_images_paths) == len(LR_images_paths), \
+                    'Error: When using duplicate paths, dataroot_HR and dataroot_LR must contain the same number of elements.'
+
+                for paths in zip(HR_images_paths, LR_images_paths):
+                    _, paths_HR = util.get_image_paths(opt['data_type'], paths[0])
+                    _, paths_LR = util.get_image_paths(opt['data_type'], paths[1])
+                    for imgs in zip(paths_HR, paths_LR):
+                        _, HR_filename = os.path.split(imgs[0])
+                        _, LR_filename = os.path.split(imgs[1])
+                        assert HR_filename == LR_filename, 'Wrong pair of images {} and {}'.format(HR_filename, LR_filename)
+                        self.paths_HR.append(imgs[0])
+                        self.paths_LR.append(imgs[1])
+            else: # for cases with extra HR directories for OTF images or original single directories
                 self.HR_env = []
-                self.paths_HR = []
+                self.LR_env = []
+                # process HR_images_paths
+                # if type(HR_images_paths) is list:
                 for path in HR_images_paths:
                     HR_env, paths_HR = util.get_image_paths(opt['data_type'], path)
                     if type(HR_env) is list:
@@ -51,14 +87,11 @@ class LRHRDataset(data.Dataset):
                 else:
                     self.HR_env = sorted(self.HR_env)
                 self.paths_HR = sorted(self.paths_HR)
-            elif type(HR_images_paths) is str:
-                self.HR_env, self.paths_HR = util.get_image_paths(opt['data_type'], HR_images_paths)
-            
-            # Check if dataroot_LR is a list of directories or a single directory. Note: lmdb will not currently work with a list
-            LR_images_paths = opt['dataroot_LR']
-            if type(LR_images_paths) is list:
-                self.LR_env = []
-                self.paths_LR = []
+                # elif type(HR_images_paths) is str:
+                #     self.HR_env, self.paths_HR = util.get_image_paths(opt['data_type'], HR_images_paths)
+                
+                # process LR_images_paths
+                # if type(LR_images_paths) is list:
                 for path in LR_images_paths:
                     LR_env, paths_LR = util.get_image_paths(opt['data_type'], path)
                     if type(LR_env) is list:
@@ -71,12 +104,12 @@ class LRHRDataset(data.Dataset):
                 else:
                     self.LR_env = sorted(self.LR_env)
                 self.paths_LR = sorted(self.paths_LR)
-            elif type(LR_images_paths) is str:
-                self.LR_env, self.paths_LR = util.get_image_paths(opt['data_type'], LR_images_paths)
+                # elif type(LR_images_paths) is str:
+                #     self.LR_env, self.paths_LR = util.get_image_paths(opt['data_type'], LR_images_paths)
 
         assert self.paths_HR, 'Error: HR path is empty.'
         if self.paths_LR and self.paths_HR:
-            # Modify to allow using HR and LR folders with different amount of images
+            # Modified to allow using HR and LR folders with different amount of images
             # - If an LR image pair is not found, downscale HR on the fly, else, use the LR
             # - If all LR are provided and 'lr_downscale' is enabled, randomize use of provided LR and OTF LR for augmentation
             """
