@@ -2,6 +2,25 @@ import os
 import os.path as osp
 import logging
 from collections import OrderedDict
+import cv2
+
+#PAD_MOD
+_cv2_pad_to_str = {'constant':cv2.BORDER_CONSTANT,
+                   'edge':cv2.BORDER_REPLICATE,
+                   'reflect':cv2.BORDER_REFLECT_101,
+                   'symmetric':cv2.BORDER_REFLECT
+                  }
+#INTER_MODE
+_cv2_interpolation_to_str = {'nearest':cv2.INTER_NEAREST, 
+                         'linear':cv2.INTER_LINEAR,
+                         'bilinear':cv2.INTER_LINEAR,
+                         'area':cv2.INTER_AREA,
+                         'cubic':cv2.INTER_CUBIC,
+                         'bicubic':cv2.INTER_CUBIC,
+                         'lanczos':cv2.INTER_LANCZOS4,
+                         'lanczos4':cv2.INTER_LANCZOS4,
+                         'linear_exact':cv2.INTER_LINEAR_EXACT,
+                         'matlab_bicubic':777}
 
 
 def parse(opt_path, is_train=True):
@@ -98,6 +117,15 @@ def parse(opt_path, is_train=True):
 
         if phase == 'train' and 'subset_file' in dataset and dataset['subset_file'] is not None:
             dataset['subset_file'] = os.path.expanduser(dataset['subset_file'])
+
+        if 'lr_downscale_types' in dataset and dataset['lr_downscale_types'] is not None:
+            downscale_types = []
+            for algo in dataset['lr_downscale_types']:
+                if type(algo) == str:
+                    downscale_types.append(_cv2_interpolation_to_str[algo.lower()])
+                else:
+                    downscale_types.append(algo)
+            dataset['lr_downscale_types'] = downscale_types
 
     # path
     for key, path in opt['path'].items():

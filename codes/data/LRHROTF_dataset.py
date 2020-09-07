@@ -401,10 +401,15 @@ class LRHRDataset(data.Dataset):
                     #img_LR = augmentations.simplest_cb(img_LR, znorm=znorm) #TODO: now images are processed in the [0,255] range
                     img_LR = augmentations.simplest_cb(img_LR)
             
+            # Apply unsharpening mask to LR images
+            rand_unsharp = (1 - self.opt['lr_rand_unsharp']) if self.opt['lr_rand_unsharp'] else 1 # Randomize for augmentation
+            if self.opt['lr_unsharp_mask'] and np.random.rand() > rand_unsharp:
+                #img_LR = augmentations.unsharp_mask(img_LR, znorm=znorm) #TODO: now images are processed in the [0,255] range
+                img_LR = augmentations.unsharp_mask(img_LR)
+
             # Apply unsharpening mask to HR images
-            # img_HR1 = img_HR
-            rand_unsharp = (1 - self.opt['rand_unsharp']) if self.opt['rand_unsharp'] else 1 # Randomize for augmentation
-            if self.opt['unsharp_mask'] and np.random.rand() > rand_unsharp:
+            rand_unsharp = (1 - self.opt['hr_rand_unsharp']) if self.opt['hr_rand_unsharp'] else 1 # Randomize for augmentation
+            if self.opt['hr_unsharp_mask'] and np.random.rand() > rand_unsharp:
                 #img_HR = augmentations.unsharp_mask(img_HR, znorm=znorm) #TODO: now images are processed in the [0,255] range
                 img_HR = augmentations.unsharp_mask(img_HR)
         
