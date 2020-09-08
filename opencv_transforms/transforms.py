@@ -1863,7 +1863,6 @@ class RandomBoxBlur(object):
         if random.random() < self.p:
             if self.random_params:
                 self.kernel_size = self.get_params(h)
-            print(self.kernel_size)
             return EF.box_blur(img, kernel_size=self.kernel_size)
         return img
 
@@ -1913,7 +1912,6 @@ class RandomGaussianBlur(object):
         if random.random() < self.p:
             if self.random_params:
                 self.kernel_size = self.get_params(h)
-            print(self.kernel_size)
             return EF.gaussian_blur(img, kernel_size=self.kernel_size)
         return img
 
@@ -2161,7 +2159,6 @@ class FilterColorBalance(object):
                 percent = self.get_params(self.percent)
             else:
                 percent = self.percent
-            print(percent)
             return EF.filter_colorbalance(img, percent)
         return img
 
