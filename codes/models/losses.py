@@ -271,11 +271,19 @@ class Adversarial(nn.Module):
                     feats_d_fake = pred_g_fake[1]
                     pred_g_fake = pred_g_fake[0]
             else: # normal gan
-                pred_g_real = netD(real).detach() # detach to avoid backpropagation to D
+                pred_g_real = netD(real) #.detach() # detach to avoid backpropagation to D
                 pred_g_fake = netD(fake)
-            
-            l_g_gan = self.l_gan_w * (self.cri_gan(pred_g_real - torch.mean(pred_g_fake), False) +
-                                        self.cri_gan(pred_g_fake - torch.mean(pred_g_real), True)) / 2            
+
+            if isinstance(pred_g_real, list) and isinstance(pred_g_fake, list):
+                # for multiscale discriminator
+                l_g_gan = 0
+                for preds in zip(pred_g_real, pred_g_fake):
+                    l_g_gan += self.l_gan_w * (self.cri_gan(preds[0][0].detach() - torch.mean(preds[1][0]), False) +
+                                        self.cri_gan(preds[1][0] - torch.mean(preds[0][0].detach()), True)) / 2
+            else: # regular single scale discriminators
+                pred_g_real = pred_g_real.detach() # detach to avoid backpropagation to D
+                l_g_gan = self.l_gan_w * (self.cri_gan(pred_g_real - torch.mean(pred_g_fake), False) +
+                                            self.cri_gan(pred_g_fake - torch.mean(pred_g_real), True)) / 2
             
             # SRPGAN-like Features Perceptual loss, extracted from the discriminator
             if self.use_featmaps:
@@ -291,8 +299,19 @@ class Adversarial(nn.Module):
             # updating discriminator
             pred_d_real = netD(real)
             pred_d_fake = netD(fake.detach())  # detach to avoid backpropagation to G
-            l_d_real = self.cri_gan(pred_d_real - torch.mean(pred_d_fake), True)
-            l_d_fake = self.cri_gan(pred_d_fake - torch.mean(pred_d_real), False)
+            
+            if isinstance(pred_d_real, list) and isinstance(pred_d_fake, list):
+                # for multiscale discriminator
+                l_d_real = 0
+                l_d_fake = 0
+                for preds in zip(pred_d_real, pred_d_fake):
+                    l_d_real = self.cri_gan(preds[0][0] - torch.mean(preds[1][0]), True)
+                    l_d_fake = self.cri_gan(preds[1][0] - torch.mean(preds[0][0]), False)
+                pred_d_real = pred_d_real[0][0] # leave only the largest D for the logs
+                pred_d_fake = pred_d_fake[0][0] # leave only the largest D for the logs
+            else: # regular single scale discriminators
+                l_d_real = self.cri_gan(pred_d_real - torch.mean(pred_d_fake), True)
+                l_d_fake = self.cri_gan(pred_d_fake - torch.mean(pred_d_real), False)
 
             l_d_total = (l_d_real + l_d_fake) / 2
 

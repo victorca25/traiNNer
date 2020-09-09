@@ -196,6 +196,10 @@ def define_D(opt):
     elif which_model == 'pixelgan' or which_model == 'PixelDiscriminator':
         from models.modules.architectures import discriminators
         netD = discriminators.PixelDiscriminator(input_nc=opt_net['in_nc'], ndf=opt_net['nf'])
+    elif which_model == 'multiscale':
+        from models.modules.architectures import discriminators
+        netD = discriminators.MultiscaleDiscriminator(input_nc=opt_net['in_nc'], ndf=opt_net['nf'], \
+            n_layers=opt_net['nlayer'], num_D=opt_net['num_D'])
     else:
         raise NotImplementedError('Discriminator model [{:s}] not recognized'.format(which_model))
     """
