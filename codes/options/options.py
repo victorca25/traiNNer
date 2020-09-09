@@ -22,6 +22,26 @@ _cv2_interpolation_to_str = {'nearest':cv2.INTER_NEAREST,
                          'linear_exact':cv2.INTER_LINEAR_EXACT,
                          'matlab_bicubic':777}
 
+def parse2lists(types):
+    """ Converts dictionaries or single string options to lists that
+        work with random choice
+    """
+
+    if(isinstance(types, dict)):
+        types_list = []
+        for k, v in types.items():
+            types_list.extend([k]*v)
+        types = types_list
+    elif(isinstance(types, str)):
+        types = [types]
+    # else:
+    #     raise TypeError("Unrecognized blur type, must be list, dict or a string")
+
+    # if(isinstance(types, list)):
+    #     pass
+
+    return types
+
 
 def parse(opt_path, is_train=True):
     """Parse options file.
@@ -126,6 +146,18 @@ def parse(opt_path, is_train=True):
                 else:
                     downscale_types.append(algo)
             dataset['lr_downscale_types'] = downscale_types
+
+        if dataset.get('lr_blur_types', None) and dataset.get('lr_blur', None):
+            dataset['lr_blur_types'] = parse2lists(dataset['lr_blur_types'])
+        
+        if dataset.get('lr_noise_types', None) and dataset.get('lr_noise', None):
+            dataset['lr_noise_types'] = parse2lists(dataset['lr_noise_types'])
+        
+        if dataset.get('lr_noise_types2', None) and dataset.get('lr_noise2', None):
+            dataset['lr_noise_types2'] = parse2lists(dataset['lr_noise_types2'])
+        
+        if dataset.get('hr_noise_types', None) and dataset.get('hr_noise', None):
+            dataset['hr_noise_types'] = parse2lists(dataset['hr_noise_types'])
 
     # path
     for key, path in opt['path'].items():

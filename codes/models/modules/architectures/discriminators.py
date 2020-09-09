@@ -555,6 +555,7 @@ class NLayerDiscriminator(nn.Module):
         '''
         #self.getIntermFeat = getIntermFeat # not used for now
         #use_sigmoid not used for now
+        #TODO: test if there are benefits by incorporating the use of intermediate features from pix2pixHD
 
         use_bias = False
         kw = 4

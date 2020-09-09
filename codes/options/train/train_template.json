@@ -54,13 +54,13 @@
       
       // Noise and blur augmentations:
       , "lr_blur": false //true | false
-      , "lr_blur_types":  ["gaussian", "clean", "clean", "clean"] //select from: ["average","box","gaussian","bilateral","clean"] //#blur options #median and motion aren't working yet
+      , "lr_blur_types":  {"gaussian":1, "clean":3} //select from: "average","box","gaussian","bilateral","clean" //#blur options #median and motion aren't working yet
       , "lr_noise": false //true | false
-      , "lr_noise_types": ["gaussian", "clean", "clean", "clean", "clean"] //select from: ["gaussian", "JPEG", "quantize", "poisson", "dither", "s&p", "speckle", "clean"]
+      , "lr_noise_types": {"gaussian":1, "JPEG":1, "clean":4} //select from: "gaussian", "JPEG", "quantize", "poisson", "dither", "s&p", "speckle", "clean"
       , "lr_noise2": false //true | false
-      , "lr_noise_types2": ["dither", "dither", "clean", "clean"] //select from: ["gaussian", "JPEG", "quantize", "poisson", "dither", "s&p", "speckle", "clean"]
+      , "lr_noise_types2": {"dither":2, "clean":2} //select from: "gaussian", "JPEG", "quantize", "poisson", "dither", "s&p", "speckle", "clean"
       , "hr_noise": false //true | false
-      , "hr_noise_types": ["gaussian", "clean", "clean", "clean", "clean"] //select from: ["gaussian", "JPEG", "quantize", "poisson", "dither", "s&p", "speckle", "clean"]
+      , "hr_noise_types": {"gaussian":1, "clean":4} //select from: "gaussian", "JPEG", "quantize", "poisson", "dither", "s&p", "speckle", "clean"
       
       // Color augmentations
       //, "lr_fringes": true //true | false
