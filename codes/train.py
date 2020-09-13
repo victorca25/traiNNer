@@ -74,7 +74,9 @@ def main():
     for phase, dataset_opt in opt['datasets'].items():
         if phase == 'train':
             train_set = create_dataset(dataset_opt)
-            train_size = int(math.ceil(len(train_set) / dataset_opt['batch_size']))
+            batch_size = dataset_opt.get('batch_size', 4)
+            virtual_batch_size = dataset_opt.get('virtual_batch_size', batch_size)
+            train_size = int(math.ceil(len(train_set) / batch_size))
             logger.info('Number of train images: {:,d}, iters: {:,d}'.format(
                 len(train_set), train_size))
             total_iters = int(opt['train']['niter'])
@@ -98,11 +100,14 @@ def main():
     if resume_state:
         start_epoch = resume_state['epoch']
         current_step = resume_state['iter']
+        virtual_step = current_step * virtual_batch_size / batch_size \
+            if virtual_batch_size and virtual_batch_size > batch_size else current_step
         model.resume_training(resume_state)  # handle optimizers and schedulers
         model.update_schedulers(opt['train']) # updated schedulers in case JSON configuration has changed
         del resume_state
     else:
         current_step = 0
+        virtual_step = 0
         start_epoch = 0
 
     # training
@@ -110,16 +115,20 @@ def main():
     try:
         for epoch in range(start_epoch, total_epochs):
             for n, train_data in enumerate(train_loader,start=1):
-                current_step += 1
-                if current_step > total_iters:
-                    break
+                virtual_step += 1
+                take_step = False
+                if virtual_step * batch_size % virtual_batch_size == 0:
+                    current_step += 1
+                    take_step = True
+                    if current_step > total_iters:
+                        break
 
                 # training
                 model.feed_data(train_data)
-                model.optimize_parameters(current_step)
+                model.optimize_parameters(virtual_step)
 
                 # log
-                if current_step % opt['logger']['print_freq'] == 0:
+                if current_step % opt['logger']['print_freq'] == 0 and take_step:
                     logs = model.get_current_log()
                     message = '<epoch:{:3d}, iter:{:8,d}, lr:{:.3e}> '.format(
                         epoch, current_step, model.get_current_learning_rate())
@@ -131,17 +140,17 @@ def main():
                     logger.info(message)
 
                 # update learning rate
-                if model.optGstep and model.optDstep:
+                if model.optGstep and model.optDstep and take_step:
                     model.update_learning_rate()
-
+                
                 # save models and training states (changed to save models before validation)
-                if current_step % opt['logger']['save_checkpoint_freq'] == 0:
+                if current_step % opt['logger']['save_checkpoint_freq'] == 0 and take_step:
                     model.save(current_step, opt['logger']['overwrite_chkp'])
                     model.save_training_state(epoch + (n >= len(train_loader)), current_step, opt['logger']['overwrite_chkp'])
                     logger.info('Models and training states saved.')
                 
                 # validation
-                if val_loader and current_step % opt['train']['val_freq'] == 0:
+                if val_loader and current_step % opt['train']['val_freq'] == 0 and take_step:
                     val_sr_imgs_list = []
                     val_gt_imgs_list = []
                     val_metrics = metrics.MetricsDict(metrics=opt['train'].get('metrics', None))
