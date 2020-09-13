@@ -335,6 +335,12 @@ def np2tensor(img, bgr2rgb=True, data_range=1., normalize=False, change_range=Tr
     #check how many channels the image has, then condition, like in my BasicSR. ie. RGB, RGBA, Gray
     #if bgr2rgb:
         #img = img[:, :, [2, 1, 0]] #BGR to RGB -> in numpy, if using OpenCV, else not needed. Only if image has colors.
+    if change_range:
+        if np.issubdtype(img.dtype, np.integer):
+            info = np.iinfo
+        elif np.issubdtype(img.dtype, np.floating):
+            info = np.finfo
+        img = img*data_range/info(img.dtype).max #uint8 = /255
     img = torch.from_numpy(np.ascontiguousarray(np.transpose(img, (2, 0, 1)))).float() #"HWC to CHW" and "numpy to tensor"
     if bgr2rgb:
         if img.shape[0] == 3: #RGB
@@ -345,8 +351,6 @@ def np2tensor(img, bgr2rgb=True, data_range=1., normalize=False, change_range=Tr
             img = bgra_to_rgba(img)
     if add_batch:
         img.unsqueeze_(0) # Add fake batch dimension = 1 . squeeze() will remove the dimensions of size 1
-    if change_range:
-        img = img*data_range/255.0
     if normalize:
         img = norm(img)
     return img
@@ -682,6 +686,17 @@ def imresize_np(img, scale, antialiasing=True, interpolation=None):
     # Now the scale should be the same for H and W
     # input: img: Numpy, HWC BGR [0,1]
     # output: HWC BGR [0,1] w/o round
+    
+    change_range = False
+    if img.max() > 1:
+        img_type = img.dtype
+        if np.issubdtype(img_type, np.integer):
+            info = np.iinfo
+        elif np.issubdtype(img_type, np.floating):
+            info = np.finfo
+        img = img/info(img_type).max
+        change_range = True
+
     img = torch.from_numpy(img)
 
     in_H, in_W, in_C = img.size()
@@ -753,7 +768,13 @@ def imresize_np(img, scale, antialiasing=True, interpolation=None):
         out_2[:, i, 1] = out_1_aug[:, idx:idx + kernel_width, 1].mv(weights_W[i])
         out_2[:, i, 2] = out_1_aug[:, idx:idx + kernel_width, 2].mv(weights_W[i])
 
-    return out_2.numpy()
+    out_2 = out_2.numpy().clip(0,1)
+    
+    if change_range:
+        out_2 = out_2*info(img_type).max #uint8 = 255
+        out_2 = out_2.astype(img_type)
+
+    return out_2
 
 
 if __name__ == '__main__':

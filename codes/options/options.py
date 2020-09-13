@@ -139,6 +139,8 @@ def parse(opt_path, is_train=True):
             dataset['subset_file'] = os.path.expanduser(dataset['subset_file'])
 
         if 'lr_downscale_types' in dataset and dataset['lr_downscale_types'] is not None:
+            if(isinstance(dataset['lr_downscale_types'], str)):
+                dataset['lr_downscale_types'] = [dataset['lr_downscale_types']]
             downscale_types = []
             for algo in dataset['lr_downscale_types']:
                 if type(algo) == str:
