@@ -786,10 +786,24 @@ class Rotations:
 
 
 
+def _get_paths(path):
+    images = []
+    for dirpath, _, fnames in sorted(os.walk(path)):
+        for fname in sorted(fnames):
+            img_path = os.path.join(dirpath, fname)
+            images.append(img_path)
+    return images
 
 
+def paired_walk_dir(s_path=None, t_path=None, o=None, algo=None, regrain=None, histo=None):
+    source_paths = _get_paths(s_path)
+    target_paths = _get_paths(t_path)
+    # print(source_paths)
+    # print(target_paths)
 
-
+    for paths in zip(source_paths, target_paths):
+        apply_transfer(s=paths[0], t=paths[1], o=o, algo=algo, regrain=regrain, histo=histo)
+    
 
 def walk_dir(s=None, t_path=None, o=None, algo=None, regrain=None, histo=None):
     for dpath, dnames, fnames in os.walk(t_path):
@@ -879,6 +893,8 @@ if __name__ == "__main__":
     elif os.path.isdir(t) and os.path.isfile(s):
         walk_dir(s=s, t_path=t, o=o, algo=algo, regrain=regrain, histo=histo)
     #check if both paths are a directory, must be paired images
+    elif os.path.isdir(t) and os.path.isdir(s):
+        paired_walk_dir(s_path=s, t_path=t, o=o, algo=algo, regrain=regrain, histo=histo)
 
 
 
