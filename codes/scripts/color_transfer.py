@@ -200,6 +200,37 @@ def ycbcr2rgb(img):
     return rlt.astype(in_img_type)
 
 
+def hue_transfer(source=None, target=None):
+    """ Extracts hue from source img and applies apply mean 
+    std transfer from target, then returns image with converted y.
+    Args:
+        target: bgr numpy array of input image.
+        source: bgr numpy array of reference image.
+    Returns:
+        img_arr_out: transfered bgr numpy array of input image.
+    """
+
+    target = read_image(target)
+    source = read_image(source)
+
+    hsv_in = cv2.cvtColor(target, cv2.COLOR_BGR2HSV)
+    _, s_in, v_in = cv2.split(hsv_in)
+    # h_in, s_in, v_in = cv2.split(hsv_in)
+    
+    hsv_ref = cv2.cvtColor(source, cv2.COLOR_BGR2HSV)
+
+    hsv_out = stats_transfer(target=hsv_in, source=hsv_ref)
+    h_out, _, _ = cv2.split(hsv_out)
+    # h_out, s_out, v_out = cv2.split(hsv_out)
+
+    hsv_out = cv2.merge([h_out, s_in, v_in])
+    # hsv_out = cv2.merge([h_in, s_out, v_out])
+
+    img_arr_out = cv2.cvtColor(hsv_out, cv2.COLOR_HSV2BGR)
+    
+    return img_arr_out.astype('uint8')
+
+
 def luminance_transfer(source=None, target=None):
     """ Extracts luminance from source img and applies apply mean 
     std transfer from target, then returns image with converted y.
@@ -801,6 +832,9 @@ if __name__ == "__main__":
     elif algo == 'lum':
         # luminance transfer
         img = luminance_transfer(source=s, target=img)
+    elif algo == 'hue':
+        # hue transfer
+        img = hue_transfer(source=s, target=img)
     elif algo == 'pdf':
         # pdf transfer
         img = PDFTransfer(n=300).pdf_tranfer(source=s, target=img)
