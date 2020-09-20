@@ -222,6 +222,9 @@ def bgr2ycbcr(img, only_y=True):
     else:
         rlt = np.matmul(img_ , [[24.966, 112.0, -18.214], [128.553, -74.203, -93.786],
                               [65.481, -37.797, 112.0]]) / 255.0 + [16, 128, 128]
+    # fix channel order
+    rlt = rlt[:, :, (0, 2, 1)]
+    
     if in_img_type == np.uint8:
         rlt = rlt.round()
     else:
@@ -241,6 +244,14 @@ def ycbcr2rgb(img):
     # convert
     rlt = np.matmul(img_ , [[0.00456621, 0.00456621, 0.00456621], [0, -0.00153632, 0.00791071],
                           [0.00625893, -0.00318811, 0]]) * 255.0 + [-222.921, 135.576, -276.836]
+    
+    #alternative conversion:
+    # xform = np.array([[1, 0, 1.402], [1, -0.34414, -.71414], [1, 1.772, 0]])
+    # img_[:, :, [1, 2]] -= 128
+    # rlt = img_.dot(xform.T)
+    np.putmask(rlt, rlt > 255, 255)
+    np.putmask(rlt, rlt < 0, 0)
+    
     if in_img_type == np.uint8:
         rlt = rlt.round()
     else:

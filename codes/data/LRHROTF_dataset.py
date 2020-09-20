@@ -311,7 +311,7 @@ class LRHRDataset(data.Dataset):
             # Final sizes checks
             # if the resulting HR image size so far is too large or too small, resize HR to the correct size and downscale to generate a new LR on the fly
             # if the resulting LR so far does not have the correct dimensions, also generate a new HR-LR image pair on the fly
-            if img_HR.shape[0] != HR_size or img_HR.shape[1] != HR_size or img_LR.shape[0] != LR_size or img_LR.shape[0] != LR_size:
+            if img_HR.shape[0] != HR_size or img_HR.shape[1] != HR_size or img_LR.shape[0] != LR_size or img_LR.shape[1] != LR_size:
 
                 #if img_HR.shape[0] != HR_size or img_HR.shape[1] != HR_size:
                     #TODO: temp disabled to test
