@@ -1,6 +1,8 @@
 import cv2
 import numpy as np
 import argparse
+import os
+
 
 
 '''
@@ -789,17 +791,69 @@ class Rotations:
 
 
 
+def walk_dir(s=None, t_path=None, o=None, algo=None, regrain=None, histo=None):
+    for dpath, dnames, fnames in os.walk(t_path):
+        for f in fnames:
+            #os.chdir(t_path)
+            full_path = os.path.join(t_path, f)
+            #print(full_path)
+            apply_transfer(s=s, t=full_path, o=o, algo=algo, regrain=regrain, histo=histo)
 
 
+def apply_transfer(s=None, t=None, o=None, algo=None, regrain=None, histo=None):
+    img = read_image(image=t)
+    #img_name = t.split("/")[-1].split(".")[0]
+    img_name = os.path.splitext(os.path.basename(t))[0]
+    
+    algos = algo.split(",")
+    if isinstance(algos, str):
+        algos = [algos]
 
+    for alg in algos:
+        if algo == 'rgb' or algo == 'bgr':
+            # mean transfer 
+            img = stats_transfer(source=s, target=img)
+        elif algo == 'lab':
+            # lab transfer
+            img = lab_transfer(source=s, target=img)
+        elif algo == 'ycbcr':
+            # ycbcr transfer
+            img = ycbcr_transfer(source=s, target=img)
+        elif algo == 'lum':
+            # luminance transfer
+            img = luminance_transfer(source=s, target=img)
+        elif algo == 'hue':
+            # hue transfer
+            img = hue_transfer(source=s, target=img)
+        elif algo == 'pdf':
+            # pdf transfer
+            img = PDFTransfer(n=300).pdf_tranfer(source=s, target=img)
+        elif algo == 'sot':
+            # sliced OT
+            img = SOTransfer(source=s, target=img, steps=10, clip=False)
+        #cv2.imwrite('{}/{}_{}.png'.format(o, img_name, algo),img)
+    
+    if histo or algo == 'histo':
+        # histogram matching
+        img = histogram_matching(reference=s, target=img, nbr_bins=256, nph=False, calc_map=True)
+        algo = algo + "_histo"
+
+    if regrain:
+        img = Regrain().regrain(source=img, target=t)
+        algo = algo + "_regrain"
+
+    cv2.imwrite('{}/{}_{}.png'.format(o, img_name, algo),img)
+    #print(img_name)
+    print('{}/{}_{}.png'.format(o, img_name, algo))
 
 
 
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('-s', type=str, help='The reference image to source the colors from')
-    parser.add_argument('-t', type=str, help='The input image that will have colors transfered to')
+    parser.add_argument('-s', type=str, help='The reference image to source the colors from.')
+    parser.add_argument('-t', type=str, help='The input image that will have colors transfered to.')
+    parser.add_argument('-o', type=str, help='Output directory for resulting images.')
     parser.add_argument('-algo', type=str, required=True, 
         help='Select which algorithm to use. Options: rgb, lab, ycbcr, lum, pdf, sot.')
     parser.add_argument('-regrain', dest='regrain', default=False, 
@@ -812,44 +866,25 @@ if __name__ == "__main__":
     args = parser.parse_args()
     s = args.s if args.s else './source.png'
     t = args.t if args.t else './target.png'
+    o = args.o if args.o else './'
     algo = args.algo
     regrain = args.regrain
     #regrain = False #True #
     histo = args.histo
 
-    img = read_image(image=t)
-    img_name = t.split("/")[-1].split(".")[0]
+    #checks if both paths are a single file
+    if os.path.isfile(s) and os.path.isfile(t):
+        apply_transfer(s=s, t=t, o=o, algo=algo, regrain=regrain, histo=histo)
+    #checks if source is a single image and target path is a directory
+    elif os.path.isdir(t) and os.path.isfile(s):
+        walk_dir(s=s, t_path=t, o=o, algo=algo, regrain=regrain, histo=histo)
+    #check if both paths are a directory, must be paired images
 
-    if algo == 'rgb' or algo == 'bgr':
-        # mean transfer 
-        img = stats_transfer(source=s, target=img)
-    elif algo == 'lab':
-        # lab transfer
-        img = lab_transfer(source=s, target=img)
-    elif algo == 'ycbcr':
-        # ycbcr transfer
-        img = ycbcr_transfer(source=s, target=img)
-    elif algo == 'lum':
-        # luminance transfer
-        img = luminance_transfer(source=s, target=img)
-    elif algo == 'hue':
-        # hue transfer
-        img = hue_transfer(source=s, target=img)
-    elif algo == 'pdf':
-        # pdf transfer
-        img = PDFTransfer(n=300).pdf_tranfer(source=s, target=img)
-    elif algo == 'sot':
-        # sliced OT
-        img = SOTransfer(source=s, target=img, steps=10, clip=False)
+
+
+    #img = 
+
     
-    if histo or algo == 'histo':
-        # histogram matching
-        img = histogram_matching(reference=s, target=img, nbr_bins=256, nph=False, calc_map=True)
-        algo = algo + "_histo"
-
-    if regrain:
-        img = Regrain().regrain(source=img, target=t)
-        algo = algo + "_regrain"
-
-    cv2.imwrite('./{}_{}.png'.format(img_name, algo),img)
+    
+    
 
