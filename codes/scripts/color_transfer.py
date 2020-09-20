@@ -309,6 +309,29 @@ def stats_transfer(source=None, target=None):
     return img_arr_out.astype('uint8')
 
 
+def calc_pdf_cdf(img, nbr_bins=256):
+    '''
+    Compute histogram (Probability Density Function, pdf) and cdf 
+    (Cumulative Distribution Function)
+
+    Parameters:
+        img: single channel image
+    '''
+    height = img.shape[0]
+    width  = img.shape[1]
+
+    pdf = cv2.calcHist([img], [0], None, [nbr_bins], [0, nbr_bins])
+    pdf /= (width*height)
+    pdf = np.array( pdf )
+
+    cdf = np.zeros(nbr_bins)
+    cdf[0] = pdf[0]
+    for i in range(1, nbr_bins):
+        cdf[i] = cdf[i-1] + pdf[i]
+
+    return pdf, cdf
+
+
 def histogram_matching(reference, target, nbr_bins=256, nph=False, calc_map=False):
     '''
     The histogram matching algorithm applies histogram equalization 
