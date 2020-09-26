@@ -239,7 +239,7 @@ class LRHRDataset(data.Dataset):
             # HR downscale
             if self.opt.get('hr_downscale', None): 
                 ds_algo  = self.opt.get('hr_downscale_types', 777)
-                hr_downscale_amt  = self.opt.get('hr_downscale_types', 2)
+                hr_downscale_amt  = self.opt.get('hr_downscale_amt', 2)
                 if isinstance(hr_downscale_amt, list):
                     hr_downscale_amt = random.choice(hr_downscale_amt)
                 # will ignore if 1 or if result is smaller than hr size

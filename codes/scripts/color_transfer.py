@@ -148,8 +148,23 @@ def _min_max_scale(arr, new_range=(0, 255)):
     return scaled
 
 
+def im2double(im):
+    if im.dtype == 'uint8':
+        out = im.astype('float') / 255
+    elif im.dtype == 'uint16':
+        out = im.astype('float') / 65535
+    elif im.dtype == 'float':
+        out = im
+    else:
+        assert False
+    out = np.clip(out, 0, 1)
+    return out
+
+
 def bgr2ycbcr(img, only_y=True):
     '''bgr version of matlab rgb2ycbcr
+    Python opencv library (cv2) cv2.COLOR_BGR2YCrCb has 
+    different parameters with MATLAB color convertion.
     only_y: only return Y channel
     Input:
         uint8, [0, 255]
@@ -161,12 +176,23 @@ def bgr2ycbcr(img, only_y=True):
         img_  *= 255.
     # convert
     if only_y:
+        # mat = [24.966, 128.553, 65.481])
+        # rlt = np.dot(img_ , mat)/ 255.0 + 16.0
+
         rlt = np.dot(img_ , [24.966, 128.553, 65.481]) / 255.0 + 16.0
     else:
+        # mat = np.array([[24.966, 128.553, 65.481],[112, -74.203, -37.797], [-18.214, -93.786, 112.0]])
+        # mat = mat.T/255.0
+        # offset = np.array([[[16, 128, 128]]])
+        # rlt = np.dot(img_, mat) + offset
+        # rlt = np.clip(rlt, 0, 255)
+        ## rlt = np.rint(rlt).astype('uint8')
+
         rlt = np.matmul(img_ , [[24.966, 112.0, -18.214], [128.553, -74.203, -93.786],
                               [65.481, -37.797, 112.0]]) / 255.0 + [16, 128, 128]
     
-    rlt = rlt[:, :, (0, 2, 1)]
+    # to make ycrcb like cv2
+    # rlt = rlt[:, :, (0, 2, 1)]
 
     if in_img_type == np.uint8:
         rlt = rlt.round()
@@ -175,7 +201,7 @@ def bgr2ycbcr(img, only_y=True):
     return rlt.astype(in_img_type)
 
 
-def ycbcr2rgb(img):
+def ycbcr2rgb_(img):
     '''same as matlab ycbcr2rgb
     Input:
         uint8, [0, 255]
@@ -202,8 +228,103 @@ def ycbcr2rgb(img):
     return rlt.astype(in_img_type)
 
 
+def ycbcr2rgb(img, only_y=True):
+    '''
+    bgr version of matlab ycbcr2rgb
+    Python opencv library (cv2) cv2.COLOR_YCrCb2BGR has 
+    different parameters with MATLAB color convertion.
+
+    Input:
+        uint8, [0, 255]
+        float, [0, 1]
+    '''
+    in_img_type = img.dtype
+    img_ = img.astype(np.float32)
+    if in_img_type != np.uint8:
+        img_  *= 255.
+
+    # to make ycrcb like cv2
+    # rlt = rlt[:, :, (0, 2, 1)]
+    
+    # convert
+    mat = np.array([[24.966, 128.553, 65.481],[112, -74.203, -37.797], [-18.214, -93.786, 112.0]])
+    mat = np.linalg.inv(mat.T) * 255
+    offset = np.array([[[16, 128, 128]]])
+
+    rlt = np.dot((img_ - offset), mat)
+    rlt = np.clip(rlt, 0, 255)
+    ## rlt = np.rint(rlt).astype('uint8')
+
+    if in_img_type == np.uint8:
+        rlt = rlt.round()
+    else:
+        rlt /= 255.
+    return rlt.astype(in_img_type)
+
+
+def replace_channels(source=None, target=None, ycbcr = True, hsv = False, transfersv = False):
+    """ 
+    Extracts channels from source img and replaces the same channels 
+    from target, then returns the converted image.
+    Args:
+        target: bgr numpy array of input image.
+        source: bgr numpy array of reference image.
+        ycbcr: replace the color channels (Cb and Cr)
+        hsv: replace the hue channel
+        transfersv: if using hsv option, can also transfer the 
+            mean/std of the S and V channels
+    Returns:
+        target: transfered bgr numpy array of input image.
+    """
+    target = read_image(target)
+    source = read_image(source)
+
+    if source.shape != target.shape:
+        source = scale_img(source, target)
+
+    if ycbcr:
+        # ycbcr_in = bgr2ycbcr(target, only_y=False)
+        ycbcr_in = cv2.cvtColor(target, cv2.COLOR_BGR2YCR_CB)
+        # if keep_y:
+        y_in, _, _ = cv2.split(ycbcr_in)
+        
+        # ycbcr_ref = bgr2ycbcr(source, only_y=False)
+        ycbcr_ref = cv2.cvtColor(source, cv2.COLOR_BGR2YCR_CB)
+
+        # if histo_match:
+        #     ycbcr_ref = histogram_matching(reference=ycbcr_ref, image=ycbcr_in)
+
+        # ycbcr_out = stats_transfer(target=ycbcr_in, source=ycbcr_ref)
+
+        # if keep_y:
+        _, cb_out, cr_out = cv2.split(ycbcr_ref)
+        ycbcr_out = cv2.merge([y_in, cb_out, cr_out])
+        
+        # target = ycbcr2rgb(ycbcr_out)
+        target = cv2.cvtColor(ycbcr_out, cv2.COLOR_YCR_CB2BGR)
+    
+    if hsv:
+        hsv_in = cv2.cvtColor(target, cv2.COLOR_BGR2HSV)
+        _, s_in, v_in = cv2.split(hsv_in)
+        # h_in, s_in, v_in = cv2.split(hsv_in)
+        
+        hsv_ref = cv2.cvtColor(source, cv2.COLOR_BGR2HSV)
+        h_out, _, _ = cv2.split(hsv_ref)
+
+        if transfersv:
+            hsv_out = stats_transfer(target=hsv_in, source=hsv_ref)
+            _, s_out, v_out = cv2.split(hsv_out)
+            hsv_out = cv2.merge([h_out, s_out, v_out])
+        else:
+            hsv_out = cv2.merge([h_out, s_in, v_in])
+
+        target = cv2.cvtColor(hsv_out, cv2.COLOR_HSV2BGR)
+    
+    return target.astype('uint8')
+
+
 def hue_transfer(source=None, target=None):
-    """ Extracts hue from source img and applies apply mean 
+    """ Extracts hue from source img and applies mean and 
     std transfer from target, then returns image with converted y.
     Args:
         target: bgr numpy array of input image.
@@ -234,7 +355,7 @@ def hue_transfer(source=None, target=None):
 
 
 def luminance_transfer(source=None, target=None):
-    """ Extracts luminance from source img and applies apply mean 
+    """ Extracts luminance from source img and applies mean and
     std transfer from target, then returns image with converted y.
     Args:
         target: bgr numpy array of input image.
@@ -264,12 +385,16 @@ def luminance_transfer(source=None, target=None):
     return img_arr_out.astype('uint8')
 
 
-def ycbcr_transfer(source=None, target=None, keep_y=True):
-    """ Convert img from rgb space to ycbcr space, apply mean 
+def ycbcr_transfer(source=None, target=None, keep_y=True, histo_match=False):
+    """ Convert img from rgb space to ycbcr space, apply mean and
     std transfer, then convert back.
     Args:
         target: bgr numpy array of input image.
         source: bgr numpy array of reference image.
+        keep_y: option to keep the original target y channel unchanged.
+        histo_match: option to do histogram matching before transfering the
+            image statistics (if combined with keep_y, only color channels
+            are modified).
     Returns:
         img_arr_out: transfered bgr numpy array of input image.
     """
@@ -285,6 +410,9 @@ def ycbcr_transfer(source=None, target=None, keep_y=True):
     # ycbcr_ref = bgr2ycbcr(source, only_y=False)
     ycbcr_ref = cv2.cvtColor(source, cv2.COLOR_BGR2YCR_CB)
 
+    if histo_match:
+        ycbcr_ref = histogram_matching(reference=ycbcr_ref, image=ycbcr_in)
+
     ycbcr_out = stats_transfer(target=ycbcr_in, source=ycbcr_ref)
 
     if keep_y:
@@ -298,7 +426,7 @@ def ycbcr_transfer(source=None, target=None, keep_y=True):
 
 
 def lab_transfer(source=None, target=None):
-    """ Convert img from rgb space to lab space, apply mean 
+    """ Convert img from rgb space to lab space, apply mean and
     std transfer, then convert back.
     Args:
         target: bgr numpy array of input image.
@@ -342,107 +470,80 @@ def stats_transfer(source=None, target=None):
     return img_arr_out.astype('uint8')
 
 
-def calc_pdf_cdf(img, nbr_bins=256):
-    '''
-    Compute histogram (Probability Density Function, pdf) and cdf 
-    (Cumulative Distribution Function)
+def _match_cumulative_cdf(source, template):
+    """
+    Return modified source array so that the cumulative density function of
+    its values matches the cumulative density function of the template.
+    """
+    src_values, src_unique_indices, src_counts = np.unique(source.ravel(),
+                                                           return_inverse=True,
+                                                           return_counts=True)
+    tmpl_values, tmpl_counts = np.unique(template.ravel(), return_counts=True)
 
-    Parameters:
-        img: single channel image
-    '''
-    height = img.shape[0]
-    width  = img.shape[1]
+    # calculate normalized quantiles for each array
+    src_quantiles = np.cumsum(src_counts) / source.size
+    tmpl_quantiles = np.cumsum(tmpl_counts) / template.size
 
-    pdf = cv2.calcHist([img], [0], None, [nbr_bins], [0, nbr_bins])
-    pdf /= (width*height)
-    pdf = np.array( pdf )
+    # use linear interpolation of cdf to find new pixel values = interp(image, bins, cdf)
+    interp_a_values = np.interp(src_quantiles, tmpl_quantiles, tmpl_values)
 
-    cdf = np.zeros(nbr_bins)
-    cdf[0] = pdf[0]
-    for i in range(1, nbr_bins):
-        cdf[i] = cdf[i-1] + pdf[i]
-
-    return pdf, cdf
+    # reshape to original image shape and return
+    return interp_a_values[src_unique_indices].reshape(source.shape)
 
 
-def histogram_matching(reference, target, nbr_bins=256, nph=False, calc_map=False):
-    '''
-    The histogram matching algorithm applies histogram equalization 
-    to two images, and then it creates the pixel value translation 
-    function from the two equalization functions.
+def histogram_matching(reference=None, image=None, clip=None):
+    """
+    Adjust an image so that its cumulative histogram matches that of another.
+    The adjustment is applied separately for each channel.
     (https://en.wikipedia.org/wiki/Histogram_matching)
 
-    ref:
-    https://github.com/TakashiIjiri/histogram_matching_python/blob/master/histgram_matching.py
-    https://vzaguskin.github.io/histmatching1/
+    Parameters
+    ----------
+    image : ndarray
+        Input image. Can be gray-scale or in color.
+    reference : ndarray
+        Image to match histogram of. Must have the same number of channels as
+        image.
+    Returns
+    -------
+    matched : ndarray
+        Transformed input image.
+    Raises
+    ------
+    ValueError
+        Thrown when the number of channels in the input image and the reference
+        differ.
+    References
+    ----------
+    .. [1] http://paulbourke.net/miscellaneous/equalisation/
+    .. [2] https://github.com/scikit-image/scikit-image/blob/master/skimage/exposure/histogram_matching.py
+    """
 
-    Parameters:
-	-------
-	reference: NumPy array or path to image (the source image)
-	target_file: NumPy array or path to image (the target image)
+    image = read_image(image) # target
+    reference = read_image(reference) # ref
 
-    '''
-
-    ref_bgr = read_image(reference)
-    target_bgr = read_image(target)
-    
     # expand dimensions if grayscale
-    ref_bgr = expand_img(ref_bgr)
-    target_bgr = expand_img(target_bgr)
+    image = expand_img(image)
+    reference = expand_img(reference)
 
-    imres = target_bgr.copy()
-    for d in range(target_bgr.shape[2]):
-        
-        if nph: # using numpy histogram
-            #get target image histograms
-            imhist, bins = np.histogram(target_bgr[:,:,d].flatten(), nbr_bins) #normed=True
-            src_cdf = imhist.cumsum() #cumulative distribution function
-            src_cdf = (255 * src_cdf / src_cdf[-1]).astype(np.uint8) #normalize
+    if image.ndim != reference.ndim:
+        raise ValueError('Image and reference must have the same number '
+                         'of channels.')
 
-            #get reference image histograms
-            refhist, bins = np.histogram(ref_bgr[:,:,d].flatten(), nbr_bins) #normed=True
-            ref_cdf = refhist.cumsum() #cumulative distribution function
-            ref_cdf = (255 * ref_cdf / ref_cdf[-1]).astype(np.uint8) #normalize
-        
-        else: # using cv2 histogram
-            #calc pdf and cdf
-            #_, bins = np.histogram(target_bgr[:,:,d].flatten(), nbr_bins)
-            _, bins = np.histogram(ref_bgr[:,:,d].flatten(), nbr_bins)
-            src_pdf, src_cdf = calc_pdf_cdf(target_bgr, nbr_bins)
-            ref_pdf, ref_cdf = calc_pdf_cdf(ref_bgr, nbr_bins)
+    if image.shape[-1] != reference.shape[-1]:
+        raise ValueError('Number of channels in the input image and '
+                            'reference image must match!')
 
-        if calc_map: #calp mapping new_level = mapping(old_level)
-            mapping = np.zeros(nbr_bins, dtype = int)
+    matched = np.empty(image.shape, dtype=image.dtype)
+    for channel in range(image.shape[-1]):
+        matched_channel = _match_cumulative_cdf(image[..., channel],
+                                                reference[..., channel])
+        matched[..., channel] = matched_channel
 
-            for i in range(nbr_bins) :
-                #search j such that src_cdf(i) = ref_cdf(j)
-                # and set mapping[i] = j
-                for j in range(nbr_bins) :
-                    if ref_cdf[j] >= src_cdf[i] :
-                        break
-                mapping[i] = j
+    if clip:
+        matched = _scale_array(matched, clip=clip)
 
-            #gen output channel
-            ch_out = np.zeros_like(target_bgr[:,:,d], dtype = np.uint8)
-            for i in range(nbr_bins):
-                ch_out[target_bgr[:,:,d] == i] = mapping[i]
-            
-            imres[:,:,d] = ch_out
-
-        else: #interpolate cdf
-            #use linear interpolation of cdf to find new pixel values
-            #im2 = interp(im.flatten(),bins[:-1],cdf)
-            im2 = np.interp(target_bgr[:,:,d].flatten(), bins[:-1], src_cdf)
-            im3 = np.interp(im2, ref_cdf, bins[:-1])
-
-            # reshape to original image shape
-            imres[:,:,d] = im3.reshape((target_bgr.shape[0], target_bgr.shape[1]))
-
-        #imres = np.clip(imres, 0, 255)
-        # imres = cv2.normalize(imres, None, 0, 255,
-        #                            cv2.NORM_MINMAX, cv2.CV_8UC1)
-
-        return imres
+    return matched.astype("uint8")
 
 
 def SOTransfer(source, target, steps=10, batch_size=5, reg_sigmaXY=16.0, reg_sigmaV=5.0, clip=False):
@@ -785,6 +886,138 @@ class Rotations:
         return H
 
 
+# Alternative CT calculation test to use with BlendingAlt. Still produces the lines in the images
+def CT_alt(im=None, window_size=3):
+    """
+    Take a gray scale image and for each pixel around the center of the window generate a bit value of length
+    window_size * 2 - 1. window_size of 3 produces bit length of 8, and 5 produces 24.
+
+    The image gets border of zero padded pixels half the window size.
+
+    Bits are set to one if pixel under consideration is greater than the center, otherwise zero.
+
+    :param image: numpy.ndarray(shape=(MxN), dtype=numpy.uint8)
+    :param window_size: int odd-valued
+    :return: numpy.ndarray(shape=(MxN), , dtype=numpy.uint8)
+    >>> image = np.array([ [50, 70, 80], [90, 100, 110], [60, 120, 150] ])
+    >>> np.binary_repr(transform(image)[0, 0])
+    '1011'
+    >>> image = np.array([ [60, 75, 85], [115, 110, 105], [70, 130, 170] ])
+    >>> np.binary_repr(transform(image)[0, 0])
+    '10011'
+    """
+ 
+    half_window_size = window_size // 2
+    image = cv2.copyMakeBorder(im, top=half_window_size, left=half_window_size, right=half_window_size, bottom=half_window_size, borderType=cv2.BORDER_CONSTANT, value=0)
+
+    #Get the source image dims
+    # w, h = im.size
+    # h, w = im.shape
+    rows, cols = image.shape
+
+    #Initialize output array
+    # Census = np.zeros((h-2, w-2), dtype='uint8')
+    Census = np.zeros((rows - half_window_size * 2, cols - half_window_size * 2), dtype=np.uint8)
+
+    #centre pixels, which are offset by (1, 1)
+    # cp = im[1:h-1, 1:w-1]
+    center_pixels = image[half_window_size:rows - half_window_size, half_window_size:cols - half_window_size]
+
+    #offsets of non-central pixels 
+    # offsets = [(u, v) for v in range(3) for u in range(3) if not u == 1 == v]
+    offsets = [(row, col) for row in range(half_window_size) for col in range(half_window_size) if not row == half_window_size + 1 == col]
+
+    #Do the pixel comparisons
+    # for u, v in offsets:
+    #     Census = (Census << 1) | (im[v:v+h-2, u:u+w-2] >= cp)
+    for (row, col) in offsets:
+        Census = (Census << 1) | (image[row:row + rows - half_window_size * 2, col:col + cols - half_window_size * 2] >= center_pixels)
+    
+    # print(Census.shape)
+    return Census
+
+def BlendingAlt(LR, HR):
+    #TODO: Note: expects a single channel Y
+    #H, W, _ = LR.shape
+    H, W = LR.shape
+    #H1, W1, _ = HR.shape
+    H1, W1 = HR.shape
+    assert H1==H and W1==W
+    Census = CT_alt(LR)
+    blending0 = Census*HR + (1 - Census)*LR
+    return blending0
+
+
+# Original CT calculation, to use with Blending1 and Blending2
+def CT_descriptor(im):
+    #TODO: Note: expects a single channel Y
+    #H, W, _ = im.shape
+    H, W = im.shape
+    windowSize = 3
+    Census = np.zeros((H, W))
+    CT = np.zeros((H, W, windowSize, windowSize))
+    C = np.int((windowSize-1)/2)
+    for i in range(C,H-C):
+        for j in range(C, W-C):
+            cen = 0
+            for a in range(-C, C+1):
+                for b in range(-C, C+1):
+                    if not (a==0 and b==0):
+                        #TODO: Note: expects a single channel Y
+                        if im[i+a, j+b] < im[i, j]:
+                            cen += 1
+                            CT[i, j, a+C,b+C] = 1
+            Census[i, j] = cen
+    Census = Census/8
+    # print(Census.shape, CT.shape)
+    return Census, CT
+
+def Blending1(LR, HR):
+    #TODO: Note: expects a single channel Y
+    #H, W, _ = LR.shape
+    H, W = LR.shape
+    #H1, W1, _ = HR.shape
+    H1, W1 = HR.shape
+    assert H1==H and W1==W
+    Census, CT = CT_descriptor(LR)
+    blending1 = Census*HR + (1 - Census)*LR
+    # blending1 = cv2.addWeighted(HR, Census, LR, 1-Census, 0)
+    return blending1
+
+def Blending2(LR, HR):
+    #TODO: Note: expects a single channel Y
+    #H, W, _ = LR.shape
+    H, W = LR.shape
+    #H1, W1, _ = HR.shape
+    H1, W1 = HR.shape
+    assert H1==H and W1==W
+    Census1, CT1 = CT_descriptor(LR)
+    Census2, CT2 = CT_descriptor(HR)
+    # print("1: ", Census1.min(), Census1.max(), CT1.min(), CT1.max())
+    # print("2: ", Census2.min(), Census2.max(), CT2.min(), CT2.max())
+    weight = np.zeros((H, W))
+    x = np.zeros(( 3, 3))
+    for i in range(H):
+        for j in range(W):
+            x  = np.absolute(CT1[i,j]-CT2[i,j])
+            weight[i, j] = x.sum()
+
+    weight = weight/weight.max()
+    blending2 = weight * LR + (1 - weight) * HR
+    # blending2 = cv2.addWeighted(LR, weight, HR, 1-weight, 0)
+    return blending2
+
+def gaussian_blur(image=None, ksize = (3, 3), sigma = 0.85):
+    return cv2.GaussianBlur(image, ksize, sigma)
+
+
+
+
+
+
+
+
+
 
 def _get_paths(path):
     images = []
@@ -795,70 +1028,131 @@ def _get_paths(path):
     return images
 
 
-def paired_walk_dir(s_path=None, t_path=None, o=None, algo=None, regrain=None, histo=None):
+def paired_walk_dir(s_path=None, t_path=None, o=None, algo=None, regrain=None, histo=None, blending=None, rep=None):
     source_paths = _get_paths(s_path)
     target_paths = _get_paths(t_path)
     # print(source_paths)
     # print(target_paths)
 
     for paths in zip(source_paths, target_paths):
-        apply_transfer(s=paths[0], t=paths[1], o=o, algo=algo, regrain=regrain, histo=histo)
+        apply_transfer(s=paths[0], t=paths[1], o=o, algo=algo, regrain=regrain, histo=histo, blending=blending, rep=rep)
     
 
-def walk_dir(s=None, t_path=None, o=None, algo=None, regrain=None, histo=None):
+def walk_dir(s=None, t_path=None, o=None, algo=None, regrain=None, histo=None, blending=None, rep=None):
     for dpath, dnames, fnames in os.walk(t_path):
         for f in fnames:
             #os.chdir(t_path)
             full_path = os.path.join(t_path, f)
             #print(full_path)
-            apply_transfer(s=s, t=full_path, o=o, algo=algo, regrain=regrain, histo=histo)
+            apply_transfer(s=s, t=full_path, o=o, algo=algo, regrain=regrain, histo=histo, blending=blending, rep=rep)
 
 
-def apply_transfer(s=None, t=None, o=None, algo=None, regrain=None, histo=None):
+def apply_transfer(s=None, t=None, o=None, algo=None, regrain=None, histo=None, blending=None, rep=None):
     img = read_image(image=t)
     #img_name = t.split("/")[-1].split(".")[0]
     img_name = os.path.splitext(os.path.basename(t))[0]
-    
-    algos = algo.split(",")
-    if isinstance(algos, str):
-        algos = [algos]
+    nam = ''
 
-    for alg in algos:
-        if algo == 'rgb' or algo == 'bgr':
-            # mean transfer 
-            img = stats_transfer(source=s, target=img)
-        elif algo == 'lab':
-            # lab transfer
-            img = lab_transfer(source=s, target=img)
-        elif algo == 'ycbcr':
-            # ycbcr transfer
-            img = ycbcr_transfer(source=s, target=img)
-        elif algo == 'lum':
-            # luminance transfer
-            img = luminance_transfer(source=s, target=img)
-        elif algo == 'hue':
-            # hue transfer
-            img = hue_transfer(source=s, target=img)
-        elif algo == 'pdf':
-            # pdf transfer
-            img = PDFTransfer(n=300).pdf_tranfer(source=s, target=img)
-        elif algo == 'sot':
-            # sliced OT
-            img = SOTransfer(source=s, target=img, steps=10, clip=False)
-        #cv2.imwrite('{}/{}_{}.png'.format(o, img_name, algo),img)
+    #Pre-processing
+    if rep:
+        # replace image channels
+        # Note: the target image with replaced channels could be used as the new target 
+        # or source for the other algorithms. If using as source, images have to be aligned
+        replace = 'source' #'target'
+        if replace == 'target':
+            img = replace_channels(source=s, target=img, ycbcr=True, hsv=False, transfersv=False)
+        elif replace == 'source':
+            s = replace_channels(source=s, target=img, ycbcr=True, hsv=True, transfersv=True)
+        nam = "{}_{}".format(nam, "rep")
     
-    if histo or algo == 'histo':
+    if algo:
+        algos = algo.split(",")
+        if isinstance(algos, str):
+            algos = [algos]
+
+        for alg in algos:
+            if algo == 'rgb' or algo == 'bgr':
+                # mean transfer 
+                img = stats_transfer(source=s, target=img)
+            elif algo == 'lab':
+                # lab transfer
+                img = lab_transfer(source=s, target=img)
+            elif algo == 'ycbcr':
+                # ycbcr transfer
+                img = ycbcr_transfer(source=s, target=img)
+            elif algo == 'lum':
+                # luminance transfer
+                img = luminance_transfer(source=s, target=img)
+            elif algo == 'hue':
+                # hue transfer
+                img = hue_transfer(source=s, target=img)
+            elif algo == 'pdf':
+                # pdf transfer
+                img = PDFTransfer(n=300).pdf_tranfer(source=s, target=img)
+            elif algo == 'sot':
+                # sliced OT
+                img = SOTransfer(source=s, target=img, steps=10, clip=False)
+            elif algo == 'histo':
+                # histogram matching
+                img = histogram_matching(reference=s, image=img)
+            #cv2.imwrite('{}/{}_{}.png'.format(o, img_name, algo),img)
+            nam = "{}_{}".format(nam, alg)
+    
+    #Post-processing
+    if histo:
         # histogram matching
-        img = histogram_matching(reference=s, target=img, nbr_bins=256, nph=False, calc_map=True)
-        algo = algo + "_histo"
+        img = histogram_matching(reference=s, image=img)
+        nam = "{}_{}".format(nam, "histo")
+
+    if blending:
+        blend_src = 'target' #'source'
+        if blend_src == 'target':
+            orimg = read_image(image=t)
+        if blend_src == 'target_blur':
+            orimg = read_image(image=t)
+            orimg = gaussian_blur(image=orimg, ksize=(5,5), sigma=0) #ksize=(15,15)
+        elif blend_src == 'source':
+            orimg = read_image(image=s)
+            #expand source to target size if smaller
+            if orimg.shape != img.shape:
+                orimg = scale_img(orimg, img)
+        elif blend_src == 'regrain':
+            orimg = Regrain().regrain(source=img, target=t)
+
+        ycbcr_orimg = cv2.cvtColor(orimg, cv2.COLOR_BGR2YCR_CB)
+        #ycbcr_orimg = im2double(ycbcr_orimg).astype('float64')
+        y_orig, _, _ = cv2.split(ycbcr_orimg)
+
+        ycbcr_img = cv2.cvtColor(img, cv2.COLOR_BGR2YCR_CB)
+        #ycbcr_img = im2double(ycbcr_img).astype('float64')
+        y_img, cr_img, cb_img = cv2.split(ycbcr_img)
+        CT_alt(y_img)
+
+        # blend_y = Blending1(y_orig, y_img)
+        blend_y = Blending2(y_orig, y_img)
+        # blend_y = BlendingAlt(y_orig, y_img)
+
+        blend_y = _scale_array(blend_y, clip=False).astype("uint8")
+        # blend_y = _scale_array(255*blend_y, clip=False).astype("uint8")
+        # cr_img = _scale_array(255*cr_img, clip=False).astype("uint8")
+        # cb_img = _scale_array(255*cb_img, clip=False).astype("uint8")
+
+        # print(blend_y.shape, blend_y.dtype)
+        # print(cr_img.shape, cr_img.dtype)
+        # print(cb_img.shape, cb_img.dtype)
+
+        img = cv2.merge([blend_y, cr_img, cb_img])
+        img = cv2.cvtColor(img, cv2.COLOR_YCR_CB2BGR)
+        nam = "{}_{}".format(nam, "blending")
 
     if regrain:
         img = Regrain().regrain(source=img, target=t)
-        algo = algo + "_regrain"
+        nam = "{}_{}".format(nam, "regrain")
 
-    cv2.imwrite('{}/{}_{}.png'.format(o, img_name, algo),img)
+    # algo = algo.replace(',', '_')
+    cv2.imwrite('{}/{}{}.png'.format(o, img_name, nam),img)
     #print(img_name)
-    print('{}/{}_{}.png'.format(o, img_name, algo))
+    print('{}/{}{}.png'.format(o, img_name, nam))
 
 
 
@@ -868,13 +1162,17 @@ if __name__ == "__main__":
     parser.add_argument('-s', type=str, help='The reference image to source the colors from.')
     parser.add_argument('-t', type=str, help='The input image that will have colors transfered to.')
     parser.add_argument('-o', type=str, help='Output directory for resulting images.')
-    parser.add_argument('-algo', type=str, required=True, 
+    parser.add_argument('-algo', type=str, required=False, 
         help='Select which algorithm to use. Options: rgb, lab, ycbcr, lum, pdf, sot.')
     parser.add_argument('-regrain', dest='regrain', default=False, 
-        action='store_true', help='If added will use regrain for post-process')
+        action='store_true', help='If added will use regrain for post-process.')
     #parser.add_argument('-no-regrain', dest='regrain', action='store_false')
     parser.add_argument('-histo', dest='histo', default=False, 
-        action='store_true', help='If added will use histogram matching after color transfer')
+        action='store_true', help='If added will use histogram matching after color transfer.')
+    parser.add_argument('-blending', dest='blending', default=False, 
+        action='store_true', help='If added will blend original image and resulting color transfer image.')
+    parser.add_argument('-rep', dest='rep', default=False, 
+        action='store_true', help='If added will replace channels of the target image from the source image.')
 
 
     args = parser.parse_args()
@@ -885,22 +1183,20 @@ if __name__ == "__main__":
     regrain = args.regrain
     #regrain = False #True #
     histo = args.histo
+    blending = args.blending
+    rep = args.rep
 
     #checks if both paths are a single file
     if os.path.isfile(s) and os.path.isfile(t):
-        apply_transfer(s=s, t=t, o=o, algo=algo, regrain=regrain, histo=histo)
+        apply_transfer(s=s, t=t, o=o, algo=algo, regrain=regrain, histo=histo, blending=blending, rep=rep)
     #checks if source is a single image and target path is a directory
     elif os.path.isdir(t) and os.path.isfile(s):
-        walk_dir(s=s, t_path=t, o=o, algo=algo, regrain=regrain, histo=histo)
+        walk_dir(s=s, t_path=t, o=o, algo=algo, regrain=regrain, histo=histo, blending=blending, rep=rep)
     #check if both paths are a directory, must be paired images
     elif os.path.isdir(t) and os.path.isdir(s):
-        paired_walk_dir(s_path=s, t_path=t, o=o, algo=algo, regrain=regrain, histo=histo)
-
-
-
-    #img = 
-
+        paired_walk_dir(s_path=s, t_path=t, o=o, algo=algo, regrain=regrain, histo=histo, blending=blending, rep=rep)
+    else:
+        raise ValueError("Unsuported combination of source and target type: {} and {}.").format(s, t)
     
-    
-    
+    print("Done")
 
