@@ -48,6 +48,12 @@ def get_loss_fn(loss_type=None, weight=0, recurrent=False, reduction='mean', net
     elif loss_type == 'clipl1':
         loss_function = ClipL1()
         loss_type = 'pix-{}'.format(loss_type)
+    # Multiscale content/pixel loss
+    # elif loss_type == 'multiscale-l1':
+    elif loss_type.find('multiscale') >= 0:
+        ms_loss_f = get_loss_fn(loss_type.split('-')[1], recurrent=True)
+        loss_function = MultiscalePixelLoss(loss_f=ms_loss_f)
+        loss_type = 'pix-{}'.format(loss_type)
     # SSIM losses
     #TODO: pass SSIM options from opt_train
     elif loss_type == 'ssim' or loss_type == 'SSIM': #l_ssim_type
@@ -122,7 +128,7 @@ def get_loss_fn(loss_type=None, weight=0, recurrent=False, reduction='mean', net
     elif loss_type.find('avg') >= 0:
         avg_loss_f = get_loss_fn(loss_type.split('-')[1], recurrent=True)
         ds_f = torch.nn.AvgPool2d(kernel_size=opt['scale'])
-        loss_function = AverageLoss(loss_f=avg_loss_f, ds_f=ds_f) 
+        loss_function = AverageLoss(loss_f=avg_loss_f, ds_f=ds_f)
     else:
         loss_function = None
         #raise NotImplementedError('Loss type [{:s}] not recognized.'.format(loss_type))
@@ -377,6 +383,9 @@ class GeneratorLoss(nn.Module):
         avg_weight  = train_opt.get('avg_weight', 0)
         avg_criterion  = train_opt.get('avg_criterion', None)
 
+        ms_weight  = train_opt.get('ms_weight', 0)
+        ms_criterion  = train_opt.get('ms_criterion', None)
+
         spl_weight  = train_opt.get('spl_weight', 0)
         spl_type  = train_opt.get('spl_type', None)
 
@@ -471,6 +480,10 @@ class GeneratorLoss(nn.Module):
 
         if avg_weight > 0 and avg_criterion:
             cri_avg = get_loss_fn(avg_criterion, avg_weight, opt = opt) 
+            self.loss_list.append(cri_avg)
+        
+        if ms_weight > 0 and ms_criterion:
+            cri_avg = get_loss_fn(ms_criterion, ms_weight, opt = opt) 
             self.loss_list.append(cri_avg)
 
 

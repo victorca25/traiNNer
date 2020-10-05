@@ -54,10 +54,11 @@ datasets:
     # Noise and blur augmentations:
     lr_blur: false # true | false
     lr_blur_types: {gaussian: 1, clean: 3} # select from: "average","box","gaussian","bilateral","clean" ##blur options #median and motion aren't working yet
+    noise_data: ../noise_patches/normal/
     lr_noise: false # true | false
-    lr_noise_types: {gaussian: 1, JPEG: 1, clean: 4} # select from: "gaussian", "JPEG", "quantize", "poisson", "dither", "s&p", "speckle", "clean"
+    lr_noise_types: {gaussian: 1, JPEG: 1, clean: 4} # select from: "gaussian", "JPEG", "quantize", "poisson", "dither", "s&p", "speckle", "patches", "clean"
     lr_noise2: false # true | false
-    lr_noise_types2: {dither: 2, clean: 2} # select from: "gaussian", "JPEG", "quantize", "poisson", "dither", "s&p", "speckle", "clean"
+    lr_noise_types2: {dither: 2, clean: 2} # select from: "gaussian", "JPEG", "quantize", "poisson", "dither", "s&p", "speckle", "patches", "clean"
     hr_noise: false # true | false
     hr_noise_types:  {gaussian: 1, clean: 4} # select from: "gaussian", "JPEG", "quantize", "poisson", "dither", "s&p", "speckle", "clean"
     
@@ -219,16 +220,18 @@ train:
     # lpips_net: squeeze # "vgg" | "alex" | "squeeze" 
     
     # Experimental losses
-    # spl_weight: 0.1 # 1e-2 # SPL loss function. note: needs to add a cap in the generator (finalcap; For [0,1] range -> "finalcap": "clamp") or the overflow loss or it can become unstable.
     # spl_type: spl # "spl" | "gpl" | "cpl"
-    # of_weight: 0.2
+    # spl_weight: 0.1 # 1e-2 # SPL loss function. note: needs to add a cap in the generator (finalcap; For [0,1] range -> "finalcap": "clamp") or the overflow loss or it can become unstable.
     # of_type: overflow # overflow loss function to force the images back into the [0, 1] range
-    # fft_weight: 0.1
+    # of_weight: 0.2
     # fft_type: fft
-    # color_weight: 1 # Loss based on the UV channels of YUV color space, helps preserve color consistency
+    # fft_weight: 0.1
     # color_criterion: color-l1cosinesim # l1cosinesim naturally helps color consistency, so it is the best to use here, but others can be used as well
-    # avg_weight: 5 # Averaging downscale loss
+    # color_weight: 1 # Loss based on the UV channels of YUV color space, helps preserve color consistency
     # avg_criterion: avg-l1
+    # avg_weight: 5 # Averaging downscale loss
+    # ms_criterion: multiscale-l1
+    # ms_weight: 1e-2
     
     # Adversarial loss:
     gan_type: vanilla # "vanilla" | "wgan-gp" | "lsgan" 

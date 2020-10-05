@@ -273,7 +273,7 @@ class L1CosineSim(nn.Module):
     to ensure color correctness of the RGB vectors of each pixel.
     lambda is a constant factor that adjusts the contribution of the cosine similarity term
     It provides improved color stability, especially for low luminance values, which
-    are frequent in HDR images, since slight variations in any of theRGB components of these 
+    are frequent in HDR images, since slight variations in any of the RGB components of these 
     low values do not contribute much totheL1loss, but they may however cause noticeable 
     color shifts. More in the paper: https://arxiv.org/pdf/1803.02266.pdf
     '''
@@ -304,6 +304,56 @@ class ClipL1(nn.Module):
 
     def forward(self, sr, hr):
         loss = torch.mean(torch.clamp(torch.abs(sr-hr), self.clip_min, self.clip_max))
+        return loss
+
+
+class MaskedL1Loss(nn.Module):
+    r"""Masked L1 loss constructor."""
+    def __init__(self):
+        super(MaskedL1Loss, self, normalize_over_valid=False).__init__()
+        self.criterion = nn.L1Loss()
+        self.normalize_over_valid = normalize_over_valid
+
+    def forward(self, input, target, mask):
+        r"""Masked L1 loss computation.
+        Args:
+            input (tensor): Input tensor.
+            target (tensor): Target tensor.
+            mask (tensor): Mask to be applied to the output loss.
+        Returns:
+            (tensor): Loss value.
+        """
+        mask = mask.expand_as(input)
+        loss = self.criterion(input * mask, target * mask)
+        if self.normalize_over_valid:
+            # The loss has been averaged over all pixels.
+            # Only average over regions which are valid.
+            loss = loss * torch.numel(mask) / (torch.sum(mask) + 1e-6)
+        return loss
+
+
+class MultiscalePixelLoss(nn.Module):
+    def __init__(self, loss_f = torch.nn.L1Loss(), scale = 5):
+        super(MultiscalePixelLoss, self).__init__()
+        self.criterion = loss_f
+        self.downsample = nn.AvgPool2d(2, stride=2, count_include_pad=False)
+        self.weights = [1, 0.5, 0.25, 0.125, 0.125]
+        self.weights = self.weights[:scale]
+
+    def forward(self, input, target, mask=None):
+        loss = 0
+        if mask is not None:
+            mask = mask.expand(-1, input.size()[1], -1, -1)
+        for i in range(len(self.weights)):
+            if mask is not None:
+                loss += self.weights[i] * self.criterion(input * mask, target * mask)
+            else:
+                loss += self.weights[i] * self.criterion(input, target)
+            if i != len(self.weights) - 1:
+                input = self.downsample(input)
+                target = self.downsample(target)
+                if mask is not None:
+                    mask = self.downsample(mask)
         return loss
 
 
