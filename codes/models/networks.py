@@ -123,6 +123,10 @@ def define_G(opt):
         from models.modules.architectures import ABPN_arch
         netG = ABPN_arch.ABPN_v5(input_dim=3, dim=32)
         # netG = ABPN_arch.ABPN_v5(input_dim=opt_net['in_nc'], dim=opt_net['out_nc'])
+    elif which_model == 'pan_net': #PAN
+        from models.modules.architectures import PAN_arch
+        netG = PAN_arch.PAN(in_nc=opt_net['in_nc'], out_nc=opt_net['out_nc'],
+                            nf=opt_net['nf'], unf=opt_net['unf'], nb=opt_net['nb'], scale=opt_net['scale'])
     else:
         raise NotImplementedError('Generator model [{:s}] not recognized'.format(which_model))
 
