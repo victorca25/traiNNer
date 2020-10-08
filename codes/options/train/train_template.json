@@ -168,7 +168,8 @@
     // , "nf": 40
     // , "unf": 24
     // , "nb": 16
-    // , "scale": 4
+    // , "self_attention": true
+    // , "double_scpa": false
   }
 
   // Discriminator options:

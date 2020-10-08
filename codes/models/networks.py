@@ -126,7 +126,10 @@ def define_G(opt):
     elif which_model == 'pan_net': #PAN
         from models.modules.architectures import PAN_arch
         netG = PAN_arch.PAN(in_nc=opt_net['in_nc'], out_nc=opt_net['out_nc'],
-                            nf=opt_net['nf'], unf=opt_net['unf'], nb=opt_net['nb'], scale=opt_net['scale'])
+                            nf=opt_net['nf'], unf=opt_net['unf'], nb=opt_net['nb'], scale=opt_net['scale'],
+                            self_attention=opt_net.get('self_attention', False), 
+                            double_scpa=opt_net.get('double_scpa', False),
+                            ups_inter_mode=opt_net.get('ups_inter_mode', 'nearest'))
     else:
         raise NotImplementedError('Generator model [{:s}] not recognized'.format(which_model))
 

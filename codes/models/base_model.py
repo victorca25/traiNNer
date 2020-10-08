@@ -118,8 +118,9 @@ class BaseModel():
         for i, o in enumerate(resume_optimizers):
             self.optimizers[i].load_state_dict(o)
         for i, s in enumerate(resume_schedulers):
-            if isinstance(self.schedulers[i].milestones, Counter) and isinstance(s['milestones'], list):
-                s['milestones'] = Counter(s['milestones'])
+            if hasattr(self.schedulers[i], 'milestones'): # for schedulers without milestones attribute
+                if isinstance(self.schedulers[i].milestones, Counter) and isinstance(s['milestones'], list):
+                    s['milestones'] = Counter(s['milestones'])
             self.schedulers[i].load_state_dict(s)
 
     #TODO: check all these updates 
