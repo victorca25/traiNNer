@@ -394,7 +394,7 @@ def noise_img(img_LR, noise_types=['clean']):
         
         # decode
         noise_img = cv2.imdecode(encimg, 1) 
-        noise_img = noise_img.astype(np.float32).
+        noise_img = noise_img.astype(np.uint8)
         
     elif noise_type == 'quantize': # Color quantization / palette
         pixels = np.reshape(img_LR, (img_LR.shape[0]*img_LR.shape[1], 3)) 
