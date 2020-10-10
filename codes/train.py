@@ -180,7 +180,8 @@ def main():
                                 img_name, current_step))
 
                         if opt['train']['make_val_comparison']:
-                            comparison = cv2.hconcat([lr_img, sr_img])
+                            resized_lr = cv2.resize(lr_img, (sr_img.shape[1], sr_img.shape[0]), interpolation=cv2.INTER_NEAREST)
+                            comparison = cv2.hconcat([resized_lr, sr_img])
                             util.save_img(comparison, save_img_path)
                         else:
                             util.save_img(sr_img, save_img_path)
