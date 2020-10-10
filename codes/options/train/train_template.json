@@ -311,6 +311,7 @@
     , "niter": 5e5
     , "val_freq": 1000 //5e3
     //, "overwrite_val_imgs": true
+    //, "make_val_comparison": true
     , "metrics": "psnr,ssim,lpips" //select from: "psnr,ssim,lpips" or a combination separated by comma ","
   }
 

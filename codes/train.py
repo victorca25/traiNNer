@@ -7,6 +7,7 @@ import random
 import numpy as np
 from collections import OrderedDict
 import logging
+import cv2
 
 import torch
 
@@ -166,6 +167,7 @@ def main():
                         Get Visuals
                         """
                         visuals = model.get_current_visuals()
+                        lr_img = tensor2np(visuals['LR'], denormalize=opt['datasets']['train']['znorm'])
                         sr_img = tensor2np(visuals['SR'], denormalize=opt['datasets']['train']['znorm'])
                         gt_img = tensor2np(visuals['HR'], denormalize=opt['datasets']['train']['znorm'])
                         
@@ -176,7 +178,13 @@ def main():
                         else:
                             save_img_path = os.path.join(img_dir, '{:s}_{:d}.png'.format(\
                                 img_name, current_step))
-                        util.save_img(sr_img, save_img_path)
+
+                        if opt['train']['make_val_comparison']:
+                            resized_lr = cv2.resize(lr_img, (sr_img.shape[1], sr_img.shape[0]), interpolation=cv2.INTER_NEAREST)
+                            comparison = cv2.hconcat([resized_lr, sr_img])
+                            util.save_img(comparison, save_img_path)
+                        else:
+                            util.save_img(sr_img, save_img_path)
 
                         """
                         Get Metrics
