@@ -247,7 +247,7 @@ class LRHRDataset(data.Dataset):
                     img_HR, hr_scale_interpol_algo = augmentations.scale_img(img_HR, hr_downscale_amt, algo=ds_algo)
                     # Downscales LR to match new size of HR if scale does not match after
                     if img_LR is not None and (img_HR.shape[0] // scale != img_LR.shape[0] or img_HR.shape[1] // scale != img_LR.shape[1]):
-                        img_LR, lr_scale_interpol_algo = augmentations.scale_img(img_LR, hr_downscale_amt, algo=ds_algo)
+                        img_LR, lr_scale_interpol_algo = augmentations.scale_img(img_LR, hr_downscale_amt, algo=hr_scale_interpol_algo)
 
             # Validate there's an img_LR, if not, use img_HR
             if img_LR is None:
