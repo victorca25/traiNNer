@@ -7,7 +7,6 @@ import random
 import numpy as np
 from collections import OrderedDict
 import logging
-import cv2
 
 import torch
 
@@ -106,6 +105,8 @@ def main():
         model.resume_training(resume_state)  # handle optimizers and schedulers
         model.update_schedulers(opt['train']) # updated schedulers in case JSON configuration has changed
         del resume_state
+        # start the iteration time when resuming
+        t0 = time.time()
     else:
         current_step = 0
         virtual_step = 0
@@ -178,7 +179,6 @@ def main():
                         Get Visuals
                         """
                         visuals = model.get_current_visuals()
-                        lr_img = tensor2np(visuals['LR'], denormalize=opt['datasets']['train']['znorm'])
                         sr_img = tensor2np(visuals['SR'], denormalize=opt['datasets']['train']['znorm'])
                         gt_img = tensor2np(visuals['HR'], denormalize=opt['datasets']['train']['znorm'])
                         
@@ -190,10 +190,10 @@ def main():
                             save_img_path = os.path.join(img_dir, '{:s}_{:d}.png'.format(\
                                 img_name, current_step))
 
-                        if opt['train']['make_val_comparison']:
-                            resized_lr = cv2.resize(lr_img, (sr_img.shape[1], sr_img.shape[0]), interpolation=cv2.INTER_NEAREST)
-                            comparison = cv2.hconcat([resized_lr, sr_img])
-                            util.save_img(comparison, save_img_path)
+                        # save single images or lr / sr comparison
+                        if opt['train']['val_comparison']:
+                            lr_img = tensor2np(visuals['LR'], denormalize=opt['datasets']['train']['znorm'])
+                            util.save_img_comp(lr_img, sr_img, save_img_path)
                         else:
                             util.save_img(sr_img, save_img_path)
 

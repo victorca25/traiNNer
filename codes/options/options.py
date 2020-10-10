@@ -5,13 +5,13 @@ from collections import OrderedDict
 import cv2
 
 #PAD_MOD
-_cv2_pad_to_str = {'constant':cv2.BORDER_CONSTANT,
+_str_to_cv2_pad_to = {'constant':cv2.BORDER_CONSTANT,
                    'edge':cv2.BORDER_REPLICATE,
                    'reflect':cv2.BORDER_REFLECT_101,
                    'symmetric':cv2.BORDER_REFLECT
                   }
 #INTER_MODE
-_cv2_interpolation_to_str = {'nearest':cv2.INTER_NEAREST, 
+_str_to_cv2_interpolation = {'nearest':cv2.INTER_NEAREST, 
                          'linear':cv2.INTER_LINEAR,
                          'bilinear':cv2.INTER_LINEAR,
                          'area':cv2.INTER_AREA,
@@ -20,7 +20,8 @@ _cv2_interpolation_to_str = {'nearest':cv2.INTER_NEAREST,
                          'lanczos':cv2.INTER_LANCZOS4,
                          'lanczos4':cv2.INTER_LANCZOS4,
                          'linear_exact':cv2.INTER_LINEAR_EXACT,
-                         'matlab_bicubic':777}
+                         'matlab_bicubic':777,
+                         'realistic':999}
 
 def parse2lists(types):
     """ Converts dictionaries or single string options to lists that
@@ -144,7 +145,7 @@ def parse(opt_path, is_train=True):
             downscale_types = []
             for algo in dataset['lr_downscale_types']:
                 if type(algo) == str:
-                    downscale_types.append(_cv2_interpolation_to_str[algo.lower()])
+                    downscale_types.append(_str_to_cv2_interpolation[algo.lower()])
                 else:
                     downscale_types.append(algo)
             dataset['lr_downscale_types'] = downscale_types
@@ -173,6 +174,7 @@ def parse(opt_path, is_train=True):
         opt['path']['log'] = experiments_root
         opt['path']['val_images'] = os.path.join(experiments_root, 'val_images')
         opt['train']['overwrite_val_imgs'] = opt['train'].get('overwrite_val_imgs', None)
+        opt['train']['val_comparison'] = opt['train'].get('val_comparison', None)
         opt['logger']['overwrite_chkp'] = opt['logger'].get('overwrite_chkp', None)
         fsa = opt['train'].get('use_frequency_separation', None)
         if fsa and not opt['train'].get('fs', None):

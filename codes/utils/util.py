@@ -67,3 +67,8 @@ def sorted_nicely( l ):
 
 def save_img(img, img_path, mode='RGB'):
     cv2.imwrite(img_path, img)
+
+def save_img_comp(lr_img, sr_img, img_path, mode='RGB'):
+    lr_resized = cv2.resize(lr_img, (sr_img.shape[1], sr_img.shape[0]), interpolation=cv2.INTER_NEAREST)
+    comparison = cv2.hconcat([lr_resized, sr_img])
+    save_img(img=comparison, img_path=img_path, mode=mode)
