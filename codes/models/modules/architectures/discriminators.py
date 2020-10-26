@@ -527,7 +527,73 @@ class Discriminator_VGG_128_fea(nn.Module):
         return x
 
 
+class Discriminator_VGG_fea(nn.Module):
+    def __init__(self, size, in_nc, base_nf, norm_type='batch', act_type='leakyrelu', mode='CNA', convtype='Conv2D', \
+         arch='ESRGAN', spectral_norm=False, self_attention = False, max_pool=False, poolsize = 4):
+        super(Discriminator_VGG_fea, self).__init__()
+        # features
+        # hxw, c
+        # 128, 64
+        
+        # Self-Attention configuration
+        '''#TODO
+        self.self_attention = self_attention
+        self.max_pool = max_pool
+        self.poolsize = poolsize
+        '''
+        
+        # Remove BatchNorm2d if using spectral_norm
+        if spectral_norm:
+            norm_type = None
 
+        self.conv_blocks = []
+        self.conv_blocks.append(B.conv_block(in_nc, base_nf, kernel_size=3, norm_type=None, \
+            act_type=act_type, mode=mode, spectral_norm=spectral_norm))
+        self.conv_blocks.append(B.conv_block(base_nf, base_nf, kernel_size=4, stride=2, norm_type=norm_type, \
+            act_type=act_type, mode=mode, spectral_norm=spectral_norm))
+
+        cur_size = size // 2
+        cur_nc = base_nf
+        while cur_size > 4:
+            out_nc = cur_nc * 2 if cur_nc < 512 else cur_nc
+            self.conv_blocks.append(B.conv_block(cur_nc, out_nc, kernel_size=3, stride=1, norm_type=norm_type, \
+                act_type=act_type, mode=mode, spectral_norm=spectral_norm))
+            self.conv_blocks.append(B.conv_block(out_nc, out_nc, kernel_size=4, stride=2, norm_type=norm_type, \
+                act_type=act_type, mode=mode, spectral_norm=spectral_norm))
+            cur_nc = out_nc
+            cur_size //= 2
+        
+        '''#TODO
+        if self.self_attention:
+            self.FSA = SelfAttentionBlock(in_dim = base_nf*4, max_pool=self.max_pool, poolsize = self.poolsize, spectral_norm=spectral_norm)
+        '''
+
+        # self.features = B.sequential(*conv_blocks)
+
+        # classifier
+        if arch=='PPON':
+            self.classifier = nn.Sequential(
+                nn.Linear(cur_nc * cur_size * cur_size, 128), nn.LeakyReLU(0.2, True), nn.Linear(128, 1))
+        else: #arch='ESRGAN':
+            self.classifier = nn.Sequential(
+                nn.Linear(cur_nc * cur_size * cur_size, 100), nn.LeakyReLU(0.2, True), nn.Linear(100, 1))
+
+    #TODO: modify to a listening dictionary like VGG_Model(), can select what maps to use
+    def forward(self, x, return_maps=False):
+        feature_maps = []
+        # x = self.features(x)
+        for conv in self.conv_blocks:
+            # Fixes incorrect device error
+            device = x.device
+            conv = conv.to(device)
+            x = conv(x)
+            feature_maps.append(x)
+        
+        x = x.view(x.size(0), -1)
+        x = self.classifier(x)
+        if return_maps:
+            return [x, feature_maps]
+        return x
 
 
 class NLayerDiscriminator(nn.Module):
