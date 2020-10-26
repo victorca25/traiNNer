@@ -390,11 +390,11 @@ def noise_img(img_LR, noise_types=['clean']):
         compression = np.random.uniform(10, 50) #randomize quality between 10 and 50%
         encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), compression] #encoding parameters
         # encode
-        is_success, encimg = cv2.imencode('.jpg', img_LR*255, encode_param) 
+        is_success, encimg = cv2.imencode('.jpg', img_LR, encode_param) 
         
         # decode
         noise_img = cv2.imdecode(encimg, 1) 
-        noise_img = noise_img.astype(np.float32) / 255.
+        noise_img = noise_img.astype(np.uint8)
         
     elif noise_type == 'quantize': # Color quantization / palette
         pixels = np.reshape(img_LR, (img_LR.shape[0]*img_LR.shape[1], 3)) 

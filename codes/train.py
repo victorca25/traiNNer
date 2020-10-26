@@ -105,6 +105,8 @@ def main():
         model.resume_training(resume_state)  # handle optimizers and schedulers
         model.update_schedulers(opt['train']) # updated schedulers in case JSON configuration has changed
         del resume_state
+        # start the iteration time when resuming
+        t0 = time.time()
     else:
         current_step = 0
         virtual_step = 0
@@ -115,6 +117,11 @@ def main():
     try:
         for epoch in range(start_epoch, total_epochs):
             for n, train_data in enumerate(train_loader,start=1):
+
+                if virtual_step == 0:
+                    # first iteration start time
+                    t0 = time.time()
+
                 virtual_step += 1
                 take_step = False
                 if virtual_step * batch_size % virtual_batch_size == 0:
@@ -129,15 +136,21 @@ def main():
 
                 # log
                 if current_step % opt['logger']['print_freq'] == 0 and take_step:
+                    # iteration end time 
+                    t1 = time.time()
+
                     logs = model.get_current_log()
-                    message = '<epoch:{:3d}, iter:{:8,d}, lr:{:.3e}> '.format(
-                        epoch, current_step, model.get_current_learning_rate())
+                    message = '<epoch:{:3d}, iter:{:8,d}, lr:{:.3e}, i_time: {:.4f} sec.> '.format(
+                        epoch, current_step, model.get_current_learning_rate(), (t1 - t0))
                     for k, v in logs.items():
                         message += '{:s}: {:.4e} '.format(k, v)
                         # tensorboard logger
                         if opt['use_tb_logger'] and 'debug' not in opt['name']:
                             tb_logger.add_scalar(k, v, current_step)
                     logger.info(message)
+
+                    # # start time for next iteration
+                    # t0 = time.time()
 
                 # update learning rate
                 if model.optGstep and model.optDstep and take_step:
@@ -176,7 +189,13 @@ def main():
                         else:
                             save_img_path = os.path.join(img_dir, '{:s}_{:d}.png'.format(\
                                 img_name, current_step))
-                        util.save_img(sr_img, save_img_path)
+
+                        # save single images or lr / sr comparison
+                        if opt['train']['val_comparison']:
+                            lr_img = tensor2np(visuals['LR'], denormalize=opt['datasets']['train']['znorm'])
+                            util.save_img_comp(lr_img, sr_img, save_img_path)
+                        else:
+                            util.save_img(sr_img, save_img_path)
 
                         """
                         Get Metrics
@@ -203,6 +222,14 @@ def main():
                     if opt['use_tb_logger'] and 'debug' not in opt['name']:
                         for r in avg_metrics:
                             tb_logger.add_scalar(r['name'], r['average'], current_step)
+                    
+                    # # reset time for next iteration to skip the validation time from calculation
+                    # t0 = time.time()
+
+                if current_step % opt['logger']['print_freq'] == 0 and take_step or \
+                    (val_loader and current_step % opt['train']['val_freq'] == 0 and take_step):
+                    # reset time for next iteration to skip the validation time from calculation
+                    t0 = time.time()
 
         logger.info('Saving the final model.')
         model.save('latest')
