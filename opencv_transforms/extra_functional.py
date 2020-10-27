@@ -220,18 +220,29 @@ def compression_jpeg(img: np.ndarray, quality=20):
         quality (int: [0,100]): Compression quality for the image. Lower values represent 
             higher compression and lower quality. Default=20
     Returns:
-        numpy ndarray: version of the image with Speckle noise added.
+        numpy ndarray: version of the image with JPEG compression.
     """
     
     imgtype = img.dtype
-    
+    if img.ndim >= 3:
+        img_channels = img.shape[2]
+    elif img.ndim == 2:
+        img_channels = 1
+
     #encoding parameters
     encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), quality]
     # encode
     is_success, encimg = cv2.imencode('.jpg', img, encode_param) 
     
     # decode
-    jpeg_img = cv2.imdecode(encimg, 1) 
+    jpeg_img = cv2.imdecode(encimg, 1)
+    
+    # fix for grayscale images
+    if jpeg_img.ndim == 3 and jpeg_img.shape[2] != img_channels:
+        jpeg_img = jpeg_img[:,:,1]
+
+    if jpeg_img.ndim != 3:
+        jpeg_img = jpeg_img[..., np.newaxis]
     
     return jpeg_img.astype(imgtype)
 
@@ -626,6 +637,7 @@ def filter_colorbalance(img: np.ndarray, percent=1):
         img.shape[0] * img.shape[1] * (1 - percent / 200.0)
     )
     for channel in cv2.split(img):
+        channel = channel.astype(np.uint8)
         cumhist = np.cumsum(cv2.calcHist([channel], [0], None, [256], (0,256)))
         low_cut, high_cut = np.searchsorted(cumhist, cumstops)
         lut = np.concatenate((
@@ -668,12 +680,12 @@ def filter_unsharp(img: np.ndarray, blur_algo='median', kernel_size=None, streng
     else: # 'laplacian': using LoG (actually, median blur instead of gaussian)
         #randomize kernel_size between 1, 3 and 5
         if kernel_size is None:
-            kernel_sizes = [1, 3, 5]
+            kernel_sizes = [1, 3, 5] #TODO: ks 5 is causing errors
             kernel_size = random.choice(kernel_sizes)
         # Median filtering (could be Gaussian for proper LoG)
         #gray_image_mf = median_filter(gray_image, 1)
         if blur_algo == 'median':
-            smooth = cv2.medianBlur(img, kernel_size)
+            smooth = cv2.medianBlur(img.astype(np.uint8), kernel_size)
         # Calculate the Laplacian (LoG, or in this case, Laplacian of Median)
         lap = cv2.Laplacian(smooth,cv2.CV_64F)
         # Calculate the sharpened image

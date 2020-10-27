@@ -254,14 +254,20 @@ def pad(img, padding, fill=0, padding_mode='constant'):
         pad_left = pad_right = pad_top = pad_bottom = padding
         # pad_left, pad_top, pad_right, pad_bottom = padding
     if isinstance(padding, collections.Sequence) and len(padding) == 2:
-        pad_left = pad_right = padding[0]
-        pad_top = pad_bottom = padding[1]
+        pad_top = pad_bottom = padding[0]
+        pad_left = pad_right = padding[1]
     if isinstance(padding, collections.Sequence) and len(padding) == 4:
-        pad_left = padding[0]
-        pad_top = padding[1]
-        pad_right = padding[2]
-        pad_bottom = padding[3]
+        pad_top = padding[0]
+        pad_bottom = padding[1]
+        pad_left = padding[2]
+        pad_right = padding[3]
     
+    # if fill == 'random':
+    #     fill_list = []
+    #     for _ in range(len(img.shape)):
+    #         fill_list.append(random.randint(0, 255))
+    #     fill = tuple(fill_list)
+
     if isinstance(fill, numbers.Number):
         fill = (fill,) * (2 * len(img.shape) - 3)
     
