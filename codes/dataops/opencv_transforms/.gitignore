@@ -1,0 +1,7 @@
+__pycache__/
+.ipynb_checkpoints
+/dist/
+/*.egg-info
+*.pyc
+/build/
+todo.txt
