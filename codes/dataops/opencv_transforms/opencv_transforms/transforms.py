@@ -32,7 +32,8 @@ __all__ = ["Compose", "ToTensor", "ToCVImage",
            "RandomAverageBlur", "RandomBilateralBlur", "RandomBoxBlur","RandomGaussianBlur",
            "BayerDitherNoise", "FSDitherNoise", "AverageBWDitherNoise", "BayerBWDitherNoise",
            "BinBWDitherNoise", "FSBWDitherNoise", "RandomBWDitherNoise", 
-           "FilterMaxRGB", "FilterColorBalance", "FilterUnsharp", "FilterCanny"
+           "FilterMaxRGB", "FilterColorBalance", "FilterUnsharp", "FilterCanny",
+           "SimpleQuantize"
            ]
 
 _cv2_pad_to_str = {'constant':cv2.BORDER_CONSTANT,
@@ -1617,7 +1618,7 @@ class RandomSpeckleNoise(object):
             if self.random_params:
                 std = get_params(self.std)
             else:
-                stf = self.std
+                std = self.std
             return EF.noise_speckle(img, mean=0.0, std=std, gtype=self.gtype)
         return img
 
@@ -1636,21 +1637,23 @@ class RandomJPEGNoise(object):
                 sample with the minimum being 10% quality.
         """
 
-    def __init__(self, p=0.5, quality=20, random_params = False):
-        assert isinstance(quality, numbers.Number) and quality >= 0, 'quality should be a positive value'
+    def __init__(self, p=0.5, min_quality=20, max_quality=90, random_params = True):
+        assert isinstance(min_quality, numbers.Number) and min_quality >= 0, 'min_quality should be a positive value'
+        assert isinstance(max_quality, numbers.Number) and max_quality >= 0, 'max_quality should be a positive value'
         assert isinstance(p, numbers.Number) and p >= 0, 'p should be a positive value'
         self.p = p
-        self.quality = quality
+        self.min_quality = min_quality
+        self.max_quality = max_quality
         self.random_params = random_params
 
     @staticmethod
-    def get_params(quality):
+    def get_params(min_quality, max_quality):
         """Get compression level for JPEG noise
 
         Returns:
             quality level to be passed to compression
         """
-        quality = np.random.uniform(10, quality) #randomize quality between 10 and 50%
+        quality = np.random.uniform(min_quality, max_quality) #randomize quality between min_quality and max_quality
         return quality
 
     def __call__(self, img):
@@ -1663,9 +1666,9 @@ class RandomJPEGNoise(object):
         """
         if random.random() < self.p:
             if self.random_params:
-                quality = self.get_params(self.quality)
+                quality = self.get_params(self.min_quality, self.max_quality)
             else:
-                quality = self.quality
+                quality = self.max_quality
             return EF.compression_jpeg(img, quality=quality)
         return img
 
