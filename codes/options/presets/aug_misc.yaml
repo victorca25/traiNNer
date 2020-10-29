@@ -1,0 +1,22 @@
+kind: Misc
+version: v1
+metadata:
+  name: miscaug-default
+  description: other augmentations default preset
+
+config:
+  color_balance:
+    p: 0.5
+    percent: 1
+    random_params: false
+
+  unsharp:
+    p: 0.5
+    blur_algo: median #'median' or null
+    kernel_size: 3
+    strength: 0.3
+    unsharp_algo: laplacian #'DoG' or 'laplacian'
+
+  canny:
+    p: 0.5
+    sigma: 0.33

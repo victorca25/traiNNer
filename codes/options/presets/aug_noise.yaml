@@ -1,0 +1,49 @@
+kind: Noise
+version: v1
+metadata:
+  name: noise-default
+  description: default noise preset
+
+config:
+  dither:
+    p: 0.5
+    samplingF: 1
+
+  # simple_quantize:
+  #     p: 0.5
+  #     rgb_range: 40
+
+  quantize:
+    p: 0.5
+    num_colors: 16
+    sigma: 1.0
+    learning_rate: 0.2
+    neighborhood_function: bubble #'bubble', 'gaussian', 'mexican_hat' or 'triangle'
+
+  gaussian:
+    p: 0.5
+    mean: 0
+    std: 1.0
+    gtype: color # 'color' or 'bw'
+    random_params: false
+
+  jpeg:
+    p: 0.5
+    min_quality: 20
+    max_quality: 90
+
+  poisson:
+    p: 0.5
+
+  sp:
+    p: 0.5
+    prob: 0.1
+
+  speckle:
+    p: 0.5
+    std: 0.12
+    gtype: color # 'color' or 'bw'
+    random_params: false
+
+  maxrgb: 
+    p: 0.5

@@ -1,0 +1,28 @@
+kind: Blur
+version: v1
+metadata:
+  name: blur-default
+  description: default blur preset
+
+config:
+  average:
+    p: 0.5
+    kernel_size: 3
+    random_params: false
+
+  box:
+    p: 0.5
+    kernel_size: 3
+    random_params: false
+
+  gaussian:
+    p: 0.5
+    kernel_size: 3
+    random_params: false
+
+  bilateral:
+    p: 0.5
+    kernel_size: 3
+    sigmaColor: 5
+    sigmaSpace: 5
+    random_params: false
