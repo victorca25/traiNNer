@@ -27,8 +27,11 @@ def create_dataset(dataset_opt):
         from data.LRHR_dataset import LRHRDataset as D
     elif mode == 'LRHROTF':
         from data.LRHROTF_dataset import LRHRDataset as D
+    elif mode == 'LRHRC':
+        from data.LRHRC_dataset import LRHRDataset as D
     elif mode == 'LRHRseg_bg':
         from data.LRHR_seg_bg_dataset import LRHRSeg_BG_Dataset as D
+
     else:
         raise NotImplementedError('Dataset [{:s}] is not recognized.'.format(mode))
     dataset = D(dataset_opt)

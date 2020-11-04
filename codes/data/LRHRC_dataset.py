@@ -1,16 +1,22 @@
 import os.path
+# import glob
 import random
 import numpy as np
 import cv2
 import torch
-import torch.utils.data as data
+# import torch.utils.data as data
+from torch.utils.data.dataset import Dataset
 import dataops.common as util
 
-import dataops.augmentations as augmentations
+import dataops.augmentations as augmentations #TMP
+from dataops.augmentations import Scale, MLResize, RandomQuantize, KernelDownscale, NoisePatches, RandomNoisePatches, get_resize, get_blur, get_noise, get_pad
 from dataops.debug import tmp_vis, describe_numpy, describe_tensor
 
+import dataops.opencv_transforms.opencv_transforms as transforms
 
-class LRHRDataset(data.Dataset):
+
+
+class LRHRDataset(Dataset):
     '''
     Read LR and HR image pairs.
     If only HR image is provided, generate LR image on-the-fly.
@@ -23,6 +29,17 @@ class LRHRDataset(data.Dataset):
         self.paths_LR, self.paths_HR = None, None
         self.LR_env, self.HR_env = None, None  # environment for lmdb
         self.output_sample_imgs = None
+
+        if opt.get('dataroot_kernels', None):
+            #TODO: note: use the model scale to get the right kernel 
+            scale = opt.get('scale', 4)
+            self.ds_kernels = KernelDownscale(scale=scale, kernel_paths=opt['dataroot_kernels'])
+
+        if opt['phase'] == 'train' and opt.get('lr_noise_types', 3) and "patches" in opt['lr_noise_types']:
+            assert opt['noise_data']
+            self.noise_patches = NoisePatches(opt['noise_data'], opt.get('HR_size', 128)/opt.get('scale', 4))
+        else:
+            self.noise_patches = None
 
         # read image list from subset list txt
         if opt['subset_file'] is not None and opt['phase'] == 'train':
@@ -118,7 +135,7 @@ class LRHRDataset(data.Dataset):
             #"""
             assert len(self.paths_HR) >= len(self.paths_LR), \
                 'HR dataset contains less images than LR dataset  - {}, {}.'.format(\
-                len(self.paths_LR), len(self.paths_HR))
+                len(self.paths_HR), len(self.paths_LR))
             #"""
             if len(self.paths_LR) < len(self.paths_HR):
                 print('LR contains less images than HR dataset  - {}, {}. Will generate missing images on the fly.'.format(len(self.paths_LR), len(self.paths_HR)))
@@ -145,8 +162,8 @@ class LRHRDataset(data.Dataset):
 
     def __getitem__(self, index):
         HR_path, LR_path = None, None
-        scale = self.opt['scale']
-        HR_size = self.opt['HR_size']
+        scale = self.opt.get('scale', 4)
+        HR_size = self.opt.get('HR_size', 128)
         if HR_size:
             LR_size = HR_size // scale
         
@@ -197,8 +214,8 @@ class LRHRDataset(data.Dataset):
             # Even if LR dataset is provided, force to generate aug_downscale % of downscales OTF from HR
             # The code will later make sure img_LR has the correct size
             if self.opt.get('aug_downscale', None):
-                aug_downscale = self.opt['aug_downscale']
-                if np.random.rand() < aug_downscale:
+                #aug_downscale = self.opt['aug_downscale']
+                if np.random.rand() < self.opt['aug_downscale']:
                     img_LR = img_HR
             
         # If LR is not provided, use HR and modify on the fly
@@ -207,6 +224,10 @@ class LRHRDataset(data.Dataset):
             img_HR = util.read_img(self.HR_env, HR_path, out_nc=image_channels)
             img_LR = img_HR
             LR_path = HR_path
+        
+        # tmp_vis(img_HR, False)
+        # tmp_vis(img_LR, False)
+
         
         ######## Modify the images ########
         
@@ -244,23 +265,42 @@ class LRHRDataset(data.Dataset):
                     hr_downscale_amt = random.choice(hr_downscale_amt)
                 # will ignore if 1 or if result is smaller than hr size
                 if hr_downscale_amt > 1 and img_HR.shape[0]//hr_downscale_amt >= HR_size and img_HR.shape[1]//hr_downscale_amt >= HR_size:
-                    img_HR, hr_scale_interpol_algo = augmentations.scale_img(img_HR, hr_downscale_amt, algo=ds_algo)
+                    #img_HR, hr_scale_interpol_algo = augmentations.scale_img(img_HR, hr_downscale_amt, algo=ds_algo)
+                    img_HR, _ = Scale(img=img_HR, scale=hr_downscale_amt, algo=ds_algo)
                     # Downscales LR to match new size of HR if scale does not match after
                     if img_LR is not None and (img_HR.shape[0] // scale != img_LR.shape[0] or img_HR.shape[1] // scale != img_LR.shape[1]):
-                        img_LR, lr_scale_interpol_algo = augmentations.scale_img(img_LR, hr_downscale_amt, algo=ds_algo)
+                        #img_LR, lr_scale_interpol_algo = augmentations.scale_img(img_LR, hr_downscale_amt, algo=ds_algo)
+                        img_LR, _ = Scale(img=img_LR, scale=hr_downscale_amt, algo=ds_algo)
 
             # Validate there's an img_LR, if not, use img_HR
             if img_LR is None:
                 img_LR = img_HR
                 print("Image LR: ", LR_path, ("was not loaded correctly, using HR pair to downscale on the fly."))
-            
-            # Check that HR and LR have the same dimensions ratio, else, generate new LR from HR
+
+            # Check that HR and LR have the same dimensions ratio, else use an option to process
+            #TODO: add options variable
+            shape_change = self.opt.get('shape_change', 'reshape_hr') #"reshape_lr"
             if img_HR.shape[0]//img_LR.shape[0] != img_HR.shape[1]//img_LR.shape[1]:
-                #TODO: disabled to test cx loss 
-                #print("Warning: img_LR dimensions ratio does not match img_HR dimensions ratio for: ", HR_path)
-                #TODO: temporary change to test contextual loss with unaligned LR-HR pairs, forcing them to have the correct scale
-                img_HR, _ = augmentations.resize_img(np.copy(img_HR), newdim=(img_LR.shape[1]*scale,img_LR.shape[0]*scale), algo=cv2.INTER_LINEAR)
-                #img_LR = img_HR
+                if shape_change == "reshape_lr":
+                    img_LR = transforms.Resize((int(img_HR.shape[0]/scale), int(img_HR.shape[1]/scale)), interpolation="BILINEAR")(np.copy(img_LR))
+                elif shape_change == "reshape_hr":
+                    # print("pre: ", img_HR.shape[0], img_HR.shape[1])
+                    nh = img_HR.shape[0]*(2*img_LR.shape[1])//(img_LR.shape[0]+img_LR.shape[1])
+                    nw = img_HR.shape[1]*(2*img_LR.shape[0])//(img_LR.shape[0]+img_LR.shape[1])
+                    #TODO: temporary change to test contextual loss with unaligned LR-HR pairs, forcing them to have the correct scale
+                    #img_HR, _ = augmentations.resize_img(np.copy(img_HR), newdim=(img_LR.shape[1]*scale,img_LR.shape[0]*scale), algo=cv2.INTER_LINEAR)
+                    #img_HR = transforms.Resize((img_LR.shape[0]*scale,img_LR.shape[1]*scale), interpolation="BILINEAR")(np.copy(img_HR))
+                    img_HR = transforms.Resize((nh,nw), interpolation="BILINEAR")(np.copy(img_HR))
+                    # print("post: ", img_HR.shape[0], img_HR.shape[1])
+                    img_LR = transforms.Resize((int(img_HR.shape[0]/scale), int(img_HR.shape[1]/scale)), interpolation="BILINEAR")(np.copy(img_LR))
+                #TODO: check, this may not make sense
+                # elif shape_change == "pad_lr":
+                #     LR_pad, _ = get_pad(img_LR, HR_size//scale, fill=0, padding_mode='constant')
+                #     img_LR = LR_pad(np.copy(img_LR))
+                else: # generate new LR from HR
+                    #TODO: disabled to test cx loss 
+                    #print("Warning: img_LR dimensions ratio does not match img_HR dimensions ratio for: ", HR_path)
+                    img_LR = img_HR
             
             # Random Crop (reduce computing cost and adjust images to correct size first)
             if img_HR.shape[0] > HR_size or img_HR.shape[1] > HR_size:
@@ -268,16 +308,41 @@ class LRHRDataset(data.Dataset):
                 scaleor = img_HR.shape[0]//img_LR.shape[0]
                 img_HR, img_LR = augmentations.random_crop_pairs(img_HR, img_LR, HR_size, scaleor)
             
+            #TODO: test to be removed
+            # img_HR = transforms.Resize((HR_size-100,img_HR.shape[1]), interpolation="BILINEAR")(np.copy(img_HR))
+            # img_LR = transforms.Resize((LR_size-(100//scale),img_LR.shape[1]), interpolation="BILINEAR")(np.copy(img_LR))
             # Or if the HR images are too small, Resize to the HR_size size and fit LR pair to LR_size too
+            #TODO: add options variable
+            dim_change = self.opt.get('dim_change', 'pad')
             if img_HR.shape[0] < HR_size or img_HR.shape[1] < HR_size:
-                #TODO: temp disabled to test
-                #print("Warning: Image: ", HR_path, " size does not match HR size: (", HR_size,"). The image size is: ", img_HR.shape)
-                # rescale HR image to the HR_size 
-                img_HR, _ = augmentations.resize_img(np.copy(img_HR), newdim=(HR_size,HR_size), algo=cv2.INTER_LINEAR)
-                # rescale LR image to the LR_size (The original code discarded the img_LR and generated a new one on the fly from img_HR)
-                img_LR, _ = augmentations.resize_img(np.copy(img_LR), newdim=(LR_size,LR_size), algo=cv2.INTER_LINEAR)
+                if dim_change == "resize":
+                    #TODO: temp disabled to test
+                    #print("Warning: Image: ", HR_path, " size does not match HR size: (", HR_size,"). The image size is: ", img_HR.shape)
+                    # rescale HR image to the HR_size 
+                    # img_HR, _ = augmentations.resize_img(np.copy(img_HR), newdim=(HR_size,HR_size), algo=cv2.INTER_LINEAR)
+                    img_HR = transforms.Resize((HR_size, HR_size), interpolation="BILINEAR")(np.copy(img_HR))
+                    # rescale LR image to the LR_size (The original code discarded the img_LR and generated a new one on the fly from img_HR)
+                    #img_LR, _ = augmentations.resize_img(np.copy(img_LR), newdim=(LR_size,LR_size), algo=cv2.INTER_LINEAR)
+                    img_LR = transforms.Resize((LR_size, LR_size), interpolation="BILINEAR")(np.copy(img_LR))
+                elif dim_change == "pad":
+                    # if img_LR is img_HR, padding will be wrong, downscaling LR before padding
+                    if img_LR.shape[0] != img_HR.shape[0]//scale or img_LR.shape[1] != img_HR.shape[1]//scale:
+                        ds_algo = 777 # default to matlab-like bicubic downscale
+                        if self.opt.get('lr_downscale', None): # if manually set and scale algorithms are provided, then:
+                            ds_algo  = self.opt.get('lr_downscale_types', 777)
+                        if self.opt.get('lr_downscale', None) and self.opt.get('dataroot_kernels', None) and 999 in self.opt["lr_downscale_types"]:
+                            ds_kernel = self.ds_kernels
+                        else:
+                            ds_kernel = None
+                        img_LR, _ = Scale(img=img_LR, scale=scale, algo=ds_algo, ds_kernel=ds_kernel)
+                    
+                    HR_pad, fill = get_pad(img_HR, HR_size, fill='random', padding_mode=self.opt.get('pad_mode', 'constant'))
+                    img_HR = HR_pad(np.copy(img_HR))
+                    
+                    LR_pad, _ = get_pad(img_LR, HR_size//scale, fill=fill, padding_mode=self.opt.get('pad_mode', 'constant'))
+                    img_LR = LR_pad(np.copy(img_LR))
             
-            # Randomly scale LR from HR during training if :
+            # (Randomly) scale LR (from HR) during training if :
             # - LR dataset is not provided
             # - LR dataset is not in the correct scale
             # - Also to check if LR is not at the correct scale already (if img_LR was changed to img_HR)
@@ -288,7 +353,14 @@ class LRHRDataset(data.Dataset):
                 else: # else, if for some reason img_LR is too large, default to matlab-like bicubic downscale
                     #if not self.opt['aug_downscale']: #only print the warning if not being forced to use HR images instead of LR dataset (which is a known case)
                     print("LR image is too large, auto generating new LR for: ", LR_path)
-                img_LR, scale_interpol_algo = augmentations.scale_img(img_LR, scale, algo=ds_algo)
+                if self.opt.get('lr_downscale', None) and self.opt.get('dataroot_kernels', None) and 999 in self.opt["lr_downscale_types"]:
+                    ds_kernel = self.ds_kernels #KernelDownscale(scale, self.kernel_paths, self.num_kernel)
+                else:
+                    ds_kernel = None
+                #img_LR, scale_interpol_algo = augmentations.scale_img(img_LR, scale, algo=ds_algo)
+                img_LR, _ = Scale(img=img_LR, scale=scale, algo=ds_algo, ds_kernel=ds_kernel)
+                # resize = get_resize(size=LR_size, scale=scale, ds_algo=ds_algo)
+                # img_LR = resize(np.copy(img_LR))
             #"""
             
             # Rotations. 'use_flip' = 180 or 270 degrees (mirror), 'use_rot' = 90 degrees, 'HR_rrot' = random rotations +-45 degrees
@@ -307,7 +379,6 @@ class LRHRDataset(data.Dataset):
                 if np.random.rand() > 0.5: # randomize the random rotations, so half the images are the original
                     img_HR, img_LR = augmentations.random_rotate_pairs(img_HR, img_LR, HR_size, scale)
             
-            
             # Final sizes checks
             # if the resulting HR image size so far is too large or too small, resize HR to the correct size and downscale to generate a new LR on the fly
             # if the resulting LR so far does not have the correct dimensions, also generate a new HR-LR image pair on the fly
@@ -321,48 +392,61 @@ class LRHRDataset(data.Dataset):
                     #print("Image: ", LR_path, " size does not match LR size: (", HR_size//scale,"). The image size is: ", img_LR.shape)
 
                 # rescale HR image to the HR_size (should not be needed in LR case, but something went wrong before, just for sanity)
-                img_HR, _ = augmentations.resize_img(np.copy(img_HR), newdim=(HR_size,HR_size), algo=cv2.INTER_LINEAR)
+                #img_HR, _ = augmentations.resize_img(np.copy(img_HR), newdim=(HR_size,HR_size), algo=cv2.INTER_LINEAR)
+                img_HR = transforms.Resize((HR_size, HR_size), interpolation="BILINEAR")(np.copy(img_HR))
                 # if manually provided and scale algorithms are provided, then use it, else use matlab imresize to generate LR pair
                 ds_algo  = self.opt.get('lr_downscale_types', 777) 
-                img_LR, _ = augmentations.scale_img(img_HR, scale, algo=ds_algo)
+                #img_LR, _ = augmentations.scale_img(img_HR, scale, algo=ds_algo)
+                img_LR, _ = Scale(img_HR, scale, algo=ds_algo)
             
             
             # Below are the On The Fly augmentations
-
-            # Apply "auto levels" to images
-            rand_levels = (1 - self.opt.get('rand_auto_levels', 0)) # Randomize for augmentation
-            if self.opt.get('auto_levels', None) and np.random.rand() > rand_levels:
-                if self.opt['auto_levels'] == 'HR':
-                    #img_HR = augmentations.simplest_cb(img_HR, znorm=znorm) #TODO: now images are processed in the [0,255] range
-                    img_HR = augmentations.simplest_cb(img_HR)
-                elif self.opt['auto_levels'] == 'LR':
-                    #img_LR = augmentations.simplest_cb(img_LR, znorm=znorm) #TODO: now images are processed in the [0,255] range
-                    img_LR = augmentations.simplest_cb(img_LR)
-                elif self.opt['auto_levels'] == True or self.opt['auto_levels'] == 'Both':
-                    #img_HR = augmentations.simplest_cb(img_HR, znorm=znorm) #TODO: now images are processed in the [0,255] range
-                    img_HR = augmentations.simplest_cb(img_HR)
-                    #img_LR = augmentations.simplest_cb(img_LR, znorm=znorm) #TODO: now images are processed in the [0,255] range
-                    img_LR = augmentations.simplest_cb(img_LR)
             
+            # Apply "auto levels" to images
+            #rand_levels = (1 - self.opt.get('rand_auto_levels', 0)) # Randomize for augmentation
+            rand_levels = self.opt.get('rand_auto_levels', 0)
+            #rand_percent = self.opt.get('rand_auto_per', 10)
+            #if self.opt.get('auto_levels', None) and np.random.rand() > rand_levels:
+            if self.opt.get('auto_levels', None) == 'HR' or self.opt.get('auto_levels', None) == 'Both':
+                #img_HR = augmentations.simplest_cb(img_HR, znorm=znorm) #TODO: now images are processed in the [0,255] range
+                #img_HR = augmentations.simplest_cb(img_HR)
+                img_HR = transforms.FilterColorBalance(p=rand_levels, percent=10, random_params=True)(img_HR)
+            if self.opt.get('auto_levels', None)  == 'LR' or self.opt.get('auto_levels', None) == 'Both':
+                #img_LR = augmentations.simplest_cb(img_LR, znorm=znorm) #TODO: now images are processed in the [0,255] range
+                #img_LR = augmentations.simplest_cb(img_LR)
+                img_LR = transforms.FilterColorBalance(p=rand_levels, percent=10, random_params=True)(img_LR)
+
             # Apply unsharpening mask to LR images
+            '''
             rand_unsharp = (1 - self.opt.get('lr_rand_unsharp', 0)) # Randomize for augmentation
             if self.opt.get('lr_unsharp_mask', None) and np.random.rand() > rand_unsharp:
                 #img_LR = augmentations.unsharp_mask(img_LR, znorm=znorm) #TODO: now images are processed in the [0,255] range
                 img_LR = augmentations.unsharp_mask(img_LR)
+            '''
+            if self.opt.get('lr_unsharp_mask', None):
+                lr_rand_unsharp = self.opt.get('lr_rand_unsharp', 0)
+                img_LR =  transforms.FilterUnsharp(p=lr_rand_unsharp)(img_LR)
 
             # Apply unsharpening mask to HR images
+            '''
             rand_unsharp = (1 - self.opt.get('hr_rand_unsharp', 0)) # Randomize for augmentation
             if self.opt.get('hr_unsharp_mask', None) and np.random.rand() > rand_unsharp:
                 #img_HR = augmentations.unsharp_mask(img_HR, znorm=znorm) #TODO: now images are processed in the [0,255] range
                 img_HR = augmentations.unsharp_mask(img_HR)
-
-
+            '''
+            if self.opt.get('hr_unsharp_mask', None):
+                hr_rand_unsharp = self.opt.get('hr_rand_unsharp', 0)
+                img_HR =  transforms.FilterUnsharp(p=hr_rand_unsharp)(img_HR)
+            
             # Add noise to HR if enabled AND noise types are provided (for noise2noise and similar)
             if self.opt.get('hr_noise', None):
-                if self.opt['hr_noise_types']:
-                    img_HR, hr_noise_algo = augmentations.noise_img(img_HR, noise_types=self.opt['hr_noise_types'])
-                else:
-                    print("Noise types 'hr_noise_types' not defined. Skipping OTF noise for HR.")
+                noise_option = get_noise(self.opt.get('hr_noise_types', None))
+                if noise_option:
+                    #img_HR, hr_noise_algo = augmentations.noise_img(img_HR, noise_types=self.opt['hr_noise_types'])
+                    img_HR = noise_option(img_HR)
+                #TODO: check if necessary
+                # else:
+                #     print("Noise types 'hr_noise_types' not defined. Skipping OTF noise for HR.")
             
             # Create color fringes
             # Caution: Can easily destabilize a model
@@ -375,49 +459,64 @@ class LRHRDataset(data.Dataset):
             #"""
             #v LR blur AND blur types are provided, else will skip
             if self.opt.get('lr_blur', None):
-                if self.opt.get('lr_blur_types', None):
-                    img_LR, blur_algo, blur_kernel_size = augmentations.blur_img(img_LR, blur_algos=self.opt['lr_blur_types'])
-                else:
-                    print("Blur types 'lr_blur_types' not defined. Skipping OTF blur.")
+                blur_option = get_blur(self.opt.get('lr_blur_types', None))
+                if blur_option:
+                    #img_LR, blur_algo, blur_kernel_size = augmentations.blur_img(img_LR, blur_algos=blur_algos)
+                    img_LR = blur_option(img_LR)
+                #TODO: check if necessary
+                # else:
+                #     print("Blur types 'lr_blur_types' not defined. Skipping OTF blur.")
             #"""
                 
             #"""
             #v LR primary noise: Add noise to LR if enabled AND noise types are provided, else will skip
             if self.opt.get('lr_noise', None):
-                if self.opt.get('lr_noise_types', None):
-                    img_LR, noise_algo = augmentations.noise_img(img_LR, noise_types=self.opt['lr_noise_types'])
-                else:
-                    print("Noise types 'lr_noise_types' not defined. Skipping OTF noise.")
+                noise_option = get_noise(self.opt.get('lr_noise_types', None), self.noise_patches)
+                if noise_option:
+                    #img_LR, noise_algo = augmentations.noise_img(img_LR, noise_types=self.opt['lr_noise_types'])
+                    img_LR = noise_option(img_LR)
+                #TODO: check if necessary
+                # else:
+                #     print("Noise types 'lr_noise_types' not defined. Skipping OTF noise.")
+
             #v LR secondary noise: Add additional noise to LR if enabled AND noise types are provided, else will skip
             if self.opt.get('lr_noise2', None):
-                if self.opt.get('lr_noise_types2', None):
-                    img_LR, noise_algo2 = augmentations.noise_img(img_LR, noise_types=self.opt['lr_noise_types2'])
-                else:
-                    print("Noise types 'lr_noise_types2' not defined. Skipping OTF secondary noise.")
+                noise_option = get_noise(self.opt.get('lr_noise_types2', None), self.noise_patches)
+                if noise_option:
+                    #img_LR, noise_algo2 = augmentations.noise_img(img_LR, noise_types=self.opt['lr_noise_types2'])
+                    img_LR = noise_option(img_LR)
+                #TODO: check if necessary
+                # else:
+                #     print("Noise types 'lr_noise_types2' not defined. Skipping OTF secondary noise.")
             #"""
                 
             #"""
             #v LR cutout / LR random erasing (for inpainting/classification tests)
             if self.opt.get('lr_cutout', None) and (self.opt.get('lr_erasing', None)  != True):
-                img_LR = augmentations.cutout(img_LR, img_LR.shape[0] // 2)
+                # img_LR = augmentations.cutout(img_LR, img_LR.shape[0] // 2)
+                img_LR = transforms.Cutout(p=1, mask_size=img_LR.shape[0] // 2)(img_LR)
             elif self.opt.get('lr_erasing', None) and (self.opt.get('lr_cutout', None)  != True):
-                img_LR = augmentations.random_erasing(img_LR)
-            elif self.opt.get('lr_cutout', None) and self.opt.get('lr_erasing', None):
+                # img_LR = augmentations.random_erasing(img_LR)
+                img_LR = transforms.RandomErasing(p=1)(img_LR, mode=[3])
+            elif self.opt.get('lr_cutout', None) and self.opt.get('lr_erasing', None): 
                 if np.random.rand() > 0.5: #only do cutout or erasing, not both at the same time
-                    img_LR = augmentations.cutout(img_LR, img_LR.shape[0] // 2, p=0.5)
+                    #img_LR = augmentations.cutout(img_LR, img_LR.shape[0] // 2, p=0.5)
+                    img_LR = transforms.Cutout(p=1, mask_size=img_LR.shape[0] // 2)(img_LR)
                 else:
-                    img_LR = augmentations.random_erasing(img_LR, p=0.5, modes=[3])                
+                    #img_LR = augmentations.random_erasing(img_LR, p=0.5, modes=[3])
+                    img_LR = transforms.RandomErasing(p=1)(img_LR, mode=[3])
             #"""
-            
-        
+
+
         # For testing and validation
         if self.opt['phase'] != 'train':
             # Randomly downscale LR if enabled 
             if self.opt['lr_downscale']:
-                if self.opt['lr_downscale_types']:
-                    img_LR, scale_interpol_algo = augmentations.scale_img(img_LR, scale, algo=self.opt['lr_downscale_types'])
-                else: # Default to matlab-like bicubic downscale
-                    img_LR, scale_interpol_algo = augmentations.scale_img(img_LR, scale, algo=777)
+                # if self.opt['lr_downscale_types']:
+                #     img_LR, scale_interpol_algo = augmentations.scale_img(img_LR, scale, algo=self.opt['lr_downscale_types'])
+                # else: # Default to matlab-like bicubic downscale
+                #     img_LR, scale_interpol_algo = augmentations.scale_img(img_LR, scale, algo=777)
+                img_LR, _ = Scale(img_LR, scale, algo=self.opt.get('lr_downscale_types', 777))
         
         # Alternative position for changing the colorspace of LR. 
         # if self.opt['color_LR']: # Only change LR
@@ -470,7 +569,10 @@ class LRHRDataset(data.Dataset):
         if len(img_LR.shape) < 3:
             img_LR = img_LR[..., np.newaxis]
         
-        img_HR = util.np2tensor(img_HR, normalize=znorm, add_batch=False)
+        # tmp_vis(img_HR, False)
+        # tmp_vis(img_LR, False)
+
+        img_HR = util.np2tensor(img_HR, normalize=znorm, add_batch=False) #.astype('uint8').clip(0,255)
         img_LR = util.np2tensor(img_LR, normalize=znorm, add_batch=False)
         
         if LR_path is None:

@@ -128,12 +128,12 @@ def rgb_to_yuv(input: torch.Tensor, consts='yuv'):
         v: torch.Tensor = (r - y) * Vc + delta #cr
 
     if consts == 'uv': #returns only UV channels
-        return torch.stack((u, v), -2) 
+        return torch.stack((u, v), -3)
     else:
-        return torch.stack((y, u, v), -3) 
+        return torch.stack((y, u, v), -3)
 
 def ycbcr_to_rgb(input: torch.Tensor):
-    return yuv_to_rgb(input, consts == 'ycbcr')
+    return yuv_to_rgb(input, consts = 'ycbcr')
 
 def yuv_to_rgb(input: torch.Tensor, consts='yuv') -> torch.Tensor:
     if consts == 'yuvK': # Alt. yuv from Kornia YUV values: https://github.com/kornia/kornia/blob/master/kornia/color/yuv.py

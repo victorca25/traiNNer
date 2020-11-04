@@ -178,7 +178,6 @@ def bgr2ycbcr(img, only_y=True):
     if only_y:
         # mat = [24.966, 128.553, 65.481])
         # rlt = np.dot(img_ , mat)/ 255.0 + 16.0
-
         rlt = np.dot(img_ , [24.966, 128.553, 65.481]) / 255.0 + 16.0
     else:
         # mat = np.array([[24.966, 128.553, 65.481],[112, -74.203, -37.797], [-18.214, -93.786, 112.0]])
@@ -187,12 +186,11 @@ def bgr2ycbcr(img, only_y=True):
         # rlt = np.dot(img_, mat) + offset
         # rlt = np.clip(rlt, 0, 255)
         ## rlt = np.rint(rlt).astype('uint8')
-
         rlt = np.matmul(img_ , [[24.966, 112.0, -18.214], [128.553, -74.203, -93.786],
                               [65.481, -37.797, 112.0]]) / 255.0 + [16, 128, 128]
     
-    # to make ycrcb like cv2
-    # rlt = rlt[:, :, (0, 2, 1)]
+        # to make ycrcb like cv2
+        # rlt = rlt[:, :, (0, 2, 1)]
 
     if in_img_type == np.uint8:
         rlt = rlt.round()

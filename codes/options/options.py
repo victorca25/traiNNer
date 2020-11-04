@@ -20,6 +20,10 @@ _str_to_cv2_interpolation = {'nearest':cv2.INTER_NEAREST,
                          'lanczos':cv2.INTER_LANCZOS4,
                          'lanczos4':cv2.INTER_LANCZOS4,
                          'linear_exact':cv2.INTER_LINEAR_EXACT,
+                         'matlab_linear':773,
+                         'matlab_box':774,
+                         'matlab_lanczos2':775,
+                         'matlab_lanczos3':776,
                          'matlab_bicubic':777,
                          'realistic':999}
 
