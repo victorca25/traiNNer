@@ -10,6 +10,7 @@ import numpy as np
 #import pdb
 
 from models.modules.architectures.perceptual import VGG_Model
+from models.modules.architectures.video import optical_flow_warp
 from dataops.filters import *
 from dataops.colors import *
 from dataops.common import norm, denorm
@@ -383,6 +384,35 @@ class OFLoss(torch.nn.Module):
         img_clamp = img1.clamp(0,1)
         b,c,h,w = img1.shape
         return torch.log((img1 - img_clamp).abs() + 1).sum()/b/c/h/w
+
+
+class OFR_loss(torch.nn.Module):
+    '''
+    Optical flow reconstruction loss (for video)
+    https://github.com/LongguangWang/SOF-VSR/blob/master/TIP/data_utils.py
+    '''
+    def __init__(self, reg_weight=0.1):
+        super(OFR_loss, self).__init__()
+        self.regularization = L1_regularization()
+        self.reg_weight = reg_weight #lambda3
+
+    def forward(self, x0, x1, optical_flow):
+        warped = optical_flow_warp(x0, optical_flow)
+        loss = torch.mean(torch.abs(x1 - warped)) + self.reg_weight * self.regularization(optical_flow)
+        return loss
+
+class L1_regularization(torch.nn.Module):
+    # TODO: This is TVLoss/regularization, modify to reuse existing loss. Used by OFR_loss()
+    def __init__(self):
+        super(L1_regularization, self).__init__()
+
+    def forward(self, image):
+        b, _, h, w = image.size()
+        reg_x_1 = image[:, :, 0:h-1, 0:w-1] - image[:, :, 1:, 0:w-1]
+        reg_y_1 = image[:, :, 0:h-1, 0:w-1] - image[:, :, 0:h-1, 1:]
+        reg_L1 = torch.abs(reg_x_1) + torch.abs(reg_y_1)
+        return torch.sum(reg_L1) / (b*(h-1)*(w-1))
+
 
 
 #TODO: testing

@@ -25,6 +25,8 @@ def create_model(opt):
         # from .LPIPS_model import LPIPSModel as M
     elif model == 'asrragan':
         from .ASRRaGAN_model import ASRRaGANModel as M
+    elif model == 'vsrgan':
+        from .VSR_model import VSRModel as M
     else:
         raise NotImplementedError('Model [{:s}] not recognized.'.format(model))
     m = M(opt)

@@ -1,0 +1,32 @@
+name: VSR_x4
+suffix: null
+model: vsrgan # 
+scale: 4
+gpu_ids: [0]
+chop_forward: false
+
+datasets:
+  test_1: # the 1st test dataset
+    name: calendar
+    mode: VLR
+    #dataroot_HR: '../Vid4/calendar/HR'
+    dataroot_LR: '../Vid4/calendar/LR'
+    num_frames: 3 # the number of frames the network was trained to use to estimate the central frame
+    srcolors: true # to generate images with 3 channels
+  test_2: # the 2nd test dataset
+    name: foliage
+    mode: VLR
+    #dataroot_HR: '../Vid4/foliage/HR'
+    dataroot_LR: '../Vid4/foliage/LR'
+    num_frames: 3 # the number of frames the network was trained to use to estimate the central frame
+    srcolors: true # to generate images with 3 channels
+
+path:
+  root: 'D:/Code/GitHub/BasicSR'
+  pretrain_model_G: '../experiments/pretrained_models/video_x4.pth'
+
+network_G:
+  # SOFVSR:
+  which_model_G: sofvsr_net
+  n_frames: 3 # number of frames the network will use to estimate the central frame (n-1)/2. Must coincide with "num_frames" in the dataset.
+  channels: 320

@@ -3,6 +3,7 @@
 import torch
 import numpy as np
 
+from dataops.flow_utils import flow2img, flow2rgb
 
 # use these to debug the results from the image operations, to know if there 
 # are negative values, what are the min and max, mean, etc. Then know if a result 
@@ -90,7 +91,7 @@ def timefunctions(runs = 1000, function=None, *args):
     #print(kernel.shape)
     return None
 
-def tmp_vis(img_t, to_np=True):
+def tmp_vis(img_t, to_np=True, rgb2bgr=True, remove_batch=False):
     '''
         Visualization function that can be inserted at any point 
         in the code, works with tensor or np images
@@ -99,9 +100,47 @@ def tmp_vis(img_t, to_np=True):
     from dataops.common import tensor2np
 
     if to_np:
-        img = tensor2np(img_t.detach(), rgb2bgr=True, remove_batch=False)
+        img = tensor2np(img_t.detach(), rgb2bgr=rgb2bgr, remove_batch=remove_batch)
     else:
         img = img_t
+    print("out: ", img.shape)
+
+    cv2.imshow('image', img)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+
+    return None
+
+def tmp_vis_flow(img_t, to_np=True, rgb2bgr=False, remove_batch=True):
+    '''
+        Visualization function that can be inserted at any point 
+        in the code, works with tensor or np images
+    '''
+    import cv2
+    
+    ''' # for flow2img()
+    #TODO: Note: not producing the expected color maps, needs more testing
+    from dataops.common import tensor2np
+
+    if to_np:
+        img = tensor2np(img_t.detach(), rgb2bgr=rgb2bgr, remove_batch=remove_batch)
+    else:
+        img = img_t
+    
+    img = flow2img(np.float32(img/255.0))
+    '''
+
+    #''' # for flow2rgb
+    #TODO: simpler, but producing the expected color maps
+    max_flow = 10 # 'max flow value. Flow map color is saturated above this value. If not set, will use flow map's max value'
+    div_flow = 20 # 'value by which flow will be divided. Original value is 20 but 1 with batchNorm gives good results'
+    img = flow2rgb(div_flow * img_t[0,...], max_value=max_flow)
+    img = np.uint8(img*255)
+    #'''
+    
+    # rgb to bgr
+    img = img[:, :, [2, 1, 0]]
+    
     print("out: ", img.shape)
 
     cv2.imshow('image', img)

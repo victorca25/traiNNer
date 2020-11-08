@@ -130,6 +130,11 @@ def define_G(opt):
                             self_attention=opt_net.get('self_attention', False), 
                             double_scpa=opt_net.get('double_scpa', False),
                             ups_inter_mode=opt_net.get('ups_inter_mode', 'nearest'))
+    elif which_model == 'sofvsr_net':
+        from models.modules.architectures import SOFVSR_arch
+        netG = SOFVSR_arch.SOFVSR(scale=opt_net['scale'],
+                                  n_frames=opt_net.get('n_frames', 3),
+                                  channels=opt_net.get('channels', 320))
     else:
         raise NotImplementedError('Generator model [{:s}] not recognized'.format(which_model))
 

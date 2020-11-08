@@ -18,7 +18,7 @@ from dataops.debug import tmp_vis, describe_numpy, describe_tensor
 ####################
 
 ###################### get image path list ######################
-IMG_EXTENSIONS = ['.jpg', '.JPG', '.jpeg', '.JPEG', '.png', '.PNG', '.ppm', '.PPM', '.bmp', '.BMP', '.dng', '.DNG']
+IMG_EXTENSIONS = ['.jpg', '.JPG', '.jpeg', '.JPEG', '.png', '.PNG', '.ppm', '.PPM', '.bmp', '.BMP', '.dng', '.DNG', '.webp','.npy', '.NPY']
 
 def is_image_file(filename):
     return any(filename.endswith(extension) for extension in IMG_EXTENSIONS)
@@ -91,11 +91,15 @@ def read_img(env, path, out_nc=3, fix_channels=True):
         Numpy uint8, HWC, BGR, [0,255] by default 
     '''
 
+    img = None
     if env is None:  # img
-        if(path[-3:] == 'dng'): # if image is a DNG
+        if(path[-3:].lower() == 'dng'): # if image is a DNG
             import rawpy
             with rawpy.imread(path) as raw:
                 img = raw.postprocess()
+        if(path[-3:].lower() == 'npy'): # if image is a NPY numpy array
+            with open(path, 'rb') as f:
+                img = np.load(f)
         else: # else, if image can be read by cv2 
             img = cv2.imread(path, cv2.IMREAD_UNCHANGED)
         #TODO: add variable detecting if cv2 is not available and try PIL instead
@@ -107,7 +111,6 @@ def read_img(env, path, out_nc=3, fix_channels=True):
     else:
         img = _read_lmdb_img(env, path)
 
-    #TODO: review
     # if not img:
     #     raise ValueError(f"Failed to read image: {path}")
 
@@ -205,9 +208,13 @@ def rgb2ycbcr(img, only_y=True):
         rlt /= 255.
     return rlt.astype(in_img_type)
 
-def bgr2ycbcr(img, only_y=True):
+def bgr2ycbcr(img, only_y=True, separate=False):
     '''bgr version of matlab rgb2ycbcr
+    Python opencv library (cv2) cv2.COLOR_BGR2YCrCb has 
+    different parameters with MATLAB color convertion.
     only_y: only return Y channel
+    separate: if true, will returng the channels as 
+        separate images
     Input:
         uint8, [0, 255]
         float, [0, 1]
@@ -222,29 +229,43 @@ def bgr2ycbcr(img, only_y=True):
     else:
         rlt = np.matmul(img_ , [[24.966, 112.0, -18.214], [128.553, -74.203, -93.786],
                               [65.481, -37.797, 112.0]]) / 255.0 + [16, 128, 128]
-    # fix channel order
-    rlt = rlt[:, :, (0, 2, 1)]
+        # to make ycrcb like cv2
+        # rlt = rlt[:, :, (0, 2, 1)]
     
     if in_img_type == np.uint8:
         rlt = rlt.round()
     else:
         rlt /= 255.
-    return rlt.astype(in_img_type)
+    
+    if separate:
+        rlt = rlt.astype(in_img_type)
+        # y, cb, cr
+        return rlt[:, :, 0], rlt[:, :, 1], rlt[:, :, 2]
+    else:
+        return rlt.astype(in_img_type)
 
-def ycbcr2rgb(img):
-    '''same as matlab ycbcr2rgb
+'''
+def ycbcr2rgb_(img, only_y=True):
+    """same as matlab ycbcr2rgb
+    (Note: this implementation is the original from BasicSR, but 
+    appears to be for ycrcb, like cv2)
     Input:
         uint8, [0, 255]
         float, [0, 1]
-    '''
+    """
     in_img_type = img.dtype
     img_ = img.astype(np.float32)
     if in_img_type != np.uint8:
         img_  *= 255.
+    
+    # to make ycrcb like cv2
+    # rlt = rlt[:, :, (0, 2, 1)]
+
     # convert
+    # original (for ycrcb):
     rlt = np.matmul(img_ , [[0.00456621, 0.00456621, 0.00456621], [0, -0.00153632, 0.00791071],
                           [0.00625893, -0.00318811, 0]]) * 255.0 + [-222.921, 135.576, -276.836]
-    
+
     #alternative conversion:
     # xform = np.array([[1, 0, 1.402], [1, -0.34414, -.71414], [1, 1.772, 0]])
     # img_[:, :, [1, 2]] -= 128
@@ -257,6 +278,62 @@ def ycbcr2rgb(img):
     else:
         rlt /= 255.
     return rlt.astype(in_img_type)
+'''
+
+def ycbcr2rgb(img, only_y=True):
+    '''
+    bgr version of matlab ycbcr2rgb
+    Python opencv library (cv2) cv2.COLOR_YCrCb2BGR has 
+    different parameters to MATLAB color convertion.
+
+    Input:
+        uint8, [0, 255]
+        float, [0, 1]
+    '''
+    in_img_type = img.dtype
+    img_ = img.astype(np.float32)
+    if in_img_type != np.uint8:
+        img_  *= 255.
+    
+    # to make ycrcb like cv2
+    # rlt = rlt[:, :, (0, 2, 1)]
+
+    # convert
+    mat = np.array([[24.966, 128.553, 65.481],[112, -74.203, -37.797], [-18.214, -93.786, 112.0]])
+    mat = np.linalg.inv(mat.T) * 255
+    offset = np.array([[[16, 128, 128]]])
+
+    rlt = np.dot((img_ - offset), mat)
+    rlt = np.clip(rlt, 0, 255)
+    ## rlt = np.rint(rlt).astype('uint8')
+    
+    if in_img_type == np.uint8:
+        rlt = rlt.round()
+    else:
+        rlt /= 255.
+    return rlt.astype(in_img_type)
+
+'''
+#TODO: TMP RGB version, to check (PIL)
+def rgb2ycbcr(img_rgb):
+    ## the range of img_rgb should be (0, 1)
+    img_y = 0.257 * img_rgb[:, :, 0] + 0.504 * img_rgb[:, :, 1] + 0.098 * img_rgb[:, :, 2] + 16 / 255.0
+    img_cb = -0.148 * img_rgb[:, :, 0] - 0.291 * img_rgb[:, :, 1] + 0.439 * img_rgb[:, :, 2] + 128 / 255.0
+    img_cr = 0.439 * img_rgb[:, :, 0] - 0.368 * img_rgb[:, :, 1] - 0.071 * img_rgb[:, :, 2] + 128 / 255.0
+    return img_y, img_cb, img_cr
+
+#TODO: TMP RGB version, to check (PIL)
+def ycbcr2rgb(img_ycbcr):
+    ## the range of img_ycbcr should be (0, 1)
+    img_r = 1.164 * (img_ycbcr[:, :, 0] - 16 / 255.0) + 1.596 * (img_ycbcr[:, :, 2] - 128 / 255.0)
+    img_g = 1.164 * (img_ycbcr[:, :, 0] - 16 / 255.0) - 0.392 * (img_ycbcr[:, :, 1] - 128 / 255.0) - 0.813 * (img_ycbcr[:, :, 2] - 128 / 255.0)
+    img_b = 1.164 * (img_ycbcr[:, :, 0] - 16 / 255.0) + 2.017 * (img_ycbcr[:, :, 1] - 128 / 255.0)
+    img_r = img_r[:, :, np.newaxis]
+    img_g = img_g[:, :, np.newaxis]
+    img_b = img_b[:, :, np.newaxis]
+    img_rgb = np.concatenate((img_r, img_g, img_b), 2)
+    return img_rgb
+'''
 
 def modcrop(img_in, scale):
     # img_in: Numpy, HWC or HW
@@ -273,7 +350,7 @@ def modcrop(img_in, scale):
         raise ValueError('Wrong img ndim: [{:d}].'.format(img.ndim))
     return img
 
-#TODO: this should probably be elsewhere
+#TODO: this should probably be elsewhere (augmentations.py)
 def augment(img_list, hflip=True, rot=True):
     # horizontal flip OR rotate
     hflip = hflip and random.random() < 0.5
