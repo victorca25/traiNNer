@@ -79,25 +79,30 @@ class VidTrainsetLoader(Dataset):
         _, paths_HR = util.get_image_paths(self.opt['data_type'], os.path.join(self.paths_HR, video_dir))
         # print(paths_HR)
 
-        assert self.num_frames <= len(paths_HR), (
-            f'num_frame must be smaller than the number of frames per video, check {video_dir}')
-
         if self.opt['phase'] == 'train':
             # random reverse augmentation
             random_reverse = self.opt.get('random_reverse', False)
             
             # skipping intermediate frames to learn from low FPS videos augmentation
             # testing random frameskip up to 'max_frameskip' frames
-            max_frameskip = min(self.opt.get('max_frameskip', 5), len(paths_HR)//(self.num_frames-1))
-            frameskip = random.randint(1, max_frameskip)
+            max_frameskip = self.opt.get('max_frameskip', 0)
+            if max_frameskip > 0:
+                max_frameskip = min(max_frameskip, len(paths_HR)//(self.num_frames-1))
+                frameskip = random.randint(1, max_frameskip)
+            else:
+                frameskip = 1
             # print("max_frameskip: ", max_frameskip)
+
+            assert ((self.num_frames-1)*frameskip) <= (len(paths_HR)-1), (
+                f'num_frame*frameskip must be smaller than the number of frames per video, check {video_dir}')
             
             # if number of frames of training video is for example 31, "max index -num_frames" = 31-3=28
-            idx_frame = random.randint(0, len(paths_HR)-(self.num_frames*frameskip))
+            idx_frame = random.randint(0, (len(paths_HR)-1)-((self.num_frames-1)*frameskip))
+            # print('frameskip:', frameskip)
         else:
             frameskip = 1
             idx_frame = idx
-
+        
         '''
         List based frames loading
         '''
@@ -119,7 +124,10 @@ class VidTrainsetLoader(Dataset):
         resize_type = None
         LR_bicubic = None
         HR_center = None
+
+        # print('len(paths_HR)', len(paths_HR))
         for i_frame in range(self.num_frames):
+            # print('frame path:', paths_HR[int(idx_frame)+(frameskip*i_frame)])
             HR_img = util.read_img(None, paths_HR[int(idx_frame)+(frameskip*i_frame)], out_nc=self.image_channels)
             HR_img = util.modcrop(HR_img, scale)
 
