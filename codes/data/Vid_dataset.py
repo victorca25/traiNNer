@@ -69,7 +69,7 @@ class VidTrainsetLoader(Dataset):
             # get a random video directory
             idx_video = random.randint(0, len(self.video_list)-1)
             video_dir = self.video_list[idx_video]
-            print(video_dir)
+            # print(video_dir)
         else:
             # only one video and paths_LR/paths_HR is already the video dir
             video_dir = ""
