@@ -11,7 +11,7 @@
   , "datasets": {
     "train": {
       "name": "DIV2K"
-      , "mode": "LRHROTF"
+      , "mode": "LRHRC"
       //, "dataroot_HR": "../datasets/train/hr" //Original, with a single directory
       //, "dataroot_LR": "../datasets/train/lr" //Original, with a single directory
       , "dataroot_HR": [
@@ -44,8 +44,9 @@
       //, "aug_downscale": 0.2 // Example: 0.6 = 60% chance of generating LR on the fly, even if LR dataset exists
       
       // If manually configuring on the fly generation of LR: (else, it will automatically default to Matlab-like downscale algorithm (777) when/if required
+      , "dataroot_kernels": "D:/Code/Notebooks/training/kernels/results/" //location of the image kernels extracted with KernelGAN, for use with the "realistic" downscale type
       , "lr_downscale": true //false
-      , "lr_downscale_types": ["linear", "cubic", "matlab_bicubic"] //select from ["nearest", "linear", "cubic", "area", "lanczos4", "linear_exact", "matlab_bicubic"] //scale_algos //scaling interpolation options
+      , "lr_downscale_types": ["linear", "cubic", "matlab_bicubic"] //select from ["nearest", "linear", "cubic", "area", "lanczos4", "linear_exact", "matlab_bicubic", "realistic"] //scale_algos //scaling interpolation options
       
       // Rotations augmentations:
       , "use_flip": true //flip images 
@@ -55,7 +56,7 @@
       // Noise and blur augmentations:
       , "lr_blur": false //true | false
       , "lr_blur_types":  {"gaussian":1, "clean":3} //select from: "average","box","gaussian","bilateral","clean" //#blur options #median and motion aren't working yet
-      , "noise_data": "../noise_patches/normal/"
+      , "noise_data": "../noise_patches/normal/" //location of the noise patches extracted from real images to use for noise injection with noise option "patches"
       , "lr_noise": false //true | false
       , "lr_noise_types": {"gaussian":1, "JPEG":1, "clean":4} //select from: "gaussian", "JPEG", "quantize", "poisson", "dither", "s&p", "speckle", "patches", "clean"
       , "lr_noise2": false //true | false
