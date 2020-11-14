@@ -14,6 +14,11 @@ Some of the new things in the branch:
 - Other changes: added graceful interruption of training to continue from where it was interrupted, virtual batch option, "strict" model loading flag, support for using YAML or JSON options files, color transfer script (color_transfer.py) with multiple algorithms to transfer image statistics (colors) from a reference image to another
 - WIP: added on the fly use of realistic image kernels extracted with KernelGAN (https://openaccess.thecvf.com/content_ICCV_2019/papers/Zhou_Kernel_Modeling_Super-Resolution_on_Real_Low-Resolution_Images_ICCV_2019_paper.pdf) and injection of noise extracted from real images patches (https://openaccess.thecvf.com/content_cvpr_2018/papers/Chen_Image_Blind_Denoising_CVPR_2018_paper.pdf), change to use openCV-based composable transformation for augmentations (https://github.com/victorca25/opencv_transforms) with a new dataloader, use of configuration presets for reuse instead of editing full configuration files, video network for optical flow and video super-resolution (http://arxiv.org/abs/2001.02129 . Pretrained model using 3 frames, trained on a subset of REDS dataset: https://mega.nz/file/28JmyLrK#xhRP-EZKR7Vg7UjIRZQqotiFLix21JaGGLSvZq7cjt4 )
 
+Other useful links:
+- To extract the realistic kernels and noise patches, use the modified KernelGAN and patches extraction code in: https://github.com/victorca25/DLIP
+- Recommended GUI for using ESRGAN models: https://github.com/n00mkrad/cupscale
+
+
 
 
 

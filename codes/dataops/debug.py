@@ -91,10 +91,12 @@ def timefunctions(runs = 1000, function=None, *args):
     #print(kernel.shape)
     return None
 
-def tmp_vis(img_t, to_np=True, rgb2bgr=True, remove_batch=False):
+def tmp_vis(img_t, to_np=True, rgb2bgr=True, remove_batch=False, save_dir=''):
     '''
         Visualization function that can be inserted at any point 
         in the code, works with tensor or np images
+        img_t: image
+        save_dir: path to save image
     '''
     import cv2
     from dataops.common import tensor2np
@@ -107,14 +109,18 @@ def tmp_vis(img_t, to_np=True, rgb2bgr=True, remove_batch=False):
 
     cv2.imshow('image', img)
     cv2.waitKey(0)
+
+    if save_dir != '':
+        cv2.imwrite(save_dir, img)
+
     cv2.destroyAllWindows()
 
     return None
 
 def tmp_vis_flow(img_t, to_np=True, rgb2bgr=False, remove_batch=True):
     '''
-        Visualization function that can be inserted at any point 
-        in the code, works with tensor or np images
+        Flow visualization function that can be inserted at any point 
+        in the code
     '''
     import cv2
     

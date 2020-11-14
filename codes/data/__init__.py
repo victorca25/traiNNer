@@ -35,6 +35,8 @@ def create_dataset(dataset_opt):
         from data.Vid_dataset import VidTrainsetLoader as D
     elif mode == 'VLR':
         from data.Vid_dataset import VidTestsetLoader as D
+    elif mode == 'LRHRPBR':
+        from data.LRHRPBR_dataset import LRHRDataset as D
     else:
         raise NotImplementedError('Dataset [{:s}] is not recognized.'.format(mode))
     dataset = D(dataset_opt)
