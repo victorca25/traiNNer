@@ -9,8 +9,7 @@ from torch.utils.data.dataset import Dataset
 import dataops.common as util
 
 # import dataops.augmentations as augmentations #TMP
-# from dataops.augmentations import Scale, MLResize, RandomQuantize, KernelDownscale, NoisePatches, RandomNoisePatches, get_resize, get_blur, get_noise, get_pad
-from dataops.augmentations import KernelDownscale, NoisePatches
+from dataops.augmentations import Scale, MLResize, RandomQuantize, KernelDownscale, NoisePatches, RandomNoisePatches, get_resize, get_blur, get_noise, get_pad
 from dataops.debug import tmp_vis, describe_numpy, describe_tensor
 
 import dataops.opencv_transforms.opencv_transforms as transforms
@@ -39,10 +38,13 @@ class LRHRDataset(Dataset):
         else:
             self.noise_patches = None
 
-        # Check if dataroot_HR is a list of directories or a single directory. Note: lmdb will not currently work with a list
+        # Get dataroot_HR
         self.paths_HR = opt.get('dataroot_HR', None)
         if self.paths_HR:
             self.pbr_list = os.listdir(self.paths_HR)
+        
+        # Get dataroot_LR
+        self.paths_LR = opt.get('dataroot_LR', None)
 
     def __getitem__(self, index):
         HR_path, LR_path = None, None
@@ -77,13 +79,18 @@ class LRHRDataset(Dataset):
         roughness_img = None
 
         for source in dir_content:
-            if source.find('_diffuse.') >= 0:
+            #TODO: handle uppercase names
+            #ref: https://marmoset.co/posts/pbr-texture-conversion/
+            if source.find('_diffuse.') >= 0 or source.find('_color.') >= 0:
                 diffuse_img = util.read_img(None, os.path.join(cur_dir, source), out_nc=3)
-            elif source.find('_ao.') >= 0:
+                if self.paths_LR:
+                    cur_dir_lr = os.path.join(self.paths_LR, pbr_dir)
+                    diffuse_img_lr = util.read_img(None, os.path.join(cur_dir_lr, source), out_nc=3)
+                else:
+                    diffuse_img_lr = diffuse_img
+            elif source.find('_ao.') >= 0 or source.find('_occlusion.') >= 0 or source.find('_ambientocclusion.') >= 0:
                 ao_img = util.read_img(None, os.path.join(cur_dir, source), out_nc=1)
-            elif source.find('_glossiness.') >= 0:
-                glossiness_img = util.read_img(None, os.path.join(cur_dir, source), out_nc=1)
-            elif source.find('_height.') >= 0:
+            elif source.find('_height.') >= 0 or source.find('_displacement.') >= 0 or source.find('_bump.') >= 0:
                 height_img = util.read_img(None, os.path.join(cur_dir, source), out_nc=1)
             elif source.find('_metalness.') >= 0:
                 metalness_img = util.read_img(None, os.path.join(cur_dir, source), out_nc=1)
@@ -93,13 +100,16 @@ class LRHRDataset(Dataset):
                 reflection_img = util.read_img(None, os.path.join(cur_dir, source), out_nc=3)
             elif source.find('_roughness.') >= 0:
                 roughness_img = util.read_img(None, os.path.join(cur_dir, source), out_nc=1)
+            elif source.find('_glossiness.') >= 0 and not isinstance(roughness_img, np.ndarray):
+                # glossiness_img = util.read_img(None, os.path.join(cur_dir, source), out_nc=1)
+                roughness_img = 255 - util.read_img(None, os.path.join(cur_dir, source), out_nc=1)
         
         # if isinstance(diffuse_img, np.ndarray):
         #     tmp_vis(diffuse_img, False)
+        # if isinstance(diffuse_img_lr, np.ndarray):
+        #     tmp_vis(diffuse_img_lr, False)
         # if isinstance(ao_img, np.ndarray):
         #     tmp_vis(ao_img, False)
-        # if isinstance(glossiness_img, np.ndarray):
-        #     tmp_vis(glossiness_img, False)
         # if isinstance(height_img, np.ndarray):
         #     tmp_vis(height_img, False)
         # if isinstance(metalness_img, np.ndarray):
@@ -122,19 +132,61 @@ class LRHRDataset(Dataset):
         #Augmentations during training
         if self.opt['phase'] == 'train':
             
+            # Or if the HR images are too small, fix to the HR_size size and fit LR pair to LR_size too
+            dim_change = self.opt.get('dim_change', 'pad')
+            if diffuse_img.shape[0] < HR_size or diffuse_img.shape[1] < HR_size:
+                if dim_change == "resize":
+                    # rescale HR image to the HR_size 
+                    diffuse_img = transforms.Resize((HR_size, HR_size), interpolation="BILINEAR")(np.copy(diffuse_img))
+                    # rescale LR image to the LR_size (The original code discarded the diffuse_img_lr and generated a new one on the fly from diffuse_img)
+                    diffuse_img_lr = transforms.Resize((LR_size, LR_size), interpolation="BILINEAR")(np.copy(diffuse_img_lr))
+                elif dim_change == "pad":
+                    # if diffuse_img_lr is diffuse_img, padding will be wrong, downscaling LR before padding
+                    if diffuse_img_lr.shape[0] != diffuse_img.shape[0]//scale or diffuse_img_lr.shape[1] != diffuse_img.shape[1]//scale:
+                        ds_algo = 777 # default to matlab-like bicubic downscale
+                        if self.opt.get('lr_downscale', None): # if manually set and scale algorithms are provided, then:
+                            ds_algo  = self.opt.get('lr_downscale_types', 777)
+                        if self.opt.get('lr_downscale', None) and self.opt.get('dataroot_kernels', None) and 999 in self.opt["lr_downscale_types"]:
+                            ds_kernel = self.ds_kernels
+                        else:
+                            ds_kernel = None
+                        diffuse_img_lr, _ = Scale(img=diffuse_img_lr, scale=scale, algo=ds_algo, ds_kernel=ds_kernel)
+                    
+                    HR_pad, fill = get_pad(diffuse_img, HR_size, fill='random', padding_mode=self.opt.get('pad_mode', 'constant'))
+                    diffuse_img = HR_pad(np.copy(diffuse_img))
+                    
+                    LR_pad, _ = get_pad(diffuse_img_lr, HR_size//scale, fill=fill, padding_mode=self.opt.get('pad_mode', 'constant'))
+                    diffuse_img_lr = LR_pad(np.copy(diffuse_img_lr))
+            
+            # (Randomly) scale LR (from HR) during training if :
+            # - LR dataset is not provided
+            # - LR dataset is not in the correct scale
+            # - Also to check if LR is not at the correct scale already (if img_LR was changed to img_HR)
+            if diffuse_img_lr.shape[0] != LR_size or diffuse_img_lr.shape[1] != LR_size:
+                ds_algo = 777 # default to matlab-like bicubic downscale
+                if self.opt.get('lr_downscale', None): # if manually set and scale algorithms are provided, then:
+                    ds_algo  = self.opt.get('lr_downscale_types', 777)
+                else: # else, if for some reason diffuse_img_lr is too large, default to matlab-like bicubic downscale
+                    #if not self.opt['aug_downscale']: #only print the warning if not being forced to use HR images instead of LR dataset (which is a known case)
+                    print("LR image is too large, auto generating new LR for: ", LR_path)
+                if self.opt.get('lr_downscale', None) and self.opt.get('dataroot_kernels', None) and 999 in self.opt["lr_downscale_types"]:
+                    ds_kernel = self.ds_kernels #KernelDownscale(scale, self.kernel_paths, self.num_kernel)
+                else:
+                    ds_kernel = None
+                diffuse_img_lr, _ = Scale(img=diffuse_img_lr, scale=scale, algo=ds_algo, ds_kernel=ds_kernel)
+
             # Random Crop (reduce computing cost and adjust images to correct size first)
             if diffuse_img.shape[0] > HR_size or diffuse_img.shape[1] > HR_size:
                 #Here the scale should be in respect to the images, not to the training scale (in case they are being scaled on the fly)
-                crop_params = get_crop_params(diffuse_img, HR_size, scale)
-
-                diffuse_img = apply_crop_params(diffuse_img, crop_params)
-                ao_img = apply_crop_params(ao_img, crop_params)
-                glossiness_img = apply_crop_params(glossiness_img, crop_params)
-                height_img = apply_crop_params(height_img, crop_params)
-                metalness_img = apply_crop_params(metalness_img, crop_params)
-                normal_img = apply_crop_params(normal_img, crop_params)
-                reflection_img = apply_crop_params(reflection_img, crop_params)
-                roughness_img= apply_crop_params(roughness_img, crop_params)
+                hr_crop_params, lr_crop_params = get_crop_params(diffuse_img, LR_size, scale)
+                diffuse_img, _ = apply_crop_params(HR=diffuse_img, LR=None, hr_crop_params=hr_crop_params, lr_crop_params=None)
+                _, diffuse_img_lr = apply_crop_params(HR=None, LR=diffuse_img_lr, hr_crop_params=None, lr_crop_params=lr_crop_params)
+                ao_img, _ = apply_crop_params(HR=ao_img, LR=None, hr_crop_params=hr_crop_params, lr_crop_params=None)
+                height_img, _ = apply_crop_params(HR=height_img, LR=None, hr_crop_params=hr_crop_params, lr_crop_params=None)
+                metalness_img, _ = apply_crop_params(HR=metalness_img, LR=None, hr_crop_params=hr_crop_params, lr_crop_params=None)
+                normal_img, _ = apply_crop_params(HR=normal_img, LR=None, hr_crop_params=hr_crop_params, lr_crop_params=None)
+                reflection_img, _ = apply_crop_params(HR=reflection_img, LR=None, hr_crop_params=hr_crop_params, lr_crop_params=None)
+                roughness_img, _ = apply_crop_params(HR=roughness_img, LR=None, hr_crop_params=hr_crop_params, lr_crop_params=None)
 
         if isinstance(diffuse_img, np.ndarray):
             # tmp_vis(diffuse_img, False)
@@ -142,17 +194,18 @@ class LRHRDataset(Dataset):
             # tmp_vis(diffuse_img, True)
         else:
             diffuse_img = []
+        if isinstance(diffuse_img_lr, np.ndarray):
+            # tmp_vis(diffuse_img, False)
+            diffuse_img_lr = util.np2tensor(diffuse_img_lr, normalize=znorm, add_batch=False)
+            # tmp_vis(diffuse_img, True)
+        else:
+            diffuse_img_lr = []
         if isinstance(ao_img, np.ndarray):
             # tmp_vis(ao_img, False)
             ao_img = util.np2tensor(ao_img, normalize=znorm, add_batch=False)
             # tmp_vis(ao_img, True)
         else:
             ao_img = []
-        if isinstance(glossiness_img, np.ndarray):
-            # tmp_vis(glossiness_img, False)
-            glossiness_img = util.np2tensor(glossiness_img, normalize=znorm, add_batch=False)
-        else:
-            glossiness_img = []
         if isinstance(height_img, np.ndarray):
             # tmp_vis(height_img, False)
             height_img = util.np2tensor(height_img, normalize=znorm, add_batch=False)
@@ -180,10 +233,10 @@ class LRHRDataset(Dataset):
             roughness_img = []
 
         # return {'LR': diffuse_img, 'HR': normal_img, 'LR_path': cur_dir, 'HR_path': cur_dir}
-        return {'LR': diffuse_img, 
-                'HR': normal_img, 
+        return {'LR': diffuse_img_lr, 
+                'HR': diffuse_img, 
+                'NO': normal_img, 
                 'AO': ao_img, 
-                'GL': glossiness_img, 
                 'HE': height_img, 
                 'ME': metalness_img, 
                 'RE': reflection_img, 
@@ -195,27 +248,39 @@ class LRHRDataset(Dataset):
         return len(self.pbr_list)
 
 
-def get_crop_params(img, patch_size, scale):
+def get_crop_params(img, patch_size_lr, scale):
     h_hr, w_hr, _ = img.shape
     h_lr = h_hr // scale
     w_lr = w_hr // scale
-    idx_h = random.randint(10, h_lr - patch_size - 10)
-    idx_w = random.randint(10, w_lr - patch_size - 10)
+    idx_h = random.randint(10, h_lr - patch_size_lr - 10)
+    idx_w = random.randint(10, w_lr - patch_size_lr - 10)
 
     h_start_hr = (idx_h - 1) * scale
-    h_end_hr = (idx_h - 1 + patch_size) * scale
+    h_end_hr = (idx_h - 1 + patch_size_lr) * scale
     w_start_hr = (idx_w - 1) * scale
-    w_end_hr = (idx_w - 1 + patch_size) * scale
-    
-    crop_params = [h_start_hr, h_end_hr, w_start_hr, w_end_hr]
-    
-    return crop_params
+    w_end_hr = (idx_w - 1 + patch_size_lr) * scale
 
-def apply_crop_params(img=None, crop_params=None):
-    if isinstance(img, np.ndarray) and crop_params:
-        (h_start_hr, h_end_hr, w_start_hr, w_end_hr) = crop_params
-        img = img[h_start_hr:h_end_hr, w_start_hr:w_end_hr]
+    h_start_lr = idx_h - 1
+    h_end_lr = idx_h - 1 + patch_size_lr
+    w_start_lr = idx_w - 1
+    w_end_lr = idx_w - 1 + patch_size_lr
+    
+    hr_crop_params = [h_start_hr, h_end_hr, w_start_hr, w_end_hr]
+    lr_crop_params = [h_start_lr, h_end_lr, w_start_lr, w_end_lr]
+    
+    return hr_crop_params, lr_crop_params
+
+def apply_crop_params(HR=None, LR=None, hr_crop_params=None, lr_crop_params=None):
+    if isinstance(HR, np.ndarray) and hr_crop_params:
+        (h_start_hr, h_end_hr, w_start_hr, w_end_hr) = hr_crop_params
+        HR = HR[h_start_hr:h_end_hr, w_start_hr:w_end_hr]
     else:
-        img = None
+        HR = None
+    
+    if isinstance(LR, np.ndarray) and lr_crop_params:
+        (h_start_lr, h_end_lr, w_start_lr, w_end_lr) = lr_crop_params
+        LR = LR[h_start_lr:h_end_lr, w_start_lr:w_end_lr]
+    else:
+        LR = None
         
-    return img
+    return HR, LR

@@ -22,7 +22,7 @@ def Scale(img=None, scale: int = None, algo=None, ds_kernel=None, resize_type=No
     w = int(oh/scale)
     h = int(ow/scale)
     if (h == oh) and (w == ow):
-        return img
+        return img, None
     
     resize, resize_type = get_resize(size=(h, w), scale=scale, ds_algo=algo, ds_kernel=ds_kernel, resize_type=resize_type)
     return resize(np.copy(img)), resize_type
