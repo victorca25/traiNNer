@@ -58,8 +58,9 @@ class LRHRDataset(Dataset):
         znorm  = self.opt.get('znorm', False)
 
         # get a random pbr directory
-        idx_pbr = random.randint(0, len(self.pbr_list)-1)
-        pbr_dir = self.pbr_list[idx_pbr]
+        # idx_pbr = random.randint(0, len(self.pbr_list)-1)
+        # pbr_dir = self.pbr_list[idx_pbr]
+        pbr_dir = self.pbr_list[index]
         # print(pbr_dir)
 
         #TODO: TMP os problem
@@ -97,7 +98,7 @@ class LRHRDataset(Dataset):
             elif source.find('_normal.') >= 0:
                 normal_img = util.read_img(None, os.path.join(cur_dir, source), out_nc=3)
             elif source.find('_reflection.') >= 0:
-                reflection_img = util.read_img(None, os.path.join(cur_dir, source), out_nc=3)
+                reflection_img = util.read_img(None, os.path.join(cur_dir, source), out_nc=1)
             elif source.find('_roughness.') >= 0:
                 roughness_img = util.read_img(None, os.path.join(cur_dir, source), out_nc=1)
             elif source.find('_glossiness.') >= 0 and not isinstance(roughness_img, np.ndarray):
@@ -188,61 +189,71 @@ class LRHRDataset(Dataset):
                 reflection_img, _ = apply_crop_params(HR=reflection_img, LR=None, hr_crop_params=hr_crop_params, lr_crop_params=None)
                 roughness_img, _ = apply_crop_params(HR=roughness_img, LR=None, hr_crop_params=hr_crop_params, lr_crop_params=None)
 
+            # Below are the On The Fly augmentations
+            
+            # Apply unsharpening mask to HR images
+            if self.opt.get('hr_unsharp_mask', None):
+                hr_rand_unsharp = self.opt.get('hr_rand_unsharp', 0)
+                diffuse_img_lr =  transforms.FilterUnsharp(p=hr_rand_unsharp)(diffuse_img_lr)
+            
+            # Add blur if LR blur AND blur types are provided, else will skip
+            if self.opt.get('lr_blur', None):
+                blur_option = get_blur(self.opt.get('lr_blur_types', None))
+                if blur_option:
+                    diffuse_img_lr = blur_option(diffuse_img_lr)
+            
+            # LR primary noise: Add noise to LR if enabled AND noise types are provided, else will skip
+            if self.opt.get('lr_noise', None):
+                noise_option = get_noise(self.opt.get('lr_noise_types', None), self.noise_patches)
+                if noise_option:
+                    diffuse_img_lr = noise_option(diffuse_img_lr)
+
+            # LR secondary noise: Add additional noise to LR if enabled AND noise types are provided, else will skip
+            if self.opt.get('lr_noise2', None):
+                noise_option = get_noise(self.opt.get('lr_noise_types2', None), self.noise_patches)
+                if noise_option:
+                    diffuse_img_lr = noise_option(diffuse_img_lr)
+
+        dataset_out = {}
         if isinstance(diffuse_img, np.ndarray):
             # tmp_vis(diffuse_img, False)
             diffuse_img = util.np2tensor(diffuse_img, normalize=znorm, add_batch=False)
             # tmp_vis(diffuse_img, True)
-        else:
-            diffuse_img = []
+            dataset_out['HR'] = diffuse_img
+            dataset_out['HR_path'] = cur_dir
         if isinstance(diffuse_img_lr, np.ndarray):
             # tmp_vis(diffuse_img, False)
             diffuse_img_lr = util.np2tensor(diffuse_img_lr, normalize=znorm, add_batch=False)
             # tmp_vis(diffuse_img, True)
-        else:
-            diffuse_img_lr = []
+            dataset_out['LR'] = diffuse_img_lr
+            dataset_out['LR_path'] = cur_dir
         if isinstance(ao_img, np.ndarray):
             # tmp_vis(ao_img, False)
             ao_img = util.np2tensor(ao_img, normalize=znorm, add_batch=False)
             # tmp_vis(ao_img, True)
-        else:
-            ao_img = []
+            dataset_out['AO'] = ao_img
         if isinstance(height_img, np.ndarray):
             # tmp_vis(height_img, False)
             height_img = util.np2tensor(height_img, normalize=znorm, add_batch=False)
-        else:
-            height_img = []
+            dataset_out['HE'] = height_img
         if isinstance(metalness_img, np.ndarray):
             # tmp_vis(metalness_img, False)
             metalness_img = util.np2tensor(metalness_img, normalize=znorm, add_batch=False)
-        else:
-            metalness_img = []
+            dataset_out['ME'] = metalness_img
         if isinstance(normal_img, np.ndarray):
             # tmp_vis(normal_img, False)
             normal_img = util.np2tensor(normal_img, normalize=znorm, add_batch=False)
-        else:
-            normal_img = []
+            dataset_out['NO'] = normal_img
         if isinstance(reflection_img, np.ndarray):
             # tmp_vis(reflection_img, False)
             reflection_img = util.np2tensor(reflection_img, normalize=znorm, add_batch=False)
-        else:
-            reflection_img = []
+            dataset_out['RE'] = reflection_img
         if isinstance(roughness_img, np.ndarray):
             # tmp_vis(roughness_img, False)
             roughness_img = util.np2tensor(roughness_img, normalize=znorm, add_batch=False)
-        else:
-            roughness_img = []
+            dataset_out['RO'] = roughness_img
 
-        # return {'LR': diffuse_img, 'HR': normal_img, 'LR_path': cur_dir, 'HR_path': cur_dir}
-        return {'LR': diffuse_img_lr, 
-                'HR': diffuse_img, 
-                'NO': normal_img, 
-                'AO': ao_img, 
-                'HE': height_img, 
-                'ME': metalness_img, 
-                'RE': reflection_img, 
-                'RO': roughness_img, 
-                'LR_path': cur_dir, 
-                'HR_path': cur_dir}
+        return dataset_out
 
     def __len__(self):
         return len(self.pbr_list)

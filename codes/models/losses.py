@@ -346,7 +346,7 @@ class Adversarial(nn.Module):
 
 
 class GeneratorLoss(nn.Module):
-    def __init__(self, opt=None, device = 'cpu'):
+    def __init__(self, opt=None, device = 'cpu', allow_featnets=True):
         super(GeneratorLoss, self).__init__()
 
         train_opt = opt['train']
@@ -356,9 +356,12 @@ class GeneratorLoss(nn.Module):
         pixel_weight  = train_opt.get('pixel_weight', 0)
         pixel_criterion  = train_opt.get('pixel_criterion', None) # 'skip'
 
-        feature_weight  = train_opt.get('feature_weight', 0)
-        feature_network  = train_opt.get('feature_network', 'vgg19') # TODO 
-        feature_criterion = check_loss_names(feature_criterion=train_opt['feature_criterion'], feature_network=feature_network)
+        if allow_featnets:
+            feature_weight = train_opt.get('feature_weight', 0)
+            feature_network = train_opt.get('feature_network', 'vgg19') # TODO 
+            feature_criterion = check_loss_names(feature_criterion=train_opt['feature_criterion'], feature_network=feature_network)
+        else:
+            feature_weight = 0
         
         hfen_weight  = train_opt.get('hfen_weight', 0)
         hfen_criterion = check_loss_names(hfen_criterion=train_opt['hfen_criterion'])
@@ -372,10 +375,13 @@ class GeneratorLoss(nn.Module):
         ssim_weight  = train_opt.get('ssim_weight', 0)
         ssim_type  = train_opt.get('ssim_type', None)
 
-        lpips_weight  = train_opt.get('lpips_weight', 0)
-        lpips_network  = train_opt.get('lpips_net', 'vgg')
-        lpips_type  = train_opt.get('lpips_type', 'net-lin')
-        lpips_criterion = check_loss_names(lpips_criterion=train_opt['lpips_type'], lpips_network=lpips_network)
+        if allow_featnets:
+            lpips_weight  = train_opt.get('lpips_weight', 0)
+            lpips_network  = train_opt.get('lpips_net', 'vgg')
+            lpips_type  = train_opt.get('lpips_type', 'net-lin')
+            lpips_criterion = check_loss_names(lpips_criterion=train_opt['lpips_type'], lpips_network=lpips_network)
+        else:
+            lpips_weight = 0
 
         color_weight  = train_opt.get('color_weight', 0)
         color_criterion  = train_opt.get('color_criterion', None)
@@ -405,8 +411,11 @@ class GeneratorLoss(nn.Module):
             gpl_type = 'gpl'
             gpl_weight = spl_weight
 
-        cx_weight  = train_opt.get('cx_weight', 0)
-        cx_type  = train_opt.get('cx_type', None)
+        if allow_featnets:
+            cx_weight  = train_opt.get('cx_weight', 0)
+            cx_type  = train_opt.get('cx_type', None)
+        else:
+            cx_weight = 0
 
         fft_weight  = train_opt.get('fft_weight', 0)
         fft_type  = train_opt.get('fft_type', None)
