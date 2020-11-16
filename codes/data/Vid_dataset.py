@@ -1,3 +1,8 @@
+#TODO: TMP
+# import sys
+# sys.path.append('../')
+# from dataops.colors import ycbcr_to_rgb, yuv_to_rgb
+
 import os #, glob
 import random
 import numpy as np
@@ -354,7 +359,12 @@ class VidTestsetLoader(Dataset):
 
             # get the bicubic upscale of the center frame to concatenate for SR
             if self.srcolors and i_frame == idx_center:
-                LR_bicubic, _ = Scale(img=LR_img, scale=1/scale, algo=777) # bicubic upscale
+                if self.opt.get('denoise_LRbic', False):
+                    LR_bicubic = transforms.RandomAverageBlur(p=1, kernel_size=3)(LR_img)
+                    # LR_bicubic = transforms.RandomBoxBlur(p=1, kernel_size=3)(LR_img)
+                else:
+                    LR_bicubic = LR_img
+                LR_bicubic, _ = Scale(img=LR_bicubic, scale=1/scale, algo=777) # bicubic upscale
                 # HR_center = HR_img
                 # tmp_vis(LR_bicubic, False)
                 # tmp_vis(HR_center, False)

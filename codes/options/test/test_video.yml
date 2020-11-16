@@ -13,6 +13,7 @@ datasets:
     dataroot_LR: '../Vid4/calendar/LR'
     num_frames: 3 # the number of frames the network was trained to use to estimate the central frame
     srcolors: true # to generate images with 3 channels
+    denoise_LRbic: true
   test_2: # the 2nd test dataset
     name: foliage
     mode: VLR
@@ -20,6 +21,7 @@ datasets:
     dataroot_LR: '../Vid4/foliage/LR'
     num_frames: 3 # the number of frames the network was trained to use to estimate the central frame
     srcolors: true # to generate images with 3 channels
+    denoise_LRbic: true
 
 path:
   root: 'D:/Code/GitHub/BasicSR'
