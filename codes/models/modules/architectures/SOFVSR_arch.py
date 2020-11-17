@@ -57,6 +57,8 @@ class SOFVSR(nn.Module):
                 flow_L2.append(optical_flow_L2[idx, :, :, :, :])
                 flow_L3.append(optical_flow_L3[idx, :, :, :, :])
 
+                # Generate the draft_cube by subsampling the SR flow optical_flow_L3
+                # according to the scale
                 for i in range(self.scale):
                     for j in range(self.scale):
                         draft = optical_flow_warp(x[:, idx_frame, :, :, :],
@@ -104,6 +106,10 @@ class OFRnet(nn.Module):
             SR.append(nn.Conv2d(channels, 64 * 4, 1, 1, 0, bias=False))
             SR.append(nn.PixelShuffle(2)) #TODO
             SR.append(nn.LeakyReLU(0.1, inplace=True))
+        #TODO: test scale 1x
+        elif self.scale == 1:
+            SR.append(nn.Conv2d(channels, 64 * 1, 1, 1, 0, bias=False))
+            SR.append(nn.LeakyReLU(0.1, inplace=True))
         SR.append(nn.Conv2d(64, 2, 3, 1, 1, bias=False))
 
         self.SR = nn.Sequential(*SR)
@@ -143,6 +149,7 @@ class SRnet(nn.Module):
     def __init__(self, scale, channels, n_frames):
         super(SRnet, self).__init__()
         body = []
+        # scale ** 2 -> due to the subsampling of the SR flow 
         body.append(nn.Conv2d(1 * scale ** 2 * (n_frames-1) + 1, channels, 3, 1, 1, bias=False))
         body.append(nn.LeakyReLU(0.1, inplace=True))
         body.append(CasResB(8, channels))
@@ -160,6 +167,10 @@ class SRnet(nn.Module):
         elif scale == 2:
             body.append(nn.Conv2d(channels, 64 * 4, 1, 1, 0, bias=False))
             body.append(nn.PixelShuffle(2)) #TODO
+            body.append(nn.LeakyReLU(0.1, inplace=True))
+        #TODO: test scale 1x
+        elif scale == 1:
+            body.append(nn.Conv2d(channels, 64 * 1, 1, 1, 0, bias=False))
             body.append(nn.LeakyReLU(0.1, inplace=True))
         body.append(nn.Conv2d(64, 1, 3, 1, 1, bias=True))
 
