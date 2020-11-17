@@ -89,6 +89,8 @@ class LRHRDataset(Dataset):
                     diffuse_img_lr = util.read_img(None, os.path.join(cur_dir_lr, source), out_nc=3)
                 else:
                     diffuse_img_lr = diffuse_img
+            elif source.find('_albedo.') >= 0:
+                albedo_img = util.read_img(None, os.path.join(cur_dir, source), out_nc=1)
             elif source.find('_ao.') >= 0 or source.find('_occlusion.') >= 0 or source.find('_ambientocclusion.') >= 0:
                 ao_img = util.read_img(None, os.path.join(cur_dir, source), out_nc=1)
             elif source.find('_height.') >= 0 or source.find('_displacement.') >= 0 or source.find('_bump.') >= 0:
@@ -109,6 +111,8 @@ class LRHRDataset(Dataset):
         #     tmp_vis(diffuse_img, False)
         # if isinstance(diffuse_img_lr, np.ndarray):
         #     tmp_vis(diffuse_img_lr, False)
+        # if isinstance(albedo_img, np.ndarray):
+        #     tmp_vis(albedo_img, False)
         # if isinstance(ao_img, np.ndarray):
         #     tmp_vis(ao_img, False)
         # if isinstance(height_img, np.ndarray):
@@ -182,6 +186,7 @@ class LRHRDataset(Dataset):
                 hr_crop_params, lr_crop_params = get_crop_params(diffuse_img, LR_size, scale)
                 diffuse_img, _ = apply_crop_params(HR=diffuse_img, LR=None, hr_crop_params=hr_crop_params, lr_crop_params=None)
                 _, diffuse_img_lr = apply_crop_params(HR=None, LR=diffuse_img_lr, hr_crop_params=None, lr_crop_params=lr_crop_params)
+                albedo_img, _ = apply_crop_params(HR=albedo_img, LR=None, hr_crop_params=hr_crop_params, lr_crop_params=None)
                 ao_img, _ = apply_crop_params(HR=ao_img, LR=None, hr_crop_params=hr_crop_params, lr_crop_params=None)
                 height_img, _ = apply_crop_params(HR=height_img, LR=None, hr_crop_params=hr_crop_params, lr_crop_params=None)
                 metalness_img, _ = apply_crop_params(HR=metalness_img, LR=None, hr_crop_params=hr_crop_params, lr_crop_params=None)
@@ -227,6 +232,11 @@ class LRHRDataset(Dataset):
             # tmp_vis(diffuse_img, True)
             dataset_out['LR'] = diffuse_img_lr
             dataset_out['LR_path'] = cur_dir
+        if isinstance(albedo_img, np.ndarray):
+            # tmp_vis(albedo_img, False)
+            albedo_img = util.np2tensor(albedo_img, normalize=znorm, add_batch=False)
+            # tmp_vis(ao_img, True)
+            dataset_out['AL'] = albedo_img
         if isinstance(ao_img, np.ndarray):
             # tmp_vis(ao_img, False)
             ao_img = util.np2tensor(ao_img, normalize=znorm, add_batch=False)

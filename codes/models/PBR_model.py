@@ -92,7 +92,7 @@ class PBRModel(BaseModel):
             Initialize losses
             """
             #Initialize the losses with the opt parameters
-            # Generator losses for 3 channel maps: diffuse and normal:
+            # Generator losses for 3 channel maps: diffuse, albedo and normal:
             self.generatorlosses = losses.GeneratorLoss(opt, self.device)
             # TODO: show the configured losses names in logger
             # print(self.generatorlosses.loss_list)
@@ -184,6 +184,11 @@ class PBRModel(BaseModel):
         else:
             self.var_NO = None
         
+        if isinstance(data.get('AL', None), torch.Tensor):
+            self.var_AL = data['AL'].to(self.device)
+        else:
+            self.var_AL = None
+
         if isinstance(data.get('AO', None), torch.Tensor):
             self.var_AO = data['AO'].to(self.device)
         else:
@@ -240,11 +245,12 @@ class PBRModel(BaseModel):
 
         fake_SR = self.fake_H[:, 0:3, :, :]
         fake_NO = self.fake_H[:, 3:6, :, :]
-        fake_AO = self.fake_H[:, 6:7, :, :]
-        fake_HE = self.fake_H[:, 7:8, :, :]
-        fake_ME = self.fake_H[:, 8:9, :, :]
-        fake_RE = self.fake_H[:, 9:10, :, :]
-        fake_RO = self.fake_H[:, 10:11, :, :]
+        fake_AL = self.fake_H[:, 6:9, :, :]
+        fake_AO = self.fake_H[:, 9:10, :, :]
+        fake_HE = self.fake_H[:, 10:11, :, :]
+        fake_ME = self.fake_H[:, 11:12, :, :]
+        fake_RE = self.fake_H[:, 12:13, :, :]
+        fake_RO = self.fake_H[:, 13:14, :, :]
 
         # batch (mixup) augmentations
         # cutout-ed pixels are discarded when calculating loss by masking removed pixels
@@ -273,6 +279,12 @@ class PBRModel(BaseModel):
                     log_dict_normal = {}
                     NO_loss_results, log_dict_normal = self.generatorlosses(fake_NO, self.var_NO, log_dict_normal, self.f_low)
                     l_g_total += sum(NO_loss_results)/self.accumulations
+
+                if isinstance(self.var_AL, torch.Tensor):
+                    AL_loss_results = []
+                    log_dict_albedo = {}
+                    AL_loss_results, log_dict_albedo = self.generatorlosses(fake_AL, self.var_AL, log_dict_albedo, self.f_low)
+                    l_g_total += sum(AL_loss_results)/self.accumulations
                 
                 if isinstance(self.var_AO, torch.Tensor):
                     AO_loss_results = []
