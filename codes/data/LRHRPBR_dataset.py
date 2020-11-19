@@ -71,6 +71,7 @@ class LRHRDataset(Dataset):
 
         ######## Read the images ########
         diffuse_img = None
+        albedo_img = None
         ao_img = None
         glossiness_img = None
         height_img = None
