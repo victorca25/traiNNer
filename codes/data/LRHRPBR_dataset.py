@@ -41,7 +41,13 @@ class LRHRDataset(Dataset):
         # Get dataroot_HR
         self.paths_HR = opt.get('dataroot_HR', None)
         if self.paths_HR:
-            self.pbr_list = os.listdir(self.paths_HR)
+            # self.pbr_list = os.listdir(self.paths_HR)
+            # print(self.paths_HR)
+            self.pbr_list = []
+            for root,dirs,files in os.walk(self.paths_HR):
+                if files and not dirs:
+                    self.pbr_list.append(root)
+            # print(self.pbr_list)
         
         # Get dataroot_LR
         self.paths_LR = opt.get('dataroot_LR', None)
@@ -64,8 +70,9 @@ class LRHRDataset(Dataset):
         # print(pbr_dir)
 
         #TODO: TMP os problem
-        import os
-        cur_dir = os.path.join(self.paths_HR, pbr_dir)
+        # import os
+        # cur_dir = os.path.join(self.paths_HR, pbr_dir)
+        cur_dir = pbr_dir
         dir_content = os.listdir(cur_dir)
         # print(dir_content)
 
@@ -82,6 +89,7 @@ class LRHRDataset(Dataset):
 
         for source in dir_content:
             #TODO: handle uppercase names
+            source = source.lower()
             #ref: https://marmoset.co/posts/pbr-texture-conversion/
             if source.find('_diffuse.') >= 0 or source.find('_color.') >= 0:
                 diffuse_img = util.read_img(None, os.path.join(cur_dir, source), out_nc=3)
@@ -108,6 +116,14 @@ class LRHRDataset(Dataset):
                 # glossiness_img = util.read_img(None, os.path.join(cur_dir, source), out_nc=1)
                 roughness_img = 255 - util.read_img(None, os.path.join(cur_dir, source), out_nc=1)
         
+        # if isinstance(albedo_img, np.ndarray) and isinstance(ao_img, np.ndarray) and not isinstance(diffuse_img, np.ndarray):
+        #     diffuse_img = albedo_img - (255 - ao_img)
+        #     diffuse_img_lr = diffuse_img
+        if isinstance(albedo_img, np.ndarray) and not isinstance(diffuse_img, np.ndarray):
+            diffuse_img = albedo_img
+            diffuse_img_lr = diffuse_img
+            albedo_img = None
+
         # if isinstance(diffuse_img, np.ndarray):
         #     tmp_vis(diffuse_img, False)
         # if isinstance(diffuse_img_lr, np.ndarray):
