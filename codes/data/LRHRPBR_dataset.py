@@ -99,7 +99,7 @@ class LRHRDataset(Dataset):
                 else:
                     diffuse_img_lr = diffuse_img
             elif source.find('_albedo.') >= 0:
-                albedo_img = util.read_img(None, os.path.join(cur_dir, source), out_nc=1)
+                albedo_img = util.read_img(None, os.path.join(cur_dir, source), out_nc=3)
             elif source.find('_ao.') >= 0 or source.find('_occlusion.') >= 0 or source.find('_ambientocclusion.') >= 0:
                 ao_img = util.read_img(None, os.path.join(cur_dir, source), out_nc=1)
             elif source.find('_height.') >= 0 or source.find('_displacement.') >= 0 or source.find('_bump.') >= 0:
