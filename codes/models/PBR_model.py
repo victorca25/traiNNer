@@ -348,6 +348,7 @@ class PBRModel(BaseModel):
                 self.optimizer_G.zero_grad()
                 self.optGstep = True
 
+        #TODO: for now only one GAN for the diffuse image, can have one for each map
         if self.cri_gan:
             # update discriminator
             # unfreeze discriminator
@@ -357,7 +358,7 @@ class PBRModel(BaseModel):
             
             with self.cast(): # Casts operations to mixed precision if enabled, else nullcontext
                 l_d_total, gan_logs = self.adversarial(
-                    self.fake_H, self.var_ref, netD=self.netD, 
+                    fake_SR, self.var_ref, netD=self.netD, 
                     stage='discriminator', fsfilter = self.f_high) # (sr, hr)
 
                 for g_log in gan_logs:

@@ -19,7 +19,14 @@ from dataops.debug import *
 
 
 #loss builder
-def get_loss_fn(loss_type=None, weight=0, recurrent=False, reduction='mean', network = None, device = 'cuda:0', opt = None):
+def get_loss_fn(loss_type=None, 
+                weight=0, 
+                recurrent=False, 
+                reduction='mean', 
+                network = None, 
+                device = 'cuda:0', 
+                opt = None,
+                allow_featnets = True):
     if loss_type == 'skip':
         loss_function = None
     # pixel / content losses
@@ -57,10 +64,16 @@ def get_loss_fn(loss_type=None, weight=0, recurrent=False, reduction='mean', net
     # SSIM losses
     #TODO: pass SSIM options from opt_train
     elif loss_type == 'ssim' or loss_type == 'SSIM': #l_ssim_type
-        image_channels = opt['image_channels'] if opt['image_channels'] else 3
+        if not allow_featnets:
+            image_channels = 1
+        else:
+            image_channels = opt['image_channels'] if opt['image_channels'] else 3
         loss_function =  SSIM(window_size=11, window_sigma=1.5, size_average=True, data_range=1., channels=image_channels)
     elif loss_type == 'ms-ssim' or loss_type == 'MSSSIM': #l_ssim_type
-        image_channels = opt['image_channels'] if opt['image_channels'] else 3
+        if not allow_featnets:
+            image_channels = 1
+        else:
+            image_channels = opt['image_channels'] if opt['image_channels'] else 3
         loss_function =  MS_SSIM(window_size=11, window_sigma=1.5, size_average=True, data_range=1., channels=image_channels, normalize='relu')
     # HFEN loss
     elif loss_type.find('hfen') >= 0:
@@ -439,7 +452,7 @@ class GeneratorLoss(nn.Module):
             self.loss_list.append(cri_grad)
 
         if ssim_weight > 0 and ssim_type:
-            cri_ssim = get_loss_fn(ssim_type, ssim_weight, opt = train_opt)
+            cri_ssim = get_loss_fn(ssim_type, ssim_weight, opt = train_opt, allow_featnets = allow_featnets)
             self.loss_list.append(cri_ssim)
         
         if tv_weight > 0 and tv_type:
