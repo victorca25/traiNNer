@@ -22,10 +22,11 @@ class VidTrainsetLoader(Dataset):
     def __init__(self, opt):
         super(VidTrainsetLoader).__init__()
         self.opt = opt
-        self.image_channels  = opt.get('image_channels', 3)
+        self.image_channels = opt.get('image_channels', 3)
         self.num_frames  = opt.get('num_frames', 3)
         self.srcolors = opt.get('srcolors', None)
         self.otf_noise = opt.get('lr_noise', None) or opt.get('lr_blur', None)
+        self.y_only = opt.get('y_only', True)
 
         assert self.num_frames % 2 == 1, (
             f'num_frame must be an odd number, but got {self.num_frames}')
@@ -38,7 +39,7 @@ class VidTrainsetLoader(Dataset):
             # if opt['phase'] == 'train' and opt.get('lr_noise_types', None) and "patches" in opt['lr_noise_types']:
             if opt.get('lr_noise_types', None) and "patches" in opt['lr_noise_types']:
                 assert opt['noise_data']
-                self.noise_patches = NoisePatches(opt['noise_data'], opt.get('HR_size', 128)/opt.get('scale', 4), grayscale=True)
+                self.noise_patches = NoisePatches(opt['noise_data'], opt.get('HR_size', 128)/opt.get('scale', 4), grayscale=self.y_only)
             else:
                 self.noise_patches = None
             
@@ -61,8 +62,7 @@ class VidTrainsetLoader(Dataset):
         LR_size = HR_size // scale
         idx_center = (self.num_frames - 1) // 2
         ds_kernel = None
-        fullimgchannels = None
-
+        
         # Default case: tensor will result in the [0,1] range
         # Alternative: tensor will be z-normalized to the [-1,1] range
         znorm  = self.opt.get('znorm', False)
@@ -153,21 +153,24 @@ class VidTrainsetLoader(Dataset):
             if self.paths_LR:
                 # LR images are provided at the correct scale
                 LR_img = util.read_img(None, paths_LR[int(idx_frame)+(frameskip*i_frame)], out_nc=self.image_channels)
+                if LR_img.shape == HR_img.shape:
+                    LR_img, resize_type = Scale(img=HR_img, scale=scale, algo=ds_algo, ds_kernel=ds_kernel, resize_type=resize_type)
             else:
                 # generate LR images on the fly
                 LR_img, resize_type = Scale(img=HR_img, scale=scale, algo=ds_algo, ds_kernel=ds_kernel, resize_type=resize_type)
 
             # get the bicubic upscale of the center frame to concatenate for SR
-            if self.srcolors and i_frame == idx_center:
+            if self.y_only and self.srcolors and i_frame == idx_center:
                 LR_bicubic, _ = Scale(img=LR_img, scale=1/scale, algo=777) # bicubic upscale
                 HR_center = HR_img
                 # tmp_vis(LR_bicubic, False)
                 # tmp_vis(HR_center, False)
             
-            # extract Y channel from frames
-            # normal path, only Y for both
-            HR_img = util.bgr2ycbcr(HR_img, only_y=True)
-            LR_img = util.bgr2ycbcr(LR_img, only_y=True)
+            if self.y_only:
+                # extract Y channel from frames
+                # normal path, only Y for both
+                HR_img = util.bgr2ycbcr(HR_img, only_y=True)
+                LR_img = util.bgr2ycbcr(LR_img, only_y=True)
 
             # crop patches randomly if using otf noise
             #TODO: make a BasicSR composable random_crop
@@ -175,14 +178,15 @@ class VidTrainsetLoader(Dataset):
             # to crop after concatenating. Check the speed difference.
             if self.otf_noise and self.opt['phase'] == 'train':
                 HR_img, LR_img = apply_crop_params(HR_img, LR_img, hr_crop_params, lr_crop_params)
-                if self.srcolors and i_frame == idx_center:
+                if self.y_only and self.srcolors and i_frame == idx_center:
                     LR_bicubic, _ = apply_crop_params(LR_bicubic, None, hr_crop_params, None)
                     HR_center, _ = apply_crop_params(HR_center, None, hr_crop_params, None)
 
             # expand Y images to add the channel dimension
             # normal path, only Y for both
-            HR_img = util.fix_img_channels(HR_img, 1)
-            LR_img = util.fix_img_channels(LR_img, 1)
+            if self.y_only:
+                HR_img = util.fix_img_channels(HR_img, 1)
+                LR_img = util.fix_img_channels(LR_img, 1)
 
             if self.opt['phase'] == 'train':
                 # single frame augmentation (noise, blur, etc). Would only be efficient if patches are cropped in this loop
@@ -196,7 +200,8 @@ class VidTrainsetLoader(Dataset):
                 # expand LR images to add the channel dimension again if needed (blur removes the grayscale channel)
                 #TODO: add a if condition, can compare to the ndim before the augs, maybe move inside the aug condition
                 # if not fullimgchannels: #TODO: TMP, this should be when using srcolors for HR or when training with 3 channels tests, separatedly
-                LR_img = util.fix_img_channels(LR_img, 1)
+                if self.y_only:
+                    LR_img = util.fix_img_channels(LR_img, 1)
             
             # print("HR_img.shape: ", HR_img.shape)
             # print("LR_img.shape", LR_img.shape)
@@ -213,14 +218,18 @@ class VidTrainsetLoader(Dataset):
                 HR_list.reverse()
                 LR_list.reverse()
 
-        # if self.srcolors:
-            # HR = [np.asarray(GT) for GT in HR_list]  # list -> numpy # input: list (contatin numpy: [H,W,C])
-            # HR = np.asarray(HR) # numpy, [T,H,W,C]
-            # t, h_HR, w_HR, c = HR_center.shape
-            # HR_center = HR_center.transpose(1,2,3,0).reshape(h_HR, w_HR, -1) # numpy, [H',W',CT]
-        # else:
-        HR = np.concatenate((HR_list), axis=2) # h, w, t
-        LR = np.concatenate((LR_list), axis=2) # h, w, t
+        if not self.y_only:
+            t = self.num_frames
+            HR = [np.asarray(GT) for GT in HR_list]  # list -> numpy # input: list (contatin numpy: [H,W,C])
+            HR = np.asarray(HR) # numpy, [T,H,W,C]
+            h_HR, w_HR, c = HR_img.shape #HR_center.shape #TODO: check, may be risky
+            HR = HR.transpose(1,2,3,0).reshape(h_HR, w_HR, -1) # numpy, [H',W',CT]
+            LR = [np.asarray(LT) for LT in LR_list]  # list -> numpy # input: list (contatin numpy: [H,W,C])
+            LR = np.asarray(LR) # numpy, [T,H,W,C]
+            LR = LR.transpose(1,2,3,0).reshape(h_HR//scale, w_HR//scale, -1) # numpy, [Hl',Wl',CT]
+        else:
+            HR = np.concatenate((HR_list), axis=2) # h, w, t
+            LR = np.concatenate((LR_list), axis=2) # h, w, t
 
         if self.opt['phase'] == 'train':
             '''
@@ -229,7 +238,7 @@ class VidTrainsetLoader(Dataset):
             # crop patches randomly. If not using otf noise, crop all concatenated images 
             if not self.otf_noise:
                 HR, LR, hr_crop_params, _ = random_crop_mod(HR, LR, LR_size, scale)
-                if self.srcolors:
+                if self.y_only and self.srcolors:
                     LR_bicubic, _, _, _ = random_crop_mod(LR_bicubic, _, LR_size, scale, hr_crop_params)
                     HR_center, _, _, _ = random_crop_mod(HR_center, _, LR_size, scale, hr_crop_params)
                     # tmp_vis(LR_bicubic, False)
@@ -245,8 +254,12 @@ class VidTrainsetLoader(Dataset):
         # tmp_vis(LR_bicubic, False)
         # tmp_vis(HR_center, False)
 
-        HR = util.np2tensor(HR, normalize=znorm, bgr2rgb=False, add_batch=False) # Tensor, [CT',H',W'] or [T, H, W]
-        LR = util.np2tensor(LR, normalize=znorm, bgr2rgb=False, add_batch=False) # Tensor, [CT',H',W'] or [T, H, W]
+        if self.y_only:
+            HR = util.np2tensor(HR, normalize=znorm, bgr2rgb=False, add_batch=False) # Tensor, [CT',H',W'] or [T, H, W]
+            LR = util.np2tensor(LR, normalize=znorm, bgr2rgb=False, add_batch=False) # Tensor, [CT',H',W'] or [T, H, W]
+        else:
+            HR = util.np2tensor(HR, normalize=znorm, bgr2rgb=True, add_batch=False) # Tensor, [CT',H',W'] or [T, H, W]
+            LR = util.np2tensor(LR, normalize=znorm, bgr2rgb=True, add_batch=False) # Tensor, [CT',H',W'] or [T, H, W]
         
         #TODO: TMP to test generating 3 channel images for SR loss
         # HR = util.np2tensor(HR, normalize=znorm, bgr2rgb=False, add_batch=True) # Tensor, [CT',H',W'] or [T, H, W]
@@ -254,15 +267,15 @@ class VidTrainsetLoader(Dataset):
         
         # if self.srcolors:
         #     HR = HR.view(c,t,HR_size,HR_size) # Tensor, [C,T,H,W]
-        # elif fullimgchannels:
-        #     HR = HR.view(c,t,HR_size,HR_size) # Tensor, [C,T,H,W]
-        #     # HR = HR.transpose(0,1) # Tensor, [T,C,H,W]
-        #     LR = LR.view(c,t,LR_size,LR_size) # Tensor, [C,T,H,W]
-        #     # LR = LR.transpose(0,1) # Tensor, [T,C,H,W]
+        if not self.y_only:
+            HR = HR.view(c,t,HR_size,HR_size) # Tensor, [C,T,H,W]
+            HR = HR.transpose(0,1) # Tensor, [T,C,H,W]
+            LR = LR.view(c,t,LR_size,LR_size) # Tensor, [C,T,H,W]
+            LR = LR.transpose(0,1) # Tensor, [T,C,H,W]
 
         # generate Cr, Cb channels using bicubic interpolation
         #TODO: check, it might be easier to return the whole image and separate later when needed
-        if self.srcolors:
+        if self.y_only and self.srcolors:
             LR_bicubic = util.bgr2ycbcr(LR_bicubic, only_y=False)
             # HR_center = util.bgr2ycbcr(HR_center, only_y=False) #not needed, can directly use rgb image
             ## LR_bicubic = util.ycbcr2rgb(LR_bicubic, only_y=False) #test, looks ok
@@ -274,9 +287,12 @@ class VidTrainsetLoader(Dataset):
             #TODO: TMP to test generating 3 channel images for SR loss
             # LR_bicubic = util.np2tensor(LR_bicubic, normalize=znorm, bgr2rgb=False, add_batch=True)
             # HR_center = util.np2tensor(HR_center, normalize=znorm, bgr2rgb=False, add_batch=True)
-        else:
+        elif self.y_only and not self.srcolors:
             LR_bicubic = []
             HR_center = []
+        else:
+            HR_center = HR[idx_center,:,:,:]
+            LR_bicubic = []
 
         # return toTensor(LR), toTensor(HR)
         return {'LR': LR, 'HR': HR, 'LR_path': LR_dir, 'HR_path': HR_dir, 'LR_bicubic': LR_bicubic, 'HR_center': HR_center}
@@ -293,6 +309,7 @@ class VidTestsetLoader(Dataset):
         self.image_channels  = opt.get('image_channels', 3)
         self.num_frames  = opt.get('num_frames', 3)
         self.srcolors = opt.get('srcolors', None)
+        self.y_only = opt.get('y_only', True)
 
         assert self.num_frames % 2 == 1, (
             f'num_frame must be an odd number, but got {self.num_frames}')
@@ -311,6 +328,8 @@ class VidTestsetLoader(Dataset):
     def __getitem__(self, idx):
         scale = self.opt.get('scale', 4)
         idx_center = (self.num_frames - 1) // 2
+        h_LR = None
+        w_LR = None
 
         # Default case: tensor will result in the [0,1] range
         # Alternative: tensor will be z-normalized to the [-1,1] range
@@ -358,7 +377,7 @@ class VidTestsetLoader(Dataset):
             LR_img = util.modcrop(LR_img, scale)
 
             # get the bicubic upscale of the center frame to concatenate for SR
-            if self.srcolors and i_frame == idx_center:
+            if not self.y_only and self.srcolors and i_frame == idx_center:
                 if self.opt.get('denoise_LRbic', False):
                     LR_bicubic = transforms.RandomAverageBlur(p=1, kernel_size=3)(LR_img)
                     # LR_bicubic = transforms.RandomBoxBlur(p=1, kernel_size=3)(LR_img)
@@ -369,33 +388,49 @@ class VidTestsetLoader(Dataset):
                 # tmp_vis(LR_bicubic, False)
                 # tmp_vis(HR_center, False)
             
-            # extract Y channel from frames
-            # normal path, only Y for both
-            LR_img = util.bgr2ycbcr(LR_img, only_y=True)
+            if self.y_only:
+                # extract Y channel from frames
+                # normal path, only Y for both
+                LR_img = util.bgr2ycbcr(LR_img, only_y=True)
 
-            # expand Y images to add the channel dimension
-            # normal path, only Y for both
-            LR_img = util.fix_img_channels(LR_img, 1)
-            
-            # print("HR_img.shape: ", HR_img.shape)
-            # print("LR_img.shape", LR_img.shape)
+                # expand Y images to add the channel dimension
+                # normal path, only Y for both
+                LR_img = util.fix_img_channels(LR_img, 1)
+                
+                # print("HR_img.shape: ", HR_img.shape)
+                # print("LR_img.shape", LR_img.shape)
 
             LR_list.append(LR_img) # h, w, c
+            
+            if not self.y_only and (not h_LR or not w_LR):
+                h_LR, w_LR, c = LR_img.shape
+        
+        if not self.y_only:
+            t = self.num_frames
+            LR = [np.asarray(LT) for LT in LR_list]  # list -> numpy # input: list (contatin numpy: [H,W,C])
+            LR = np.asarray(LR) # numpy, [T,H,W,C]
+            LR = LR.transpose(1,2,3,0).reshape(h_LR, w_LR, -1) # numpy, [Hl',Wl',CT]
+        else:
+            LR = np.concatenate((LR_list), axis=2) # h, w, t
 
-        LR = np.concatenate((LR_list), axis=2) # h, w, t
+        if self.y_only:
+            LR = util.np2tensor(LR, normalize=znorm, bgr2rgb=False, add_batch=False) # Tensor, [CT',H',W'] or [T, H, W]
+        else:
+            LR = util.np2tensor(LR, normalize=znorm, bgr2rgb=True, add_batch=False) # Tensor, [CT',H',W'] or [T, H, W]
+            LR = LR.view(c,t,h_LR,w_LR) # Tensor, [C,T,H,W]
+            LR = LR.transpose(0,1) # Tensor, [T,C,H,W]
 
-        LR = util.np2tensor(LR, normalize=znorm, bgr2rgb=False, add_batch=False) # Tensor, [CT',H',W'] or [T, H, W]
-
-        if self.srcolors:
+        if self.y_only and self.srcolors:
             # generate Cr, Cb channels using bicubic interpolation
             LR_bicubic = util.bgr2ycbcr(LR_bicubic, only_y=False)
             LR_bicubic = util.np2tensor(LR_bicubic, normalize=znorm, bgr2rgb=False, add_batch=False)
+            HR_center = []
         else:
             LR_bicubic = []
             HR_center = []
 
         # return toTensor(LR), toTensor(HR)
-        return {'LR': LR, 'LR_path': LR_name, 'LR_bicubic': LR_bicubic, 'HR_center': []}
+        return {'LR': LR, 'LR_path': LR_name, 'LR_bicubic': LR_bicubic, 'HR_center': HR_center}
 
     def __len__(self):
         return len(self.video_list)-1

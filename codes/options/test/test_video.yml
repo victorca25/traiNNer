@@ -31,4 +31,15 @@ network_G:
   # SOFVSR:
   which_model_G: sofvsr_net
   n_frames: 3 # number of frames the network will use to estimate the central frame (n-1)/2. Must coincide with "num_frames" in the dataset.
-  channels: 320
+  channels: 320 # feature extraction layer with 320 kernels of size 3 × 3
+  img_ch: 3 # # of input image channels: 3 for RGB and 1 for grayscale
+  # for SR network:
+  SR_net: rrdb #sofvsr | rrdb | pan
+  sr_nf: 64 # for rrdb or pan
+  sr_nb: 23 # for rrdb or pan
+  sr_gc: 32 # for rrdb
+  # sr_unf: 24 # for pan
+  sr_gaussian_noise: true # for rrdb
+  sr_plus: false # for rrdb
+  # sr_sa: true # for pan
+  # sr_upinter_mode: nearest # for pan

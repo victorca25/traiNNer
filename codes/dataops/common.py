@@ -431,11 +431,10 @@ def np2tensor(img, bgr2rgb=True, data_range=1., normalize=False, change_range=Tr
         img = img*data_range/info(img.dtype).max #uint8 = /255
     img = torch.from_numpy(np.ascontiguousarray(np.transpose(img, (2, 0, 1)))).float() #"HWC to CHW" and "numpy to tensor"
     if bgr2rgb:
-        if img.shape[0] == 3: #RGB
-            #BGR to RGB -> in tensor, if using OpenCV, else not needed. Only if image has colors.
+        #BGR to RGB -> in tensor, if using OpenCV, else not needed. Only if image has colors.)
+        if img.shape[0] == 3 or img.shape[0] == 9: #RGB or 3xRGB
             img = bgr_to_rgb(img)
         elif img.shape[0] == 4: #RGBA
-            #BGR to RGB -> in tensor, if using OpenCV, else not needed. Only if image has colors.)
             img = bgra_to_rgba(img)
     if add_batch:
         img.unsqueeze_(0) # Add fake batch dimension = 1 . squeeze() will remove the dimensions of size 1

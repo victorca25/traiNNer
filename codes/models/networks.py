@@ -132,9 +132,14 @@ def define_G(opt):
                             ups_inter_mode=opt_net.get('ups_inter_mode', 'nearest'))
     elif which_model == 'sofvsr_net':
         from models.modules.architectures import SOFVSR_arch
-        netG = SOFVSR_arch.SOFVSR(scale=opt_net['scale'],
-                                  n_frames=opt_net.get('n_frames', 3),
-                                  channels=opt_net.get('channels', 320))
+        netG = SOFVSR_arch.SOFVSR(scale=opt_net['scale'],n_frames=opt_net.get('n_frames', 3),
+                                  channels=opt_net.get('channels', 320), img_ch=opt_net.get('img_ch', 1), 
+                                  SR_net=opt_net.get('SR_net', 'sofvsr'), 
+                                  sr_nf=opt_net.get('sr_nf', 64), sr_nb=opt_net.get('sr_nb', 23), 
+                                  sr_gc=opt_net.get('sr_gc', 32), sr_unf=opt_net.get('sr_unf', 24),
+                                  sr_gaussian_noise=opt_net.get('sr_gaussian_noise', 64), 
+                                  sr_plus=opt_net.get('sr_plus', False), sr_sa=opt_net.get('sr_sa', True),
+                                  sr_upinter_mode=opt_net.get('sr_upinter_mode', 'nearest'))
     else:
         raise NotImplementedError('Generator model [{:s}] not recognized'.format(which_model))
 

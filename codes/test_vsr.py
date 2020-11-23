@@ -53,7 +53,8 @@ def chop_forward(x, model, scale, shave=16, min_size=5000, nGPUs=1, need_HR=Fals
 
     # output = Variable(x.data.new(1, 1, h, w), volatile=True) #UserWarning: volatile was removed and now has no effect. Use `with torch.no_grad():` instead.
     with torch.no_grad():
-        output = Variable(x.data.new(1, 1, h, w))
+        # output = Variable(x.data.new(1, 1, h, w))
+        output = Variable(x.data.new(1, c, h, w))
     output[:, :, 0:h_half, 0:w_half] = outputlist[0][:, :, 0:h_half, 0:w_half]
     output[:, :, 0:h_half, w_half:w] = outputlist[1][:, :, 0:h_half, (w_size - w + w_half):w_size]
     output[:, :, h_half:h, 0:w_half] = outputlist[2][:, :, (h_size - h + h_half):h_size, 0:w_half]
@@ -125,15 +126,16 @@ def main():
 
             img_path = data['LR_path'][0]
             img_name = os.path.splitext(os.path.basename(img_path))[0]
+            # tmp_vis(data['LR'][:,1,:,:,:], True)
 
             if  opt.get('chop_forward', None):
                 # data
                 if len(data['LR'].size()) == 4:
                     b, n_frames, h_lr, w_lr = data['LR'].size()
                     LR_y_cube = data['LR'].view(b, -1, 1, h_lr, w_lr) # b, t, c, h, w
-                # elif len(data['LR'].size()) == 5: #for networks that work with 3 channel images
-                #     _, n_frames, _, _, _ = data['LR'].size()
-                #     LR_y_cube = data['LR'] # b, t, c, h, w
+                elif len(data['LR'].size()) == 5: #for networks that work with 3 channel images
+                    _, n_frames, _, _, _ = data['LR'].size()
+                    LR_y_cube = data['LR'] # b, t, c, h, w
 
                 # print(LR_y_cube.shape)
                 # print(data['LR_bicubic'].shape)
@@ -155,20 +157,25 @@ def main():
                 if test_loader.dataset.opt.get('srcolors', None):
                     print(SR_y.shape, SR_cb.shape, SR_cr.shape)
                     sr_img = ycbcr_to_rgb(torch.stack((SR_y, SR_cb, SR_cr), -3))
+                else:
+                    sr_img = SR_y
             else:
                 # data
                 model.feed_data(data, need_HR=need_HR)
                 # SR_y = net(LR_y_cube).squeeze(0)
                 model.test()  # test
                 visuals = model.get_current_visuals(need_HR=need_HR)
-                SR_cb = data['LR_bicubic'][:, 1, :, :]
-                SR_cr = data['LR_bicubic'][:, 2, :, :]
                 # ds = torch.nn.AvgPool2d(2, stride=2, count_include_pad=False)
-                # tmp_vis(ds(SR_cb), True)
-                # tmp_vis(ds(SR_cr), True)
                 # tmp_vis(ds(visuals['SR']), True)
-                if test_loader.dataset.opt.get('srcolors', None):
+                # tmp_vis(visuals['SR'], True)
+                if test_loader.dataset.opt.get('y_only', None) and test_loader.dataset.opt.get('srcolors', None):
+                    SR_cb = data['LR_bicubic'][:, 1, :, :]
+                    SR_cr = data['LR_bicubic'][:, 2, :, :]    
+                    # tmp_vis(ds(SR_cb), True)
+                    # tmp_vis(ds(SR_cr), True)
                     sr_img = ycbcr_to_rgb(torch.stack((visuals['SR'], SR_cb, SR_cr), -3))
+                else:
+                    sr_img = visuals['SR']
             
             #if znorm the image range is [-1,1], Default: Image range is [0,1] # testing, each "dataset" can have a different name (not train, val or other)
             sr_img = tensor2np(sr_img, denormalize=znorm)  # uint8
