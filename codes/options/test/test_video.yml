@@ -22,6 +22,7 @@ datasets:
     num_frames: 3 # the number of frames the network was trained to use to estimate the central frame
     srcolors: true # to generate images with 3 channels
     denoise_LRbic: true
+    y_only: false #true
 
 path:
   root: 'D:/Code/GitHub/BasicSR'

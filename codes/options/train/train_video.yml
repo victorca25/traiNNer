@@ -26,7 +26,8 @@ datasets:
     random_reverse: true # augmentation to randomly revert the frame orders
     max_frameskip: 3 # if training data FPS is higher than inference data, introduce random frameskip between 1 and max_frameskip
     srcolors: true # enable to be able to use losses that need 3 channels (feature losses, CX, etc), otherwise training only with Y channel
-    
+    y_only: false #true
+
     # If manually configuring on the fly generation of LR: (else, it will automatically default to Matlab-like downscale algorithm (777) when/if required
     dataroot_kernels: '../training/kernels/results/' # location of the image kernels extracted with KernelGAN, for use with the "realistic" downscale type
     lr_downscale: true # false
