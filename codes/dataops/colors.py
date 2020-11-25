@@ -30,7 +30,7 @@ def rgba_to_bgra(image: torch.Tensor) -> torch.Tensor:
 
 def rgb_to_grayscale(input: torch.Tensor) -> torch.Tensor:
     r, g, b = torch.chunk(input, chunks=3, dim=-3)
-    gray: torch.Tensor = 0.299 * r + 0.587 * g + 0.114 * b
+    gray: torch.Tensor = 0.2989 * r + 0.587 * g + 0.114 * b
     #gray = rgb_to_yuv(input,consts='y')
     return gray
 
