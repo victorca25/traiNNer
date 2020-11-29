@@ -115,7 +115,7 @@ def main():
     # training
     logger.info('Start training from epoch: {:d}, iter: {:d}'.format(start_epoch, current_step))
     try:
-        for epoch in range(start_epoch, total_epochs):
+        for epoch in range(start_epoch, total_epochs*(virtual_batch_size//batch_size)):
             for n, train_data in enumerate(train_loader,start=1):
 
                 if virtual_step == 0:
@@ -124,7 +124,7 @@ def main():
 
                 virtual_step += 1
                 take_step = False
-                if virtual_step * batch_size % virtual_batch_size == 0:
+                if virtual_step > 0 and virtual_step * batch_size % virtual_batch_size == 0:
                     current_step += 1
                     take_step = True
                     if current_step > total_iters:
