@@ -77,7 +77,9 @@ def main():
     logger.info('Random seed: {}'.format(seed))
     util.set_random_seed(seed)
 
-    torch.backends.cudnn.benckmark = True
+    # if the model does not change and input sizes remain the same during training then there may be benefit 
+    # from setting torch.backends.cudnn.benchmark = True, otherwise it may stall training
+    torch.backends.cudnn.benchmark = True
     # torch.backends.cudnn.deterministic = True
 
     # create train and val dataloader
@@ -157,7 +159,7 @@ def main():
                 logger.info('Models and training states saved.')
             
             # validation
-            if current_step % opt['train']['val_freq'] == 0:
+            if val_loader and current_step % opt['train']['val_freq'] == 0:
                 avg_psnr_c = 0.0
                 avg_psnr_s = 0.0
                 avg_psnr_p = 0.0

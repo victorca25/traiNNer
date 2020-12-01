@@ -1,0 +1,46 @@
+name: VSR_x4
+suffix: null
+model: vsrgan # 
+scale: 4
+gpu_ids: [0]
+chop_forward: false
+
+datasets:
+  test_1: # the 1st test dataset
+    name: calendar
+    mode: VLR
+    #dataroot_HR: '../Vid4/calendar/HR'
+    dataroot_LR: '../Vid4/calendar/LR'
+    num_frames: 3 # the number of frames the network was trained to use to estimate the central frame
+    srcolors: true # to generate images with 3 channels
+    denoise_LRbic: true
+  test_2: # the 2nd test dataset
+    name: foliage
+    mode: VLR
+    #dataroot_HR: '../Vid4/foliage/HR'
+    dataroot_LR: '../Vid4/foliage/LR'
+    num_frames: 3 # the number of frames the network was trained to use to estimate the central frame
+    srcolors: true # to generate images with 3 channels
+    denoise_LRbic: true
+    y_only: false #true
+
+path:
+  root: 'D:/Code/GitHub/BasicSR'
+  pretrain_model_G: '../experiments/pretrained_models/video_x4.pth'
+
+network_G:
+  # SOFVSR:
+  which_model_G: sofvsr_net
+  n_frames: 3 # number of frames the network will use to estimate the central frame (n-1)/2. Must coincide with "num_frames" in the dataset.
+  channels: 320 # feature extraction layer with 320 kernels of size 3 × 3
+  img_ch: 3 # # of input image channels: 3 for RGB and 1 for grayscale
+  # for SR network:
+  SR_net: rrdb #sofvsr | rrdb | pan
+  sr_nf: 64 # for rrdb or pan
+  sr_nb: 23 # for rrdb or pan
+  sr_gc: 32 # for rrdb
+  # sr_unf: 24 # for pan
+  sr_gaussian_noise: true # for rrdb
+  sr_plus: false # for rrdb
+  # sr_sa: true # for pan
+  # sr_upinter_mode: nearest # for pan

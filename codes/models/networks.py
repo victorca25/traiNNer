@@ -108,7 +108,7 @@ def define_G(opt):
         netG = RRDBNet_arch.RRDBNet(in_nc=opt_net['in_nc'], out_nc=opt_net['out_nc'], nf=opt_net['nf'], \
             nb=opt_net['nb'], gc=opt_net['gc'], upscale=opt_net['scale'], norm_type=opt_net['norm_type'], \
             act_type=act_type, mode=opt_net['mode'], upsample_mode='upconv', convtype=opt_net['convtype'], \
-            finalact=opt_net['finalact'])
+            finalact=opt_net['finalact'], gaussian_noise=opt_net['gaussian'], plus=opt_net['plus'])
     elif which_model == 'ppon':
         from models.modules.architectures import PPON_arch
         netG = PPON_arch.PPON(in_nc=opt_net['in_nc'], nf=opt_net['nf'], nb=opt_net['nb'], out_nc=opt_net['out_nc'], 
@@ -123,6 +123,26 @@ def define_G(opt):
         from models.modules.architectures import ABPN_arch
         netG = ABPN_arch.ABPN_v5(input_dim=3, dim=32)
         # netG = ABPN_arch.ABPN_v5(input_dim=opt_net['in_nc'], dim=opt_net['out_nc'])
+    elif which_model == 'pan_net': #PAN
+        from models.modules.architectures import PAN_arch
+        netG = PAN_arch.PAN(in_nc=opt_net['in_nc'], out_nc=opt_net['out_nc'],
+                            nf=opt_net['nf'], unf=opt_net['unf'], nb=opt_net['nb'], scale=opt_net['scale'],
+                            self_attention=opt_net.get('self_attention', False), 
+                            double_scpa=opt_net.get('double_scpa', False),
+                            ups_inter_mode=opt_net.get('ups_inter_mode', 'nearest'))
+    elif which_model == 'sofvsr_net':
+        from models.modules.architectures import SOFVSR_arch
+        netG = SOFVSR_arch.SOFVSR(scale=opt_net['scale'],n_frames=opt_net.get('n_frames', 3),
+                                  channels=opt_net.get('channels', 320), img_ch=opt_net.get('img_ch', 1), 
+                                  SR_net=opt_net.get('SR_net', 'sofvsr'), 
+                                  sr_nf=opt_net.get('sr_nf', 64), sr_nb=opt_net.get('sr_nb', 23), 
+                                  sr_gc=opt_net.get('sr_gc', 32), sr_unf=opt_net.get('sr_unf', 24),
+                                  sr_gaussian_noise=opt_net.get('sr_gaussian_noise', 64), 
+                                  sr_plus=opt_net.get('sr_plus', False), sr_sa=opt_net.get('sr_sa', True),
+                                  sr_upinter_mode=opt_net.get('sr_upinter_mode', 'nearest'))
+    elif which_model == 'rife_net':
+        from models.modules.architectures import RIFE_arch
+        netG = RIFE_arch.RIFE()
     else:
         raise NotImplementedError('Generator model [{:s}] not recognized'.format(which_model))
 
@@ -185,11 +205,21 @@ def define_D(opt):
         netD = ASRResNet_arch.ADiscriminator_S(spectral_norm=opt_net['spectral_norm'], self_attention=opt_net['self_attention'], \
             max_pool=opt_net['max_pool'], poolsize=opt_net['poolsize'] )
     elif which_model == 'discriminator_vgg_128_fea': #VGG-like discriminator with features extraction
-        from models.modules.architectures import ASRResNet_arch
-        netD = ASRResNet_arch.Discriminator_VGG_128_fea(in_nc=opt_net['in_nc'], base_nf=opt_net['nf'], \
+        from models.modules.architectures import discriminators
+        netD = discriminators.Discriminator_VGG_128_fea(in_nc=opt_net['in_nc'], base_nf=opt_net['nf'], \
             norm_type=opt_net['norm_type'], mode=opt_net['mode'], act_type=opt_net['act_type'], \
             convtype=opt_net['convtype'], arch=model_G, spectral_norm=opt_net['spectral_norm'], self_attention=opt_net['self_attention'], \
             max_pool=opt_net['max_pool'], poolsize=opt_net['poolsize'])
+    elif which_model == 'patchgan' or which_model == 'NLayerDiscriminator':
+        from models.modules.architectures import discriminators
+        netD = discriminators.NLayerDiscriminator(input_nc=opt_net['in_nc'], ndf=opt_net['nf'], n_layers=opt_net['nlayer'])
+    elif which_model == 'pixelgan' or which_model == 'PixelDiscriminator':
+        from models.modules.architectures import discriminators
+        netD = discriminators.PixelDiscriminator(input_nc=opt_net['in_nc'], ndf=opt_net['nf'])
+    elif which_model == 'multiscale':
+        from models.modules.architectures import discriminators
+        netD = discriminators.MultiscaleDiscriminator(input_nc=opt_net['in_nc'], ndf=opt_net['nf'], \
+            n_layers=opt_net['nlayer'], num_D=opt_net['num_D'])
     else:
         raise NotImplementedError('Discriminator model [{:s}] not recognized'.format(which_model))
     """

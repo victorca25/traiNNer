@@ -8,7 +8,7 @@ from collections import OrderedDict
 
 import options.options as option
 import utils.util as util
-from data.util import bgr2ycbcr, ImageSplitter, patchify_tensor, recompose_tensor
+from dataops.common import bgr2ycbcr, tensor2np, patchify_tensor, recompose_tensor #ImageSplitter
 from data import create_dataset, create_dataloader
 from models import create_model
 
@@ -125,24 +125,34 @@ def main():
                     pred_270f = chop_forward2(LR_270f, model, scale=scale, patch_size=chop_patch_size)
                     
                     #convert to numpy array
-                    if znorm: #opt['datasets']['train']['znorm']: # If the image range is [-1,1] # In testing, each "dataset" can have a different name (not train, val or other)
-                        pred = util.tensor2img(pred,min_max=(-1, 1)).clip(0, 255)  # uint8                        
-                        pred_90 = util.tensor2img(pred_90,min_max=(-1, 1)).clip(0, 255)  # uint8                        
-                        pred_180 = util.tensor2img(pred_180,min_max=(-1, 1)).clip(0, 255)  # uint8                        
-                        pred_270 = util.tensor2img(pred_270,min_max=(-1, 1)).clip(0, 255)  # uint8                        
-                        pred_f = util.tensor2img(pred_f,min_max=(-1, 1)).clip(0, 255)  # uint8                        
-                        pred_90f = util.tensor2img(pred_90f,min_max=(-1, 1)).clip(0, 255)  # uint8                        
-                        pred_180f = util.tensor2img(pred_180f,min_max=(-1, 1)).clip(0, 255)  # uint8                        
-                        pred_270f = util.tensor2img(pred_270f,min_max=(-1, 1)).clip(0, 255)  # uint8                        
-                    else: # Default: Image range is [0,1]
-                        pred = util.tensor2img(pred).clip(0, 255)  # uint8
-                        pred_90 = util.tensor2img(pred_90).clip(0, 255)  # uint8
-                        pred_180 = util.tensor2img(pred_180).clip(0, 255)  # uint8
-                        pred_270 = util.tensor2img(pred_270).clip(0, 255)  # uint8
-                        pred_f = util.tensor2img(pred_f).clip(0, 255)  # uint8
-                        pred_90f = util.tensor2img(pred_90f).clip(0, 255)  # uint8
-                        pred_180f = util.tensor2img(pred_180f).clip(0, 255)  # uint8
-                        pred_270f = util.tensor2img(pred_270f).clip(0, 255)  # uint8
+                    # if znorm: #opt['datasets']['train']['znorm']: # If the image range is [-1,1] # In testing, each "dataset" can have a different name (not train, val or other)
+                    #     pred = util.tensor2img(pred,min_max=(-1, 1)).clip(0, 255)  # uint8                        
+                    #     pred_90 = util.tensor2img(pred_90,min_max=(-1, 1)).clip(0, 255)  # uint8                        
+                    #     pred_180 = util.tensor2img(pred_180,min_max=(-1, 1)).clip(0, 255)  # uint8                        
+                    #     pred_270 = util.tensor2img(pred_270,min_max=(-1, 1)).clip(0, 255)  # uint8                        
+                    #     pred_f = util.tensor2img(pred_f,min_max=(-1, 1)).clip(0, 255)  # uint8                        
+                    #     pred_90f = util.tensor2img(pred_90f,min_max=(-1, 1)).clip(0, 255)  # uint8                        
+                    #     pred_180f = util.tensor2img(pred_180f,min_max=(-1, 1)).clip(0, 255)  # uint8                        
+                    #     pred_270f = util.tensor2img(pred_270f,min_max=(-1, 1)).clip(0, 255)  # uint8                        
+                    # else: # Default: Image range is [0,1]
+                    #     pred = util.tensor2img(pred).clip(0, 255)  # uint8
+                    #     pred_90 = util.tensor2img(pred_90).clip(0, 255)  # uint8
+                    #     pred_180 = util.tensor2img(pred_180).clip(0, 255)  # uint8
+                    #     pred_270 = util.tensor2img(pred_270).clip(0, 255)  # uint8
+                    #     pred_f = util.tensor2img(pred_f).clip(0, 255)  # uint8
+                    #     pred_90f = util.tensor2img(pred_90f).clip(0, 255)  # uint8
+                    #     pred_180f = util.tensor2img(pred_180f).clip(0, 255)  # uint8
+                    #     pred_270f = util.tensor2img(pred_270f).clip(0, 255)  # uint8
+
+                    #if znorm the image range is [-1,1], Default: Image range is [0,1] # testing, each "dataset" can have a different name (not train, val or other)
+                    pred = tensor2np(pred, denormalize=znorm).clip(0, 255)  # uint8
+                    pred_90 = tensor2np(pred_90, denormalize=znorm).clip(0, 255)  # uint8
+                    pred_180 = tensor2np(pred_180, denormalize=znorm).clip(0, 255)  # uint8
+                    pred_270 = tensor2np(pred_270, denormalize=znorm).clip(0, 255)  # uint8
+                    pred_f = tensor2np(pred_f, denormalize=znorm).clip(0, 255)  # uint8
+                    pred_90f = tensor2np(pred_90f, denormalize=znorm).clip(0, 255)  # uint8
+                    pred_180f = tensor2np(pred_180f, denormalize=znorm).clip(0, 255)  # uint8
+                    pred_270f = tensor2np(pred_270f, denormalize=znorm).clip(0, 255)  # uint8
                     
                     pred_90 = np.rot90(pred_90, 3)
                     pred_180 = np.rot90(pred_180, 2)
@@ -163,20 +173,26 @@ def main():
                 
                     #convert to numpy array
                     #highres_image = highres_output[0].permute(1, 2, 0).clamp(0.0, 1.0).cpu()
-                    if znorm: #opt['datasets']['train']['znorm']: # If the image range is [-1,1] # In testing, each "dataset" can have a different name (not train, val or other)
-                        sr_img = util.tensor2img(highres_output,min_max=(-1, 1))  # uint8
-                    else: # Default: Image range is [0,1]
-                        sr_img = util.tensor2img(highres_output)  # uint8
+                    # if znorm: #opt['datasets']['train']['znorm']: # If the image range is [-1,1] # In testing, each "dataset" can have a different name (not train, val or other)
+                    #     sr_img = util.tensor2img(highres_output,min_max=(-1, 1))  # uint8
+                    # else: # Default: Image range is [0,1]
+                    #     sr_img = util.tensor2img(highres_output)  # uint8
+
+                    #if znorm the image range is [-1,1], Default: Image range is [0,1] # testing, each "dataset" can have a different name (not train, val or other)
+                    sr_img = tensor2np(highres_output, denormalize=znorm)  # uint8
             
             else: # will upscale each image in the batch without chopping 
                 model.feed_data(data, need_HR=need_HR)
                 model.test()  # test
                 visuals = model.get_current_visuals(need_HR=need_HR)
                 
-                if znorm: #opt['datasets']['train']['znorm']: # If the image range is [-1,1] # In testing, each "dataset" can have a different name (not train, val or other)
-                    sr_img = util.tensor2img(visuals['SR'],min_max=(-1, 1))  # uint8
-                else: # Default: Image range is [0,1]
-                    sr_img = util.tensor2img(visuals['SR'])  # uint8
+                #if znorm the image range is [-1,1], Default: Image range is [0,1] # testing, each "dataset" can have a different name (not train, val or other)
+                sr_img = tensor2np(visuals['SR'], denormalize=znorm)  # uint8
+
+                # if znorm: #opt['datasets']['train']['znorm']: # If the image range is [-1,1] # In testing, each "dataset" can have a different name (not train, val or other)
+                #     sr_img = util.tensor2img(visuals['SR'],min_max=(-1, 1))  # uint8
+                # else: # Default: Image range is [0,1]
+                #     sr_img = util.tensor2img(visuals['SR'])  # uint8
 
             # save images
             suffix = opt['suffix']

@@ -4,12 +4,445 @@ import argparse
 import os
 import os.path
 import sys
-sys.path.append('../data')
-sys.path.append('../')
+import glob
 
-import util as util
 import numpy as np
 import cv2
+import dataops.common as util
+from dataops.minisom import MiniSom
+from dataops.debug import *
+
+import dataops.opencv_transforms.opencv_transforms as transforms
+from torch.utils.data.dataset import Dataset #TODO TMP, move NoisePatches to a separate dataloader
+
+
+def Scale(img=None, scale: int = None, algo=None, ds_kernel=None, resize_type=None):
+
+    ow, oh = img.shape[0], img.shape[1]
+    w = int(oh/scale)
+    h = int(ow/scale)
+    if (h == oh) and (w == ow):
+        return img, None
+    
+    resize, resize_type = get_resize(size=(h, w), scale=scale, ds_algo=algo, ds_kernel=ds_kernel, resize_type=resize_type)
+    return resize(np.copy(img)), resize_type
+
+
+class MLResize(object):
+    """Resize the input numpy ndarray to the given size using the Matlab-like
+    algorithm (warning an order of magnitude slower than OpenCV).
+
+    Args:
+        scale (sequence or int): Desired amount to scale the image. 
+        interpolation (int, optional): Desired interpolation. Default is
+            ``cubic`` interpolation, other options are: "lanczos2", 
+            "lanczos3", "box", "linear"
+    """
+
+    def __init__(self, scale, antialiasing=True, interpolation='cubic'):
+        
+        self.scale = 1/scale
+        self.interpolation = interpolation
+        self.antialiasing = antialiasing
+
+    def __call__(self, img):
+        """
+        Args:
+            img (numpy ndarray): Image to be scaled.
+        Returns:
+            numpy ndarray: Rescaled image.
+            
+        """
+        return util.imresize_np(img=img, scale=self.scale, antialiasing=self.antialiasing, interpolation=self.interpolation)
+
+
+def get_resize(size, scale=None, ds_algo=None, ds_kernel=None, resize_type=None):
+
+    if ds_algo is None:
+        #scaling interpolation options
+        ds_algo = [cv2.INTER_NEAREST, cv2.INTER_LINEAR, cv2.INTER_CUBIC, cv2.INTER_AREA, cv2.INTER_LANCZOS4, cv2.INTER_LINEAR_EXACT]
+    elif isinstance(ds_algo, int):
+        ds_algo = [ds_algo]
+    #elif(!isinstance(resize_types, list)):
+        #Error, unexpected type
+
+    resize = None
+    if resize_type == 0:
+        pass
+    elif not resize_type:
+        resize_type = random.choice(ds_algo)
+        
+    # print(resize_type)
+    if resize_type == 777 or resize_type == 776 or resize_type == 775 or resize_type == 774 \
+        or resize_type == 773: #matlab-like resize, ie: 'matlab_bicubic'
+        _ml_interpolation_to_str = {777:'cubic',
+                                776:'lanczos3',
+                                775:'lanczos2',
+                                774:'box',
+                                773:'linear'}
+        # print('matlab')
+        resize = MLResize(scale=scale, interpolation=_ml_interpolation_to_str[resize_type]) #(np.copy(img_LR))
+    elif resize_type == 999: # use realistic downscale kernels
+        # print('kernelgan')
+        if ds_kernel:
+            resize = ds_kernel
+    else: # use the provided OpenCV2 algorithms
+        #TODO: tmp fix in case ds_kernel was not provided, default to something
+        if resize_type == 999:
+            #TODO: add a log message to explain ds_kernel is missing
+            resize_type = cv2.INTER_CUBIC
+        _cv2_interpolation_to_str = {cv2.INTER_NEAREST:'NEAREST',
+                                cv2.INTER_LINEAR:'BILINEAR',
+                                cv2.INTER_AREA:'AREA',
+                                cv2.INTER_CUBIC:'BICUBIC',
+                                cv2.INTER_LANCZOS4:'LANCZOS'}
+        resize = transforms.Resize(size, interpolation=_cv2_interpolation_to_str[resize_type]) #(np.copy(img_LR))
+        # print('cv2')
+
+    return resize, resize_type
+
+
+#TODO: use options to set the blur types parameters if configured, else random_params=True
+def get_blur(blur_types: list = []):
+
+    blur = None
+    if(isinstance(blur_types, list)):
+        blur_type = random.choice(blur_types)
+        if blur_type == 'average':
+            # print('average')
+            blur = transforms.RandomAverageBlur(random_params=True, p=1)
+        elif blur_type == 'box':
+            # print('box')
+            blur = transforms.RandomBoxBlur(random_params=True, p=1)
+        elif blur_type == 'gaussian':
+            # print('gaussian')
+            blur = transforms.RandomGaussianBlur(random_params=True, p=1)
+        elif blur_type == 'bilateral':
+            # print('bilateral')
+            blur = transforms.RandomBilateralBlur(sigmaSpace=200, sigmaColor=200, random_params=True, p=1)
+        #elif blur_type == 'clean':
+    return blur
+
+
+#TODO: use options to set the noise types parameters if configured, else random_params=True
+def get_noise(noise_types: list = [], noise_patches=None):
+
+    noise = None
+    if(isinstance(noise_types, list)):
+        noise_type = random.choice(noise_types)
+        
+        # if noise_type == 'dither':
+        if noise_type.find('dither') >= 0:
+            #TODO: need a dither type selector, there are multiple options including b&w dithers
+            # dither = 'fs'
+            # if dither == 'fs':
+            if noise_type.find('fs') >= 0:
+                noise = transforms.FSDitherNoise(p=1)
+            # elif dither == 'bayer':
+            elif noise_type.find('bayer') >= 0:
+                noise = transforms.BayerDitherNoise(p=1)
+            # elif dither == 'fs_bw':
+            elif noise_type.find('fs_bw') >= 0:
+                noise = transforms.FSBWDitherNoise(p=1)
+            # elif dither == 'avg_bw':
+            elif noise_type.find('avg_bw') >= 0:
+                noise = transforms.AverageBWDitherNoise(p=1)
+            # elif dither == 'bayer_bw':
+            elif noise_type.find('bayer_bw') >= 0:
+                noise = transforms.BayerBWDitherNoise(p=1)
+            # elif dither == 'bin_bw':
+            elif noise_type.find('bin_bw') >= 0:
+                noise = transforms.BinBWDitherNoise(p=1)
+            # elif dither == 'rnd_bw':
+            elif noise_type.find('rnd_bw') >= 0:
+                noise = transforms.RandomBWDitherNoise(p=1)
+            # print("dither")
+        elif noise_type == 'simplequantize':
+            #TODO: find a useful rgb_range for SimpleQuantize 
+            noise = transforms.SimpleQuantize(p=1, rgb_range = 150) #30
+            # print("simplequantize")
+        elif noise_type == 'quantize':
+            noise = RandomQuantize(p=1, num_colors=32)
+            # print("quantize")
+        elif noise_type == 'gaussian':
+            noise = transforms.RandomGaussianNoise(p=1, random_params=True, gtype='bw')
+            # print("gaussian")
+        elif noise_type == 'JPEG':
+            noise = transforms.RandomJPEGNoise(p=1, random_params=True)
+            # print("JPEG")
+        elif noise_type == 'poisson':
+            noise = transforms.RandomPoissonNoise(p=1)
+            # print("poisson")
+        elif noise_type == 's&p':
+            noise = transforms.RandomSPNoise(p=1)
+            # print("s&p")
+        elif noise_type == 'speckle':
+            noise = transforms.RandomSpeckleNoise(gtype='bw', p=1)
+            # print("speckle")
+        elif noise_type == 'maxrgb':
+            noise = transforms.FilterMaxRGB(p=1)
+            # print("maxrgb")
+        elif noise_type == 'patches' and noise_patches:
+            noise = RandomNoisePatches(noise_patches)
+            # print("patches")
+        #elif noise_type == 'clean':
+
+    return noise
+
+def get_pad(img, size: int, fill = 0, padding_mode: str ='constant'):
+    h, w = img.shape[0], img.shape[1]
+
+    if fill == 'random':
+        fill_list = []
+        for _ in range(len(img.shape)):
+            fill_list.append(random.randint(0, 255))
+        fill = tuple(fill_list)
+
+    top = (size - h) // 2 if h < size else 0
+    bottom = top + h % 2 if h < size else 0
+    left = (size - w) // 2 if w < size else 0
+    right = left + w % 2 if w < size else 0
+    
+    pad = transforms.Pad(padding=(top, bottom, left, right), padding_mode=padding_mode, fill=fill) #reflect
+
+    return pad, fill
+
+
+
+class RandomQuantize(object):
+    r"""Color quantization using MiniSOM
+    Args:
+        img (numpy ndarray): Image to be quantized.
+        num_colors (int): the target number of colors to quantize to
+        sigma (float): the radius of the different neighbors in the SOM
+        learning_rate (float): determines how much weights are adjusted 
+            during each SOM iteration
+        neighborhood_function (str): the neighborhood function to use 
+            with SOM
+    Returns:
+        numpy ndarray: quantized version of the image.
+    """
+
+    def __init__(self, p = 0.5, num_colors=None, sigma=1.0, learning_rate=0.2, neighborhood_function='bubble'):
+        # assert isinstance(p, numbers.Number) and p >= 0, 'p should be a positive value'
+        self.p = p
+
+        if not num_colors:
+            N = int(np.random.uniform(2, 8))
+        else:
+            N = int(num_colors/2)
+        # assert isinstance(N, numbers.Number) and N >= 0, 'N should be a positive value'
+        # input_len corresponds to the shape of the pixels array (H, W, C)
+        # x and y are the "palette" matrix shape. x=2, y=N means 2xN final colors, but 
+        # could reshape to something like x=3, y=3 too
+        # try sigma = 0.1 , 0.2, 1.0, etc
+        self.som = MiniSom(x=2, y=N, input_len=3, sigma=sigma,
+                    learning_rate=0.2, neighborhood_function=neighborhood_function)
+
+    def __call__(self, img):
+        """
+        Args:
+            img (np.ndarray): Image to be quantized.
+
+        Returns:
+            np.ndarray: Quantized image.
+        """
+        if random.random() < self.p:
+
+            img_type = img.dtype
+            if np.issubdtype(img_type, np.integer):
+                img_max = np.iinfo(img_type).max
+            elif np.issubdtype(img_type, np.floating):
+                img_max = np.finfo(img_type).max
+
+            # reshape image as a 2D array
+            pixels = np.reshape(img, (img.shape[0]*img.shape[1], 3))
+            # print(pixels.shape)
+            # print(pixels.min())
+            # print(pixels.max())
+
+            # initialize som
+            self.som.random_weights_init(pixels)
+            # save the starting weights (the image’s initial colors)
+            starting_weights = self.som.get_weights().copy() 
+            self.som.train_random(pixels, 500, verbose=False)
+            #som.train_random(pixels, 100)
+            
+            # Vector quantization: quantize each pixel of the image to reduce the number of colors
+            qnt = self.som.quantization(pixels) 
+            clustered = np.zeros(img.shape)
+            for i, q in enumerate(qnt): 
+                clustered[np.unravel_index(i, dims=(img.shape[0], img.shape[1]))] = q
+            img = np.clip(clustered, 0, img_max).astype(img_type)
+        return img
+
+    def __repr__(self):
+        return self.__class__.__name__ + '(p={})'.format(self.p)
+
+
+class KernelDownscale(object):
+    '''
+    Use the previously extracted realistic kernels to downscale images with
+
+    Ref:
+    https://openaccess.thecvf.com/content_ICCV_2019/papers/Zhou_Kernel_Modeling_Super-Resolution_on_Real_Low-Resolution_Images_ICCV_2019_paper.pdf
+    https://openaccess.thecvf.com/content_CVPRW_2020/papers/w31/Ji_Real-World_Super-Resolution_via_Kernel_Estimation_and_Noise_Injection_CVPRW_2020_paper.pdf
+    '''
+    #TODO: can make this class into a pytorch dataloader, as an iterator can load all the kernels in init
+
+    def __init__(self, scale, kernel_paths, size=13, permute=True):
+        self.scale = 1.0/scale
+
+        # self.kernel_paths = glob.glob(os.path.join(opt['dataroot_kernels'], '*/*_kernel_x{}.npy'.format(scale)))
+        self.kernel_paths = glob.glob(os.path.join(kernel_paths, '*/*_kernel_x{}.npy'.format(scale)))
+        self.num_kernel = len(self.kernel_paths)
+        # print('num_kernel: ', self.num_kernel)
+
+        if permute:
+            np.random.shuffle(self.kernel_paths)
+
+        # making sure the kernel size (receptive field) is 13x13 (https://arxiv.org/pdf/1909.06581.pdf)
+        self.pre_process = transforms.Compose([transforms.CenterCrop(size)])
+
+        # print(kernel_path)
+        # print(self.kernel.shape)
+    
+    def __call__(self, img):
+        
+        kernel_path = self.kernel_paths[np.random.randint(0, self.num_kernel)]
+        with open(kernel_path, 'rb') as f:
+            kernel = np.load(f)
+
+        kernel = self.pre_process(kernel)
+        # print(kernel.shape)
+
+        input_shape = img.shape
+        # By default, if scale-factor is a scalar assume 2d resizing and duplicate it.
+        if isinstance(self.scale, (int, float)):
+            scale_factor = [self.scale, self.scale]
+        else:
+            scale_factor = self.scale
+        
+        # if needed extend the size of scale-factor list to the size of the input 
+        # by assigning 1 to all the unspecified scales
+        if len(scale_factor) != len(input_shape):
+            scale_factor = list(scale_factor)
+            scale_factor.extend([1] * (len(input_shape) - len(scale_factor)))
+        
+        # Dealing with missing output-shape. calculating according to scale-factor
+        output_shape = np.uint(np.ceil(np.array(input_shape) * np.array(scale_factor)))
+
+        # First run a correlation (convolution with flipped kernel)
+        out_im = cv2.filter2D(img, -1, kernel)
+
+        # Then subsample and return
+        return out_im[np.round(np.linspace(0, out_im.shape[0] - 1 / scale_factor[0], output_shape[0])).astype(int)[:, None],
+                np.round(np.linspace(0, out_im.shape[1] - 1 / scale_factor[1], output_shape[1])).astype(int), :]
+
+
+
+# class NoisePatches(Object):
+class NoisePatches(Dataset):
+    '''
+    Load the previously noise patches from real images to apply to the LR images
+    Ref:
+    https://openaccess.thecvf.com/content_cvpr_2018/papers/Chen_Image_Blind_Denoising_CVPR_2018_paper.pdf
+    https://openaccess.thecvf.com/content_ICCV_2019/papers/Zhou_Kernel_Modeling_Super-Resolution_on_Real_Low-Resolution_Images_ICCV_2019_paper.pdf
+
+    '''
+    def __init__(self, dataset=None, size=32, permute=True, grayscale=False):
+        # size = opt['GT_size']/opt['scale']
+        super(NoisePatches, self).__init__()
+        assert os.path.exists(dataset)
+
+        self.grayscale = grayscale
+        self.noise_imgs = sorted(glob.glob(dataset + '*.png'))
+        if permute:
+            np.random.shuffle(self.noise_imgs)
+
+        self.pre_process = transforms.Compose([transforms.RandomCrop(size), 
+                                               transforms.RandomHorizontalFlip(p=0.5), 
+                                               transforms.RandomVerticalFlip(p=0.5), 
+                                               ])
+
+    def __getitem__(self, index, out_nc=3):
+        
+        noise = self.pre_process(util.read_img(None, self.noise_imgs[index], out_nc))
+        # describe_numpy(noise, all=True)
+        # tmp_vis(noise, False)
+        norm_noise = (noise - np.mean(noise, axis=(0, 1), keepdims=True, dtype=np.float32))
+        # tmp_vis(np.mean(noise, axis=(0, 1), keepdims=True), False)
+        # describe_numpy(np.mean(noise, axis=(0, 1), keepdims=True), all=True)
+        # describe_numpy(norm_noise, all=True)
+        
+        #TODO: test adding noise to single channel images 
+        if self.grayscale:
+            norm_noise = util.bgr2ycbcr(norm_noise, only_y=True)
+        return norm_noise #.astype('uint8')
+
+    def __len__(self):
+        return len(self.noise_imgs)
+
+
+class RandomNoisePatches():
+    def __init__(self, noise_patches):
+        self.noise_patches = noise_patches
+
+    def __call__(self, img):
+        # add noise from patches 
+        noise = self.noise_patches[np.random.randint(0, len(self.noise_patches))]
+        # tmp_vis(noise, False)
+        # img = torch.clamp(img + noise, 0, 1)
+        img = np.clip((img + noise), 0, 255).astype('uint8')
+        ## tmp_vis(img, False)
+        return img
+
+
+
+
+
+def get_transform(opt):
+    transform_list = []
+    #osizes = util.parse_args(opt.loadSize)
+    #fineSize = util.parse_args(opt.fineSize)
+
+    '''
+    if opt.resize_or_crop == 'resize_and_crop':    
+        transform_list.append(
+            transforms.RandomChoice([
+                transforms.Resize([osize, osize], Image.BICUBIC) for osize in osizes
+            ]))
+        transform_list.append(transforms.RandomCrop(fineSize))
+    elif opt.resize_or_crop == 'crop':
+        transform_list.append(transforms.RandomCrop(fineSize))
+    elif opt.resize_or_crop == 'scale_width':
+        transform_list.append(transforms.Lambda(
+            lambda img: __scale_width(img, fineSize)))
+    elif opt.resize_or_crop == 'scale_width_and_crop':
+        transform_list.append(transforms.Lambda(
+            lambda img: __scale_width(img, opt.loadSize)))
+        transform_list.append(transforms.RandomCrop(opt.fineSize))
+    '''
+
+    '''
+    if opt.isTrain and not opt.no_flip:
+        transform_list.append(transforms.RandomHorizontalFlip())
+    '''
+
+    return transforms.Compose(transform_list)
+
+
+
+
+
+
+
+
+
+########### below is the original augmentations file
+
+
+
 
 IMAGE_EXTENSIONS = ['.png', '.jpg']
 
@@ -62,10 +495,10 @@ def random_crop_pairs(img_HR, img_LR, HR_size, scale):
     rnd_h = random.randint(0, max(0, H - LR_size))
     rnd_w = random.randint(0, max(0, W - LR_size))
     #print ("LR rnd: ",rnd_h, rnd_w)
-    img_LR = img_LR[rnd_h:rnd_h + LR_size, rnd_w:rnd_w + LR_size, :]
+    img_LR = img_LR[rnd_h:rnd_h + LR_size, rnd_w:rnd_w + LR_size, ...]
     rnd_h_HR, rnd_w_HR = int(rnd_h * scale), int(rnd_w * scale)
     #print ("HR rnd: ",rnd_h_HR, rnd_w_HR)
-    img_HR = img_HR[rnd_h_HR:rnd_h_HR + HR_size, rnd_w_HR:rnd_w_HR + HR_size, :]
+    img_HR = img_HR[rnd_h_HR:rnd_h_HR + HR_size, rnd_w_HR:rnd_w_HR + HR_size, ...]
     
     return img_HR, img_LR
 
@@ -131,7 +564,7 @@ def random_erasing(image_origin, p=0.5, s=(0.02, 0.4), r=(0.3, 3), modes=[0,1,2]
 
 # scale image
 def scale_img(image, scale, algo=None):
-    h,w,c = image.shape
+    h, w = image.shape[0], image.shape[1]
     newdim = (int(w/scale), int(h/scale))
     
     # randomly use OpenCV2 algorithms if none are provided
@@ -159,11 +592,7 @@ def scale_img(image, scale, algo=None):
     return resized, interpol
 
 # resize image to a defined size 
-def resize_img(image, crop_size=(128, 128), algo=None):
-    w = crop_size[0]
-    h = crop_size[1]
-    newdim = (w, h)
-    
+def resize_img(image, newdim=(128, 128), algo=None):
     if algo is None:
         scale_algos = [cv2.INTER_NEAREST, cv2.INTER_LINEAR, cv2.INTER_CUBIC, cv2.INTER_AREA, cv2.INTER_LANCZOS4, cv2.INTER_LINEAR_EXACT] #scaling interpolation options
         interpol = random.choice(scale_algos)
@@ -394,14 +823,13 @@ def noise_img(img_LR, noise_types=['clean']):
         compression = np.random.uniform(10, 50) #randomize quality between 10 and 50%
         encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), compression] #encoding parameters
         # encode
-        is_success, encimg = cv2.imencode('.jpg', img_LR*255, encode_param) 
+        is_success, encimg = cv2.imencode('.jpg', img_LR, encode_param) 
         
         # decode
         noise_img = cv2.imdecode(encimg, 1) 
-        noise_img = noise_img.astype(np.float32) / 255.
+        noise_img = noise_img.astype(np.uint8)
         
     elif noise_type == 'quantize': # Color quantization / palette
-        from minisom import MiniSom
         pixels = np.reshape(img_LR, (img_LR.shape[0]*img_LR.shape[1], 3)) 
         
         N = int(np.random.uniform(2, 8))

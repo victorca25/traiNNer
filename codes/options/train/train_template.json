@@ -1,16 +1,17 @@
 {
-  "name": "debug_001_template" //use "debug" in the name to run a test session and check everything is working. Does validation and state saving every 8 iterations.
+  "name": "debug_001_template" //use "debug" or "debug_nochkp" in the name to run a test session and check everything is working. Does validation and state saving every 8 iterations.
   //"name": "001_template" //remove "debug" to run the real training session.
   , "use_tb_logger": true
   , "model":"srragan" //srragan | sr | srgan | ppon | asrragan
   , "scale": 4
   , "gpu_ids": [0]
+  , "use_amp": true
 
   //Dataset options:
   , "datasets": {
     "train": {
       "name": "DIV2K"
-      , "mode": "LRHROTF"
+      , "mode": "LRHRC"
       //, "dataroot_HR": "../datasets/train/hr" //Original, with a single directory
       //, "dataroot_LR": "../datasets/train/lr" //Original, with a single directory
       , "dataroot_HR": [
@@ -28,7 +29,9 @@
       , "znorm": false // true | false // To normalize images in [-1, 1] range. Default = None (range [0,1]). Can use with activation function like tanh.
       , "n_workers": 4 //0 to disable CPU multithreading, or an integrer representing CPU threads to use for dataloading
       , "batch_size": 8
+      , "virtual_batch_size": 8 //32
       , "HR_size": 128 //patch size. Default: 128. Needs to be coordinated with the patch size of the features network
+      , "image_channels": 3 //number of channels to load images in
       
       // Color space conversion: "color" for both LR and HR, "color_LR" for LR independently, "color_HR" for HR independently
       //, "color": "y" //remove for no conversion (RGB) | "y" for Y in YCbCr | "gray" to convert RGB to grayscale | "RGB" to convert gray to RGB
@@ -41,8 +44,9 @@
       //, "aug_downscale": 0.2 // Example: 0.6 = 60% chance of generating LR on the fly, even if LR dataset exists
       
       // If manually configuring on the fly generation of LR: (else, it will automatically default to Matlab-like downscale algorithm (777) when/if required
+      , "dataroot_kernels": "D:/Code/Notebooks/training/kernels/results/" //location of the image kernels extracted with KernelGAN, for use with the "realistic" downscale type
       , "lr_downscale": true //false
-      , "lr_downscale_types": [1,2,777] //select from [0,1,2,3,4,5,777] where each number is: ["cv2.INTER_NEAREST", "cv2.INTER_LINEAR", "cv2.INTER_CUBIC", "cv2.INTER_AREA", "cv2.INTER_LANCZOS4", "cv2.INTER_LINEAR_EXACT", matlab.bicubic] //scale_algos //scaling interpolation options
+      , "lr_downscale_types": ["linear", "cubic", "matlab_bicubic"] //select from ["nearest", "linear", "cubic", "area", "lanczos4", "linear_exact", "matlab_bicubic", "realistic"] //scale_algos //scaling interpolation options
       
       // Rotations augmentations:
       , "use_flip": true //flip images 
@@ -51,21 +55,24 @@
       
       // Noise and blur augmentations:
       , "lr_blur": false //true | false
-      , "lr_blur_types":  ["gaussian", "clean", "clean", "clean"] //select from: ["average","box","gaussian","bilateral","clean"] //#blur options #median and motion aren't working yet
+      , "lr_blur_types":  {"gaussian":1, "clean":3} //select from: "average","box","gaussian","bilateral","clean" //#blur options #median and motion aren't working yet
+      , "noise_data": "../noise_patches/normal/" //location of the noise patches extracted from real images to use for noise injection with noise option "patches"
       , "lr_noise": false //true | false
-      , "lr_noise_types": ["gaussian", "clean", "clean", "clean", "clean"] //select from: ["gaussian", "JPEG", "quantize", "poisson", "dither", "s&p", "speckle", "clean"]
+      , "lr_noise_types": {"gaussian":1, "JPEG":1, "clean":4} //select from: "gaussian", "JPEG", "quantize", "poisson", "dither", "s&p", "speckle", "patches", "clean"
       , "lr_noise2": false //true | false
-      , "lr_noise_types2": ["dither", "dither", "clean", "clean"] //select from: ["gaussian", "JPEG", "quantize", "poisson", "dither", "s&p", "speckle", "clean"]
+      , "lr_noise_types2": {"dither":2, "clean":2} //select from: "gaussian", "JPEG", "quantize", "poisson", "dither", "s&p", "speckle", "patches", "clean"
       , "hr_noise": false //true | false
-      , "hr_noise_types": ["gaussian", "clean", "clean", "clean", "clean"] //select from: ["gaussian", "JPEG", "quantize", "poisson", "dither", "s&p", "speckle", "clean"]
+      , "hr_noise_types": {"gaussian":1, "clean":4} //select from: "gaussian", "JPEG", "quantize", "poisson", "dither", "s&p", "speckle", "clean"
       
       // Color augmentations
       //, "lr_fringes": true //true | false
       //, "lr_fringes_chance": 0.4
       //, "auto_levels": "HR" // "HR" | "LR" | "Both" //add auto levels to the images to expand dynamic range. Can use with SPL loss or (MS)-SSIM.
       //, "rand_auto_levels": 0.7 //Example: 0.4 = 40% chance of adding auto levels to images on the fly
-      //, "unsharp_mask": true //add a unsharpening mask to HR images. Can work well together with the HFEN loss function.
-      //, "rand_unsharp": 1 //Example: 0.5 = 50% chance of adding unsharpening mask to HR images on the fly
+      //, "lr_unsharp_mask": true //add a unsharpening mask to LR images. Can work well together with the HFEN loss function.
+      //, "lr_rand_unsharp": 1 //Example: 0.5 = 50% chance of adding unsharpening mask to LR images on the fly
+      //, "hr_unsharp_mask": true //add a unsharpening mask to HR images. Can work well together with the HFEN loss function.
+      //, "hr_rand_unsharp": 1 //Example: 0.5 = 50% chance of adding unsharpening mask to HR images on the fly
       
       // Augmentations for classification or (maybe) inpainting networks:
       //, "lr_cutout": false
@@ -86,21 +93,24 @@
       
       //, "hr_crop": false //disabled
       , "lr_downscale": false
-      , "lr_downscale_types": [0,1] //[0,1,2,3,4,5] //["cv2.INTER_NEAREST", "cv2.INTER_LINEAR", "cv2.INTER_CUBIC", "cv2.INTER_AREA", "cv2.INTER_LANCZOS4", "cv2.INTER_LINEAR_EXACT"] //scale_algos //scaling interpolation options
+      , "lr_downscale_types": ["linear", "cubic"] //select from ["nearest", "linear", "cubic", "area", "lanczos4", "linear_exact", "matlab_bicubic"] //scale_algos //scaling interpolation options
     }
   }
 
   , "path": {
-    "root": "D:/Code/GitHub/BasicSR"
+    "strict": false // true | false 
+    , "root": "D:/Code/GitHub/BasicSR"
     , "pretrain_model_G": "../experiments/pretrained_models/RRDB_PSNR_x4.pth"
     //, "pretrain_model_G": "../experiments/pretrained_models/RRDB_ESRGAN_x4.pth"
+    //, "pretrain_model_G": "../experiments/pretrained_models/nESRGANplus.pth"
     //, "pretrain_model_G": "../experiments/pretrained_models/PPON_G.pth"
+    //, "pretrain_model_G": "../experiments/pretrained_models/PANx4_DF2K.pth"
     // , "resume_state": "../experiments/debug_002_RRDB_ESRGAN_x4_DIV2K/training_state/16.state"
   }
 
-  //Generator options:
+  // Generator options:
   , "network_G": {
-    //ESRGAN:
+    // ESRGAN:
     "which_model_G": "RRDB_net" // RRDB_net | sr_resnet
     , "norm_type": null
     , "mode": "CNA"
@@ -112,13 +122,15 @@
     , "group": 1
     , "convtype": "Conv2D" //"Conv2D" | "PartialConv2D"
     , "net_act": "leakyrelu" //"swish" | "leakyrelu"
+    , "gaussian": true // true | false
+    , "plus": false // true | false
     ////, "finalact": "tanh" // Test. Activation function to make outputs fit in [-1, 1] range. Default = None. Coordinate with znorm.
     
-    //ASRGAN:
+    // ASRGAN:
     //"which_model_G": "asr_resnet" // "asr_resnet" | "asr_cnn"
     //, "nf": 64
     
-    //PPON:
+    // PPON:
     //"which_model_G": "ppon" // | ppon
     ////, "norm_type": null
     //, "mode": "CNA"
@@ -130,7 +142,7 @@
     //, "group": 1
     ////, "convtype": "Conv2D" //"Conv2D" | "PartialConv2D"
     
-    //SRGAN:
+    // SRGAN:
     //"which_model_G": "sr_resnet" // RRDB_net | sr_resnet
     //, "norm_type": null
     //, "mode": "CNA"
@@ -139,7 +151,7 @@
     //, "in_nc": 3
     //, "out_nc": 3
     
-    //SR:
+    // SR:
     //"which_model_G": "RRDB_net" // RRDB_net | sr_resnet
     //, "norm_type": null
     //, "mode": "CNA"
@@ -149,32 +161,32 @@
     //, "out_nc": 3
     //, "gc": 32
     //, "group": 1
+
+    //PAN:
+    // "which_model_G": "pan_net"
+    // , "in_nc": 3
+    // , "out_nc": 3
+    // , "nf": 40
+    // , "unf": 24
+    // , "nb": 16
+    // , "self_attention": true
+    // , "double_scpa": false
   }
 
-  //Discriminator options:
+  // Discriminator options:
   , "network_D": {
-    //ESRGAN (default)| PPON:
-    "which_model_D": "discriminator_vgg_128" // discriminator_vgg_128 | discriminator_vgg
+    // ESRGAN (default)| PPON:
+    "which_model_D": "discriminator_vgg" // discriminator_vgg_128 | discriminator_vgg | discriminator_vgg_128_fea (feature extraction) | patchgan | multiscale
     , "norm_type": "batch"
     , "act_type": "leakyrelu"
     , "mode": "CNA" // "CNA" | "NAC"
     , "nf": 64
     , "in_nc": 3
-    
-    //ASRGAN (feature extraction):
-    //"which_model_D": "discriminator_vgg_128_fea" // discriminator_vgg_128_fea
-    //, "norm_type": "batch"
-    //, "act_type": "leakyrelu"
-    //, "mode": "CNA" // "CNA" | "NAC"
-    //, "nf": 64
-    //, "in_nc": 3
-    //, "spectral_norm": true
-    //, "self_attention": true
-    //, "max_pool": true
-    //, "poolsize": 4
+    , "nlayer": 3 // only for patchgan and multiscale
+    , "num_D": 3 // only for multiscale
   }
 
-  //Schedulers options:
+  // Schedulers options:
   , "train": {
     "lr_G": 1e-4 //2e-4 //starting lr_g //Test, default: 1e-4
     , "weight_decay_G": 0
@@ -183,13 +195,13 @@
     , "weight_decay_D": 0
     , "beta1_D": 0.9
     
-    //For MultiStepLR (ESRGAN, default):
+    // For MultiStepLR (ESRGAN, default):
     , "lr_scheme": "MultiStepLR"
     , "lr_steps": [50000, 100000, 200000, 300000] //training from scratch
     //, "lr_steps": [50000, 75000, 85000, 100000] //finetuning
     , "lr_gamma": 0.5 //lr change at every step (multiplied by)
     
-    //For StepLR_Restart (PPON):
+    // For StepLR_Restart (PPON):
     //, "lr_gamma": 0.9 //lr change at every step (multiplied by)
     ///, "lr_scheme": "StepLR_Restart" // "MultiStepLR" | MultiStepLR_Restart | "StepLR" | "StepLR_Restart" | CosineAnnealingLR_Restart
     //, "lr_step_sizes": [200, 100, 250] //Steps for each restart for "StepLR_Restart"
@@ -197,41 +209,78 @@
     //, "restart_weights": [1, 0.5, 0.5]//lr_() * each weight in "restart_weights" for each restart in "restarts"    
     ////, "clear_state": true
     
-    //For MultiStepLR_Restart:
+    // For MultiStepLR_Restart:
     //, "lr_gamma": 0.9
     //, "lr_scheme": "MultiStepLR_Restart" // "MultiStepLR" | MultiStepLR_Restart | "StepLR" | "StepLR_Restart" | CosineAnnealingLR_Restart
     //, "lr_steps": [34500, 69000, 103500, 155250, 189750, 241500] //For "MultiStepLR" and "MultiStepLR_Restart"
     //, "restarts": [138000, 172500] //Restart iterations for "MultiStepLR_Restart", "StepLR_Restart" and "CosineAnnealingLR_Restart"
     //, "restart_weights": [0.5, 0.5] //lr_() * each weight in "restart_weights" for each restart in "restarts"
     ////, "clear_state": true
+
+    // For CosineAnnealingLR_Restart (PAN)
+    // "lr_G": 7e-4
+    // , "lr_scheme": "CosineAnnealingLR_Restart"
+    // , "beta1_G": 0.9
+    // , "beta2_G": 0.99
+    // , "lr_D": 7e-4
+    // , "beta1_D": 0.9
+    // , "beta2_D": 0.99
+    // // , "beta1": 0.9
+    // // , "beta2": 0.99
+    // , "niter": 1000000
+    // , "warmup_iter": -1  // no warm up
+    // , "T_period": [250000, 250000, 250000, 250000]
+    // , "restarts": [250000, 500000, 750000]
+    // , "restart_weights": [1, 1, 1]
+    // , "eta_min": 1e-7
     
     // Losses:
-    , "pixel_criterion": "l1" //"l1" | "l2" | "cb" | "elastic" | "relativel1" | "l1cosinesim" //pixel loss
+    , "pixel_criterion": "cb" //"l1" | "l2" | "cb" | "elastic" | "relativel1" | "l1cosinesim" | "clipl1" //pixel loss
     , "pixel_weight": 1e-2 // 1e-2 | 1
-    , "feature_criterion": "l1" //"l1" | "l2" | "cb" | "elastic" //feature loss (VGG feature network)
+    , "feature_criterion": "cb" //"l1" | "l2" | "cb" | "elastic" //feature loss (VGG feature network)
     , "feature_weight": 1
-    //, "dis_feature_criterion": "l1" //"l1" | "l2" | "cb" | "elastic" //discriminator feature loss (only for asrragan)
-    //, "dis_feature_weight": 1 //(only for asrragan)
+    //, "cx_weight": 0.5
+    //, "cx_type": "contextual"
+    //, "cx_vgg_layers": {"conv_3_2": 1.0, "conv_4_2": 1.0}
     //, "hfen_criterion": "l1" //hfen: "l1" | "l2" | "rel_l1" | "rel_l2" //helps in deblurring and finding edges, lines
-    //, "hfen_weight": 1e-1
-    //, "tv_type": "normal" //helps in denoising, reducing upscale artefacts
-    //, "tv_weight": 1e-6
-    //, "tv_norm": 2 // 1 for l1 (default) or 2 for l2. Change "tv_weight" so the l_g_tv is around 1e-02
-    //, "ssim_type": "ms-ssim" //"ssim" | "ms-ssim" //helps to maintain luminance, contrast and covariance between SR and HR
-	//, "ssim_weight": 1
-    , "gan_type": "vanilla" //"vanilla" | basic 
-    , "gan_weight": 5e-3 //*
+    //, "hfen_weight": 1e-6
+    //, "grad_type": "grad-4d-l1" //2d | 4d / - any of the pixel crit, ie "grad-2d-l1"
+    //, "grad_weight": 4e-3 //4e-1
+    //, "tv_type": "4D" // "normal" | "4D" //helps in denoising, reducing upscale artefacts
+    //, "tv_weight": 1e-5 //Change "tv_weight" so the l_g_tv is around 1e-02 - 1e-01
+    //, "tv_norm": 1 // 1 for l1 (default) or 2 for l2.
+    //, "ssim_type": "ssim" //"ssim" | "ms-ssim" //helps to maintain luminance, contrast and covariance between SR and HR
+	  //, "ssim_weight": 1
     //, "lpips_weight": 1 //perceptual loss
     //, "lpips_type": "net-lin" // net-lin | net *
     //, "lpips_net": "squeeze" // "vgg" | "alex" | "squeeze" 
-    //, "spl_weight": 1e-3 //SPL loss function. note: needs to add a cap in the generator (finalcap) or it becomes unstable
+    
+    // Experimental losses
     //, "spl_type": "spl" //"spl" | "gpl" | "cpl" //
-	
-    //for wgan-gp
+    //, "spl_weight": 1e-1 //1e-2 //SPL loss function. note: needs to add a cap in the generator (finalcap; For [0,1] range -> "finalcap": "clamp") or the overflow loss or it can become unstable.
+    //, "of_type": "overflow" //overflow loss function to force the images back into the [0, 1] range
+    //, "of_weight": 2e-1
+    //, "fft_type": "fft"
+    //, "fft_weight": 1e-1
+    //, "color_criterion": "color-l1cosinesim" // l1cosinesim naturally helps color consistency, so it is the best to use here, but others can be used as well
+    //, "color_weight": 1 // Loss based on the UV channels of YUV color space, helps preserve color consistency
+    //, "avg_criterion": "avg-l1"
+    //, "avg_weight": 5 // Averaging downscale loss
+    // , "ms_criterion": "multiscale-l1"
+    // , "ms_weight": 1e-2
+
+    // Adversarial loss:
+    , "gan_type": "vanilla" //"vanilla" | "wgan-gp" | "lsgan" 
+    , "gan_weight": 5e-3 //* test: 7e-3
+    // for wgan-gp
     // , "D_update_ratio": 1
     // , "D_init_iters": 0
     // , "gp_weigth": 10
-    
+    // if using the discriminator_vgg_128_fea feature maps to calculate feature loss
+    //, "gan_featmaps": true // true | false
+    //, "dis_feature_criterion": "cb" //"l1" | "l2" | "cb" | "elastic" //discriminator feature loss
+    //, "dis_feature_weight": 1e-2 //1
+
     // For PPON:
     //, "train_phase": 1 //Training starting phase, can skip the first phases
     //, "phase1_s": 100 //5000 //100 //5000 //138000 //-1 to skip. Need to coordinate with the LR steps. //COBranch: lr =  2e−4, decreased by the factor of 2 for every 1000 epochs (1.38e+5 iterations) 138k
@@ -239,15 +288,37 @@
     //, "phase3_s": 5000000 //207000 //-1 to skip. Need to coordinate with the LR steps. //POBranch: η = 5e−3,  lr = 1e−4 and halved at every 250 epochs (3.45e+4iterations) 34.5k
     //, "phase4_s": 100100
 
-  //Other training options:
-    //, "finalcap": "tanh" // Test. Cap Generator outputs to fit in: [-1, 1] range ("tanh"), rescale tanh to [0,1] range ("scaltanh"), cap ("sigmoid") or clamp ("clamp") to [0,1] range. Default = None. Coordinate with znorm.
+    // Differentiable Augmentation for Data-Efficient GAN Training
+    //, "diffaug": true
+    //, "dapolicy": "color,transl_zoom,flip,rotate,cutout" //smart "all" (translation, zoom_in and zoom_out are exclusive)
+
+    // Batch (Mixup) augmentations
+    //, "mixup": true // true | false
+    //, "mixopts": ["blend", "rgb", "mixup", "cutmix", "cutmixup"] //, "cutout", "cutblur"]
+    //, "mixprob": [1.0, 1.0, 1.0, 1.0, 1.0] //#, 1.0, 1.0]
+    //, "mixalpha": [0.6, 1.0, 1.2, 0.7, 0.7] //#, 0.001, 0.7]
+    //, "aux_mixprob": 1.0
+    //, "aux_mixalpha": 1.2
+    ////, "mix_p": 1.2
+
+    // Frequency Separator
+    //, "fs": true
+    //, "lpf_type": "average" // "average" | "gaussian"
+    //, "hpf_type": "average" // "average" | "gaussian"
+
+    // Other training options:
+    //, "finalcap": "clamp" // Test. Cap Generator outputs to fit in: [-1, 1] range ("tanh"), rescale tanh to [0,1] range ("scaltanh"), cap ("sigmoid") or clamp ("clamp") to [0,1] range. Default = None. Coordinate with znorm. Required for SPL if using image range [0,1]
     , "manual_seed": 0
     , "niter": 5e5
     , "val_freq": 1000 //5e3
+    //, "overwrite_val_imgs": true
+    //, "val_comparison": true
+    , "metrics": "psnr,ssim,lpips" //select from: "psnr,ssim,lpips" or a combination separated by comma ","
   }
 
   , "logger": {
     "print_freq": 200
     , "save_checkpoint_freq": 5e3
+    , "overwrite_chkp": false
   }
 }

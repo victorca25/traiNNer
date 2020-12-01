@@ -18,12 +18,15 @@ def spatial_average(in_tens, keepdim=True):
     #return in_tens.mean([2,3],keepdim=keepdim) # For Pytorch > 1.0 #https://github.com/richzhang/PerceptualSimilarity/issues/30
     return torch.mean(torch.mean(in_tens,dim=3),dim=2)[0][0] # For any Pytorch version. alt: "in_tens.mean(dim=3).mean(dim=2)[0][0]" #Needs to pick the first element of each dimension list
 
-def upsample(in_tens, out_H=64): # assumes scale factor is same for H and W
-    in_H = in_tens.shape[2]
-    scale_factor = 1.*out_H/in_H
+#def upsample(in_tens, out_H=64): # assumes scale factor is same for H and W
+def upsample(in_tens, out_size):
+    #in_H = in_tens.shape[2]
+    #scale_factor = 1.*out_H/in_H
 
     #return nn.Upsample(scale_factor=scale_factor, mode='bilinear', align_corners=False)(in_tens)
-    return Upsample(scale_factor=scale_factor, mode='bilinear', align_corners=False)(in_tens)
+    #return Upsample(scale_factor=scale_factor, mode='bilinear', align_corners=False)(in_tens)
+    return Upsample(size=out_size, mode='bilinear', align_corners=False)(in_tens)
+
 
 # Learned perceptual metric
 class PNetLin(nn.Module):
@@ -75,12 +78,14 @@ class PNetLin(nn.Module):
 
         if(self.lpips):
             if(self.spatial):
-                res = [upsample(self.lins[kk].model(diffs[kk]), out_H=in0.shape[2]) for kk in range(self.L)]
+                # res = [upsample(self.lins[kk].model(diffs[kk]), out_H=in0.shape[2]) for kk in range(self.L)]
+                res = [upsample(self.lins[kk].model(diffs[kk]), out_size=in0.shape[2:]) for kk in range(self.L)]
             else:
                 res = [spatial_average(self.lins[kk].model(diffs[kk]), keepdim=True) for kk in range(self.L)]
         else:
             if(self.spatial):
-                res = [upsample(diffs[kk].sum(dim=1,keepdim=True), out_H=in0.shape[2]) for kk in range(self.L)]
+                # res = [upsample(diffs[kk].sum(dim=1,keepdim=True), out_H=in0.shape[2]) for kk in range(self.L)]
+                res = [upsample(diffs[kk].sum(dim=1,keepdim=True), out_size=in0.shape[2:]) for kk in range(self.L)]
             else:
                 res = [spatial_average(diffs[kk].sum(dim=1,keepdim=True), keepdim=True) for kk in range(self.L)]
 

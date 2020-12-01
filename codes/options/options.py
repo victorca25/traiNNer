@@ -2,20 +2,100 @@ import os
 import os.path as osp
 import logging
 from collections import OrderedDict
-import json
+import cv2
+
+#PAD_MOD
+_str_to_cv2_pad_to = {'constant':cv2.BORDER_CONSTANT,
+                   'edge':cv2.BORDER_REPLICATE,
+                   'reflect':cv2.BORDER_REFLECT_101,
+                   'symmetric':cv2.BORDER_REFLECT
+                  }
+#INTER_MODE
+_str_to_cv2_interpolation = {'nearest':cv2.INTER_NEAREST, 
+                         'linear':cv2.INTER_LINEAR,
+                         'bilinear':cv2.INTER_LINEAR,
+                         'area':cv2.INTER_AREA,
+                         'cubic':cv2.INTER_CUBIC,
+                         'bicubic':cv2.INTER_CUBIC,
+                         'lanczos':cv2.INTER_LANCZOS4,
+                         'lanczos4':cv2.INTER_LANCZOS4,
+                         'linear_exact':cv2.INTER_LINEAR_EXACT,
+                         'matlab_linear':773,
+                         'matlab_box':774,
+                         'matlab_lanczos2':775,
+                         'matlab_lanczos3':776,
+                         'matlab_bicubic':777,
+                         'realistic':999}
+
+def parse2lists(types):
+    """ Converts dictionaries or single string options to lists that
+        work with random choice
+    """
+
+    if(isinstance(types, dict)):
+        types_list = []
+        for k, v in types.items():
+            types_list.extend([k]*v)
+        types = types_list
+    elif(isinstance(types, str)):
+        types = [types]
+    # else:
+    #     raise TypeError("Unrecognized blur type, must be list, dict or a string")
+
+    # if(isinstance(types, list)):
+    #     pass
+
+    return types
 
 
 def parse(opt_path, is_train=True):
-    # remove comments starting with '//'
-    json_str = ''
-    with open(opt_path, 'r') as f:
-        for line in f:
-            line = line.split('//')[0] + '\n'
-            json_str += line
-    opt = json.loads(json_str, object_pairs_hook=OrderedDict)
+    """Parse options file.
+    Args:
+        opt_path (str): Option file path. Can be JSON or YAML
+        is_train (str): Indicate whether in training or not. Default: True.
+    Returns:
+        (dict): Parsed Options
+    """
+    ext = osp.splitext(opt_path)[1].lower()
+    if ext == '.json':
+        import json
+        # remove comments starting with '//'
+        json_str = ''
+        with open(opt_path, 'r') as f:
+            for line in f:
+                line = line.split('//')[0] + '\n'
+                json_str += line
+        opt = json.loads(json_str, object_pairs_hook=OrderedDict)
+    elif ext == '.yml' or ext == '.yaml':
+        import yaml
+        import re
+        with open(opt_path, mode='r') as f:
+            try:
+                from yaml import CLoader as Loader #CSafeLoader
+            except ImportError:
+                from yaml import Loader #SafeLoader
+            _mapping_tag = yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG
+
+            def dict_constructor(loader, node):
+                return OrderedDict(loader.construct_pairs(node))
+
+            Loader.add_constructor(_mapping_tag, dict_constructor)
+            # compiled resolver to correctly parse scientific notation numbers
+            Loader.add_implicit_resolver(
+                u'tag:yaml.org,2002:float',
+                re.compile(u'''^(?:
+                [-+]?(?:[0-9][0-9_]*)\\.[0-9_]*(?:[eE][-+]?[0-9]+)?
+                |[-+]?(?:[0-9][0-9_]*)(?:[eE][-+]?[0-9]+)
+                |\\.[0-9_]+(?:[eE][-+]?[0-9]+)?
+                |[-+]?[0-9][0-9_]*(?::[0-5]?[0-9])+\\.[0-9_]*
+                |[-+]?\\.(?:inf|Inf|INF)
+                |\\.(?:nan|NaN|NAN))$''', re.X),
+                list(u'-+0123456789.'))
+            opt = yaml.load(f, Loader=Loader)
 
     opt['is_train'] = is_train
     scale = opt['scale']
+    bm = opt.get('batch_multiplier', None)
 
     # datasets
     for phase, dataset in opt['datasets'].items():
@@ -44,7 +124,7 @@ def parse(opt_path, is_train=True):
             elif type(HR_images_paths) is str:
                 dataset['dataroot_HR_bg'] = os.path.expanduser(HR_images_paths)
         if 'dataroot_LR' in dataset and dataset['dataroot_LR'] is not None:
-            LR_images_paths = dataset['dataroot_LR']        
+            LR_images_paths = dataset['dataroot_LR']
             if type(LR_images_paths) is list:
                 dataset['dataroot_LR'] = []
                 for path in LR_images_paths:
@@ -57,8 +137,34 @@ def parse(opt_path, is_train=True):
                     is_lmdb = True
         dataset['data_type'] = 'lmdb' if is_lmdb else 'img'
 
+        if phase == 'train' and bm:
+            dataset['virtual_batch_size'] = bm * dataset["batch_size"]
+
         if phase == 'train' and 'subset_file' in dataset and dataset['subset_file'] is not None:
             dataset['subset_file'] = os.path.expanduser(dataset['subset_file'])
+
+        if 'lr_downscale_types' in dataset and dataset['lr_downscale_types'] is not None:
+            if(isinstance(dataset['lr_downscale_types'], str)):
+                dataset['lr_downscale_types'] = [dataset['lr_downscale_types']]
+            downscale_types = []
+            for algo in dataset['lr_downscale_types']:
+                if type(algo) == str:
+                    downscale_types.append(_str_to_cv2_interpolation[algo.lower()])
+                else:
+                    downscale_types.append(algo)
+            dataset['lr_downscale_types'] = downscale_types
+
+        if dataset.get('lr_blur_types', None) and dataset.get('lr_blur', None):
+            dataset['lr_blur_types'] = parse2lists(dataset['lr_blur_types'])
+        
+        if dataset.get('lr_noise_types', None) and dataset.get('lr_noise', None):
+            dataset['lr_noise_types'] = parse2lists(dataset['lr_noise_types'])
+        
+        if dataset.get('lr_noise_types2', None) and dataset.get('lr_noise2', None):
+            dataset['lr_noise_types2'] = parse2lists(dataset['lr_noise_types2'])
+        
+        if dataset.get('hr_noise_types', None) and dataset.get('hr_noise', None):
+            dataset['hr_noise_types'] = parse2lists(dataset['hr_noise_types'])
 
     # path
     for key, path in opt['path'].items():
@@ -71,13 +177,25 @@ def parse(opt_path, is_train=True):
         opt['path']['training_state'] = os.path.join(experiments_root, 'training_state')
         opt['path']['log'] = experiments_root
         opt['path']['val_images'] = os.path.join(experiments_root, 'val_images')
+        opt['train']['overwrite_val_imgs'] = opt['train'].get('overwrite_val_imgs', None)
+        opt['train']['val_comparison'] = opt['train'].get('val_comparison', None)
+        opt['logger']['overwrite_chkp'] = opt['logger'].get('overwrite_chkp', None)
+        fsa = opt['train'].get('use_frequency_separation', None)
+        if fsa and not opt['train'].get('fs', None):
+            opt['train']['fs'] = fsa
 
         # change some options for debug mode
-        if 'debug' in opt['name']:
+        if 'debug_nochkp' in opt['name']:
+            opt['train']['val_freq'] = 8
+            opt['logger']['print_freq'] = 2
+            opt['logger']['save_checkpoint_freq'] = 1000 #10000000
+            opt['train']['lr_decay_iter'] = 10
+        elif 'debug' in opt['name']:
             opt['train']['val_freq'] = 8
             opt['logger']['print_freq'] = 2
             opt['logger']['save_checkpoint_freq'] = 8
             opt['train']['lr_decay_iter'] = 10
+
     else:  # test
         results_root = os.path.join(opt['path']['root'], 'results', opt['name'])
         opt['path']['results_root'] = results_root

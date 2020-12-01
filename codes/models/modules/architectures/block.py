@@ -1,7 +1,8 @@
 from collections import OrderedDict
 import torch
 import torch.nn as nn
-from models.modules.architectures.convolutions.partialconv2d import PartialConv2d
+from models.modules.architectures.convolutions.partialconv2d import PartialConv2d #TODO
+#from modules.architectures.convolutions.partialconv2d import PartialConv2d
 
 ####################
 # Basic blocks
@@ -266,12 +267,23 @@ class ResidualDenseBlock_5C(nn.Module):
     Residual Dense Block
     style: 5 convs
     The core module of paper: (Residual Dense Network for Image Super-Resolution, CVPR 18)
+    Modified options that can be used:
+        - "Partial Convolution based Padding" arXiv:1811.11718
+        - "Spectral normalization" arXiv:1802.05957
+        - "ICASSP 2020 - ESRGAN+ : Further Improving ESRGAN" N. C. {Rakotonirina} and A. {Rasoanaivo}
     '''
 
     def __init__(self, nc, kernel_size=3, gc=32, stride=1, bias=True, pad_type='zero', \
-            norm_type=None, act_type='leakyrelu', mode='CNA', convtype='Conv2D', spectral_norm=False):
+            norm_type=None, act_type='leakyrelu', mode='CNA', convtype='Conv2D', \
+            spectral_norm=False, gaussian_noise=False, plus=False):
         super(ResidualDenseBlock_5C, self).__init__()
         # gc: growth channel, i.e. intermediate channels
+        
+        ## +
+        self.noise = GaussianNoise() if gaussian_noise else None
+        self.conv1x1 = conv1x1(nc, gc) if plus else None
+        ## +
+
         self.conv1 = conv_block(nc, gc, kernel_size, stride, bias=bias, pad_type=pad_type, \
             norm_type=norm_type, act_type=act_type, mode=mode, convtype=convtype, \
             spectral_norm=spectral_norm)
@@ -295,11 +307,17 @@ class ResidualDenseBlock_5C(nn.Module):
     def forward(self, x):
         x1 = self.conv1(x)
         x2 = self.conv2(torch.cat((x, x1), 1))
+        if self.conv1x1:
+            x2 = x2 + self.conv1x1(x) #+
         x3 = self.conv3(torch.cat((x, x1, x2), 1))
         x4 = self.conv4(torch.cat((x, x1, x2, x3), 1))
+        if self.conv1x1:
+            x4 = x4 + x2 #+
         x5 = self.conv5(torch.cat((x, x1, x2, x3, x4), 1))
-        return x5.mul(0.2) + x
-
+        if self.noise:
+            return self.noise(x5.mul(0.2) + x)
+        else:
+            return x5.mul(0.2) + x
 
 class RRDB(nn.Module):
     '''
@@ -309,21 +327,24 @@ class RRDB(nn.Module):
 
     def __init__(self, nc, kernel_size=3, gc=32, stride=1, bias=True, pad_type='zero', \
             norm_type=None, act_type='leakyrelu', mode='CNA', convtype='Conv2D', \
-            spectral_norm=False):
+            spectral_norm=False, gaussian_noise=False, plus=False):
         super(RRDB, self).__init__()
         self.RDB1 = ResidualDenseBlock_5C(nc, kernel_size, gc, stride, bias, pad_type, \
-            norm_type, act_type, mode, convtype, spectral_norm=spectral_norm)
+                norm_type, act_type, mode, convtype, spectral_norm=spectral_norm, \
+                gaussian_noise=gaussian_noise, plus=plus)
         self.RDB2 = ResidualDenseBlock_5C(nc, kernel_size, gc, stride, bias, pad_type, \
-            norm_type, act_type, mode, convtype, spectral_norm=spectral_norm)
+                norm_type, act_type, mode, convtype, spectral_norm=spectral_norm, \
+                gaussian_noise=gaussian_noise, plus=plus)
         self.RDB3 = ResidualDenseBlock_5C(nc, kernel_size, gc, stride, bias, pad_type, \
-            norm_type, act_type, mode, convtype, spectral_norm=spectral_norm)
+                norm_type, act_type, mode, convtype, spectral_norm=spectral_norm, \
+                gaussian_noise=gaussian_noise, plus=plus)
 
     def forward(self, x):
         out = self.RDB1(x)
         out = self.RDB2(out)
         out = self.RDB3(out)
         return out.mul(0.2) + x
-
+            
 
 
 #PPON
@@ -443,3 +464,66 @@ def upconv_blcok(in_nc, out_nc, upscale_factor=2, kernel_size=3, stride=1, bias=
 def conv_layer(in_channels, out_channels, kernel_size, stride=1, dilation=1, groups=1):
     padding = int((kernel_size - 1) / 2) * dilation
     return nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding=padding, bias=True, dilation=dilation, groups=groups)
+
+
+
+
+####################
+#ESRGANplus
+####################
+
+class GaussianNoise(nn.Module):
+    def __init__(self, sigma=0.1, is_relative_detach=False):
+        super().__init__()
+        self.sigma = sigma
+        self.is_relative_detach = is_relative_detach
+        self.noise = torch.tensor(0, dtype=torch.float).to(torch.device('cuda'))
+
+    def forward(self, x):
+        if self.training and self.sigma != 0:
+            scale = self.sigma * x.detach() if self.is_relative_detach else self.sigma * x
+            sampled_noise = self.noise.repeat(*x.size()).normal_() * scale
+            x = x + sampled_noise
+        return x 
+
+def conv1x1(in_planes, out_planes, stride=1):
+    return nn.Conv2d(in_planes, out_planes, kernel_size=1, stride=stride, bias=False)
+
+
+#TODO: Not used:
+# https://github.com/github-pengge/PyTorch-progressive_growing_of_gans/blob/master/models/base_model.py
+class minibatch_std_concat_layer(nn.Module):
+    def __init__(self, averaging='all'):
+        super(minibatch_std_concat_layer, self).__init__()
+        self.averaging = averaging.lower()
+        if 'group' in self.averaging:
+            self.n = int(self.averaging[5:])
+        else:
+            assert self.averaging in ['all', 'flat', 'spatial', 'none', 'gpool'], 'Invalid averaging mode'%self.averaging
+        self.adjusted_std = lambda x, **kwargs: torch.sqrt(torch.mean((x - torch.mean(x, **kwargs)) ** 2, **kwargs) + 1e-8)
+
+    def forward(self, x):
+        shape = list(x.size())
+        target_shape = copy.deepcopy(shape)
+        vals = self.adjusted_std(x, dim=0, keepdim=True)
+        if self.averaging == 'all':
+            target_shape[1] = 1
+            vals = torch.mean(vals, dim=1, keepdim=True)
+        elif self.averaging == 'spatial':
+            if len(shape) == 4:
+                vals = mean(vals, axis=[2,3], keepdim=True)             # torch.mean(torch.mean(vals, 2, keepdim=True), 3, keepdim=True)
+        elif self.averaging == 'none':
+            target_shape = [target_shape[0]] + [s for s in target_shape[1:]]
+        elif self.averaging == 'gpool':
+            if len(shape) == 4:
+                vals = mean(x, [0,2,3], keepdim=True)                   # torch.mean(torch.mean(torch.mean(x, 2, keepdim=True), 3, keepdim=True), 0, keepdim=True)
+        elif self.averaging == 'flat':
+            target_shape[1] = 1
+            vals = torch.FloatTensor([self.adjusted_std(x)])
+        else:                                                           # self.averaging == 'group'
+            target_shape[1] = self.n
+            vals = vals.view(self.n, self.shape[1]/self.n, self.shape[2], self.shape[3])
+            vals = mean(vals, axis=0, keepdim=True).view(1, self.n, 1, 1)
+        vals = vals.expand(*target_shape)
+        return torch.cat([x, vals], 1)
+

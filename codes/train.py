@@ -11,22 +11,10 @@ import logging
 import torch
 
 import options.options as option
-from utils import util
+from utils import util, metrics
 from data import create_dataloader, create_dataset
 from models import create_model
-from models.modules.LPIPS import compute_dists as lpips
-
-def get_pytorch_ver():
-    #print(torch.__version__)
-    pytorch_ver = torch.__version__
-    if pytorch_ver == "0.4.0":
-        return "pre"
-    elif pytorch_ver == "0.4.1":
-        return "pre"
-    elif pytorch_ver == "1.0.0":
-        return "pre"
-    else: #"1.1.0", "1.1.1", "1.2.0", "1.2.1" and beyond
-        return "post"
+from dataops.common import tensor2np
         
 def main():
     # options
@@ -34,7 +22,6 @@ def main():
     parser.add_argument('-opt', type=str, required=True, help='Path to option JSON file.')
     opt = option.parse(parser.parse_args().opt, is_train=True)
     opt = option.dict_to_nonedict(opt)  # Convert to NoneDict, which return None for missing key.
-    pytorch_ver = get_pytorch_ver()
     
     # train from scratch OR resume training
     if opt['path']['resume_state']:
@@ -77,14 +64,19 @@ def main():
     logger.info('Random seed: {}'.format(seed))
     util.set_random_seed(seed)
 
-    torch.backends.cudnn.benckmark = True
+    # if the model does not change and input sizes remain the same during training then there may be benefit 
+    # from setting torch.backends.cudnn.benchmark = True, otherwise it may stall training
+    torch.backends.cudnn.benchmark = True
     # torch.backends.cudnn.deterministic = True
 
     # create train and val dataloader
+    val_loader = False
     for phase, dataset_opt in opt['datasets'].items():
         if phase == 'train':
             train_set = create_dataset(dataset_opt)
-            train_size = int(math.ceil(len(train_set) / dataset_opt['batch_size']))
+            batch_size = dataset_opt.get('batch_size', 4)
+            virtual_batch_size = dataset_opt.get('virtual_batch_size', batch_size)
+            train_size = int(math.ceil(len(train_set) / batch_size))
             logger.info('Number of train images: {:,d}, iters: {:,d}'.format(
                 len(train_set), train_size))
             total_iters = int(opt['train']['niter'])
@@ -108,140 +100,146 @@ def main():
     if resume_state:
         start_epoch = resume_state['epoch']
         current_step = resume_state['iter']
+        virtual_step = current_step * virtual_batch_size / batch_size \
+            if virtual_batch_size and virtual_batch_size > batch_size else current_step
         model.resume_training(resume_state)  # handle optimizers and schedulers
         model.update_schedulers(opt['train']) # updated schedulers in case JSON configuration has changed
+        del resume_state
+        # start the iteration time when resuming
+        t0 = time.time()
     else:
         current_step = 0
+        virtual_step = 0
         start_epoch = 0
 
     # training
     logger.info('Start training from epoch: {:d}, iter: {:d}'.format(start_epoch, current_step))
-    for epoch in range(start_epoch, total_epochs):
-        for n, train_data in enumerate(train_loader,start=1):
-            current_step += 1
-            if current_step > total_iters:
-                break
-            
-            if pytorch_ver=="pre": #Order for PyTorch ver < 1.1.0
-                # update learning rate
-                model.update_learning_rate(current_step-1)
+    try:
+        for epoch in range(start_epoch, total_epochs*(virtual_batch_size//batch_size)):
+            for n, train_data in enumerate(train_loader,start=1):
+
+                if virtual_step == 0:
+                    # first iteration start time
+                    t0 = time.time()
+
+                virtual_step += 1
+                take_step = False
+                if virtual_step > 0 and virtual_step * batch_size % virtual_batch_size == 0:
+                    current_step += 1
+                    take_step = True
+                    if current_step > total_iters:
+                        break
+
                 # training
                 model.feed_data(train_data)
-                model.optimize_parameters(current_step)
-            elif pytorch_ver=="post": #Order for PyTorch ver > 1.1.0
-                # training
-                model.feed_data(train_data)
-                model.optimize_parameters(current_step)
-                # update learning rate
-                model.update_learning_rate(current_step-1)
-            else:
-                print('Error identifying PyTorch version. ', torch.__version__)
-                break
-
-            # log
-            if current_step % opt['logger']['print_freq'] == 0:
-                logs = model.get_current_log()
-                message = '<epoch:{:3d}, iter:{:8,d}, lr:{:.3e}> '.format(
-                    epoch, current_step, model.get_current_learning_rate())
-                for k, v in logs.items():
-                    message += '{:s}: {:.4e} '.format(k, v)
-                    # tensorboard logger
-                    if opt['use_tb_logger'] and 'debug' not in opt['name']:
-                        tb_logger.add_scalar(k, v, current_step)
-                logger.info(message)
-
-            # save models and training states (changed to save models before validation)
-            if current_step % opt['logger']['save_checkpoint_freq'] == 0:
-                model.save(current_step)
-                model.save_training_state(epoch + (n >= len(train_loader)), current_step)
-                logger.info('Models and training states saved.')
-            
-            # validation
-            if current_step % opt['train']['val_freq'] == 0:
-                avg_psnr = 0.0
-                avg_ssim = 0.0
-                avg_lpips = 0.0
-                idx = 0
-                val_sr_imgs_list = []
-                val_gt_imgs_list = []
-                for val_data in val_loader:
-                    idx += 1
-                    img_name = os.path.splitext(os.path.basename(val_data['LR_path'][0]))[0]
-                    img_dir = os.path.join(opt['path']['val_images'], img_name)
-                    util.mkdir(img_dir)
-
-                    model.feed_data(val_data)
-                    model.test()
-
-                    visuals = model.get_current_visuals()
-                    
-                    if opt['datasets']['train']['znorm']: # If the image range is [-1,1]
-                        sr_img = util.tensor2img(visuals['SR'],min_max=(-1, 1))  # uint8
-                        gt_img = util.tensor2img(visuals['HR'],min_max=(-1, 1))  # uint8
-                    else: # Default: Image range is [0,1]
-                        sr_img = util.tensor2img(visuals['SR'])  # uint8
-                        gt_img = util.tensor2img(visuals['HR'])  # uint8
-                        
-                    # sr_img = util.tensor2img(visuals['SR'])  # uint8
-                    # gt_img = util.tensor2img(visuals['HR'])  # uint8
-                    
-                    # print("Min. SR value:",sr_img.min()) # Debug
-                    # print("Max. SR value:",sr_img.max()) # Debug
-                    
-                    # print("Min. GT value:",gt_img.min()) # Debug
-                    # print("Max. GT value:",gt_img.max()) # Debug
-                    
-                    # Save SR images for reference
-                    save_img_path = os.path.join(img_dir, '{:s}_{:d}.png'.format(\
-                        img_name, current_step))
-                    util.save_img(sr_img, save_img_path)
-
-                    # calculate PSNR, SSIM and LPIPS distance
-                    crop_size = opt['scale']
-                    gt_img = gt_img / 255.
-                    sr_img = sr_img / 255.
-
-                    # For training models with only one channel ndim==2, if RGB ndim==3, etc.
-                    if gt_img.ndim == 2:
-                        cropped_gt_img = gt_img[crop_size:-crop_size, crop_size:-crop_size]
-                    else:
-                        cropped_gt_img = gt_img[crop_size:-crop_size, crop_size:-crop_size, :]
-                    if sr_img.ndim == 2:
-                        cropped_sr_img = sr_img[crop_size:-crop_size, crop_size:-crop_size]
-                    else: # Default: RGB images
-                        cropped_sr_img = sr_img[crop_size:-crop_size, crop_size:-crop_size, :]
-                    
-                    val_gt_imgs_list.append(cropped_gt_img) # If calculating only once for all images
-                    val_sr_imgs_list.append(cropped_sr_img) # If calculating only once for all images
-                    
-                    # LPIPS only works for RGB images
-                    avg_psnr += util.calculate_psnr(cropped_sr_img * 255, cropped_gt_img * 255)
-                    avg_ssim += util.calculate_ssim(cropped_sr_img * 255, cropped_gt_img * 255)
-                    #avg_lpips += lpips.calculate_lpips([cropped_sr_img], [cropped_gt_img]) # If calculating for each image
-
-                avg_psnr = avg_psnr / idx
-                avg_ssim = avg_ssim / idx
-                #avg_lpips = avg_lpips / idx # If calculating for each image
-                avg_lpips = lpips.calculate_lpips(val_sr_imgs_list,val_gt_imgs_list) # If calculating only once for all images
+                model.optimize_parameters(virtual_step)
 
                 # log
-                # logger.info('# Validation # PSNR: {:.5g}, SSIM: {:.5g}'.format(avg_psnr, avg_ssim))
-                logger.info('# Validation # PSNR: {:.5g}, SSIM: {:.5g}, LPIPS: {:.5g}'.format(avg_psnr, avg_ssim, avg_lpips))
-                logger_val = logging.getLogger('val')  # validation logger
-                # logger_val.info('<epoch:{:3d}, iter:{:8,d}> psnr: {:.5g}, ssim: {:.5g}'.format(
-                    # epoch, current_step, avg_psnr, avg_ssim))
-                logger_val.info('<epoch:{:3d}, iter:{:8,d}> psnr: {:.5g}, ssim: {:.5g}, lpips: {:.5g}'.format(
-                    epoch, current_step, avg_psnr, avg_ssim, avg_lpips))
-                # tensorboard logger
-                if opt['use_tb_logger'] and 'debug' not in opt['name']:
-                    tb_logger.add_scalar('psnr', avg_psnr, current_step)
-                    tb_logger.add_scalar('ssim', avg_ssim, current_step)
-                    tb_logger.add_scalar('lpips', avg_lpips, current_step)
+                if current_step % opt['logger']['print_freq'] == 0 and take_step:
+                    # iteration end time 
+                    t1 = time.time()
 
-    logger.info('Saving the final model.')
-    model.save('latest')
-    logger.info('End of training.')
+                    logs = model.get_current_log()
+                    message = '<epoch:{:3d}, iter:{:8,d}, lr:{:.3e}, i_time: {:.4f} sec.> '.format(
+                        epoch, current_step, model.get_current_learning_rate(), (t1 - t0))
+                    for k, v in logs.items():
+                        message += '{:s}: {:.4e} '.format(k, v)
+                        # tensorboard logger
+                        if opt['use_tb_logger'] and 'debug' not in opt['name']:
+                            tb_logger.add_scalar(k, v, current_step)
+                    logger.info(message)
 
+                    # # start time for next iteration
+                    # t0 = time.time()
+
+                # update learning rate
+                if model.optGstep and model.optDstep and take_step:
+                    model.update_learning_rate()
+                
+                # save models and training states (changed to save models before validation)
+                if current_step % opt['logger']['save_checkpoint_freq'] == 0 and take_step:
+                    model.save(current_step, opt['logger']['overwrite_chkp'])
+                    model.save_training_state(epoch + (n >= len(train_loader)), current_step, opt['logger']['overwrite_chkp'])
+                    logger.info('Models and training states saved.')
+                
+                # validation
+                if val_loader and current_step % opt['train']['val_freq'] == 0 and take_step:
+                    val_sr_imgs_list = []
+                    val_gt_imgs_list = []
+                    val_metrics = metrics.MetricsDict(metrics=opt['train'].get('metrics', None))
+                    for val_data in val_loader:
+                        img_name = os.path.splitext(os.path.basename(val_data['LR_path'][0]))[0]
+                        img_dir = os.path.join(opt['path']['val_images'], img_name)
+                        util.mkdir(img_dir)
+
+                        model.feed_data(val_data)
+                        model.test()
+
+                        """
+                        Get Visuals
+                        """
+                        visuals = model.get_current_visuals()
+                        sr_img = tensor2np(visuals['SR'], denormalize=opt['datasets']['train']['znorm'])
+                        gt_img = tensor2np(visuals['HR'], denormalize=opt['datasets']['train']['znorm'])
+                        
+                        # Save SR images for reference
+                        if opt['train']['overwrite_val_imgs']:
+                            save_img_path = os.path.join(img_dir, '{:s}.png'.format(\
+                                img_name))
+                        else:
+                            save_img_path = os.path.join(img_dir, '{:s}_{:d}.png'.format(\
+                                img_name, current_step))
+
+                        # save single images or lr / sr comparison
+                        if opt['train']['val_comparison']:
+                            lr_img = tensor2np(visuals['LR'], denormalize=opt['datasets']['train']['znorm'])
+                            util.save_img_comp(lr_img, sr_img, save_img_path)
+                        else:
+                            util.save_img(sr_img, save_img_path)
+
+                        """
+                        Get Metrics
+                        # TODO: test using tensor based metrics (batch) instead of numpy.
+                        """
+                        crop_size = opt['scale']
+                        val_metrics.calculate_metrics(sr_img, gt_img, crop_size = crop_size)  #, only_y=True)
+
+                    avg_metrics = val_metrics.get_averages()
+                    del val_metrics
+
+                    # log
+                    logger_m = ''
+                    for r in avg_metrics:
+                        #print(r)
+                        formatted_res = r['name'].upper()+': {:.5g}, '.format(r['average'])
+                        logger_m += formatted_res
+
+                    logger.info('# Validation # '+logger_m[:-2])
+                    logger_val = logging.getLogger('val')  # validation logger
+                    logger_val.info('<epoch:{:3d}, iter:{:8,d}> '.format(epoch, current_step)+logger_m[:-2])
+                    
+                    # tensorboard logger
+                    if opt['use_tb_logger'] and 'debug' not in opt['name']:
+                        for r in avg_metrics:
+                            tb_logger.add_scalar(r['name'], r['average'], current_step)
+                    
+                    # # reset time for next iteration to skip the validation time from calculation
+                    # t0 = time.time()
+
+                if current_step % opt['logger']['print_freq'] == 0 and take_step or \
+                    (val_loader and current_step % opt['train']['val_freq'] == 0 and take_step):
+                    # reset time for next iteration to skip the validation time from calculation
+                    t0 = time.time()
+
+        logger.info('Saving the final model.')
+        model.save('latest')
+        logger.info('End of training.')
+
+    except KeyboardInterrupt:
+        # catch a KeyboardInterrupt and save the model and state to resume later
+        model.save(current_step, True)
+        model.save_training_state(epoch + (n >= len(train_loader)), current_step, True)
+        logger.info('Training interrupted. Latest models and training states saved.')
 
 if __name__ == '__main__':
     main()
