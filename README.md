@@ -265,7 +265,7 @@ Following are the original pretrained models that the authors made available for
     <td>PAN.pth</td>
      <td><sub>4x pretrained modified PAN model with self-attention</sub></td>
     <td><a href=""></a></td>
-    <td><a href="https://mega.nz/file/mpRgVThY#tRi1q_PrY5OX4MVOTtjWlXzBXcLZs2tP1duo-mEkWSs"></a>Other</td>
+    <td><a href="https://mega.nz/file/mpRgVThY#tRi1q_PrY5OX4MVOTtjWlXzBXcLZs2tP1duo-mEkWSs">Other</a></td>
   </tr>
 
   <tr>
@@ -273,7 +273,7 @@ Following are the original pretrained models that the authors made available for
     <td>SOFVSR.pth</td>
      <td><sub>4x pretrained SOFVSR model, using 3 frames</sub></td>
     <td><a href=""></a></td>
-    <td><a href="https://mega.nz/file/28JmyLrK#xhRP-EZKR7Vg7UjIRZQqotiFLix21JaGGLSvZq7cjt4"></a>Other</td>
+    <td><a href="https://mega.nz/file/28JmyLrK#xhRP-EZKR7Vg7UjIRZQqotiFLix21JaGGLSvZq7cjt4">Other</a></td>
   </tr>
 
   <tr>
@@ -281,7 +281,7 @@ Following are the original pretrained models that the authors made available for
     <td>SOFVESRGAN.pth</td>
      <td><sub>4x pretrained modified SOFVSR model using ESRGAN network for super-resolution, using 3 frames</sub></td>
     <td><a href=""></a></td>
-    <td><a href="https://mega.nz/file/TwwEWD7Q#wCfUvVudI17weYc1JLeM3nTeK2xiMlVdc_JN1Nov3ac"></a>Other</td>
+    <td><a href="https://mega.nz/file/TwwEWD7Q#wCfUvVudI17weYc1JLeM3nTeK2xiMlVdc_JN1Nov3ac">Other</a></td>
   </tr>
 
   <tr>
@@ -289,7 +289,7 @@ Following are the original pretrained models that the authors made available for
     <td>RIFE.pth</td>
      <td><sub>Converted pretrained RIFE model from the three original pickle files into a single pth model</sub></td>
     <td><a href=""></a></td>
-    <td><a href="https://mega.nz/file/DhBWgRYQ#hLkR4Eiks6s3ZvwLCl4eA57J3baR0eDXjyaV9yzmTeM"></a>Other</td>
+    <td><a href="https://mega.nz/file/DhBWgRYQ#hLkR4Eiks6s3ZvwLCl4eA57J3baR0eDXjyaV9yzmTeM">Other</a></td>
   </tr>
 </table>
 
