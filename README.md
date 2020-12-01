@@ -86,6 +86,10 @@ Otherwise, it is also possible to do inference of batches of images with the cod
 1. Modify the configuration file `options/test/test_ESRGAN.yml` (or `options/test/test_ESRGAN.json`)
 1. Run command: `python test_ppon.py -opt options/test/test_ESRGAN.yml` (or `python test_ppon.py -opt options/test/test_ESRGAN.json`)
 
+### Test VSR models
+1. Modify the configuration file `options/test/test_video.yml`
+1. Run command: `python test_vsr.py -opt options/test/test_video.yml`
+
 ## How to Train
 [How to train](https://github.com/victorca25/BasicSR/blob/master/docs/howtotrain.md)
 
