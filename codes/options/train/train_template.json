@@ -6,6 +6,7 @@
   , "scale": 4
   , "gpu_ids": [0]
   , "use_amp": true
+  , "use_swa": false
 
   //Dataset options:
   , "datasets": {
@@ -233,11 +234,17 @@
     // , "restarts": [250000, 500000, 750000]
     // , "restart_weights": [1, 1, 1]
     // , "eta_min": 1e-7
+
+    // For SWA scheduler
+    , "swa_start_iter": 375000 //Just reference: 75% of 500000. Can be any value, including 0 to start right away with a pretrained model.
+    , "swa_lr": 1e-4 //Has to be ~order of magnitude of a stable lr for the regular scheduler
+    , "swa_anneal_epochs": 10
+    , "swa_anneal_strategy": "cos"
     
     // Losses:
-    , "pixel_criterion": "cb" //"l1" | "l2" | "cb" | "elastic" | "relativel1" | "l1cosinesim" | "clipl1" //pixel loss
+    , "pixel_criterion": "l1" //"l1" | "l2" | "cb" | "elastic" | "relativel1" | "l1cosinesim" | "clipl1" //pixel loss
     , "pixel_weight": 1e-2 // 1e-2 | 1
-    , "feature_criterion": "cb" //"l1" | "l2" | "cb" | "elastic" //feature loss (VGG feature network)
+    , "feature_criterion": "l1" //"l1" | "l2" | "cb" | "elastic" //feature loss (VGG feature network)
     , "feature_weight": 1
     //, "cx_weight": 0.5
     //, "cx_type": "contextual"
