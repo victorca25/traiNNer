@@ -158,8 +158,10 @@ def main():
                 
                 # save models and training states (changed to save models before validation)
                 if current_step % opt['logger']['save_checkpoint_freq'] == 0 and take_step:
-                    # model.save(current_step, opt['logger']['overwrite_chkp'])
-                    model.save(current_step, opt['logger']['overwrite_chkp'], loader=train_loader)
+                    if model.swa: 
+                        model.save(current_step, opt['logger']['overwrite_chkp'], loader=train_loader)
+                    else:
+                        model.save(current_step, opt['logger']['overwrite_chkp'])
                     model.save_training_state(epoch + (n >= len(train_loader)), current_step, opt['logger']['overwrite_chkp'])
                     logger.info('Models and training states saved.')
                 
@@ -234,14 +236,18 @@ def main():
                     t0 = time.time()
 
         logger.info('Saving the final model.')
-        # model.save('latest')
-        model.save('latest', loader=train_loader)
+        if model.swa:
+            model.save('latest', loader=train_loader)
+        else:
+            model.save('latest')
         logger.info('End of training.')
 
     except KeyboardInterrupt:
         # catch a KeyboardInterrupt and save the model and state to resume later
-        # model.save(current_step, True)
-        model.save(current_step, True, loader=train_loader)
+        if model.swa:
+            model.save(current_step, True, loader=train_loader)
+        else:
+            model.save(current_step, True)
         model.save_training_state(epoch + (n >= len(train_loader)), current_step, True)
         logger.info('Training interrupted. Latest models and training states saved.')
 
