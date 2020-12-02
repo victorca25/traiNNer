@@ -15,6 +15,7 @@ logger = logging.getLogger('base')
 from . import losses
 from . import optimizers
 from . import schedulers
+from . import swa
 
 from dataops.batchaug import BatchAug
 from dataops.filters import FilterHigh, FilterLow #, FilterX
@@ -134,6 +135,24 @@ class SRRaGANModel(BaseModel):
             self.log_dict = OrderedDict()
 
             """
+            Configure SWA
+            """
+            #https://pytorch.org/blog/pytorch-1.6-now-includes-stochastic-weight-averaging/
+            self.swa = opt.get('use_swa', False)
+            if self.swa:
+                self.swa_start_iter = train_opt.get('swa_start_iter', 0)
+                # self.swa_start_epoch = train_opt.get('swa_start_epoch', None)
+                swa_lr = train_opt.get('swa_lr', 0.0001)
+                swa_anneal_epochs = train_opt.get('swa_anneal_epochs', 10)
+                swa_anneal_strategy = train_opt.get('swa_anneal_strategy', 'cos')
+                #TODO: Note: This could be done in resume_training() instead, to prevent creating
+                # the swa scheduler and model before they are needed
+                self.swa_scheduler, self.swa_model = swa.get_swa(
+                        self.optimizer_G, self.netG, swa_lr, swa_anneal_epochs, swa_anneal_strategy)
+                self.load_swa() #load swa from resume state
+                logger.info('SWA enabled. Starting on iter: {}, lr: {}'.format(self.swa_start_iter, swa_lr))
+
+            """
             If using virtual batch
             """
             batch_size = opt["datasets"]["train"]["batch_size"]
@@ -142,7 +161,7 @@ class SRRaGANModel(BaseModel):
                 >= batch_size else batch_size
             self.accumulations = self.virtual_batch // batch_size
             self.optimizer_G.zero_grad()
-            if self. cri_gan:
+            if self.cri_gan:
                 self.optimizer_D.zero_grad()
             
             """
@@ -378,7 +397,29 @@ class SRRaGANModel(BaseModel):
                 logger.info('Loading pretrained model for D [{:s}] ...'.format(load_path_D))
                 self.load_network(load_path_D, self.netD)
 
-    def save(self, iter_step, latest=None):
+    def load_swa(self):
+        if self.opt['is_train'] and self.opt['use_swa']:
+            load_path_swaG = self.opt['path']['pretrain_model_swaG']
+            if self.opt['is_train'] and load_path_swaG is not None:
+                logger.info('Loading pretrained model for SWA G [{:s}] ...'.format(load_path_swaG))
+                self.load_network(load_path_swaG, self.swa_model)
+
+    def save(self, iter_step, latest=None, loader=None):
         self.save_network(self.netG, 'G', iter_step, latest)
         if self.cri_gan:
             self.save_network(self.netD, 'D', iter_step, latest)
+        if self.swa:
+            # when training with networks that use BN
+            # # Update bn statistics for the swa_model only at the end of training
+            # if not isinstance(iter_step, int): #TODO: not sure if it should be done only at the end
+            self.swa_model = self.swa_model.cpu()
+            torch.optim.swa_utils.update_bn(loader, self.swa_model)
+            self.swa_model = self.swa_model.cuda()
+            # Check swa BN statistics
+            # for module in self.swa_model.modules():
+            #     if isinstance(module, torch.nn.modules.batchnorm._BatchNorm):
+            #         print(module.running_mean)
+            #         print(module.running_var)
+            #         print(module.momentum)
+            #         break
+            self.save_network(self.swa_model, 'swaG', iter_step, latest)

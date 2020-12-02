@@ -20,6 +20,8 @@ class BaseModel():
         self.is_train = opt['is_train']
         self.schedulers = []
         self.optimizers = []
+        self.swa = None
+        self.swa_start_iter = None
 
     def feed_data(self, data):
         pass
@@ -42,13 +44,38 @@ class BaseModel():
     def load(self):
         pass
 
-    def update_learning_rate(self):
-        for scheduler in self.schedulers:
-            scheduler.step()
+    def update_learning_rate(self, current_step=None):
+        # SWA scheduler only steps if current_step > swa_start_iter
+        if self.swa and current_step and isinstance(self.swa_start_iter, int) and current_step > self.swa_start_iter:
+            self.swa_model.update_parameters(self.netG)
+            self.swa_scheduler.step()
+            
+            #TODO: uncertain, how to deal with the discriminator schedule when the generator enters SWA regime
+            # alt 1): D continues with its normal scheduler (current option)
+            # alt 2): D also trained using SWA scheduler
+            # alt 3): D lr is not modified any longer (Should D be frozen?)
+            sched_count = 0
+            for scheduler in self.schedulers:
+                # first scheduler is G, skip
+                if sched_count > 0:
+                    scheduler.step()
+                sched_count += 1
+        # regular schedulers
+        else:
+            # print(self.schedulers)
+            # print(str(scheduler.__class__) + ": " + str(scheduler.__dict__))
+            for scheduler in self.schedulers:
+                scheduler.step()
 
-    def get_current_learning_rate(self):
+    def get_current_learning_rate(self, current_step=None):
         if torch.__version__ >= '1.4.0':
-            return self.schedulers[0].get_last_lr()[0]
+            # Note: SWA only works for torch.__version__ >= '1.6.0'
+            if self.swa and current_step and isinstance(self.swa_start_iter, int) and current_step > self.swa_start_iter:
+                # SWA scheduler lr
+                return self.swa_scheduler.get_last_lr()[0]
+            else:
+                # Regular G scheduler lr
+                return self.schedulers[0].get_last_lr()[0]
         else:
             return self.schedulers[0].get_lr()[0]
 
@@ -91,7 +118,7 @@ class BaseModel():
         # pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict}
         # model_dict.update(pretrained_dict)
         # model.load_state_dict(model_dict)
-        
+    
     def save_training_state(self, epoch, iter_step, latest=None):
         '''Saves training state during training, which will be used for resuming'''
         state = {'epoch': epoch, 'iter': iter_step, 'schedulers': [], 'optimizers': []}
@@ -99,6 +126,11 @@ class BaseModel():
             state['schedulers'].append(s.state_dict())
         for o in self.optimizers:
             state['optimizers'].append(o.state_dict())
+        if self.opt['is_train'] and self.opt['use_swa']:
+            # only save swa_scheduler if needed
+            state['swa_scheduler'] = []
+            if self.swa and isinstance(self.swa_start_iter, int) and iter_step > self.swa_start_iter:
+                state['swa_scheduler'].append(self.swa_scheduler.state_dict())
         if latest:
             save_filename = 'latest.state'
         else:
@@ -122,7 +154,13 @@ class BaseModel():
                 if isinstance(self.schedulers[i].milestones, Counter) and isinstance(s['milestones'], list):
                     s['milestones'] = Counter(s['milestones'])
             self.schedulers[i].load_state_dict(s)
-
+        if self.opt['is_train'] and self.opt['use_swa']:
+            # Only load the swa_scheduler if it exists in the state
+            if resume_state.get('swa_scheduler', None):
+                resume_swa_scheduler = resume_state['swa_scheduler']
+                for i, s in enumerate(resume_swa_scheduler):
+                    self.swa_scheduler.load_state_dict(s)
+    
     #TODO: check all these updates 
     def update_schedulers(self, train_opt):
         '''Update scheduler parameters if they are changed in the JSON configuration'''

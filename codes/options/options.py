@@ -258,3 +258,7 @@ def check_resume(opt):
             opt['path']['pretrain_model_D'] = osp.join(opt['path']['models'],
                                                        '{}_D.pth'.format(state_idx))
             logger.info('Set [pretrain_model_D] to ' + opt['path']['pretrain_model_D'])
+        if 'swa' in opt['model'] or opt['swa']:
+            opt['path']['pretrain_model_swaG'] = osp.join(opt['path']['models'],
+                                                   '{}_swaG.pth'.format(state_idx))
+            logger.info('Set [pretrain_model_swaG] to ' + opt['path']['pretrain_model_swaG'])
