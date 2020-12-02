@@ -10,10 +10,18 @@ Some of the new things in the latest version of this code:
 - The filters and image manipulations used by the different functions (HFEN, SSIM/MS-SSIM, SPL, TV/DTV, etc) are now consolidated in filters.py and colors.py
 - Reusable loss builder to reduce the changes needed when using a new model and adding new losses only once for all models
 - Metrics builder to include only the selected ones during validation
-- Automatic Mixed Precision (AMP: https://pytorch.org/docs/master/amp.html) is now properly integrated. (Code updated to work with Pytorch 1.6.0 and 1.3.0).
-- Added the Contextual Loss (https://arxiv.org/abs/1803.02077, https://arxiv.org/abs/1803.04626) option: 'cx_type', Differential Augmentations for efficient gan training (https://arxiv.org/pdf/2006.10738) option: 'diffaug', batch augmentations (based on https://arxiv.org/abs/2004.00448) option: 'mixup', ESRGAN+ improvements to the ESRGAN network (https://arxiv.org/pdf/2001.08073) options: 'gaussian' and 'plus', adapted frequency filtering per loss function (https://arxiv.org/pdf/1911.07850) option: 'fs', enabled option to use the feature maps from the VGG-like discriminator in training for feature similarity (https://arxiv.org/abs/1712.05927) 'discriminator_vgg_128_fea', PatchGAN option for the discriminator (https://arxiv.org/pdf/1611.07004v3.pdf) 'patchgan', Multiscale PatchGAN option for the discriminator (https://arxiv.org/pdf/1711.11585.pdf) 'multiscale', additional fixes and general code refactoring.
+- Automatic Mixed Precision (AMP: https://pytorch.org/docs/master/amp.html) is now properly integrated. (Code updated to work with Pytorch 1.6.0 and 1.3.0). Option "use_amp".
+- Contextual Loss (https://arxiv.org/abs/1803.02077, https://arxiv.org/abs/1803.04626). Option: 'cx_type'.
+- Differential Augmentations for efficient gan training (https://arxiv.org/pdf/2006.10738). Option: 'diffaug'.
+- batch augmentations (based on https://arxiv.org/abs/2004.00448). Option: 'mixup'.
+- ESRGAN+ improvements to the ESRGAN network (https://arxiv.org/pdf/2001.08073). Options: 'gaussian' and 'plus'.
+- adapted frequency filtering per loss function (https://arxiv.org/pdf/1911.07850). Option: 'fs'.
+- enabled option to use the feature maps from the VGG-like discriminator in training for feature similarity (https://arxiv.org/abs/1712.05927). Option: 'discriminator_vgg_128_fea'.
+- PatchGAN option for the discriminator (https://arxiv.org/pdf/1611.07004v3.pdf). Option: 'patchgan'.
+- Multiscale PatchGAN option for the discriminator (https://arxiv.org/pdf/1711.11585.pdf). Option: 'multiscale'.
 - Added a modified Pixel Attention Network for Efficient Image Super-Resolution (https://arxiv.org/pdf/2010.01073.pdf), which includes a self-attention layer in the residual path, among other changes. A basic pretrained model for 4x scale can be found [here](https://mega.nz/file/mpRgVThY#tRi1q_PrY5OX4MVOTtjWlXzBXcLZs2tP1duo-mEkWSs)
-- Other changes: added graceful interruption of training to continue from where it was interrupted, virtual batch option, "strict" model loading flag, support for using YAML or JSON options files, color transfer script (color_transfer.py) with multiple algorithms to transfer image statistics (colors) from a reference image to another
+- Stochastic Weight Averaging (SWA: https://pytorch.org/blog/pytorch-1.6-now-includes-stochastic-weight-averaging/, https://arxiv.org/pdf/1803.05407.pdf) added as an option. Currently the change only applies to the generator network, changing the original learning rate scheduler to the SWA scheduler after a defined number of iterations have passed (the original paper refers to the later 25% part of training). The resulting SWA model can be converted to a regular model after training using the scripts/swa2normal.py script. Option "use_swa" and configure the swa scheduler.
+- Other changes: added graceful interruption of training to continue from where it was interrupted, virtual batch option, "strict" model loading flag, support for using YAML or JSON options files, color transfer script (color_transfer.py) with multiple algorithms to transfer image statistics (colors) from a reference image to another, general fixes and code refactoring.
 
 WIP: 
 - Added on the fly use of realistic image kernels extracted with KernelGAN (https://openaccess.thecvf.com/content_ICCV_2019/papers/Zhou_Kernel_Modeling_Super-Resolution_on_Real_Low-Resolution_Images_ICCV_2019_paper.pdf) and injection of noise extracted from real images patches (https://openaccess.thecvf.com/content_cvpr_2018/papers/Chen_Image_Blind_Denoising_CVPR_2018_paper.pdf)
@@ -74,10 +82,6 @@ Otherwise, it is also possible to do inference of batches of images with the cod
 1. Modify the configuration file `options/test/test_ESRGAN.yml` (or `options/test/test_ESRGAN.json`)
 1. Run command: `python test.py -opt options/test/test_ESRGAN.yml` (or `python test.py -opt options/test/test_ESRGAN.json`)
 
-### Test SR models
-1. Modify the configuration file `options/test/test_sr.yml` (or `options/test/test_sr.json`)
-1. Run command: `python test.py -opt options/test/test_sr.yml` (or `python test.py -opt options/test/test_sr.json`)
-
 ### Test SFTGAN models
 1. Obtain the segmentation probability maps: `python test_seg.py`
 1. Run command: `python test_sftgan.py`
@@ -85,6 +89,10 @@ Otherwise, it is also possible to do inference of batches of images with the cod
 ### Test PPON models
 1. Modify the configuration file `options/test/test_ESRGAN.yml` (or `options/test/test_ESRGAN.json`)
 1. Run command: `python test_ppon.py -opt options/test/test_ESRGAN.yml` (or `python test_ppon.py -opt options/test/test_ESRGAN.json`)
+
+### Test VSR models
+1. Modify the configuration file `options/test/test_video.yml`
+1. Run command: `python test_vsr.py -opt options/test/test_video.yml`
 
 ## How to Train
 [How to train](https://github.com/victorca25/BasicSR/blob/master/docs/howtotrain.md)

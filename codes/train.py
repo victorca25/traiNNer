@@ -141,7 +141,7 @@ def main():
 
                     logs = model.get_current_log()
                     message = '<epoch:{:3d}, iter:{:8,d}, lr:{:.3e}, i_time: {:.4f} sec.> '.format(
-                        epoch, current_step, model.get_current_learning_rate(), (t1 - t0))
+                        epoch, current_step, model.get_current_learning_rate(current_step), (t1 - t0))
                     for k, v in logs.items():
                         message += '{:s}: {:.4e} '.format(k, v)
                         # tensorboard logger
@@ -154,11 +154,12 @@ def main():
 
                 # update learning rate
                 if model.optGstep and model.optDstep and take_step:
-                    model.update_learning_rate()
+                    model.update_learning_rate(current_step)
                 
                 # save models and training states (changed to save models before validation)
                 if current_step % opt['logger']['save_checkpoint_freq'] == 0 and take_step:
-                    model.save(current_step, opt['logger']['overwrite_chkp'])
+                    # model.save(current_step, opt['logger']['overwrite_chkp'])
+                    model.save(current_step, opt['logger']['overwrite_chkp'], loader=train_loader)
                     model.save_training_state(epoch + (n >= len(train_loader)), current_step, opt['logger']['overwrite_chkp'])
                     logger.info('Models and training states saved.')
                 
@@ -217,6 +218,7 @@ def main():
                     logger.info('# Validation # '+logger_m[:-2])
                     logger_val = logging.getLogger('val')  # validation logger
                     logger_val.info('<epoch:{:3d}, iter:{:8,d}> '.format(epoch, current_step)+logger_m[:-2])
+                    # memory_usage = torch.cuda.memory_allocated()/(1024.0 ** 3) # in GB
                     
                     # tensorboard logger
                     if opt['use_tb_logger'] and 'debug' not in opt['name']:
@@ -232,12 +234,14 @@ def main():
                     t0 = time.time()
 
         logger.info('Saving the final model.')
-        model.save('latest')
+        # model.save('latest')
+        model.save('latest', loader=train_loader)
         logger.info('End of training.')
 
     except KeyboardInterrupt:
         # catch a KeyboardInterrupt and save the model and state to resume later
-        model.save(current_step, True)
+        # model.save(current_step, True)
+        model.save(current_step, True, loader=train_loader)
         model.save_training_state(epoch + (n >= len(train_loader)), current_step, True)
         logger.info('Training interrupted. Latest models and training states saved.')
 

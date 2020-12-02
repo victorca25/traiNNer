@@ -36,6 +36,12 @@ def get_schedulers(optimizers=None, schedulers=None, train_opt=None):
                                     gamma=train_opt['lr_gamma'],
                                     clear_state=train_opt['clear_state']))
     
+    elif train_opt['lr_scheme'] == 'CosineAnnealingLR':
+        for optimizer in optimizers:
+            schedulers.append(
+                lr_scheduler.CosineAnnealingLR(
+                    optimizer, T_max=train_opt['T_max'], eta_min=train_opt['eta_min']))
+
     elif train_opt['lr_scheme'] == 'CosineAnnealingLR_Restart':
         for optimizer in optimizers:
             schedulers.append(
