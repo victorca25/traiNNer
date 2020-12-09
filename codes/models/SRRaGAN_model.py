@@ -300,12 +300,6 @@ class SRRaGANModel(BaseModel):
                 # unfreeze discriminator
                 self.requires_grad(self.netD, flag=True)
             
-            # TODO: TMP Test
-            for name, param in self.netD.named_parameters():
-                if param.requires_grad:
-                    # print(name, param.data)
-                    print(name)
-            exit()
             l_d_total = 0
             
             with self.cast(): # Casts operations to mixed precision if enabled, else nullcontext
