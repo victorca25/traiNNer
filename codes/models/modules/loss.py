@@ -32,7 +32,7 @@ class CharbonnierLoss(nn.Module):
 # https://tuatini.me/creating-and-shipping-deep-learning-models-into-production/
 class GANLoss(nn.Module):
     r"""
-    Adversarial loss
+    Define different GAN objectives for adversarial loss
     https://arxiv.org/abs/1711.10337
     """
     def __init__(self, gan_type, real_label_val=1.0, fake_label_val=0.0):
@@ -49,7 +49,7 @@ class GANLoss(nn.Module):
             self.loss = nn.BCELoss()
         elif self.gan_type == 'hinge':
             self.loss = nn.ReLU()
-        elif self.gan_type == 'wgan-gp':
+        elif self.gan_type == 'wgan-gp' or self.gan_type == 'wgangp':
 
             def wgan_loss(input, target):
                 # target is boolean
@@ -57,7 +57,7 @@ class GANLoss(nn.Module):
 
             self.loss = wgan_loss
         else:
-            raise NotImplementedError('GAN type [{:s}] is not found'.format(self.gan_type))
+            raise NotImplementedError('GAN type [{:s}] is not implemented'.format(self.gan_type))
 
     def get_target_label(self, input, target_is_real):
         if self.gan_type == 'wgan-gp':
@@ -68,12 +68,32 @@ class GANLoss(nn.Module):
             return torch.empty_like(input).fill_(self.fake_label_val) #torch.zeros_like(d_sr_out)
 
     def forward(self, input, target_is_real, is_disc = None):
+        """Calculate loss given Discriminator's output and grount truth labels.
+        Parameters:
+            input (tensor): tpyically the prediction output from a discriminator
+            target_is_real (bool): if the ground truth label is for real images or fake images
+            is_disc (bool): if the phase is for discriminator or not
+        Returns:
+            the calculated loss.
+        """
         if self.gan_type == 'hinge': #TODO: test
-            if is_disc:
-                input = -input if target_is_real else input
-                return self.loss(1 + input).mean()
+            if isinstance(input, list):
+                loss = 0
+                for pred_i in input:
+                    if isinstance(pred_i, list):
+                        pred_i = pred_i[-1]
+                    loss_tensor = self(pred_i, target_is_real, is_disc)
+                    bs = 1 if len(loss_tensor.size()) == 0 else loss_tensor.size(0)
+                    new_loss = torch.mean(loss_tensor.view(bs, -1), dim=1)
+                    loss += new_loss
+                return loss / len(input)
             else:
-                return (-input).mean()
+                if is_disc:
+                    input = -input if target_is_real else input
+                    return self.loss(1 + input).mean()
+                else:
+                    # assert target_is_real
+                    return (-input).mean()
         else:
             target_label = self.get_target_label(input, target_is_real)
             loss = self.loss(input, target_label)
@@ -81,24 +101,34 @@ class GANLoss(nn.Module):
 
 
 class GradientPenaltyLoss(nn.Module):
-    def __init__(self, device=torch.device('cpu')):
+    """Calculate the gradient penalty loss, used in WGAN-GP paper https://arxiv.org/abs/1704.00028
+    Arguments:
+        device (str): GPU / CPU: from torch.device('cuda:{}'.format(self.gpu_ids[0])) 
+            if self.gpu_ids else torch.device('cpu')
+        constant (float): the constant used in formula ( | |gradient||_2 - constant)^2
+        eps (float): prevent division by 0
+
+     Returns the gradient penalty loss.
+    """
+    def __init__(self, device=torch.device('cpu'), eps=1e-16, constant=1.0):
         super(GradientPenaltyLoss, self).__init__()
         self.register_buffer('grad_outputs', torch.Tensor())
         self.grad_outputs = self.grad_outputs.to(device)
+        self.constant = constant
+        self.eps = eps
 
     def get_grad_outputs(self, input):
         if self.grad_outputs.size() != input.size():
             self.grad_outputs.resize_(input.size()).fill_(1.0)
         return self.grad_outputs
-
+    
     def forward(self, interp, interp_crit):
         grad_outputs = self.get_grad_outputs(interp_crit)
         grad_interp = torch.autograd.grad(outputs=interp_crit, inputs=interp, \
             grad_outputs=grad_outputs, create_graph=True, retain_graph=True, only_inputs=True)[0]
-        grad_interp = grad_interp.view(grad_interp.size(0), -1)
-        grad_interp_norm = grad_interp.norm(2, dim=1)
-
-        loss = ((grad_interp_norm - 1)**2).mean()
+        grad_interp = grad_interp.view(grad_interp.size(0), -1)  # flatten the data
+        grad_interp_norm = (grad_interp + self.eps).norm(2, dim=1) # added eps
+        loss = ((grad_interp_norm - self.constant)**2).mean()
         return loss
 
 

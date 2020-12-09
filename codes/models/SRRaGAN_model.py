@@ -287,9 +287,7 @@ class SRRaGANModel(BaseModel):
                 self.optGstep = True
 
         if self.cri_gan:
-            #TODO: Should the G be frozen here? Check!
             # update discriminator
-            
             if isinstance(self.feature_loc, int):
                 # unfreeze all D
                 self.requires_grad(self.netD, flag=True)
