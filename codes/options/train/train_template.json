@@ -279,6 +279,7 @@
     // Adversarial loss:
     , "gan_type": "vanilla" //"vanilla" | "wgan-gp" | "lsgan" 
     , "gan_weight": 5e-3 //* test: 7e-3
+    // , "freeze_loc": 4 // last feature layer location to freeze in discriminator. VGG-like Discs have 10 layers, patchgan has nlayer.
     // for wgan-gp
     // , "D_update_ratio": 1
     // , "D_init_iters": 0

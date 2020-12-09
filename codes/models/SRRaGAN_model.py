@@ -174,6 +174,23 @@ class SRRaGANModel(BaseModel):
                 logger.info('AMP enabled')
             else:
                 self.cast = nullcast
+            
+            """
+            Configure FreezeD
+            """
+            if self.cri_gan:
+                loc = train_opt.get('freeze_loc', False)
+                disc = opt["network_D"].get('which_model_D', False)
+                if "discriminator_vgg" in disc and "fea" not in disc:
+                    loc = (loc*3)-2
+                elif "patchgan" in disc:
+                    loc = (loc*3)-1
+                #TODO: TMP, for now only tested with the vgg-like or patchgan discriminators
+                if "discriminator_vgg" in disc or "patchgan" in disc:
+                    self.feature_loc = loc
+                    logger.info('FreezeD enabled')
+                else:
+                    self.feature_loc = None
 
         # print network
         """ 
@@ -201,8 +218,7 @@ class SRRaGANModel(BaseModel):
         # G
         # freeze discriminator while generator is trained to prevent BP
         if self.cri_gan:
-            for p in self.netD.parameters():
-                p.requires_grad = False
+            self.requires_grad(self.netD, flag=False, net_type='D')
 
         # batch (mixup) augmentations
         aug = None
@@ -271,10 +287,25 @@ class SRRaGANModel(BaseModel):
                 self.optGstep = True
 
         if self.cri_gan:
+            #TODO: Should the G be frozen here? Check!
             # update discriminator
-            # unfreeze discriminator
-            for p in self.netD.parameters():
-                p.requires_grad = True
+            
+            if isinstance(self.feature_loc, int):
+                # unfreeze all D
+                self.requires_grad(self.netD, flag=True)
+                # then freeze up to the selected layers
+                for loc in range(self.feature_loc):
+                    self.requires_grad(self.netD, False, target_layer=loc, net_type='D')
+            else:
+                # unfreeze discriminator
+                self.requires_grad(self.netD, flag=True)
+            
+            # TODO: TMP Test
+            for name, param in self.netD.named_parameters():
+                if param.requires_grad:
+                    # print(name, param.data)
+                    print(name)
+            exit()
             l_d_total = 0
             
             with self.cast(): # Casts operations to mixed precision if enabled, else nullcontext

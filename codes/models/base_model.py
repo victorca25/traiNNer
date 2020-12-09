@@ -87,6 +87,25 @@ class BaseModel():
         n = sum(map(lambda x: x.numel(), network.parameters()))
         return s, n
 
+    def requires_grad(self, model, flag=True, target_layer=None, net_type=None):
+        # for p in model.parameters():
+        #     p.requires_grad = flag
+        for name, param in model.named_parameters():
+            if target_layer is None:  # every layer
+                param.requires_grad = flag
+            else: #elif target_layer in name:  # target layer
+                if net_type == 'D':
+                    if 'features.' in name: #vgg-d
+                        layer=f'features.{target_layer}.'
+                    elif 'conv' in name: # vgg-fea-d
+                        layer=f'conv{target_layer}.'
+                    elif 'model.' in name: # patch-d
+                        layer=f'model.{target_layer}.'
+                
+                if layer in name:
+                    # print(name, layer)
+                    param.requires_grad = flag
+
     def save_network(self, network, network_label, iter_step, latest=None):
         if latest:
             save_filename = 'latest_{}.pth'.format(network_label)
