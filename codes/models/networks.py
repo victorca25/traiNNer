@@ -195,7 +195,7 @@ def define_D(opt):
             netD = discriminators.Discriminator_VGG(size=size, in_nc=opt_net['in_nc'], base_nf=opt_net['nf'], \
                 norm_type=opt_net['norm_type'], mode=opt_net['mode'], act_type=opt_net['act_type'], convtype=opt_net['convtype'], arch=model_G)
         except ValueError:
-            raise ValueError('VGG Discriminator size [{:s}] could not be parsed from the HR patch size. Check that the image patch size is either a power of 2 or 3 multiplied by a power of 2.'.format(vgg_size))
+            raise ValueError('VGG Discriminator size could not be parsed from the HR patch size. Check that the image patch size is either a power of 2 or 3 multiplied by a power of 2.')
     elif which_model == 'adiscriminator':
         from models.modules.architectures import ASRResNet_arch
         netD = ASRResNet_arch.ADiscriminator(spectral_norm=opt_net['spectral_norm'], self_attention=opt_net['self_attention'], \
@@ -210,6 +210,16 @@ def define_D(opt):
             norm_type=opt_net['norm_type'], mode=opt_net['mode'], act_type=opt_net['act_type'], \
             convtype=opt_net['convtype'], arch=model_G, spectral_norm=opt_net['spectral_norm'], self_attention=opt_net['self_attention'], \
             max_pool=opt_net['max_pool'], poolsize=opt_net['poolsize'])
+    elif which_model == 'discriminator_vgg_fea': #VGG-like discriminator with features extraction
+        from models.modules.architectures import discriminators
+        try:
+            size = int(opt['datasets']['train']['HR_size'])
+            netD = discriminators.Discriminator_VGG_fea(size=size, in_nc=opt_net['in_nc'], base_nf=opt_net['nf'], \
+                norm_type=opt_net['norm_type'], mode=opt_net['mode'], act_type=opt_net['act_type'], \
+                convtype=opt_net['convtype'], arch=model_G, spectral_norm=opt_net['spectral_norm'], self_attention=opt_net['self_attention'], \
+                max_pool=opt_net['max_pool'], poolsize=opt_net['poolsize'])
+        except ValueError:
+            raise ValueError('VGG Discriminator size could not be parsed from the HR patch size. Check that the image patch size is either a power of 2 or 3 multiplied by a power of 2.')
     elif which_model == 'patchgan' or which_model == 'NLayerDiscriminator':
         from models.modules.architectures import discriminators
         netD = discriminators.NLayerDiscriminator(input_nc=opt_net['in_nc'], ndf=opt_net['nf'], n_layers=opt_net['nlayer'])

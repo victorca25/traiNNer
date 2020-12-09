@@ -171,7 +171,7 @@ network_G:
 # Discriminator options:
 network_D:
     # ESRGAN (default)| PPON:
-    which_model_D: discriminator_vgg # discriminator_vgg_128 | discriminator_vgg | discriminator_vgg_128_fea (feature extraction) | patchgan | multiscale
+    which_model_D: discriminator_vgg # discriminator_vgg_128 | discriminator_vgg | discriminator_vgg_128_fea (feature extraction) | discriminator_vgg_fea (feature extraction) | patchgan | multiscale
     norm_type: batch
     act_type: leakyrelu
     mode: CNA # CNA | NAC
@@ -277,7 +277,7 @@ train:
     # D_update_ratio: 1
     # D_init_iters: 0
     # gp_weigth: 10
-    # if using the discriminator_vgg_128_fea feature maps to calculate feature loss
+    # if using the discriminator_vgg_128_fea or discriminator_vgg_fea feature maps to calculate feature loss
     # gan_featmaps: true # true | false
     # dis_feature_criterion: cb # "l1" | "l2" | "cb" | "elastic" #discriminator feature loss
     # dis_feature_weight: 0.01 # 1
