@@ -76,6 +76,7 @@ def main():
             train_set = create_dataset(dataset_opt)
             batch_size = dataset_opt.get('batch_size', 4)
             virtual_batch_size = dataset_opt.get('virtual_batch_size', batch_size)
+            virtual_batch_size = virtual_batch_size if virtual_batch_size > batch_size else batch_size
             train_size = int(math.ceil(len(train_set) / batch_size))
             logger.info('Number of train images: {:,d}, iters: {:,d}'.format(
                 len(train_set), train_size))
