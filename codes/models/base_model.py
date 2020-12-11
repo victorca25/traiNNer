@@ -44,7 +44,30 @@ class BaseModel():
     def load(self):
         pass
 
-    def update_learning_rate(self, current_step=None):
+    def _set_lr(self, lr_groups_l):
+        ''' Set learning rate for warmup.
+        Args:
+            lr_groups_l (list): List for lr_groups, one for each for an optimizer.
+        '''
+        for optimizer, lr_groups in zip(self.optimizers, lr_groups_l):
+            for param_group, lr in zip(optimizer.param_groups, lr_groups):
+                param_group['lr'] = lr
+
+    def _get_init_lr(self):
+        ''' get the initial lr, which is set by the scheduler (for warmup) 
+        '''
+        init_lr_groups_l = []
+        for optimizer in self.optimizers:
+            init_lr_groups_l.append([v['initial_lr'] for v in optimizer.param_groups])
+        return init_lr_groups_l
+
+    def update_learning_rate(self, current_step=None, warmup_iter=-1):
+        ''' Update learning rate.
+        Args:
+            current_step (int): Current iteration.
+            warmup_iter (int)： Warmup iter numbers. -1 for no warmup.
+                Default： -1.
+        '''
         # SWA scheduler only steps if current_step > swa_start_iter
         if self.swa and current_step and isinstance(self.swa_start_iter, int) and current_step > self.swa_start_iter:
             self.swa_model.update_parameters(self.netG)
@@ -66,6 +89,16 @@ class BaseModel():
             # print(str(scheduler.__class__) + ": " + str(scheduler.__dict__))
             for scheduler in self.schedulers:
                 scheduler.step()
+            #### if configured, set up warm up learning rate
+            if current_step < warmup_iter:
+                # get initial lr for each group
+                init_lr_g_l = self._get_init_lr()
+                # modify warming-up learning rates
+                warm_up_lr_l = []
+                for init_lr_g in init_lr_g_l:
+                    warm_up_lr_l.append([v / warmup_iter * current_step for v in init_lr_g])
+                # set learning rate
+                self._set_lr(warm_up_lr_l)
 
     def get_current_learning_rate(self, current_step=None):
         if torch.__version__ >= '1.4.0':

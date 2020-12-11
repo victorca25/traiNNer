@@ -155,7 +155,7 @@ def main():
 
                 # update learning rate
                 if model.optGstep and model.optDstep and take_step:
-                    model.update_learning_rate(current_step)
+                    model.update_learning_rate(current_step, warmup_iter=opt['train'].get('warmup_iter', -1))
                 
                 # save models and training states (changed to save models before validation)
                 if current_step % opt['logger']['save_checkpoint_freq'] == 0 and take_step:

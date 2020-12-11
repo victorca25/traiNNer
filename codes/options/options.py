@@ -204,6 +204,23 @@ def parse(opt_path, is_train=True):
     # network
     opt['network_G']['scale'] = scale
 
+    # relative learning rate
+    if 'train' in opt:
+        niter = opt['train']['niter']
+        if 'T_period_rel' in opt['train']:
+            opt['train']['T_period'] = [int(x * niter) for x in opt['train']['T_period_rel']]
+            opt['train'].pop('T_period_rel')
+        if 'restarts_rel' in opt['train']:
+            opt['train']['restarts'] = [int(x * niter) for x in opt['train']['restarts_rel']]
+            opt['train'].pop('restarts_rel')
+        if 'lr_steps_rel' in opt['train']:
+            opt['train']['lr_steps'] = [int(x * niter) for x in opt['train']['lr_steps_rel']]
+            opt['train'].pop('lr_steps_rel')
+        if 'lr_steps_inverse_rel' in opt['train']:
+            opt['train']['lr_steps_inverse'] = [int(x * niter) for x in opt['train']['lr_steps_inverse_rel']]
+            opt['train'].pop('lr_steps_inverse_rel')
+        # print(opt['train'])
+    
     # export CUDA_VISIBLE_DEVICES
     gpu_list = ','.join(str(x) for x in opt['gpu_ids'])
     os.environ['CUDA_VISIBLE_DEVICES'] = gpu_list

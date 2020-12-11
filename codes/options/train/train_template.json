@@ -198,7 +198,8 @@
     
     // For MultiStepLR (ESRGAN, default):
     , "lr_scheme": "MultiStepLR"
-    , "lr_steps": [50000, 100000, 200000, 300000] //training from scratch
+    // , "lr_steps": [50000, 100000, 200000, 300000] //training from scratch
+    , "lr_steps_rel": [0.1, 0.2, 0.4, 0.6] // to use lr steps relative to % of training niter instead of fixed lr_steps
     //, "lr_steps": [50000, 75000, 85000, 100000] //finetuning
     , "lr_gamma": 0.5 //lr change at every step (multiplied by)
     
@@ -229,9 +230,10 @@
     // // , "beta1": 0.9
     // // , "beta2": 0.99
     // , "niter": 1000000
-    // , "warmup_iter": -1  // no warm up
     // , "T_period": [250000, 250000, 250000, 250000]
+    //// , "T_period_rel": [0.25, 0.25, 0.25, 0.25] // to use T_period relative to % of training niter instead of fixed T_period
     // , "restarts": [250000, 500000, 750000]
+    //// , "restarts_rel": [0.25, 0.5, 0.75] // to use restarts relative to % of training niter instead of fixed restarts
     // , "restart_weights": [1, 1, 1]
     // , "eta_min": 1e-7
 
@@ -318,6 +320,7 @@
     //, "finalcap": "clamp" // Test. Cap Generator outputs to fit in: [-1, 1] range ("tanh"), rescale tanh to [0,1] range ("scaltanh"), cap ("sigmoid") or clamp ("clamp") to [0,1] range. Default = None. Coordinate with znorm. Required for SPL if using image range [0,1]
     , "manual_seed": 0
     , "niter": 5e5
+    // , "warmup_iter": -1  // number of warm up iterations, -1 for no warm up
     , "val_freq": 1000 //5e3
     //, "overwrite_val_imgs": true
     //, "val_comparison": true
