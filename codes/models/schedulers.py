@@ -7,58 +7,66 @@ from torch.optim.lr_scheduler import _LRScheduler
 
 
 def get_schedulers(optimizers=None, schedulers=None, train_opt=None):
-    # schedulers
-    if train_opt['lr_scheme'] == 'MultiStepLR':
-        for optimizer in optimizers:
-            schedulers.append(lr_scheduler.MultiStepLR(optimizer, \
-                train_opt['lr_steps'], train_opt['lr_gamma']))
+    ''' Returns a learning rate scheduler for each optimizer 
+    provided, according to the configuration in train_opt
+    '''
+    for optimizer in optimizers:
+        if train_opt['lr_scheme'] == 'Linear':
+            '''
+            For 'linear', we keep the same learning rate for the first <niter> epochs
+            and linearly decay the rate to zero over the next <niter_decay> epochs.
+            '''
+            def lambda_rule(epoch):
+                lr_l = 1.0 - max(0, epoch + 1 - train_opt['fixed_niter']) / float(train_opt['niter_decay'] + 1)
+                return lr_l
+
+            sched = lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda_rule)
+
+        elif train_opt['lr_scheme'] == 'MultiStepLR':
+            sched = lr_scheduler.MultiStepLR(optimizer, train_opt['lr_steps'], 
+                        train_opt['lr_gamma'])
     
-    elif train_opt['lr_scheme'] == 'MultiStepLR_Restart':
-        for optimizer in optimizers:
-            schedulers.append(
-                MultiStepLR_Restart(optimizer, train_opt['lr_steps'],
+        elif train_opt['lr_scheme'] == 'MultiStepLR_Restart':
+            sched = MultiStepLR_Restart(optimizer, train_opt['lr_steps'],
                                     restarts=train_opt['restarts'],
                                     weights=train_opt['restart_weights'],
                                     gamma=train_opt['lr_gamma'],
-                                    clear_state=train_opt['clear_state']))
+                                    clear_state=train_opt['clear_state'])
     
-    elif train_opt['lr_scheme'] == 'StepLR':
-        for optimizer in optimizers:
-            schedulers.append(lr_scheduler.StepLR(optimizer, \
-                train_opt['lr_step_size'], train_opt['lr_gamma']))
+        elif train_opt['lr_scheme'] == 'StepLR':
+            sched = lr_scheduler.StepLR(optimizer, step_size=train_opt['lr_step_size'], 
+                        gamma=train_opt['lr_gamma'])
     
-    elif train_opt['lr_scheme'] == 'StepLR_Restart':
-        for optimizer in optimizers:
-            schedulers.append(
-                StepLR_Restart(optimizer, step_sizes=train_opt['lr_step_sizes'],
+        elif train_opt['lr_scheme'] == 'StepLR_Restart':
+            sched = StepLR_Restart(optimizer, step_sizes=train_opt['lr_step_sizes'],
                                     restarts=train_opt['restarts'],
                                     weights=train_opt['restart_weights'],
                                     gamma=train_opt['lr_gamma'],
-                                    clear_state=train_opt['clear_state']))
+                                    clear_state=train_opt['clear_state'])
     
-    elif train_opt['lr_scheme'] == 'CosineAnnealingLR':
-        for optimizer in optimizers:
-            schedulers.append(
-                lr_scheduler.CosineAnnealingLR(
-                    optimizer, T_max=train_opt['T_max'], eta_min=train_opt['eta_min']))
+        elif train_opt['lr_scheme'] == 'ProgressiveMultiStepLR':
+            sched = ProgressiveMultiStepLR(optimizer, milestones=train_opt['gen_lr_steps'],
+                        group_starts=train_opt['progressive_starts'],
+                        gamma=train_opt['lr_gamma'])
 
-    elif train_opt['lr_scheme'] == 'CosineAnnealingLR_Restart':
-        for optimizer in optimizers:
-            schedulers.append(
-                CosineAnnealingLR_Restart(
-                    optimizer, train_opt['T_period'], eta_min=train_opt['eta_min'],
-                    restarts=train_opt['restarts'], weights=train_opt['restart_weights']))
-    
-    elif train_opt['lr_scheme'] == 'ReduceLROnPlateau':
-        for optimizer in optimizers:
-            schedulers.append(
-                #lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.2, threshold=0.01, patience=5)
-                lr_scheduler.ReduceLROnPlateau(
-                    optimizer, mode=train_opt['plateau_mode'], factor=train_opt['plateau_factor'], 
-                    threshold=train_opt['plateau_threshold'], patience=train_opt['plateau_patience']))
-    else:
-        raise NotImplementedError('Learning rate scheme ("lr_scheme") not defined or not recognized.')
-
+        elif train_opt['lr_scheme'] == 'CosineAnnealingLR':
+            sched = lr_scheduler.CosineAnnealingLR(optimizer, T_max=train_opt['T_max'], 
+                        eta_min=train_opt['eta_min'])
+                    
+        elif train_opt['lr_scheme'] == 'CosineAnnealingLR_Restart':
+            sched = CosineAnnealingLR_Restart(optimizer, T_period=train_opt['T_period'], 
+                        eta_min=train_opt['eta_min'], restarts=train_opt['restarts'], 
+                        weights=train_opt['restart_weights'])
+        
+        elif train_opt['lr_scheme'] == 'ReduceLROnPlateau':
+            #lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.2, threshold=0.01, patience=5)
+            sched = lr_scheduler.ReduceLROnPlateau(optimizer, mode=train_opt['plateau_mode'], 
+                        factor=train_opt['plateau_factor'], threshold=train_opt['plateau_threshold'], 
+                        patience=train_opt['plateau_patience'])
+        else:
+            raise NotImplementedError('Learning rate scheme [{}] not defined or not recognized.'.format(
+                        train_opt['lr_scheme']))
+        schedulers.append(sched)
     return schedulers
 
 
@@ -69,17 +77,21 @@ def get_schedulers(optimizers=None, schedulers=None, train_opt=None):
 
 class MultiStepLR_Restart(_LRScheduler):
     def __init__(self, optimizer, milestones, restarts=None, weights=None, gamma=0.1,
-                 clear_state=False, last_epoch=-1):
+                 clear_state=False, last_epoch=-1, force_lr=False):
         self.milestones = Counter(milestones)
         self.gamma = gamma
         self.clear_state = clear_state
-        self.restarts = restarts if restarts else [0]
+        restarts = restarts if restarts else [0]
+        self.restarts = [v + 1 for v in restarts]
         self.restart_weights = weights if weights else [1]
+        self.force_lr = force_lr
         assert len(self.restarts) == len(
             self.restart_weights), 'restarts and their weights do not match.'
         super(MultiStepLR_Restart, self).__init__(optimizer, last_epoch)
 
     def get_lr(self):
+        if self.force_lr:
+            return [group['initial_lr'] for group in self.optimizer.param_groups]
         if self.last_epoch in self.restarts:
             if self.clear_state:
                 self.optimizer.state = defaultdict(dict)
@@ -91,6 +103,12 @@ class MultiStepLR_Restart(_LRScheduler):
             group['lr'] * self.gamma**self.milestones[self.last_epoch]
             for group in self.optimizer.param_groups
         ]
+
+    def load_state_dict(self, s):
+        # Allow this scheduler to use newly appointed milestones partially through a training run.
+        milestones_cache = self.milestones
+        super(MultiStepLR_Restart, self).load_state_dict(s)
+        self.milestones = milestones_cache
 
 class StepLR_Restart(_LRScheduler):
     def __init__(self, optimizer, step_sizes, restarts=None, weights=None, gamma=0.1,
@@ -115,6 +133,29 @@ class StepLR_Restart(_LRScheduler):
             return [base_lr * self.weight for base_lr in self.base_lrs]
         return [base_lr * self.weight * self.gamma ** ((self.last_epoch - self.epoch_offset) // self.step_size)
                 for base_lr in self.base_lrs]
+
+class ProgressiveMultiStepLR(_LRScheduler):
+    '''
+    This scheduler is specifically designed to modulate the learning rate 
+    of several different param groups configured by a generator or 
+    discriminator that slowly adds new stages one at a time, e.g. like 
+    progressive growing of GANs.
+    '''
+    def __init__(self, optimizer, milestones, group_starts, gamma=0.1):
+        self.milestones = Counter(milestones)
+        self.gamma = gamma
+        self.group_starts = group_starts
+        super(ProgressiveMultiStepLR, self).__init__(optimizer)
+
+    def get_lr(self):
+        group_lrs = []
+        assert len(self.optimizer.param_groups) == len(self.group_starts)
+        for group, group_start in zip(self.optimizer.param_groups, self.group_starts):
+            if self.last_epoch - group_start not in self.milestones:
+                group_lrs.append(group['lr'])
+            else:
+                group_lrs.append(group['lr'] * self.gamma)
+        return group_lrs
 
 class CosineAnnealingLR_Restart(_LRScheduler):
     def __init__(self, optimizer, T_period, restarts=None, weights=None, eta_min=0, last_epoch=-1):
