@@ -172,6 +172,9 @@
     // , "nb": 16
     // , "self_attention": true
     // , "double_scpa": false
+    
+    //All:
+    , "strict": false // true | false // whether to load the model in strict mode or not  
   }
 
   // Discriminator options:
@@ -185,6 +188,7 @@
     , "in_nc": 3
     , "nlayer": 3 // only for patchgan and multiscale
     , "num_D": 3 // only for multiscale
+    , "strict": true // true | false // whether to load the model in strict mode or not
   }
 
   // Schedulers options:
@@ -239,6 +243,7 @@
 
     // For SWA scheduler
     , "swa_start_iter": 375000 //Just reference: 75% of 500000. Can be any value, including 0 to start right away with a pretrained model.
+    //, "swa_start_iter_rel": 0.75 // to use swa_start_iter relative to % of training niter instead of fixed swa_start_iter
     , "swa_lr": 1e-4 //Has to be ~order of magnitude of a stable lr for the regular scheduler
     , "swa_anneal_epochs": 10
     , "swa_anneal_strategy": "cos"

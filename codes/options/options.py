@@ -204,7 +204,7 @@ def parse(opt_path, is_train=True):
     # network
     opt['network_G']['scale'] = scale
 
-    # relative learning rate
+    # relative learning rate and options
     if 'train' in opt:
         niter = opt['train']['niter']
         if 'T_period_rel' in opt['train']:
@@ -219,6 +219,9 @@ def parse(opt_path, is_train=True):
         if 'lr_steps_inverse_rel' in opt['train']:
             opt['train']['lr_steps_inverse'] = [int(x * niter) for x in opt['train']['lr_steps_inverse_rel']]
             opt['train'].pop('lr_steps_inverse_rel')
+        if 'swa_start_iter_rel' in opt['train']:
+            opt['train']['swa_start_iter'] = int(opt['train']['swa_start_iter_rel'] * niter)
+            opt['train'].pop('swa_start_iter_rel')
         # print(opt['train'])
     
     # export CUDA_VISIBLE_DEVICES

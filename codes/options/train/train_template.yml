@@ -106,6 +106,7 @@ path:
 
 # Generator options:
 network_G:
+    strict: false # true | false # whether to load the model in strict mode or not
     # ESRGAN:
     which_model_G: RRDB_net # RRDB_net | sr_resnet
     norm_type: null
@@ -170,6 +171,7 @@ network_G:
 
 # Discriminator options:
 network_D:
+    strict: true # true | false # whether to load the model in strict mode or not
     # ESRGAN (default)| PPON:
     which_model_D: discriminator_vgg # discriminator_vgg_128 | discriminator_vgg | discriminator_vgg_128_fea (feature extraction) | discriminator_vgg_fea (feature extraction) | patchgan | multiscale
     norm_type: batch
@@ -232,6 +234,7 @@ train:
 
     # For SWA scheduler
     swa_start_iter: 375000 #Just reference: 75% of 500000. Can be any value, including 0 to start right away with a pretrained model.
+    # swa_start_iter_rel: 0.75 # to use swa_start_iter relative to % of training niter instead of fixed swa_start_iter
     swa_lr: 1e-4 #Has to be ~order of magnitude of a stable lr for the regular scheduler
     swa_anneal_epochs: 10
     swa_anneal_strategy: "cos"
