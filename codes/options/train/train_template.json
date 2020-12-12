@@ -121,7 +121,7 @@
     , "out_nc": 3 //# of output image channels: 3 for RGB and 1 for grayscale
     , "gc": 32
     , "group": 1
-    , "convtype": "Conv2D" //"Conv2D" | "PartialConv2D"
+    , "convtype": "Conv2D" //"Conv2D" | "PartialConv2D" | "DeformConv2D"
     , "net_act": "leakyrelu" //"swish" | "leakyrelu"
     , "gaussian": true // true | false
     , "plus": false // true | false
