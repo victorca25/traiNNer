@@ -56,6 +56,24 @@ def parse(opt_path, is_train=True):
     Returns:
         (dict): Parsed Options
     """
+
+    # check if configuration file exists
+    if not os.path.isfile(opt_path):
+        if is_train:
+            probe_t = os.path.join("options","train", opt_path)
+            if not os.path.isfile(probe_t):
+                print("Configuration file {} not found.".format(opt_path))
+                os._exit(1)
+            else:
+                opt_path = probe_t
+        else: # test
+            probe_t = os.path.join("options","test", opt_path)
+            if not os.path.isfile(probe_t):
+                print("Configuration file {} not found.".format(opt_path))
+                os._exit(1)
+            else:
+                opt_path = probe_t
+
     ext = osp.splitext(opt_path)[1].lower()
     if ext == '.json':
         import json
