@@ -7,55 +7,78 @@ from torch.nn import init
 #import models.modules.sft_arch as sft_arch
 logger = logging.getLogger('base')
 ####################
-# initialize
+# initialize networks
 ####################
 
-
-def weights_init_normal(m, std=0.02):
-    classname = m.__class__.__name__
-    if classname.find('Conv') != -1:
-        init.normal_(m.weight.data, 0.0, std)
+def weights_init_normal(m, bias_fill=0, mean=0.0, std=0.02):
+    # classname = m.__class__.__name__
+    # if classname.find('Conv') != -1 and classname != "DiscConvBlock": #ASRResNet's DiscConvBlock causes confusion
+    if isinstance(m, nn.Conv2d):
+        # init.normal_(m.weight.data, 0.0, std)
+        init.normal_(m.weight, mean=mean, std=std)
         if m.bias is not None:
-            m.bias.data.zero_()
-    elif classname.find('Linear') != -1:
-        init.normal_(m.weight.data, 0.0, std)
+            m.bias.data.fill_(bias_fill)
+    # elif classname.find('Linear') != -1:
+    elif isinstance(m, nn.Linear):
+        # init.normal_(m.weight.data, 0.0, std)
+        init.normal_(m.weight, mean=mean, std=std)
         if m.bias is not None:
-            m.bias.data.zero_()
-    elif classname.find('BatchNorm2d') != -1:
-        init.normal_(m.weight.data, 1.0, std)  # BN also uses norm
-        init.constant_(m.bias.data, 0.0)
+            m.bias.data.fill_(bias_fill)
+    # elif classname.find('BatchNorm2d') != -1:
+    elif isinstance(m, nn.modules.batchnorm._BatchNorm):
+        init.normal_(m.weight.data, mean=1.0, std=std)  # BN also uses norm
+        if m.bias is not None:
+            # init.constant_(m.bias.data, 0.0)
+            m.bias.data.fill_(bias_fill)
 
 
-def weights_init_kaiming(m, scale=1):
-    classname = m.__class__.__name__
-    if classname.find('Conv') != -1 and classname != "DiscConvBlock": #ASRResNet's DiscConvBlock causes confusion
-        init.kaiming_normal_(m.weight.data, a=0, mode='fan_in')
+def weights_init_kaiming(m, scale=1, bias_fill=0, **kwargs):
+    # classname = m.__class__.__name__
+    # if classname.find('Conv') != -1 and classname != "DiscConvBlock": #ASRResNet's DiscConvBlock causes confusion
+    if isinstance(m, nn.Conv2d):
+        # init.kaiming_normal_(m.weight.data, a=0, mode='fan_in')
+        init.kaiming_normal_(m.weight, **kwargs)
         m.weight.data *= scale
         if m.bias is not None:
-            m.bias.data.zero_()
-    elif classname.find('Linear') != -1:
-        init.kaiming_normal_(m.weight.data, a=0, mode='fan_in')
+            m.bias.data.fill_(bias_fill)
+    # elif classname.find('Linear') != -1:
+    elif isinstance(m, nn.Linear):
+        # init.kaiming_normal_(m.weight.data, a=0, mode='fan_in')
+        init.kaiming_normal_(m.weight, **kwargs)
         m.weight.data *= scale
         if m.bias is not None:
-            m.bias.data.zero_()
-    elif classname.find('BatchNorm2d') != -1:
-        init.constant_(m.weight.data, 1.0)
-        init.constant_(m.bias.data, 0.0)
+            m.bias.data.fill_(bias_fill)
+    # elif classname.find('BatchNorm2d') != -1:
+    # elif isinstance(m, _BatchNorm):
+    elif isinstance(m, nn.modules.batchnorm._BatchNorm):
+        # init.constant_(m.weight.data, 1.0)
+        init.constant_(m.weight, 1)
+        if m.bias is not None:
+            # init.constant_(m.bias.data, 0.0)
+            m.bias.data.fill_(bias_fill)
 
 
-def weights_init_orthogonal(m):
-    classname = m.__class__.__name__
-    if classname.find('Conv') != -1:
-        init.orthogonal_(m.weight.data, gain=1)
+def weights_init_orthogonal(m, bias_fill=0, **kwargs):
+    # classname = m.__class__.__name__
+    # if classname.find('Conv') != -1:
+    if isinstance(m, nn.Conv2d):
+        # init.orthogonal_(m.weight.data, gain=1)
+        init.orthogonal_(m.weight.data, **kwargs)
         if m.bias is not None:
-            m.bias.data.zero_()
-    elif classname.find('Linear') != -1:
-        init.orthogonal_(m.weight.data, gain=1)
+            m.bias.data.fill_(bias_fill)
+    # elif classname.find('Linear') != -1:
+    elif isinstance(m, nn.Linear):
+        # init.orthogonal_(m.weight.data, gain=1)
+        init.orthogonal_(m.weight.data, **kwargs)
         if m.bias is not None:
-            m.bias.data.zero_()
-    elif classname.find('BatchNorm2d') != -1:
-        init.constant_(m.weight.data, 1.0)
-        init.constant_(m.bias.data, 0.0)
+            m.bias.data.fill_(bias_fill)
+    # elif classname.find('BatchNorm2d') != -1:
+    elif isinstance(m, nn.modules.batchnorm._BatchNorm):
+        # init.constant_(m.weight.data, 1.0)
+        init.constant_(m.weight, 1)
+        if m.bias is not None:
+            # init.constant_(m.bias.data, 0.0)
+            m.bias.data.fill_(bias_fill)
 
 
 def init_weights(net, init_type='kaiming', scale=1, std=0.02):
@@ -109,6 +132,10 @@ def define_G(opt):
             nb=opt_net['nb'], gc=opt_net['gc'], upscale=opt_net['scale'], norm_type=opt_net['norm_type'], \
             act_type=act_type, mode=opt_net['mode'], upsample_mode='upconv', convtype=opt_net['convtype'], \
             finalact=opt_net['finalact'], gaussian_noise=opt_net['gaussian'], plus=opt_net['plus'])
+    elif which_model == 'MRRDB_net':  # Modified RRDB
+        from models.modules.architectures import RRDBNet_arch
+        netG = RRDBNet_arch.MRRDBNet(in_nc=opt_net['in_nc'], out_nc=opt_net['out_nc'], nf=opt_net['nf'], \
+            nb=opt_net['nb'], gc=opt_net['gc'])
     elif which_model == 'ppon':
         from models.modules.architectures import PPON_arch
         netG = PPON_arch.PPON(in_nc=opt_net['in_nc'], nf=opt_net['nf'], nb=opt_net['nb'], out_nc=opt_net['out_nc'], 
@@ -146,7 +173,8 @@ def define_G(opt):
     else:
         raise NotImplementedError('Generator model [{:s}] not recognized'.format(which_model))
 
-    if opt['is_train']:
+    if opt['is_train'] and which_model != 'MRRDB_net':
+        # Note: MRRDB_net initializes the modules during init, no need to initialize again here
         init_weights(netG, init_type='kaiming', scale=0.1)
     if gpu_ids:
         assert torch.cuda.is_available()
