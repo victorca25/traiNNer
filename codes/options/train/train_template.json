@@ -112,7 +112,7 @@
   // Generator options:
   , "network_G": {
     // ESRGAN:
-    "which_model_G": "RRDB_net" // RRDB_net | sr_resnet
+    "which_model_G": "RRDB_net" // RRDB_net (original ESRGAN arch) | MRRDB_net (modified/"new" arch) | sr_resnet
     , "norm_type": null
     , "mode": "CNA"
     , "nf": 64 //# of discrim filters in the first conv layer

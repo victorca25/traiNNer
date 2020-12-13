@@ -2,8 +2,9 @@ import os
 from shutil import copyfile
 import torch
 import torch.nn as nn
-from collections import Counter
-
+from copy import deepcopy
+from collections import Counter, OrderedDict
+from models.networks import model_val
 
 
 class BaseModel():
@@ -110,11 +111,12 @@ class BaseModel():
                 # Regular G scheduler lr
                 return self.schedulers[0].get_last_lr()[0]
         else:
-            return self.schedulers[0].get_lr()[0]
+            # return self.schedulers[0].get_lr()[0]
+            return self.optimizers[0].param_groups[0]['lr']
 
     def get_network_description(self, network):
         '''Get the string and total parameters of the network'''
-        if isinstance(network, nn.DataParallel):
+        if isinstance(network, (nn.DataParallel, nn.parallel.DistributedDataParallel)):
             network = network.module
         s = str(network)
         n = sum(map(lambda x: x.numel(), network.parameters()))
@@ -148,7 +150,7 @@ class BaseModel():
         if os.path.exists(save_path):
             prev_path = os.path.join(self.opt['path']['models'], 'previous_{}.pth'.format(network_label))
             copyfile(save_path, prev_path)
-        if isinstance(network, nn.DataParallel):
+        if isinstance(network, (nn.DataParallel, nn.parallel.DistributedDataParallel)):
             network = network.module
         state_dict = network.state_dict()
         for key, param in state_dict.items():
@@ -158,10 +160,56 @@ class BaseModel():
         except: #pre 1.4.0, normal torch.save
             torch.save(state_dict, save_path)
 
-    def load_network(self, load_path, network, strict=True):
-        if isinstance(network, nn.DataParallel):
+    def load_network(self, load_path, network, strict=True, submodule=None, model_type=None, param_key=None):
+        '''Load pretrained model into instantiated network.
+        Args:
+            load_path (str): The path of model to be loaded into the network.
+            network (nn.Module): the network.
+            strict (bool): Whether if the model will be strictly loaded.
+            submodule (str): Specify a submodule of the network to load the model into.
+            model_type (str): To do additional validations if needed (either 'G' or 'D').
+            param_key (str): The parameter key of loaded model. If set to
+                None, will use the root 'path'.
+        '''
+        
+        #Get bare model, especially under wrapping with DistributedDataParallel or DataParallel.
+        if isinstance(network, (nn.DataParallel, nn.parallel.DistributedDataParallel)):
             network = network.module
-        network.load_state_dict(torch.load(load_path), strict=strict)
+        # network.load_state_dict(torch.load(load_path), strict=strict)
+
+        # load into a specific submodule of the network
+        if not (submodule is None or submodule.lower() == 'none'.lower()):
+            network = network.__getattr__(submodule)
+        
+        # load_net = torch.load(load_path)
+        load_net = torch.load(
+            load_path, map_location=lambda storage, loc: storage)
+
+        # to allow loading state_dicts
+        if 'state_dict' in load_net:
+            load_net = load_net['state_dict']
+        
+        # load specific keys of the model
+        if param_key is not None:
+            load_net = load_net[param_key]
+        
+        # remove unnecessary 'module.' if needed
+        for k, v in deepcopy(load_net).items():
+            if k.startswith('module.'):
+                load_net[k[7:]] = v
+                load_net.pop(k)
+
+        # validate model type to be loaded in the network can do
+        # any additional conversion or modification steps here
+        # (requires 'model_type', either 'G' or 'D')
+        if model_type:
+            load_net = model_val(
+                opt_net=self.opt,
+                state_dict=load_net,
+                model_type=model_type)
+
+        network.load_state_dict(load_net, strict=strict)
+        
         # If loading a network with more parameters into a model with less parameters:
         # model = ABPN_v5(input_dim=3, dim=32)
         # model = model.to(device)

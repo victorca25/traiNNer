@@ -3,6 +3,7 @@ import logging
 import torch
 import torch.nn as nn
 from torch.nn import init
+from options.options import opt_get
 
 #import models.modules.sft_arch as sft_arch
 logger = logging.getLogger('base')
@@ -102,7 +103,7 @@ def init_weights(net, init_type='kaiming', scale=1, std=0.02):
 
 
 # Generator
-def define_G(opt):
+def define_G(opt, step=0):
     gpu_ids = opt['gpu_ids']
     opt_net = opt['network_G']
     which_model = opt_net['which_model_G']
@@ -170,6 +171,10 @@ def define_G(opt):
     elif which_model == 'rife_net':
         from models.modules.architectures import RIFE_arch
         netG = RIFE_arch.RIFE()
+    elif which_model == 'SRFlowNet':
+        from models.modules.architectures import SRFlowNet_arch
+        netG = SRFlowNet_arch.SRFlowNet(in_nc=opt_net['in_nc'], out_nc=opt_net['out_nc'],
+                nf=opt_net['nf'], nb=opt_net['nb'], scale=opt['scale'], K=opt_net['flow']['K'], opt=opt, step=step)
     else:
         raise NotImplementedError('Generator model [{:s}] not recognized'.format(which_model))
 
@@ -304,3 +309,109 @@ def define_F(opt, use_bn=False):
         netF = nn.DataParallel(netF)
     netF.eval()  # No need to train
     return netF
+
+
+####################
+# model coversions and validation for 
+# network loading
+####################
+
+def normal2mod(state_dict):
+    if 'model.0.weight' in state_dict:
+        try:
+            logger.info('Converting and loading an RRDB model to modified RRDB')
+        except:
+            print('Converting and loading an RRDB model to modified RRDB')
+        crt_net = {}
+        items = []
+
+        for k, v in state_dict.items():
+            items.append(k)
+
+        # # directly copy
+        # for k, v in crt_net.items():
+        #     if k in state_dict and state_dict[k].size() == v.size():
+        #         crt_net[k] = state_dict[k]
+        #         items.remove(k)
+
+        crt_net['conv_first.weight'] = state_dict['model.0.weight']
+        crt_net['conv_first.bias'] = state_dict['model.0.bias']
+
+        for k in items.copy():
+            if 'RDB' in k:
+                ori_k = k.replace('model.1.sub.', 'RRDB_trunk.')
+                if '.0.weight' in k:
+                    ori_k = ori_k.replace('.0.weight', '.weight')
+                elif '.0.bias' in k:
+                    ori_k = ori_k.replace('.0.bias', '.bias')
+                crt_net[ori_k] = state_dict[k]
+                items.remove(k)
+
+        crt_net['trunk_conv.weight'] = state_dict['model.1.sub.23.weight']
+        crt_net['trunk_conv.bias'] = state_dict['model.1.sub.23.bias']
+        crt_net['upconv1.weight'] = state_dict['model.3.weight']
+        crt_net['upconv1.bias'] = state_dict['model.3.bias']
+        crt_net['upconv2.weight'] = state_dict['model.6.weight']
+        crt_net['upconv2.bias'] = state_dict['model.6.bias']
+        crt_net['HRconv.weight'] = state_dict['model.8.weight']
+        crt_net['HRconv.bias'] = state_dict['model.8.bias']
+        crt_net['conv_last.weight'] = state_dict['model.10.weight']
+        crt_net['conv_last.bias'] = state_dict['model.10.bias']
+        state_dict = crt_net
+
+    return state_dict
+
+def mod2normal(state_dict):
+    if 'conv_first.weight' in state_dict:
+        try:
+            logger.info('Converting and loading a modified RRDB model to normal RRDB')
+        except:
+            print('Converting and loading a modified RRDB model to normal RRDB')
+        crt_net = {}
+        items = []
+        for k, v in state_dict.items():
+            items.append(k)
+
+        crt_net['model.0.weight'] = state_dict['conv_first.weight']
+        crt_net['model.0.bias'] = state_dict['conv_first.bias']
+
+        for k in items.copy():
+            if 'RDB' in k:
+                ori_k = k.replace('RRDB_trunk.', 'model.1.sub.')
+                if '.weight' in k:
+                    ori_k = ori_k.replace('.weight', '.0.weight')
+                elif '.bias' in k:
+                    ori_k = ori_k.replace('.bias', '.0.bias')
+                crt_net[ori_k] = state_dict[k]
+                items.remove(k)
+
+        crt_net['model.1.sub.23.weight'] = state_dict['trunk_conv.weight']
+        crt_net['model.1.sub.23.bias'] = state_dict['trunk_conv.bias']
+        crt_net['model.3.weight'] = state_dict['upconv1.weight']
+        crt_net['model.3.bias'] = state_dict['upconv1.bias']
+        crt_net['model.6.weight'] = state_dict['upconv2.weight']
+        crt_net['model.6.bias'] = state_dict['upconv2.bias']
+        crt_net['model.8.weight'] = state_dict['HRconv.weight']
+        crt_net['model.8.bias'] = state_dict['HRconv.bias']
+        crt_net['model.10.weight'] = state_dict['conv_last.weight']
+        crt_net['model.10.bias'] = state_dict['conv_last.bias']
+        state_dict = crt_net
+    return state_dict
+
+def model_val(opt_net=None, state_dict=None, model_type=None):
+    if model_type == 'G':
+        model = opt_get(opt_net, ['network_G', 'which_model_G'])
+        if model == 'RRDB_net': # tonormal
+            return mod2normal(state_dict)
+        elif model == 'MRRDB_net': # tomod
+            return normal2mod(state_dict)
+        else:
+            return state_dict
+    elif model_type == 'D':
+        # no particular Discriminator validation at the moment
+        # model = opt_get(opt_net, ['network_G', 'which_model_D'])
+        return state_dict
+    else:
+        # if model_type not provided, return unchanged 
+        # (can do other validations here)
+        return state_dict

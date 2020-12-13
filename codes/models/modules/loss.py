@@ -101,7 +101,8 @@ class GANLoss(nn.Module):
 
 
 class GradientPenaltyLoss(nn.Module):
-    """Calculate the gradient penalty loss, used in WGAN-GP paper https://arxiv.org/abs/1704.00028
+    """Calculate the gradient penalty loss, used in WGAN-GP 
+       paper https://arxiv.org/abs/1704.00028
     Arguments:
         device (str): GPU / CPU: from torch.device('cuda:{}'.format(self.gpu_ids[0])) 
             if self.gpu_ids else torch.device('cpu')
@@ -933,4 +934,5 @@ class Contextual_Loss(nn.Module):
         CX_loss = torch.mean(-torch.log(CS)) # Eq(5)
         if torch.isnan(CX_loss):
             raise ValueError('NaN in computing CX_loss')
+        
         return CX_loss

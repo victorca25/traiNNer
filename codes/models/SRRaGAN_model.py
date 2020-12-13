@@ -413,13 +413,13 @@ class SRRaGANModel(BaseModel):
         if load_path_G is not None:
             logger.info('Loading pretrained model for G [{:s}] ...'.format(load_path_G))
             strict = self.opt['network_G'].get('strict', None)
-            self.load_network(load_path_G, self.netG, strict)
+            self.load_network(load_path_G, self.netG, strict, model_type='G')
         if self.opt['is_train'] and self.opt['train']['gan_weight']:
             load_path_D = self.opt['path']['pretrain_model_D']
             if self.opt['is_train'] and load_path_D is not None:
                 logger.info('Loading pretrained model for D [{:s}] ...'.format(load_path_D))
                 strict = self.opt['network_D'].get('strict', None)
-                self.load_network(load_path_D, self.netD)
+                self.load_network(load_path_D, self.netD, model_type='D')
 
     def load_swa(self):
         if self.opt['is_train'] and self.opt['use_swa']:

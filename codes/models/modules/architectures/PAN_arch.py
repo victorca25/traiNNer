@@ -109,12 +109,6 @@ class SelfAttentionBlock(nn.Module):
 
 
 
-def make_layer(block, n_layers):
-    layers = []
-    for _ in range(n_layers):
-        layers.append(block())
-    return nn.Sequential(*layers)
-
 def pa_upconv_block(nf, unf, kernel_size=3, stride=1, padding=1, mode='nearest', upscale_factor=2, act_type='lrelu'):
     upsample = B.Upsample(scale_factor=upscale_factor, mode=mode)
     upconv = nn.Conv2d(nf, unf, kernel_size, stride, padding, bias=True)
@@ -189,7 +183,7 @@ class SCPA(nn.Module):
     def forward(self, x):
         residual = x
 
-        out_a= self.conv1_a(x)
+        out_a = self.conv1_a(x)
         out_b = self.conv1_b(x)
         out_a = self.lrelu(out_a)
         out_b = self.lrelu(out_b)
@@ -235,11 +229,11 @@ class PAN(nn.Module):
         self.conv_first = nn.Conv2d(in_nc, nf, 3, 1, 1, bias=True)
         
         ### main blocks
-        self.SCPA_trunk = make_layer(SCPA_block_f, nb)
+        self.SCPA_trunk = B.make_layer(SCPA_block_f, nb)
         self.trunk_conv = nn.Conv2d(nf, nf, 3, 1, 1, bias=True)
 
         if self.double_scpa:
-            self.SCPA_trunk2 = make_layer(SCPA_block_f, nb)
+            self.SCPA_trunk2 = B.make_layer(SCPA_block_f, nb)
             self.trunk_conv2 = nn.Conv2d(nf, nf, 3, 1, 1, bias=True)
 
         ### self-attention

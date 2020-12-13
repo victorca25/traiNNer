@@ -2,6 +2,8 @@ from collections import OrderedDict
 import torch
 import torch.nn as nn
 from models.modules.architectures.convolutions.partialconv2d import PartialConv2d #TODO
+from models.networks import weights_init_normal, weights_init_kaiming, weights_init_orthogonal
+
 #from modules.architectures.convolutions.partialconv2d import PartialConv2d
 
 ####################
@@ -224,6 +226,56 @@ def conv_block(in_nc, out_nc, kernel_size, stride=1, dilation=1, groups=1, bias=
         return sequential(n, a, p, c)
 
 
+def make_layer(basic_block, num_basic_block, **kwarg):
+    """Make layers by stacking the same blocks.
+    Args:
+        basic_block (nn.module): nn.module class for basic block. (block)
+        num_basic_block (int): number of blocks. (n_layers)
+    Returns:
+        nn.Sequential: Stacked blocks in nn.Sequential.
+    """
+    layers = []
+    for _ in range(num_basic_block):
+        layers.append(basic_block(**kwarg))
+    return nn.Sequential(*layers)
+
+
+####################
+# initialize modules
+####################
+
+@torch.no_grad()
+def default_init_weights(module_list, init_type='kaiming', scale=1, bias_fill=0, **kwargs):
+    """Initialize network weights.
+    Args:
+        module_list (list[nn.Module] | nn.Module): Modules to be initialized.
+        init_type (str): the type of initialization in: 'normal', 'kaiming' 
+            or 'orthogonal'
+        scale (float): Scale initialized weights, especially for residual
+            blocks. Default: 1. (for 'kaiming')
+        bias_fill (float): The value to fill bias. Default: 0
+        kwargs (dict): Other arguments for initialization function:
+            mean and/or std for 'normal'.
+            a and/or mode for 'kaiming'
+            gain for 'orthogonal'
+    """
+    
+    #TODO
+    # logger.info('Initialization method [{:s}]'.format(init_type))
+    if not isinstance(module_list, list):
+        module_list = [module_list]
+    for module in module_list:
+        for m in module.modules():
+            if init_type == 'normal':
+                weights_init_normal(m, bias_fill=bias_fill, **kwargs)    
+            elif init_type == 'kaiming':
+                weights_init_kaiming(m, scale=scale, bias_fill=bias_fill, **kwargs)
+            elif init_type == 'orthogonal':
+                weights_init_orthogonal(m, bias_fill=bias_fill)
+            else:
+                raise NotImplementedError('initialization method [{:s}] not implemented'.format(init_type))
+
+
 ####################
 # Useful blocks
 ####################
@@ -270,37 +322,47 @@ class ResidualDenseBlock_5C(nn.Module):
     Modified options that can be used:
         - "Partial Convolution based Padding" arXiv:1811.11718
         - "Spectral normalization" arXiv:1802.05957
-        - "ICASSP 2020 - ESRGAN+ : Further Improving ESRGAN" N. C. {Rakotonirina} and A. {Rasoanaivo}
+        - "ICASSP 2020 - ESRGAN+ : Further Improving ESRGAN" N. C. 
+            {Rakotonirina} and A. {Rasoanaivo}
+    
+    Args:
+        nf (int): Channel number of intermediate features (num_feat).
+        gc (int): Channels for each growth (num_grow_ch: growth channel, 
+            i.e. intermediate channels).
+        convtype (str): the type of convolution to use. Default: 'Conv2D'
+        gaussian_noise (bool): enable the ESRGAN+ gaussian noise (no new 
+            trainable parameters)
+        plus (bool): enable the additional residual paths from ESRGAN+ 
+            (adds trainable parameters)
     '''
 
-    def __init__(self, nc, kernel_size=3, gc=32, stride=1, bias=True, pad_type='zero', \
+    def __init__(self, nf=64, kernel_size=3, gc=32, stride=1, bias=1, pad_type='zero', \
             norm_type=None, act_type='leakyrelu', mode='CNA', convtype='Conv2D', \
             spectral_norm=False, gaussian_noise=False, plus=False):
         super(ResidualDenseBlock_5C, self).__init__()
-        # gc: growth channel, i.e. intermediate channels
         
         ## +
         self.noise = GaussianNoise() if gaussian_noise else None
-        self.conv1x1 = conv1x1(nc, gc) if plus else None
+        self.conv1x1 = conv1x1(nf, gc) if plus else None
         ## +
 
-        self.conv1 = conv_block(nc, gc, kernel_size, stride, bias=bias, pad_type=pad_type, \
+        self.conv1 = conv_block(nf, gc, kernel_size, stride, bias=bias, pad_type=pad_type, \
             norm_type=norm_type, act_type=act_type, mode=mode, convtype=convtype, \
             spectral_norm=spectral_norm)
-        self.conv2 = conv_block(nc+gc, gc, kernel_size, stride, bias=bias, pad_type=pad_type, \
+        self.conv2 = conv_block(nf+gc, gc, kernel_size, stride, bias=bias, pad_type=pad_type, \
             norm_type=norm_type, act_type=act_type, mode=mode, convtype=convtype, \
             spectral_norm=spectral_norm)
-        self.conv3 = conv_block(nc+2*gc, gc, kernel_size, stride, bias=bias, pad_type=pad_type, \
+        self.conv3 = conv_block(nf+2*gc, gc, kernel_size, stride, bias=bias, pad_type=pad_type, \
             norm_type=norm_type, act_type=act_type, mode=mode, convtype=convtype, \
             spectral_norm=spectral_norm)
-        self.conv4 = conv_block(nc+3*gc, gc, kernel_size, stride, bias=bias, pad_type=pad_type, \
+        self.conv4 = conv_block(nf+3*gc, gc, kernel_size, stride, bias=bias, pad_type=pad_type, \
             norm_type=norm_type, act_type=act_type, mode=mode, convtype=convtype, \
             spectral_norm=spectral_norm)
         if mode == 'CNA':
             last_act = None
         else:
             last_act = act_type
-        self.conv5 = conv_block(nc+4*gc, nc, 3, stride, bias=bias, pad_type=pad_type, \
+        self.conv5 = conv_block(nf+4*gc, nf, 3, stride, bias=bias, pad_type=pad_type, \
             norm_type=norm_type, act_type=last_act, mode=mode, convtype=convtype, \
             spectral_norm=spectral_norm)
 
@@ -317,7 +379,7 @@ class ResidualDenseBlock_5C(nn.Module):
         if self.noise:
             return self.noise(x5.mul(0.2) + x)
         else:
-            return x5.mul(0.2) + x
+            return x5 * 0.2 + x
 
 class RRDB(nn.Module):
     '''
@@ -325,17 +387,17 @@ class RRDB(nn.Module):
     (ESRGAN: Enhanced Super-Resolution Generative Adversarial Networks)
     '''
 
-    def __init__(self, nc, kernel_size=3, gc=32, stride=1, bias=True, pad_type='zero', \
+    def __init__(self, nf, kernel_size=3, gc=32, stride=1, bias=1, pad_type='zero', \
             norm_type=None, act_type='leakyrelu', mode='CNA', convtype='Conv2D', \
             spectral_norm=False, gaussian_noise=False, plus=False):
         super(RRDB, self).__init__()
-        self.RDB1 = ResidualDenseBlock_5C(nc, kernel_size, gc, stride, bias, pad_type, \
+        self.RDB1 = ResidualDenseBlock_5C(nf, kernel_size, gc, stride, bias, pad_type, \
                 norm_type, act_type, mode, convtype, spectral_norm=spectral_norm, \
                 gaussian_noise=gaussian_noise, plus=plus)
-        self.RDB2 = ResidualDenseBlock_5C(nc, kernel_size, gc, stride, bias, pad_type, \
+        self.RDB2 = ResidualDenseBlock_5C(nf, kernel_size, gc, stride, bias, pad_type, \
                 norm_type, act_type, mode, convtype, spectral_norm=spectral_norm, \
                 gaussian_noise=gaussian_noise, plus=plus)
-        self.RDB3 = ResidualDenseBlock_5C(nc, kernel_size, gc, stride, bias, pad_type, \
+        self.RDB3 = ResidualDenseBlock_5C(nf, kernel_size, gc, stride, bias, pad_type, \
                 norm_type, act_type, mode, convtype, spectral_norm=spectral_norm, \
                 gaussian_noise=gaussian_noise, plus=plus)
 
@@ -343,7 +405,7 @@ class RRDB(nn.Module):
         out = self.RDB1(x)
         out = self.RDB2(out)
         out = self.RDB3(out)
-        return out.mul(0.2) + x
+        return out * 0.2 + x
             
 
 

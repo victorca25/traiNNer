@@ -281,6 +281,17 @@ def dict2str(opt, indent_l=1):
     return msg
 
 
+def opt_get(opt=None, keys=[], default=None):
+    if opt is None:
+        return default
+    ret = opt
+    for k in keys:
+        ret = ret.get(k, None)
+        if ret is None:
+            return default
+    return ret
+
+
 def check_resume(opt):
     '''Check resume states and pretrain_model paths'''
     logger = logging.getLogger('base')
