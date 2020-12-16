@@ -14,13 +14,8 @@ logger = logging.getLogger('base')
 def weights_init_normal(m, bias_fill=0, mean=0.0, std=0.02):
     # classname = m.__class__.__name__
     # if classname.find('Conv') != -1 and classname != "DiscConvBlock": #ASRResNet's DiscConvBlock causes confusion
-    if isinstance(m, nn.Conv2d):
-        # init.normal_(m.weight.data, 0.0, std)
-        init.normal_(m.weight, mean=mean, std=std)
-        if m.bias is not None:
-            m.bias.data.fill_(bias_fill)
     # elif classname.find('Linear') != -1:
-    elif isinstance(m, nn.Linear):
+    if hasattr(m, 'weight') and isinstance(m, nn.Conv2d) or isinstance(m, nn.Linear):
         # init.normal_(m.weight.data, 0.0, std)
         init.normal_(m.weight, mean=mean, std=std)
         if m.bias is not None:
@@ -28,26 +23,38 @@ def weights_init_normal(m, bias_fill=0, mean=0.0, std=0.02):
     # elif classname.find('BatchNorm2d') != -1:
     elif isinstance(m, nn.modules.batchnorm._BatchNorm):
         init.normal_(m.weight.data, mean=1.0, std=std)  # BN also uses norm
-        if m.bias is not None:
+        if hasattr(m, 'bias') and m.bias is not None:
             # init.constant_(m.bias.data, 0.0)
             m.bias.data.fill_(bias_fill)
 
+def weights_init_xavier(m, scale=1, bias_fill=0, **kwargs):
+    # classname = m.__class__.__name__
+    # if classname.find('Conv') != -1 and classname != "DiscConvBlock": #ASRResNet's DiscConvBlock causes confusion
+    # elif classname.find('Linear') != -1:
+    if hasattr(m, 'weight') and isinstance(m, nn.Conv2d) or isinstance(m, nn.Linear):
+        # init.xavier_normal_(m.weight.data, gain=gain)
+        init.xavier_normal_(m.weight, **kwargs)
+        m.weight.data *= scale
+        if m.bias is not None:
+            m.bias.data.fill_(bias_fill)
+    # elif classname.find('BatchNorm2d') != -1:
+    # elif isinstance(m, _BatchNorm):
+    elif isinstance(m, nn.modules.batchnorm._BatchNorm):
+        # init.constant_(m.weight.data, 1.0)
+        init.constant_(m.weight, 1)
+        if hasattr(m, 'bias') and m.bias is not None:
+            # init.constant_(m.bias.data, 0.0)
+            m.bias.data.fill_(bias_fill)
 
 def weights_init_kaiming(m, scale=1, bias_fill=0, **kwargs):
     # classname = m.__class__.__name__
     # if classname.find('Conv') != -1 and classname != "DiscConvBlock": #ASRResNet's DiscConvBlock causes confusion
-    if isinstance(m, nn.Conv2d):
-        # init.kaiming_normal_(m.weight.data, a=0, mode='fan_in')
-        init.kaiming_normal_(m.weight, **kwargs)
-        m.weight.data *= scale
-        if m.bias is not None:
-            m.bias.data.fill_(bias_fill)
     # elif classname.find('Linear') != -1:
-    elif isinstance(m, nn.Linear):
+    if hasattr(m, 'weight') and isinstance(m, nn.Conv2d) or isinstance(m, nn.Linear):
         # init.kaiming_normal_(m.weight.data, a=0, mode='fan_in')
         init.kaiming_normal_(m.weight, **kwargs)
         m.weight.data *= scale
-        if m.bias is not None:
+        if hasattr(m, 'bias') and m.bias is not None:
             m.bias.data.fill_(bias_fill)
     # elif classname.find('BatchNorm2d') != -1:
     # elif isinstance(m, _BatchNorm):
@@ -58,17 +65,11 @@ def weights_init_kaiming(m, scale=1, bias_fill=0, **kwargs):
             # init.constant_(m.bias.data, 0.0)
             m.bias.data.fill_(bias_fill)
 
-
 def weights_init_orthogonal(m, bias_fill=0, **kwargs):
     # classname = m.__class__.__name__
     # if classname.find('Conv') != -1:
-    if isinstance(m, nn.Conv2d):
-        # init.orthogonal_(m.weight.data, gain=1)
-        init.orthogonal_(m.weight.data, **kwargs)
-        if m.bias is not None:
-            m.bias.data.fill_(bias_fill)
     # elif classname.find('Linear') != -1:
-    elif isinstance(m, nn.Linear):
+    if hasattr(m, 'weight') and isinstance(m, nn.Conv2d) or isinstance(m, nn.Linear):
         # init.orthogonal_(m.weight.data, gain=1)
         init.orthogonal_(m.weight.data, **kwargs)
         if m.bias is not None:
@@ -77,17 +78,33 @@ def weights_init_orthogonal(m, bias_fill=0, **kwargs):
     elif isinstance(m, nn.modules.batchnorm._BatchNorm):
         # init.constant_(m.weight.data, 1.0)
         init.constant_(m.weight, 1)
-        if m.bias is not None:
+        if hasattr(m, 'bias') and m.bias is not None:
             # init.constant_(m.bias.data, 0.0)
             m.bias.data.fill_(bias_fill)
 
+def init_weights(net, init_type='kaiming', scale=1, std=0.02, gain=0.02):
+    '''Initialize network weights.
+    To initialize a network: 
+        1. register CPU/GPU device (with multi-GPU support)
+        2. initialize the network weights
+    Parameters:
+        net (network)        -- the network to be initialized
+        init_type (str)      -- the name of an initialization method: normal | xavier | kaiming | orthogonal
+        scale (float)        -- scaling factor for kaiming.
+        gain (float)         -- scaling factor for xavier.
+        std (float)          -- scaling factor for normal.
+        gpu_ids (int list) -- which GPUs the network runs on: e.g., 0,1,2
 
-def init_weights(net, init_type='kaiming', scale=1, std=0.02):
-    # scale for 'kaiming', std for 'normal'.
+    'kaiming' is used in the ESRGAN paper, 'normal' in the original pix2pix and CycleGAN paper.
+    kaiming and xavier might work better for some applications.
+    '''
     logger.info('Initialization method [{:s}]'.format(init_type))
     if init_type == 'normal':
         weights_init_normal_ = functools.partial(weights_init_normal, std=std)
         net.apply(weights_init_normal_)
+    if init_type == 'xavier':
+        weights_init_xavier_ = functools.partial(weights_init_xavier, gain=gain)
+        net.apply(weights_init_xavier_)
     elif init_type == 'kaiming':
         weights_init_kaiming_ = functools.partial(weights_init_kaiming, scale=scale)
         net.apply(weights_init_kaiming_)
@@ -104,6 +121,10 @@ def init_weights(net, init_type='kaiming', scale=1, std=0.02):
 
 # Generator
 def define_G(opt, step=0):
+    '''Create a generator
+    Returns a generator
+    The generator is usually initialized with <init_weights>.
+    '''
     gpu_ids = opt['gpu_ids']
     opt_net = opt['network_G']
     which_model = opt_net['which_model_G']
@@ -189,6 +210,28 @@ def define_G(opt, step=0):
 
 # Discriminator
 def define_D(opt):
+    '''Create a discriminator
+    Returns a discriminator
+    Some of the available types of discriminators:
+        vgg_*: discriminators based on a VGG-like network architecture.
+            The ones with '_fea' in the name also allow to extract feature 
+            maps from the discriminator to use for feature losses. 
+        patchgan: PatchGAN classifier described in the original pix2pix paper.
+            It can classify whether 70×70 overlapping patches are real or fake.
+            Such a patch-level discriminator architecture has fewer parameters
+            than a full-image discriminator and can work on arbitrarily-sized images
+            in a fully convolutional fashion.
+            [n_layers]: With this option, you can specify the number of conv layers 
+            in the discriminator with the parameter <n_layers_D> 
+            (default=3 as used in basic (PatchGAN).)
+        multiscale: can create multiple patchgan discriminators that operate at 
+            different scales. Each one at half the scale of the previous. Must 
+            coordinate with the LR_size. 
+        pixelgan: 1x1 PixelGAN discriminator can classify whether a pixel is real or not.
+            It encourages greater color diversity but has no effect on spatial statistics.
+
+    The discriminator is usually initialized with <init_weights>.
+    '''
     gpu_ids = opt['gpu_ids']
     opt_net = opt['network_D']
     which_model = opt_net['which_model_D']
@@ -283,6 +326,8 @@ def define_D(opt):
 
 
 def define_F(opt, use_bn=False):
+    '''Create a feature extraction network for feature losses
+    '''
     from models.modules.architectures import perceptual
     
     feat_network = 'vgg' #opt['feat_network'] #can be configurable option 

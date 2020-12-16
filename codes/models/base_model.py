@@ -8,7 +8,33 @@ from models.networks import model_val
 
 
 class BaseModel():
+    '''This class is an base class for models.
+    To create a subclass, you need to implement the following five functions:
+        -- <__init__>:                      initialize the class; first call super(NewModel, self).__init__(opt)
+        -- <feed_data>:                     unpack data from dataset and apply any preprocessing.
+        -- <optimize_parameters>:           calculate losses, gradients, and update network weights.
+        -- <get_current_visuals>:           -
+        -- <get_current_losses>:            -
+        -- <print_network>:                 -
+        -- <save>:                          -
+        -- <load>:                          -
+    '''
     def __init__(self, opt):
+        '''Initialize the BaseModel class.
+        Parameters:
+            opt (Option class)-- stores all the experiment flags
+        When creating your custom class, you need to implement your own initialization.
+        Then, you need to define:
+            -- self.loss_names (str list):          specify the training losses that you want to plot and save.
+            -- self.model_names (str list):         define networks used in our training.
+            -- self.visual_names (str list):        specify the images that you want to display and save.
+            -- self.optimizers (optimizer list):    define and initialize optimizers. You can define 
+                                                    one optimizer for each network. If two networks are 
+                                                    updated at the same time, you can use itertools.chain 
+                                                    to group them.
+            -- self.schedulers (schedulers list):   a scheduler for each optimizer
+            -- other model options
+        '''
         self.opt = opt
         # self.device = torch.device('cuda' if opt['gpu_ids'] is not None else 'cpu')
         if opt['gpu_ids'] is not None:
@@ -23,26 +49,44 @@ class BaseModel():
         self.optimizers = []
         self.swa = None
         self.swa_start_iter = None
+        self.metric = 0  # used for learning rate policy 'plateau'
 
     def feed_data(self, data):
+        '''Unpack input data from the dataloader and perform necessary pre-processing steps.
+        Parameters:
+            data (dict): includes the data itself and any metadata information.
+        '''
         pass
 
     def optimize_parameters(self):
+        '''Calculate losses, gradients, and update network weights; called in every training iteration'''
         pass
 
     def get_current_visuals(self):
+        '''Return visualization images images for validation, visualization and logging'''
         pass
 
     def get_current_losses(self):
+        '''Return traning losses. train.py will print out these errors on console, and save them to a file'''
         pass
 
     def print_network(self):
+        '''Print the total number of parameters in the network and (if verbose) network architecture
+        Parameters:
+            TODO: verbose (bool) -- if verbose: print the network architecture
+        '''
         pass
 
     def save(self, label):
+        '''Save all the networks to the disk.
+        Parameters:
+            label/iter_step (int) -- current epoch; used in the file name '%s_net_%s.pth' % (epoch, name)
+        '''
         pass
 
     def load(self):
+        '''Load all the networks from the disk.
+        '''
         pass
 
     def _set_lr(self, lr_groups_l):
@@ -63,7 +107,7 @@ class BaseModel():
         return init_lr_groups_l
 
     def update_learning_rate(self, current_step=None, warmup_iter=-1):
-        ''' Update learning rate.
+        ''' Update learning rate of all networks.
         Args:
             current_step (int): Current iteration.
             warmup_iter (int)： Warmup iter numbers. -1 for no warmup.
@@ -82,14 +126,20 @@ class BaseModel():
             for scheduler in self.schedulers:
                 # first scheduler is G, skip
                 if sched_count > 0:
-                    scheduler.step()
+                    if self.opt['train']['lr_scheme'] == 'ReduceLROnPlateau':
+                        scheduler.step(self.metric)
+                    else:
+                        scheduler.step()
                 sched_count += 1
         # regular schedulers
         else:
             # print(self.schedulers)
             # print(str(scheduler.__class__) + ": " + str(scheduler.__dict__))
             for scheduler in self.schedulers:
-                scheduler.step()
+                if self.opt['train']['lr_scheme'] == 'ReduceLROnPlateau':
+                    scheduler.step(self.metric)
+                else:
+                    scheduler.step()
             #### if configured, set up warm up learning rate
             if current_step < warmup_iter:
                 # get initial lr for each group
@@ -123,6 +173,17 @@ class BaseModel():
         return s, n
 
     def requires_grad(self, model, flag=True, target_layer=None, net_type=None):
+        '''Set requies_grad for all the networks. Use flag=False to avoid 
+            unnecessary computations
+        Parameters:
+            model (network)       -- the network to be updated
+            flag (bool)           -- whether the networks require gradients or not
+            target_layer (int)    -- (optional) for supported networks, can set a specific
+                                     layer up to which the defined flag will be set, for 
+                                     example, to freeze the network up to layer "target_layer"
+            net_type (str)        -- (optional) used with target_layer to identify what type 
+                                     of supported network it is.
+        '''
         # for p in model.parameters():
         #     p.requires_grad = flag
         for name, param in model.named_parameters():

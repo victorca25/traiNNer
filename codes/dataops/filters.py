@@ -450,6 +450,7 @@ def apply_1Dfilter(input, win, use_padding: bool=False):
     """
     #N, C, H, W = input.shape
     C = input.shape[1]
+    # win = win.to(input.device, dtype=input.dtype)
     
     padding = 0
     if use_padding:

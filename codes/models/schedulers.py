@@ -9,13 +9,19 @@ from torch.optim.lr_scheduler import _LRScheduler
 def get_schedulers(optimizers=None, schedulers=None, train_opt=None):
     ''' Returns a learning rate scheduler for each optimizer 
     provided, according to the configuration in train_opt
+    
+    Parameters:
+        optimizers (list)  -- the list of optimizers, one for each of the networks
+        schedulers (list)  -- the list where the schedulers will be appended to, one for each of the networks
+        train_opt          -- stores all the experiment flags;
+                              train_opt['lr_scheme'] is the name of learning rate policy
+    For 'linear', we keep the same learning rate for the first <niter> epochs
+        and linearly decay the rate to zero over the next <niter_decay> epochs.
+    For other schedulers (step, multistep, plateau, cosine, etc), we use the default PyTorch schedulers.
+    See https://pytorch.org/docs/stable/optim.html for more details.
     '''
     for optimizer in optimizers:
         if train_opt['lr_scheme'] == 'Linear':
-            '''
-            For 'linear', we keep the same learning rate for the first <niter> epochs
-            and linearly decay the rate to zero over the next <niter_decay> epochs.
-            '''
             def lambda_rule(epoch):
                 lr_l = 1.0 - max(0, epoch + 1 - train_opt['fixed_niter']) / float(train_opt['niter_decay'] + 1)
                 return lr_l

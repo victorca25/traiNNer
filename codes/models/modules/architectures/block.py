@@ -257,7 +257,7 @@ def default_init_weights(module_list, init_type='kaiming', scale=1, bias_fill=0,
         kwargs (dict): Other arguments for initialization function:
             mean and/or std for 'normal'.
             a and/or mode for 'kaiming'
-            gain for 'orthogonal'
+            gain for 'orthogonal' and xavier
     """
     
     #TODO
@@ -267,7 +267,9 @@ def default_init_weights(module_list, init_type='kaiming', scale=1, bias_fill=0,
     for module in module_list:
         for m in module.modules():
             if init_type == 'normal':
-                weights_init_normal(m, bias_fill=bias_fill, **kwargs)    
+                weights_init_normal(m, bias_fill=bias_fill, **kwargs)
+            if init_type == 'xavier':
+                weights_init_xavier(m, scale=scale, bias_fill=bias_fill, **kwargs)    
             elif init_type == 'kaiming':
                 weights_init_kaiming(m, scale=scale, bias_fill=bias_fill, **kwargs)
             elif init_type == 'orthogonal':

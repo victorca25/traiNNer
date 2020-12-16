@@ -70,29 +70,36 @@ def get_image_paths(data_type, dataroot):
 
 
 ###################### read images ######################
-def _read_lmdb_img(env, path):
+def _read_lmdb_img(env, key, size=None):
+    '''read image from lmdb with key (w/ and w/o fixed size)
+    size: (C, H, W) tuple'''
     with env.begin(write=False) as txn:
-        buf = txn.get(path.encode('ascii'))
-        buf_meta = txn.get((path + '.meta').encode('ascii')).decode('ascii')
+        buf = txn.get(key.encode('ascii'))
+        buf_meta = txn.get((key + '.meta').encode('ascii')).decode('ascii')
     img_flat = np.frombuffer(buf, dtype=np.uint8)
-    H, W, C = [int(s) for s in buf_meta.split(',')]
+    if size:
+        C, H, W = size
+    else:
+        H, W, C = [int(s) for s in buf_meta.split(',')]
     img = img_flat.reshape(H, W, C)
     return img
 
 
-def read_img(env, path, out_nc=3, fix_channels=True):
+def read_img(env, path, out_nc=3, fix_channels=True, size=None):
     '''
-        Reads image using cv2 (rawpy if dng) or from lmdb by default
-        (can also use using PIL instead of cv2)
+        Reads image using cv2 (rawpy if dng), from lmdb bor from a buffer 
+        (path=buffer). Could also use using PIL instead of cv2.
     Arguments:
+        path: image path or buffer to read
         out_nc: Desired number of channels
         fix_channels: changes the images to the desired number of channels
+        size: fixed size to use for lmbg (optional)
     Output:
-        Numpy uint8, HWC, BGR, [0,255] by default 
+        Numpy HWC, BGR, [0,255] by default 
     '''
 
     img = None
-    if env is None:  # img
+    if env is None or env is 'img':  # img
         if(path[-3:].lower() == 'dng'): # if image is a DNG
             import rawpy
             with rawpy.imread(path) as raw:
@@ -108,8 +115,12 @@ def read_img(env, path, out_nc=3, fix_channels=True):
         # else: # For other images unrecognized by cv2
             # import matplotlib.pyplot as plt
             # img = (255*plt.imread(path)[:,:,:3]).astype('uint8')
+    elif env is 'lmdb':
+        img = _read_lmdb_img(env, path, size)
+    elif env is 'buffer':
+        img = cv2.imdecode(path, cv2.IMREAD_UNCHANGED)
     else:
-        img = _read_lmdb_img(env, path)
+        raise NotImplementedError("Unsupported env: %s" % (env,))
 
     # if not img:
     #     raise ValueError(f"Failed to read image: {path}")
