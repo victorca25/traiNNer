@@ -93,14 +93,20 @@ class PBRModel(BaseModel):
             """
             #Initialize the losses with the opt parameters
             # Generator losses for 3 channel maps: diffuse, albedo and normal:
+            # for the losses that don't require high precision (can use half precision)
             self.generatorlosses = losses.GeneratorLoss(opt, self.device)
+            # for losses that need high precision (use out of the AMP context)
+            self.precisegeneratorlosses = losses.PreciseGeneratorLoss(opt, self.device)
             # TODO: show the configured losses names in logger
             # print(self.generatorlosses.loss_list)
 
             # Generator losses for 1 channel maps (does not support feature networks like VGG):
             # using new option in the loss builder: allow_featnets = False
             # TODO: does it make sense to make fake 3ch images with the 1ch maps?
+            # for the losses that don't require high precision (can use half precision)
             self.generatorlosses1ch = losses.GeneratorLoss(opt, self.device, False)
+            # for losses that need high precision (use out of the AMP context)
+            self.precisegeneratorlosses1ch = losses.PreciseGeneratorLoss(opt, self.device, False)
 
             # Discriminator loss:
             if train_opt['gan_type'] and train_opt['gan_weight']:
@@ -326,6 +332,54 @@ class PBRModel(BaseModel):
                     l_g_total += l_g_gan/self.accumulations
 
             #/with self.cast():
+
+            # high precision generator losses (can be affected by AMP half precision)
+            #TODO: for now only showing the logs for the diffuse losses, need to append the other logs
+            precise_loss_results, self.log_dict = self.precisegeneratorlosses(
+                                fake_SR, self.var_H, self.log_dict, self.f_low)
+            l_g_total += sum(precise_loss_results)/self.accumulations
+            
+            if isinstance(self.var_NO, torch.Tensor):
+                NO_loss_results = []
+                NO_loss_results, log_dict_normal = self.precisegeneratorlosses(
+                                fake_NO, self.var_NO, log_dict_normal, self.f_low)
+                l_g_total += sum(NO_loss_results)/self.accumulations
+
+            if isinstance(self.var_AL, torch.Tensor):
+                AL_loss_results = []
+                AL_loss_results, log_dict_albedo = self.precisegeneratorlosses(
+                                fake_AL, self.var_AL, log_dict_albedo, self.f_low)
+                l_g_total += sum(AL_loss_results)/self.accumulations
+            
+            if isinstance(self.var_AO, torch.Tensor):
+                AO_loss_results = []
+                AO_loss_results, log_dict_ao = self.precisegeneratorlosses1ch(
+                                fake_AO, self.var_AO, log_dict_ao, self.f_low)
+                l_g_total += sum(AO_loss_results)/self.accumulations
+            
+            if isinstance(self.var_HE, torch.Tensor):
+                HE_loss_results = []
+                HE_loss_results, log_dict_height = self.precisegeneratorlosses1ch(
+                                fake_HE, self.var_HE, log_dict_height, self.f_low)
+                l_g_total += sum(HE_loss_results)/self.accumulations
+            
+            if isinstance(self.var_ME, torch.Tensor):
+                ME_loss_results = []
+                ME_loss_results, log_dict_metalness = self.precisegeneratorlosses1ch(
+                                fake_ME, self.var_ME, log_dict_metalness, self.f_low)
+                l_g_total += sum(ME_loss_results)/self.accumulations
+            
+            if isinstance(self.var_RE, torch.Tensor):
+                RE_loss_results = []
+                RE_loss_results, log_dict_reflection = self.precisegeneratorlosses1ch(
+                                fake_RE, self.var_RE, log_dict_reflection, self.f_low)
+                l_g_total += sum(RE_loss_results)/self.accumulations
+            
+            if isinstance(self.var_RO, torch.Tensor):
+                RO_loss_results = []
+                RO_loss_results, log_dict_roughness = self.precisegeneratorlosses1ch(
+                                fake_RO, self.var_RO, log_dict_roughness, self.f_low)
+                l_g_total += sum(RO_loss_results)/self.accumulations
             
             if self.amp:
                 # call backward() on scaled loss to create scaled gradients.

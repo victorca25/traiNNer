@@ -103,7 +103,10 @@ class VSRModel(BaseModel):
             """
             #Initialize the losses with the opt parameters
             # Generator losses:
+            # for the losses that don't require high precision (can use half precision)
             self.generatorlosses = losses.GeneratorLoss(opt, self.device)
+            # for losses that need high precision (use out of the AMP context)
+            self.precisegeneratorlosses = losses.PreciseGeneratorLoss(opt, self.device)
             # TODO: show the configured losses names in logger
             # print(self.generatorlosses.loss_list)
 
@@ -312,6 +315,7 @@ class VSRModel(BaseModel):
 
                 # optical flow reconstruction loss
                 #TODO: see if can be moved into loss file
+                #TODO 2: test if AMP could affect the loss due to loss of precision
                 if self.cri_ofr: #OFR_loss()
                     l_g_ofr = 0
                     for i in range(self.n_frames):
@@ -338,6 +342,11 @@ class VSRModel(BaseModel):
                     l_g_total += l_g_gan/self.accumulations
 
             #/with self.cast():
+            
+            # high precision generator losses (can be affected by AMP half precision)
+            precise_loss_results, self.log_dict = self.precisegeneratorlosses(
+                    self.fake_H, self.var_H, self.log_dict, self.f_low)
+            l_g_total += sum(precise_loss_results)/self.accumulations
             
             if self.amp:
                 # call backward() on scaled loss to create scaled gradients.

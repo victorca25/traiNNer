@@ -379,14 +379,14 @@ class GeneratorLoss(nn.Module):
         hfen_weight  = train_opt.get('hfen_weight', 0)
         hfen_criterion = check_loss_names(hfen_criterion=train_opt['hfen_criterion'])
 
-        grad_weight  = train_opt.get('grad_weight', 0)
-        grad_type  = train_opt.get('grad_type', None) 
+        # grad_weight  = train_opt.get('grad_weight', 0)
+        # grad_type  = train_opt.get('grad_type', None) 
 
         tv_weight  = train_opt.get('tv_weight', 0)
         tv_type = check_loss_names(tv_type=train_opt['tv_type'], tv_norm=train_opt['tv_norm'])
 
-        ssim_weight  = train_opt.get('ssim_weight', 0)
-        ssim_type  = train_opt.get('ssim_type', None)
+        # ssim_weight  = train_opt.get('ssim_weight', 0)
+        # ssim_type  = train_opt.get('ssim_type', None)
 
         if allow_featnets:
             lpips_weight  = train_opt.get('lpips_weight', 0)
@@ -430,8 +430,8 @@ class GeneratorLoss(nn.Module):
         else:
             cx_weight = 0
 
-        fft_weight  = train_opt.get('fft_weight', 0)
-        fft_type  = train_opt.get('fft_type', None)
+        # fft_weight  = train_opt.get('fft_weight', 0)
+        # fft_type  = train_opt.get('fft_type', None)
 
         of_weight  = train_opt.get('of_weight', 0)
         of_type  = train_opt.get('of_type', None)
@@ -447,13 +447,13 @@ class GeneratorLoss(nn.Module):
             cri_hfen = get_loss_fn(hfen_criterion, hfen_weight)
             self.loss_list.append(cri_hfen)
         
-        if grad_weight > 0 and grad_type:
-            cri_grad = get_loss_fn(grad_type, grad_weight, device = device)
-            self.loss_list.append(cri_grad)
+        # if grad_weight > 0 and grad_type:
+        #     cri_grad = get_loss_fn(grad_type, grad_weight, device = device)
+        #     self.loss_list.append(cri_grad)
 
-        if ssim_weight > 0 and ssim_type:
-            cri_ssim = get_loss_fn(ssim_type, ssim_weight, opt = train_opt, allow_featnets = allow_featnets)
-            self.loss_list.append(cri_ssim)
+        # if ssim_weight > 0 and ssim_type:
+        #     cri_ssim = get_loss_fn(ssim_type, ssim_weight, opt = train_opt, allow_featnets = allow_featnets)
+        #     self.loss_list.append(cri_ssim)
         
         if tv_weight > 0 and tv_type:
             cri_tv = get_loss_fn(tv_type, tv_weight)
@@ -488,9 +488,9 @@ class GeneratorLoss(nn.Module):
             cri_gpl = get_loss_fn(gpl_type, gpl_weight) 
             self.loss_list.append(cri_gpl)
 
-        if fft_weight > 0 and fft_type:
-            cri_fft = get_loss_fn(fft_type, fft_weight, device = device)
-            self.loss_list.append(cri_fft)
+        # if fft_weight > 0 and fft_type:
+        #     cri_fft = get_loss_fn(fft_type, fft_weight, device = device)
+        #     self.loss_list.append(cri_fft)
 
         if of_weight > 0 and of_type:
             cri_of = get_loss_fn(of_type, of_weight, device = device)
@@ -510,6 +510,149 @@ class GeneratorLoss(nn.Module):
 
 
     def forward(self, sr, hr, log_dict, fsfilter = None):
+        if fsfilter: #low-pass filter
+            hr_f = fsfilter(hr)
+            sr_f = fsfilter(sr)
+        
+        # to visualize the batch for debugging
+        #tmp_vis(sr)
+        #tmp_vis(hr)
+        #tmp_vis(sr_f)
+        #tmp_vis(hr_f)
+
+        loss_results = []
+        for i, l in enumerate(self.loss_list):
+            if l['function']:
+                if fsfilter: # branch selecting the ones that should use LPF
+                    if l['name'].find('tv') >= 0 or l['name'].find('overflow') >= 0:
+                        #Note: Using sr_f here means it will only preserve total variation / denoise on 
+                        # the LF, which may or may not be a valid proposition, test!
+                        effective_loss = l['weight']*l['function'](sr_f) # fake_H
+                    elif l['name'].find('pix') >= 0 or l['name'].find('hfen') >= 0 \
+                            or l['name'].find('cpl') >= 0 or l['name'].find('gpl') >= 0 \
+                            or l['name'].find('gradient') >= 0:
+                        effective_loss = l['weight']*l['function'](sr_f, hr_f) # (fake_H, var_H)
+                    elif l['name'].find('ssim') >= 0:
+                        effective_loss = l['weight']*(1 - l['function'](sr_f, hr_f)) # (fake_H, var_H)
+                    else:
+                        effective_loss = l['weight']*l['function'](sr, hr) # (fake_H, var_H)
+                else:
+                    if l['name'].find('tv') >= 0 or l['name'].find('overflow') >= 0:
+                        effective_loss = l['weight']*l['function'](sr) # fake_H
+                    elif l['name'].find('ssim') >= 0:
+                        effective_loss = l['weight']*(1 - l['function'](sr, hr)) # (fake_H, var_H)
+                    else:
+                        effective_loss = l['weight']*l['function'](sr, hr) # (fake_H, var_H)
+                #print(l['name'],effective_loss)
+                loss_results.append(effective_loss)
+                log_dict[l['name']] = effective_loss.item()
+        return loss_results, log_dict
+
+class PreciseGeneratorLoss(nn.Module):
+    '''
+    To separately instantiate losses that require high precision calculations and 
+        cannot be inside the AMP context. 
+        In principle, it's the same as GeneratorLoss, but each one initialize 
+        different losses if configured in the options.
+        If not using AMP, both classes will be equivalent.
+    '''
+    def __init__(self, opt=None, device = 'cpu', allow_featnets=True):
+        super(PreciseGeneratorLoss, self).__init__()
+
+        train_opt = opt['train']
+
+        #TODO: these checks can be moved to options.py when everything is stable
+        # parsing the losses options
+        # pixel_weight  = train_opt.get('pixel_weight', 0)
+        # pixel_criterion  = train_opt.get('pixel_criterion', None) # 'skip'
+
+        # if allow_featnets:
+        #     feature_weight = train_opt.get('feature_weight', 0)
+        #     feature_network = train_opt.get('feature_network', 'vgg19') # TODO 
+        #     feature_criterion = check_loss_names(feature_criterion=train_opt['feature_criterion'], feature_network=feature_network)
+        # else:
+        #     feature_weight = 0
+        
+        # hfen_weight  = train_opt.get('hfen_weight', 0)
+        # hfen_criterion = check_loss_names(hfen_criterion=train_opt['hfen_criterion'])
+
+        grad_weight  = train_opt.get('grad_weight', 0)
+        grad_type  = train_opt.get('grad_type', None) 
+
+        # tv_weight  = train_opt.get('tv_weight', 0)
+        # tv_type = check_loss_names(tv_type=train_opt['tv_type'], tv_norm=train_opt['tv_norm'])
+
+        ssim_weight  = train_opt.get('ssim_weight', 0)
+        ssim_type  = train_opt.get('ssim_type', None)
+
+        # if allow_featnets:
+        #     lpips_weight  = train_opt.get('lpips_weight', 0)
+        #     lpips_network  = train_opt.get('lpips_net', 'vgg')
+        #     lpips_type  = train_opt.get('lpips_type', 'net-lin')
+        #     lpips_criterion = check_loss_names(lpips_criterion=train_opt['lpips_type'], lpips_network=lpips_network)
+        # else:
+        #     lpips_weight = 0
+
+        # if allow_featnets:
+        #     cx_weight  = train_opt.get('cx_weight', 0)
+        #     cx_type  = train_opt.get('cx_type', None)
+        # else:
+        #     cx_weight = 0
+
+        fft_weight  = train_opt.get('fft_weight', 0)
+        fft_type  = train_opt.get('fft_type', None)
+
+
+        # building the loss
+        self.loss_list = []
+
+        # if hfen_weight > 0 and hfen_criterion:
+        #     cri_hfen = get_loss_fn(hfen_criterion, hfen_weight)
+        #     self.loss_list.append(cri_hfen)
+        
+        if grad_weight > 0 and grad_type:
+            cri_grad = get_loss_fn(grad_type, grad_weight, device = device)
+            self.loss_list.append(cri_grad)
+
+        if ssim_weight > 0 and ssim_type:
+            cri_ssim = get_loss_fn(ssim_type, ssim_weight, opt = train_opt, allow_featnets = allow_featnets)
+            self.loss_list.append(cri_ssim)
+        
+        # if tv_weight > 0 and tv_type:
+        #     cri_tv = get_loss_fn(tv_type, tv_weight)
+        #     self.loss_list.append(cri_tv)
+
+        # if cx_weight > 0 and cx_type:
+        #     cri_cx = get_loss_fn(cx_type, cx_weight, device = device, opt = train_opt)
+        #     self.loss_list.append(cri_cx)
+
+        # if feature_weight > 0 and feature_criterion:
+        #     #TODO: can move the self.netF to the loss class instead, like lpips, change where the network is printed from
+        #     self.netF = networks.define_F(opt, use_bn=False).to(device)
+        #     cri_fea = get_loss_fn(feature_criterion, feature_weight, network=self.netF)
+        #     self.loss_list.append(cri_fea)
+        #     self.cri_fea = True
+        # else: 
+        #     self.cri_fea = None
+
+        # if lpips_weight > 0 and lpips_criterion:
+        #     lpips_spatial = True #False # Return a spatial map of perceptual distance. Needs to use .mean() for the backprop if True, the mean distance is approximately the same as the non-spatial distance
+        #     #self.netF = networks.define_F(opt, use_bn=False).to(device)
+        #     # TODO: fix use_gpu 
+        #     lpips_network  = ps.PerceptualLoss(model=lpips_type, net=lpips_network, use_gpu=torch.cuda.is_available(), model_path=None, spatial=lpips_spatial) #.to(self.device) 
+        #     cri_lpips = get_loss_fn(lpips_criterion, lpips_weight, network=lpips_network, opt = opt)
+        #     self.loss_list.append(cri_lpips)
+
+        if fft_weight > 0 and fft_type:
+            cri_fft = get_loss_fn(fft_type, fft_weight, device = device)
+            self.loss_list.append(cri_fft)
+
+    def forward(self, sr, hr, log_dict, fsfilter = None):
+        # make sure both sr and hr are not in float16, change to float32 (torch.float32/torch.float)
+        # in some cases could need torch.float64/torch.double
+        sr = sr.float()
+        hr = hr.float()
+        
         if fsfilter: #low-pass filter
             hr_f = fsfilter(hr)
             sr_f = fsfilter(sr)
