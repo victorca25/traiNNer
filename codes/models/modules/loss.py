@@ -33,9 +33,23 @@ class CharbonnierLoss(nn.Module):
 class GANLoss(nn.Module):
     r"""
     Define different GAN objectives for adversarial loss
+    The GANLoss class abstracts away the need to create the target label tensor
+    that has the same size as the input.
     https://arxiv.org/abs/1711.10337
     """
     def __init__(self, gan_type, real_label_val=1.0, fake_label_val=0.0):
+        ''' Initialize the GANLoss class.
+        Parameters:
+            gan_type (str)          -- the type of GAN objective. It currently 
+                                       supports vanilla, lsgan, hinge and wgangp.
+                                       vanilla GAN loss is the cross-entropy objective 
+                                       used in the original GAN paper.
+            real_label_val (bool)   -- label for a real image
+            fake_label_val (bool)   -- label of a fake image
+        
+        Note: Do not use sigmoid as the last layer of Discriminator.
+        LSGAN needs no sigmoid. vanilla GANs will handle it with BCEWithLogitsLoss.
+        '''
         super(GANLoss, self).__init__()
         self.gan_type = gan_type.lower()
         self.real_label_val = real_label_val
@@ -60,6 +74,14 @@ class GANLoss(nn.Module):
             raise NotImplementedError('GAN type [{:s}] is not implemented'.format(self.gan_type))
 
     def get_target_label(self, input, target_is_real):
+        """Create label tensors with the same size as the input.
+        Parameters:
+            input (tensor): typically the prediction from a discriminator
+            target_is_real (bool): if the ground truth label is for real 
+                images or fake images
+        Returns:
+            A label tensor filled with ground truth label, and with the size of the input
+        """
         if self.gan_type == 'wgan-gp':
             return target_is_real
         if target_is_real:
@@ -70,7 +92,7 @@ class GANLoss(nn.Module):
     def forward(self, input, target_is_real, is_disc = None):
         """Calculate loss given Discriminator's output and grount truth labels.
         Parameters:
-            input (tensor): tpyically the prediction output from a discriminator
+            input (tensor): typically the prediction output from a discriminator
             target_is_real (bool): if the ground truth label is for real images or fake images
             is_disc (bool): if the phase is for discriminator or not
         Returns:

@@ -2,15 +2,15 @@ import math
 import torch
 import torch.nn as nn
 #import torchvision
-#from . import block as B
+from . import block as B
 #from . import spectral_norm as SN
-import functools #for MSRResNet
-import torch.nn.functional as F #for MSRResNet
-import models.archs.arch_util as arch_util #for MSRResNet (need to check what is needed and where to add it)
+import functools
+import torch.nn.functional as F 
 
 
 ####################
-# SRResNet Generator
+# SRResNet Generator (original architecture)
+# Super-Resolution Residual Network
 ####################
 
 class SRResNet(nn.Module):
@@ -22,12 +22,12 @@ class SRResNet(nn.Module):
             n_upscale = 1
 
         fea_conv = B.conv_block(in_nc, nf, kernel_size=3, norm_type=None, act_type=None)
-        resnet_blocks = [B.ResNetBlock(nf, nf, nf, norm_type=norm_type, act_type=act_type,\
+        resnet_blocks = [ResNetBlock(nf, nf, nf, norm_type=norm_type, act_type=act_type,\
             mode=mode, res_scale=res_scale, convtype=convtype) for _ in range(nb)]
         LR_conv = B.conv_block(nf, nf, kernel_size=3, norm_type=norm_type, act_type=None, mode=mode)
 
         if upsample_mode == 'upconv':
-            upsample_block = B.upconv_blcok
+            upsample_block = B.upconv_block
         elif upsample_mode == 'pixelshuffle':
             upsample_block = B.pixelshuffle_block
         else:
@@ -58,17 +58,56 @@ class SRResNet(nn.Module):
             return torch.clamp(x, min=0.0, max=1.0)
         else: #Default, no cap for the output
             return x
-        
+
+class ResNetBlock(nn.Module):
+    '''
+    ResNet Block, 3-3 style
+    with extra residual scaling used in EDSR
+    (Enhanced Deep Residual Networks for Single Image Super-Resolution, CVPRW 17)
+    '''
+
+    def __init__(self, in_nc, mid_nc, out_nc, kernel_size=3, stride=1, dilation=1, groups=1, \
+            bias=True, pad_type='zero', norm_type=None, act_type='relu', mode='CNA', res_scale=1, convtype='Conv2D'):
+        super(ResNetBlock, self).__init__()
+        conv0 = B.conv_block(in_nc, mid_nc, kernel_size, stride, dilation, groups, bias, pad_type, \
+            norm_type, act_type, mode, convtype)
+        if mode == 'CNA':
+            act_type = None
+        if mode == 'CNAC':  # Residual path: |-CNAC-|
+            act_type = None
+            norm_type = None
+        conv1 = B.conv_block(mid_nc, out_nc, kernel_size, stride, dilation, groups, bias, pad_type, \
+            norm_type, act_type, mode, convtype)
+        # if in_nc != out_nc:
+        #     self.project = B.conv_block(in_nc, out_nc, 1, stride, dilation, 1, bias, pad_type, \
+        #         None, None)
+        #     print('Need a projecter in ResNetBlock.')
+        # else:
+        #     self.project = lambda x:x
+        self.res = B.sequential(conv0, conv1)
+        self.res_scale = res_scale
+
+    def forward(self, x):
+        res = self.res(x).mul(self.res_scale)
+        return x + res
+
+
+
+####################
+# SRResNet Generator (modified architecture)
+####################
+
+
 class MSRResNet(nn.Module):
-    ''' modified SRResNet, from the latest mmsr repo'''
+    ''' modified SRResNet'''
 
     def __init__(self, in_nc=3, out_nc=3, nf=64, nb=16, upscale=4):
         super(MSRResNet, self).__init__()
         self.upscale = upscale
 
         self.conv_first = nn.Conv2d(in_nc, nf, 3, 1, 1, bias=True)
-        basic_block = functools.partial(arch_util.ResidualBlock_noBN, nf=nf)
-        self.recon_trunk = arch_util.make_layer(basic_block, nb)
+        basic_block = functools.partial(ResidualBlock_noBN, nf=nf)
+        self.recon_trunk = B.make_layer(basic_block, nb)
 
         # upsampling
         if self.upscale == 2:
@@ -89,10 +128,9 @@ class MSRResNet(nn.Module):
         self.lrelu = nn.LeakyReLU(negative_slope=0.1, inplace=True)
 
         # initialization
-        arch_util.initialize_weights([self.conv_first, self.upconv1, self.HRconv, self.conv_last],
-                                     0.1)
+        B.default_init_weights([self.conv_first, self.upconv1, self.HRconv, self.conv_last], 0.1)
         if self.upscale == 4:
-            arch_util.initialize_weights(self.upconv2, 0.1)
+            B.default_init_weights(self.upconv2, 0.1)
 
     def forward(self, x):
         fea = self.lrelu(self.conv_first(x))
@@ -108,3 +146,36 @@ class MSRResNet(nn.Module):
         base = F.interpolate(x, scale_factor=self.upscale, mode='bilinear', align_corners=False)
         out += base
         return out
+
+class ResidualBlockNoBN(nn.Module):
+    """Residual block without BN.
+    It has a style of:
+        ---Conv-ReLU-Conv-+-
+         |________________|
+    Args:
+        mid_channels (int): Channel number of intermediate features.
+            Default: 64.
+    """
+
+    def __init__(self, mid_channels=64):
+        super(ResidualBlockNoBN, self).__init__()
+        self.conv1 = nn.Conv2d(mid_channels, mid_channels, 3, 1, 1, bias=True)
+        self.conv2 = nn.Conv2d(mid_channels, mid_channels, 3, 1, 1, bias=True)
+
+        self.relu = nn.ReLU(inplace=True)
+
+        self.init_weights()
+
+    def init_weights(self):
+        # Initialization methods like `kaiming_init` are for VGG-style
+        # modules. For modules with residual paths, using smaller std is
+        # better for stability and performance. We empirically use 0.1.
+        # See more details in "ESRGAN: Enhanced Super-Resolution Generative
+        # Adversarial Networks"
+        for m in [self.conv1, self.conv2]:
+            B.default_init_weights(m, 0.1)
+
+    def forward(self, x):
+        identity = x
+        out = self.conv2(self.relu(self.conv1(x)))
+        return identity + out

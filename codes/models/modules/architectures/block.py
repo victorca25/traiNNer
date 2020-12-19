@@ -104,14 +104,26 @@ def act(act_type, inplace=True, neg_slope=0.2, n_prelu=1, beta=1.0):
         raise NotImplementedError('activation layer [{:s}] is not found'.format(act_type))
     return layer
 
+class Identity(nn.Module):
+    def forward(self, x):
+        return x
 
 def norm(norm_type, nc):
-    # helper selecting normalization layer
+    """Return a normalization layer
+    Parameters:
+        norm_type (str) -- the name of the normalization layer: batch | instance | none
+    For BatchNorm, we use learnable affine parameters and track running statistics (mean/stddev).
+    For InstanceNorm, we do not use learnable affine parameters. We do not track running statistics.
+    """
     norm_type = norm_type.lower()
     if norm_type == 'batch':
         layer = nn.BatchNorm2d(nc, affine=True)
+        # norm_layer = functools.partial(nn.BatchNorm2d, affine=True, track_running_stats=True)
     elif norm_type == 'instance':
         layer = nn.InstanceNorm2d(nc, affine=False)
+        # norm_layer = functools.partial(nn.InstanceNorm2d, affine=False, track_running_stats=False)
+    elif norm_type == 'none':
+        def norm_layer(x): return Identity()
     else:
         raise NotImplementedError('normalization layer [{:s}] is not found'.format(norm_type))
     return layer
@@ -278,193 +290,6 @@ def default_init_weights(module_list, init_type='kaiming', scale=1, bias_fill=0,
                 raise NotImplementedError('initialization method [{:s}] not implemented'.format(init_type))
 
 
-####################
-# Useful blocks
-####################
-
-
-class ResNetBlock(nn.Module):
-    '''
-    ResNet Block, 3-3 style
-    with extra residual scaling used in EDSR
-    (Enhanced Deep Residual Networks for Single Image Super-Resolution, CVPRW 17)
-    '''
-
-    def __init__(self, in_nc, mid_nc, out_nc, kernel_size=3, stride=1, dilation=1, groups=1, \
-            bias=True, pad_type='zero', norm_type=None, act_type='relu', mode='CNA', res_scale=1, convtype='Conv2D'):
-        super(ResNetBlock, self).__init__()
-        conv0 = conv_block(in_nc, mid_nc, kernel_size, stride, dilation, groups, bias, pad_type, \
-            norm_type, act_type, mode, convtype)
-        if mode == 'CNA':
-            act_type = None
-        if mode == 'CNAC':  # Residual path: |-CNAC-|
-            act_type = None
-            norm_type = None
-        conv1 = conv_block(mid_nc, out_nc, kernel_size, stride, dilation, groups, bias, pad_type, \
-            norm_type, act_type, mode, convtype)
-        # if in_nc != out_nc:
-        #     self.project = conv_block(in_nc, out_nc, 1, stride, dilation, 1, bias, pad_type, \
-        #         None, None)
-        #     print('Need a projecter in ResNetBlock.')
-        # else:
-        #     self.project = lambda x:x
-        self.res = sequential(conv0, conv1)
-        self.res_scale = res_scale
-
-    def forward(self, x):
-        res = self.res(x).mul(self.res_scale)
-        return x + res
-
-
-class ResidualDenseBlock_5C(nn.Module):
-    '''
-    Residual Dense Block
-    style: 5 convs
-    The core module of paper: (Residual Dense Network for Image Super-Resolution, CVPR 18)
-    Modified options that can be used:
-        - "Partial Convolution based Padding" arXiv:1811.11718
-        - "Spectral normalization" arXiv:1802.05957
-        - "ICASSP 2020 - ESRGAN+ : Further Improving ESRGAN" N. C. 
-            {Rakotonirina} and A. {Rasoanaivo}
-    
-    Args:
-        nf (int): Channel number of intermediate features (num_feat).
-        gc (int): Channels for each growth (num_grow_ch: growth channel, 
-            i.e. intermediate channels).
-        convtype (str): the type of convolution to use. Default: 'Conv2D'
-        gaussian_noise (bool): enable the ESRGAN+ gaussian noise (no new 
-            trainable parameters)
-        plus (bool): enable the additional residual paths from ESRGAN+ 
-            (adds trainable parameters)
-    '''
-
-    def __init__(self, nf=64, kernel_size=3, gc=32, stride=1, bias=1, pad_type='zero', \
-            norm_type=None, act_type='leakyrelu', mode='CNA', convtype='Conv2D', \
-            spectral_norm=False, gaussian_noise=False, plus=False):
-        super(ResidualDenseBlock_5C, self).__init__()
-        
-        ## +
-        self.noise = GaussianNoise() if gaussian_noise else None
-        self.conv1x1 = conv1x1(nf, gc) if plus else None
-        ## +
-
-        self.conv1 = conv_block(nf, gc, kernel_size, stride, bias=bias, pad_type=pad_type, \
-            norm_type=norm_type, act_type=act_type, mode=mode, convtype=convtype, \
-            spectral_norm=spectral_norm)
-        self.conv2 = conv_block(nf+gc, gc, kernel_size, stride, bias=bias, pad_type=pad_type, \
-            norm_type=norm_type, act_type=act_type, mode=mode, convtype=convtype, \
-            spectral_norm=spectral_norm)
-        self.conv3 = conv_block(nf+2*gc, gc, kernel_size, stride, bias=bias, pad_type=pad_type, \
-            norm_type=norm_type, act_type=act_type, mode=mode, convtype=convtype, \
-            spectral_norm=spectral_norm)
-        self.conv4 = conv_block(nf+3*gc, gc, kernel_size, stride, bias=bias, pad_type=pad_type, \
-            norm_type=norm_type, act_type=act_type, mode=mode, convtype=convtype, \
-            spectral_norm=spectral_norm)
-        if mode == 'CNA':
-            last_act = None
-        else:
-            last_act = act_type
-        self.conv5 = conv_block(nf+4*gc, nf, 3, stride, bias=bias, pad_type=pad_type, \
-            norm_type=norm_type, act_type=last_act, mode=mode, convtype=convtype, \
-            spectral_norm=spectral_norm)
-
-    def forward(self, x):
-        x1 = self.conv1(x)
-        x2 = self.conv2(torch.cat((x, x1), 1))
-        if self.conv1x1:
-            x2 = x2 + self.conv1x1(x) #+
-        x3 = self.conv3(torch.cat((x, x1, x2), 1))
-        x4 = self.conv4(torch.cat((x, x1, x2, x3), 1))
-        if self.conv1x1:
-            x4 = x4 + x2 #+
-        x5 = self.conv5(torch.cat((x, x1, x2, x3, x4), 1))
-        if self.noise:
-            return self.noise(x5.mul(0.2) + x)
-        else:
-            return x5 * 0.2 + x
-
-class RRDB(nn.Module):
-    '''
-    Residual in Residual Dense Block
-    (ESRGAN: Enhanced Super-Resolution Generative Adversarial Networks)
-    '''
-
-    def __init__(self, nf, kernel_size=3, gc=32, stride=1, bias=1, pad_type='zero', \
-            norm_type=None, act_type='leakyrelu', mode='CNA', convtype='Conv2D', \
-            spectral_norm=False, gaussian_noise=False, plus=False):
-        super(RRDB, self).__init__()
-        self.RDB1 = ResidualDenseBlock_5C(nf, kernel_size, gc, stride, bias, pad_type, \
-                norm_type, act_type, mode, convtype, spectral_norm=spectral_norm, \
-                gaussian_noise=gaussian_noise, plus=plus)
-        self.RDB2 = ResidualDenseBlock_5C(nf, kernel_size, gc, stride, bias, pad_type, \
-                norm_type, act_type, mode, convtype, spectral_norm=spectral_norm, \
-                gaussian_noise=gaussian_noise, plus=plus)
-        self.RDB3 = ResidualDenseBlock_5C(nf, kernel_size, gc, stride, bias, pad_type, \
-                norm_type, act_type, mode, convtype, spectral_norm=spectral_norm, \
-                gaussian_noise=gaussian_noise, plus=plus)
-
-    def forward(self, x):
-        out = self.RDB1(x)
-        out = self.RDB2(out)
-        out = self.RDB3(out)
-        return out * 0.2 + x
-            
-
-
-#PPON
-class _ResBlock_32(nn.Module):
-    def __init__(self, nc=64):
-        super(_ResBlock_32, self).__init__()
-        self.c1 = conv_layer(nc, nc, 3, 1, 1)
-        self.d1 = conv_layer(nc, nc//2, 3, 1, 1)  # rate=1
-        self.d2 = conv_layer(nc, nc//2, 3, 1, 2)  # rate=2
-        self.d3 = conv_layer(nc, nc//2, 3, 1, 3)  # rate=3
-        self.d4 = conv_layer(nc, nc//2, 3, 1, 4)  # rate=4
-        self.d5 = conv_layer(nc, nc//2, 3, 1, 5)  # rate=5
-        self.d6 = conv_layer(nc, nc//2, 3, 1, 6)  # rate=6
-        self.d7 = conv_layer(nc, nc//2, 3, 1, 7)  # rate=7
-        self.d8 = conv_layer(nc, nc//2, 3, 1, 8)  # rate=8
-        self.act = act('lrelu')
-        self.c2 = conv_layer(nc * 4, nc, 1, 1, 1)  # 256-->64
-
-    def forward(self, input):
-        output1 = self.act(self.c1(input))
-        d1 = self.d1(output1)
-        d2 = self.d2(output1)
-        d3 = self.d3(output1)
-        d4 = self.d4(output1)
-        d5 = self.d5(output1)
-        d6 = self.d6(output1)
-        d7 = self.d7(output1)
-        d8 = self.d8(output1)
-
-        add1 = d1 + d2
-        add2 = add1 + d3
-        add3 = add2 + d4
-        add4 = add3 + d5
-        add5 = add4 + d6
-        add6 = add5 + d7
-        add7 = add6 + d8
-
-        combine = torch.cat([d1, add1, add2, add3, add4, add5, add6, add7], 1)
-        output2 = self.c2(self.act(combine))
-        output = input + output2.mul(0.2)
-
-        return output
-
-class RRBlock_32(nn.Module):
-    def __init__(self):
-        super(RRBlock_32, self).__init__()
-        self.RB1 = _ResBlock_32()
-        self.RB2 = _ResBlock_32()
-        self.RB3 = _ResBlock_32()
-
-    def forward(self, input):
-        out = self.RB1(input)
-        out = self.RB2(out)
-        out = self.RB3(out)
-        return out.mul(0.2) + input
-
 
 ####################
 # Upsampler
@@ -514,10 +339,14 @@ def pixelshuffle_block(in_nc, out_nc, upscale_factor=2, kernel_size=3, stride=1,
     a = act(act_type) if act_type else None
     return sequential(conv, pixel_shuffle, n, a)
 
-def upconv_blcok(in_nc, out_nc, upscale_factor=2, kernel_size=3, stride=1, bias=True, \
+def upconv_block(in_nc, out_nc, upscale_factor=2, kernel_size=3, stride=1, bias=True, \
                 pad_type='zero', norm_type=None, act_type='relu', mode='nearest', convtype='Conv2D'):
-    # Up conv
-    # described in https://distill.pub/2016/deconv-checkerboard/
+    '''
+    Upconv layer described in https://distill.pub/2016/deconv-checkerboard/
+    Example to replace deconvolutions: 
+        - from: nn.ConvTranspose2d(in_nc, out_nc, kernel_size=4, stride=2, padding=1)
+        - to: upconv_block(in_nc, out_nc,kernel_size=3, stride=1, act_type=None)
+    '''
     #upsample = nn.Upsample(scale_factor=upscale_factor, mode=mode)
     upsample = Upsample(scale_factor=upscale_factor, mode=mode) #Updated to prevent the "nn.Upsample is deprecated" Warning
     conv = conv_block(in_nc, out_nc, kernel_size, stride, bias=bias, \
@@ -591,3 +420,7 @@ class minibatch_std_concat_layer(nn.Module):
         vals = vals.expand(*target_shape)
         return torch.cat([x, vals], 1)
 
+
+####################
+# Useful blocks
+####################

@@ -648,10 +648,17 @@ class PreciseGeneratorLoss(nn.Module):
             self.loss_list.append(cri_fft)
 
     def forward(self, sr, hr, log_dict, fsfilter = None):
-        # make sure both sr and hr are not in float16, change to float32 (torch.float32/torch.float)
-        # in some cases could need torch.float64/torch.double
-        sr = sr.float()
-        hr = hr.float()
+        # make sure both sr and hr are not in float16 or int, change to float32 (torch.float32/torch.float)
+        # in some cases could even need torch.float64/torch.double, may have to add the case here
+        if sr.dtype == torch.float16 or sr.dtype == torch.int8 or sr.dtype == torch.int32:
+            sr = sr.float()
+        if hr.dtype == torch.float16 or hr.dtype == torch.int8 or hr.dtype == torch.int32:
+            hr = hr.float()
+        
+        assert sr.dtype == hr.dtype, \
+            'Error: SR and HR have different precision in precise losses: {} and {}'.format(sr.dtype, hr.dtype)
+        assert sr.type() == hr.type(), \
+            'Error: SR and HR are on different devices in precise losses: {} and {}'.format(sr.type(), hr.type())
         
         if fsfilter: #low-pass filter
             hr_f = fsfilter(hr)

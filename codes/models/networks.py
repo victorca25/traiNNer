@@ -128,6 +128,8 @@ def define_G(opt, step=0):
     gpu_ids = opt['gpu_ids']
     opt_net = opt['network_G']
     which_model = opt_net['which_model_G']
+    init_type = opt_net.get('init_type', 'kaiming')
+    init_scale = opt_net.get('init_scale', 0.1)
     
     if opt_net['net_act']: # If set, use a different activation function
         act_type = opt_net['net_act']
@@ -137,6 +139,8 @@ def define_G(opt, step=0):
         elif which_model == 'RRDB_net':
             act_type = 'leakyrelu'
         elif which_model == 'ppon':
+            act_type = 'leakyrelu'
+        else:
             act_type = 'leakyrelu'
     
     if which_model == 'sr_resnet':  # SRResNet
@@ -196,12 +200,24 @@ def define_G(opt, step=0):
         from models.modules.architectures import SRFlowNet_arch
         netG = SRFlowNet_arch.SRFlowNet(in_nc=opt_net['in_nc'], out_nc=opt_net['out_nc'],
                 nf=opt_net['nf'], nb=opt_net['nb'], scale=opt['scale'], K=opt_net['flow']['K'], opt=opt, step=step)
+    elif which_model == 'unet_net':
+        from models.modules.architectures import UNet_arch
+        netG = UNet_arch.UnetGenerator(input_nc=opt_net['in_nc'], output_nc=opt_net['out_nc'], 
+                            num_downs=opt_net['num_downs'], ngf=opt_net['ngf'], 
+                            norm_type=opt_net['norm_type'], use_dropout=opt_net['use_dropout'],
+                            upsample_mode=opt_net['upsample_mode'])
+    elif which_model == 'resnet_net':
+        from models.modules.architectures import ResNet_arch
+        netG = ResNet_arch.ResnetGenerator(input_nc=opt_net['in_nc'], output_nc=opt_net['out_nc'], 
+                            n_blocks=opt_net['n_blocks'], ngf=opt_net['ngf'], 
+                            norm_type=opt_net['norm_type'], use_dropout=opt_net['use_dropout'],
+                            upsample_mode=opt_net['upsample_mode'])
     else:
         raise NotImplementedError('Generator model [{:s}] not recognized'.format(which_model))
 
     if opt['is_train'] and which_model != 'MRRDB_net':
         # Note: MRRDB_net initializes the modules during init, no need to initialize again here
-        init_weights(netG, init_type='kaiming', scale=0.1)
+        init_weights(netG, init_type=init_type, scale=init_scale)
     if gpu_ids:
         assert torch.cuda.is_available()
         netG = nn.DataParallel(netG)
@@ -236,6 +252,8 @@ def define_D(opt):
     opt_net = opt['network_D']
     which_model = opt_net['which_model_D']
     which_model_G = opt_net['which_model_G']
+    init_type = opt_net.get('init_type', 'kaiming')
+    init_scale = opt_net.get('init_scale', 1)
     
     if which_model_G == 'ppon':
         model_G = 'PPON'
@@ -319,7 +337,7 @@ def define_D(opt):
         except ValueError:
             raise ValueError('VGG Discriminator size [{:s}] could not be parsed.'.format(vgg_size))
     #"""
-    init_weights(netD, init_type='kaiming', scale=1)
+    init_weights(netD, init_type=init_type, scale=init_scale)
     if gpu_ids:
         netD = nn.DataParallel(netD)
     return netD
