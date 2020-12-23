@@ -47,10 +47,6 @@ class RRDBNet(nn.Module):
 
     def forward(self, x, outm=None):
         x = self.model(x)
-        if x.ndim == 5:
-            m, c, d, h, w = x.shape
-            idx_center = (d - 1) // 2
-            x = x[:, :, idx_center:idx_center+1, :, :]
         
         if outm=='scaltanh': # limit output range to [-1,1] range with tanh and rescale to [0,1] Idea from: https://github.com/goldhuang/SRGAN-PyTorch/blob/master/model.py
             return(torch.tanh(x) + 1.0) / 2.0

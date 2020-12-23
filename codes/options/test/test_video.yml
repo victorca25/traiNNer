@@ -47,6 +47,12 @@ network_G:
   # sr_sa: true # for pan
   # sr_upinter_mode: nearest # for pan
 
+  # 3DSR:
+  # which_model_G: sr3d_net
+  # nf: 64 # of discrim filters
+  # in_nc: 3 # of input image channels: 3 for RGB and 1 for grayscale
+  # out_nc: 3 # of output image channels: 3 for RGB and 1 for grayscale
+
   # EVSRGAN:
   # which_model_G: RRDB_net # RRDB_net (original ESRGAN arch)
   # norm_type: null
