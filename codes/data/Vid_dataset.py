@@ -293,7 +293,8 @@ class VidTrainsetLoader(Dataset):
             LR_bicubic = []
             HR_center = []
         else:
-            HR_center = HR[idx_center,:,:,:]
+            
+            HR_center = HR[:,idx_center,:,:] if self.shape == 'CTHW' else HR[idx_center,:,:,:]
             LR_bicubic = []
 
         # return toTensor(LR), toTensor(HR)
