@@ -199,7 +199,10 @@ class VSRModel(BaseModel):
             b, n_frames, h_lr, w_lr = data['LR'].size()
             LR = data['LR'].view(b, -1, 1, h_lr, w_lr) # b, t, c, h, w
         elif len(data['LR'].size()) == 5: #for networks that work with 3 channel images
-            _, n_frames, _, _, _ = data['LR'].size()
+            if self.tensor_shape == 'CTHW':
+                _, _, n_frames, _, _ = data['LR'].size()
+            else:
+                _, n_frames, _, _, _ = data['LR'].size()
             LR = data['LR'] # b, t, c, h, w
 
         self.idx_center = (n_frames - 1) // 2
