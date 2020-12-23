@@ -48,6 +48,7 @@ class VSRModel(BaseModel):
         super(VSRModel, self).__init__(opt)
         train_opt = opt['train']
         self.scale = opt.get('scale', 4)
+        self.tensor_shape = opt.get('tensor_shape', 'TCHW')
 
         # set if data should be normalized (-1,1) or not (0,1)
         if self.is_train:
@@ -198,7 +199,10 @@ class VSRModel(BaseModel):
             b, n_frames, h_lr, w_lr = data['LR'].size()
             LR = data['LR'].view(b, -1, 1, h_lr, w_lr) # b, t, c, h, w
         elif len(data['LR'].size()) == 5: #for networks that work with 3 channel images
-            _, n_frames, _, _, _ = data['LR'].size()
+            if self.tensor_shape == 'CTHW':
+                _, _, n_frames, _, _ = data['LR'].size()
+            else:
+                _, n_frames, _, _, _ = data['LR'].size()
             LR = data['LR'] # b, t, c, h, w
 
         self.idx_center = (n_frames - 1) // 2
@@ -259,7 +263,9 @@ class VSRModel(BaseModel):
         ### Network forward, generate SR
         with self.cast():
             # inference
-            flow_L1, flow_L2, flow_L3, self.fake_H = self.netG(self.var_L)
+            self.fake_H = self.netG(self.var_L)
+            if len(self.fake_H) == 4:
+                flow_L1, flow_L2, flow_L3, self.fake_H = self.fake_H
         #/with self.cast():
 
         # batch (mixup) augmentations
@@ -305,7 +311,8 @@ class VSRModel(BaseModel):
                     # tmp_vis(centralHR)
                 else: #if self.var_L.shape[2] == 1:
                     centralSR = self.fake_H
-                    centralHR = self.var_H[:, self.idx_center, :, :, :]
+                    centralSR = centralSR[:, :, 0, :, :] if centralSR.ndim == 5 else centralSR
+                    centralHR = self.var_H[:, :, self.idx_center, :, :] if self.tensor_shape == 'CTHW' else self.var_H[:, self.idx_center, :, :, :]
                 
                 # regular losses
                 # loss_SR = criterion(self.fake_H, self.var_H[:, idx_center, :, :, :]) #torch.nn.MSELoss()
@@ -412,10 +419,14 @@ class VSRModel(BaseModel):
         self.netG.eval()
         with torch.no_grad():
             if self.is_train:
-                _, _, _, self.fake_H = self.netG(self.var_L)
+                self.fake_H = self.netG(self.var_L)
+                if len(self.fake_H) == 4:
+                    _, _, _, self.fake_H = self.fake_H
             else:
                 #self.fake_H = self.netG(self.var_L, isTest=True)
-                _, _, _, self.fake_H = self.netG(self.var_L)
+                self.fake_H = self.netG(self.var_L)
+                if len(self.fake_H) == 4:
+                    _, _, _, self.fake_H = self.fake_H
         self.netG.train()
 
     def get_current_log(self):

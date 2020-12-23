@@ -20,11 +20,11 @@ class RRDBNet(nn.Module):
         if upscale == 3:
             n_upscale = 1
 
-        fea_conv = B.conv_block(in_nc, nf, kernel_size=3, norm_type=None, act_type=None)
+        fea_conv = B.conv_block(in_nc, nf, kernel_size=3, norm_type=None, act_type=None, convtype=convtype)
         rb_blocks = [RRDB(nf, kernel_size=3, gc=32, stride=1, bias=1, pad_type='zero', \
             norm_type=norm_type, act_type=act_type, mode='CNA', convtype=convtype, \
             gaussian_noise=gaussian_noise, plus=plus) for _ in range(nb)]
-        LR_conv = B.conv_block(nf, nf, kernel_size=3, norm_type=norm_type, act_type=None, mode=mode)
+        LR_conv = B.conv_block(nf, nf, kernel_size=3, norm_type=norm_type, act_type=None, mode=mode, convtype=convtype)
 
         if upsample_mode == 'upconv':
             upsample_block = B.upconv_block
@@ -33,11 +33,11 @@ class RRDBNet(nn.Module):
         else:
             raise NotImplementedError('upsample mode [{:s}] is not found'.format(upsample_mode))
         if upscale == 3:
-            upsampler = upsample_block(nf, nf, 3, act_type=act_type)
+            upsampler = upsample_block(nf, nf, 3, act_type=act_type, convtype=convtype)
         else:
-            upsampler = [upsample_block(nf, nf, act_type=act_type) for _ in range(n_upscale)]
-        HR_conv0 = B.conv_block(nf, nf, kernel_size=3, norm_type=None, act_type=act_type)
-        HR_conv1 = B.conv_block(nf, out_nc, kernel_size=3, norm_type=None, act_type=None)
+            upsampler = [upsample_block(nf, nf, act_type=act_type, convtype=convtype) for _ in range(n_upscale)]
+        HR_conv0 = B.conv_block(nf, nf, kernel_size=3, norm_type=None, act_type=act_type, convtype=convtype)
+        HR_conv1 = B.conv_block(nf, out_nc, kernel_size=3, norm_type=None, act_type=None, convtype=convtype)
 
         # Note: this option adds new parameters to the architecture, another option is to use "outm" in the forward
         outact = B.act(finalact) if finalact else None
@@ -47,6 +47,10 @@ class RRDBNet(nn.Module):
 
     def forward(self, x, outm=None):
         x = self.model(x)
+        if x.ndim == 5:
+            m, c, d, h, w = x.shape
+            idx_center = (d - 1) // 2
+            x = x[:, :, idx_center:idx_center+1, :, :]
         
         if outm=='scaltanh': # limit output range to [-1,1] range with tanh and rescale to [0,1] Idea from: https://github.com/goldhuang/SRGAN-PyTorch/blob/master/model.py
             return(torch.tanh(x) + 1.0) / 2.0
