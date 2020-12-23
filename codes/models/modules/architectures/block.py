@@ -130,8 +130,10 @@ def norm(norm_type, nc):
 
 
 def pad(pad_type, padding):
-    # helper selecting padding layer
-    # if padding is 'zero', do by conv layers
+    '''
+    helper selecting padding layer
+    if padding is 'zero', can be done with conv layers
+    '''
     pad_type = pad_type.lower()
     if padding == 0:
         return None
@@ -139,6 +141,8 @@ def pad(pad_type, padding):
         layer = nn.ReflectionPad2d(padding)
     elif pad_type == 'replicate':
         layer = nn.ReplicationPad2d(padding)
+    elif pad_type == 'zero':
+        PadLayer = nn.ZeroPad2d(padding)
     else:
         raise NotImplementedError('padding layer [{:s}] is not implemented'.format(pad_type))
     return layer

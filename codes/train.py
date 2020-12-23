@@ -197,7 +197,7 @@ def main():
                         # save single images or lr / sr comparison
                         if opt['train']['val_comparison']:
                             lr_img = tensor2np(visuals['LR'], denormalize=opt['datasets']['train']['znorm'])
-                            util.save_img_comp(lr_img, sr_img, save_img_path)
+                            util.save_img_comp([lr_img, sr_img], save_img_path)
                         else:
                             util.save_img(sr_img, save_img_path)
 
@@ -230,7 +230,7 @@ def main():
                     
                     # # reset time for next iteration to skip the validation time from calculation
                     # t0 = time.time()
-
+                
                 if current_step % opt['logger']['print_freq'] == 0 and take_step or \
                     (val_loader and current_step % opt['train']['val_freq'] == 0 and take_step):
                     # reset time for next iteration to skip the validation time from calculation

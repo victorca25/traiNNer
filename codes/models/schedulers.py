@@ -24,7 +24,7 @@ def get_schedulers(optimizers=None, schedulers=None, train_opt=None):
         if train_opt['lr_scheme'] == 'Linear':
             def lambda_rule(epoch):
                 lr_l = 1.0 - max(0, epoch + 1 - train_opt['fixed_niter']) / float(train_opt['niter_decay'] + 1)
-                return lr_l
+                return max(0, lr_l) # make sure lr is always >= 0
 
             sched = lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda_rule)
 

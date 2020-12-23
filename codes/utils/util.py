@@ -68,7 +68,28 @@ def sorted_nicely( l ):
 def save_img(img, img_path, mode='RGB'):
     cv2.imwrite(img_path, img)
 
-def save_img_comp(lr_img, sr_img, img_path, mode='RGB'):
-    lr_resized = cv2.resize(lr_img, (sr_img.shape[1], sr_img.shape[0]), interpolation=cv2.INTER_NEAREST)
-    comparison = cv2.hconcat([lr_resized, sr_img])
+def merge_imgs(img_list):
+    if isinstance(img_list, list):
+        img_h = 0
+        img_v = 0
+        for img in img_list:
+            if img.shape[0] > img_v:
+                img_h = img.shape[0]
+            if img.shape[1] > img_v:
+                img_v = img.shape[1]
+
+        img_list_res = []
+        for img in img_list:
+            if img.shape[1] < img_v or img.shape[0] > img_v:
+                img_res = cv2.resize(img, (img_v, img_h), interpolation=cv2.INTER_NEAREST)
+                img_list_res.append(img_res)
+            else:
+                img_list_res.append(img)
+        
+        return cv2.hconcat(img_list_res)
+
+def save_img_comp(img_list, img_path, mode='RGB'):
+    # lr_resized = cv2.resize(lr_img, (sr_img.shape[1], sr_img.shape[0]), interpolation=cv2.INTER_NEAREST)
+    # comparison = cv2.hconcat([lr_resized, sr_img])
+    comparison = merge_imgs(img_list)
     save_img(img=comparison, img_path=img_path, mode=mode)
