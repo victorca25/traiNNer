@@ -66,9 +66,16 @@ def sorted_nicely( l ):
     return sorted(l, key = alphanum_key)
 
 def save_img(img, img_path, mode='RGB'):
+    '''
+    Save a single image to the defined path
+    '''
     cv2.imwrite(img_path, img)
 
 def merge_imgs(img_list):
+    '''
+    Auxiliary function to horizontally concatenate images in
+        a list using cv2.hconcat
+    '''
     if isinstance(img_list, list):
         img_h = 0
         img_v = 0
@@ -80,15 +87,23 @@ def merge_imgs(img_list):
 
         img_list_res = []
         for img in img_list:
-            if img.shape[1] < img_v or img.shape[0] > img_v:
+            if img.shape[1] < img_v or img.shape[0] < img_h:
                 img_res = cv2.resize(img, (img_v, img_h), interpolation=cv2.INTER_NEAREST)
                 img_list_res.append(img_res)
             else:
                 img_list_res.append(img)
         
         return cv2.hconcat(img_list_res)
+    elif isinstance(img_list, np.ndarray):
+        return img_list
+    else:
+        raise NotImplementedError('To merge images img_list should be a list of cv2 images.')
 
 def save_img_comp(img_list, img_path, mode='RGB'):
+    '''
+    Create a side by side comparison of multiple images in a list
+        to save to a defined path
+    '''
     # lr_resized = cv2.resize(lr_img, (sr_img.shape[1], sr_img.shape[0]), interpolation=cv2.INTER_NEAREST)
     # comparison = cv2.hconcat([lr_resized, sr_img])
     comparison = merge_imgs(img_list)
