@@ -216,6 +216,9 @@ def conv_block(in_nc, out_nc, kernel_size, stride=1, dilation=1, groups=1, bias=
     if convtype=='PartialConv2D':
         c = PartialConv2d(in_nc, out_nc, kernel_size=kernel_size, stride=stride, padding=padding, \
                dilation=dilation, bias=bias, groups=groups)
+    elif convtype=='Conv3D':
+        c = nn.Conv3d(in_nc, out_nc, kernel_size=kernel_size, stride=stride, padding=padding, \
+                dilation=dilation, bias=bias, groups=groups)
     else: #default case is standard 'Conv2D':
         c = nn.Conv2d(in_nc, out_nc, kernel_size=kernel_size, stride=stride, padding=padding, \
                 dilation=dilation, bias=bias, groups=groups) #normal conv2d
@@ -348,6 +351,7 @@ def upconv_block(in_nc, out_nc, upscale_factor=2, kernel_size=3, stride=1, bias=
         - to: upconv_block(in_nc, out_nc,kernel_size=3, stride=1, act_type=None)
     '''
     #upsample = nn.Upsample(scale_factor=upscale_factor, mode=mode)
+    upscale_factor = (1, upscale_factor, upscale_factor) if convtype == 'Conv3D' else upscale_factor
     upsample = Upsample(scale_factor=upscale_factor, mode=mode) #Updated to prevent the "nn.Upsample is deprecated" Warning
     conv = conv_block(in_nc, out_nc, kernel_size, stride, bias=bias, \
                         pad_type=pad_type, norm_type=norm_type, act_type=act_type, convtype=convtype)

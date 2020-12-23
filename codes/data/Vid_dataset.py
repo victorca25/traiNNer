@@ -27,6 +27,7 @@ class VidTrainsetLoader(Dataset):
         self.srcolors = opt.get('srcolors', None)
         self.otf_noise = opt.get('lr_noise', None) or opt.get('lr_blur', None)
         self.y_only = opt.get('y_only', True)
+        self.shape = opt.get('tensor_shape', 'TCHW')
 
         assert self.num_frames % 2 == 1, (
             f'num_frame must be an odd number, but got {self.num_frames}')
@@ -269,9 +270,10 @@ class VidTrainsetLoader(Dataset):
         #     HR = HR.view(c,t,HR_size,HR_size) # Tensor, [C,T,H,W]
         if not self.y_only:
             HR = HR.view(c,t,HR_size,HR_size) # Tensor, [C,T,H,W]
-            HR = HR.transpose(0,1) # Tensor, [T,C,H,W]
             LR = LR.view(c,t,LR_size,LR_size) # Tensor, [C,T,H,W]
-            LR = LR.transpose(0,1) # Tensor, [T,C,H,W]
+            if self.shape == 'TCHW':
+                HR = HR.transpose(0,1) # Tensor, [T,C,H,W]
+                LR = LR.transpose(0,1) # Tensor, [T,C,H,W]
 
         # generate Cr, Cb channels using bicubic interpolation
         #TODO: check, it might be easier to return the whole image and separate later when needed
@@ -310,6 +312,7 @@ class VidTestsetLoader(Dataset):
         self.num_frames  = opt.get('num_frames', 3)
         self.srcolors = opt.get('srcolors', None)
         self.y_only = opt.get('y_only', True)
+        self.shape = opt.get('tensor_shape', 'TCHW')
 
         assert self.num_frames % 2 == 1, (
             f'num_frame must be an odd number, but got {self.num_frames}')
@@ -418,7 +421,8 @@ class VidTestsetLoader(Dataset):
         else:
             LR = util.np2tensor(LR, normalize=znorm, bgr2rgb=True, add_batch=False) # Tensor, [CT',H',W'] or [T, H, W]
             LR = LR.view(c,t,h_LR,w_LR) # Tensor, [C,T,H,W]
-            LR = LR.transpose(0,1) # Tensor, [T,C,H,W]
+            if self.shape == 'TCHW':
+                LR = LR.transpose(0,1) # Tensor, [T,C,H,W]
 
         if self.y_only and self.srcolors:
             # generate Cr, Cb channels using bicubic interpolation

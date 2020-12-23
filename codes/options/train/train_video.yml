@@ -27,6 +27,7 @@ datasets:
     max_frameskip: 3 # if training data FPS is higher than inference data, introduce random frameskip between 1 and max_frameskip
     srcolors: true # enable to be able to use losses that need 3 channels (feature losses, CX, etc), otherwise training only with Y channel
     y_only: false #true
+    # tensor_shape: CTHW # TCHW (SOFVSR), CTHW (EVSRGAN)
 
     # If manually configuring on the fly generation of LR: (else, it will automatically default to Matlab-like downscale algorithm (777) when/if required
     dataroot_kernels: '../training/kernels/results/' # location of the image kernels extracted with KernelGAN, for use with the "realistic" downscale type
@@ -68,6 +69,22 @@ network_G:
     sr_plus: false # for rrdb
     # sr_sa: true # for pan
     # sr_upinter_mode: nearest # for pan
+
+    # EVSRGAN:
+    # which_model_G: RRDB_net # RRDB_net (original ESRGAN arch)
+    # norm_type: null
+    # mode: CNA
+    # nf: 64 # of discrim filters in the first conv layer
+    # nb: 23
+    # in_nc: 3 # of input image channels: 3 for RGB and 1 for grayscale
+    # out_nc: 3 # of output image channels: 3 for RGB and 1 for grayscale
+    # gc: 32
+    # group: 1
+    # convtype: Conv3D
+    # net_act: leakyrelu # swish | leakyrelu
+    # gaussian: true # true | false
+    # plus: false # true | false
+    # ##finalact: tanh # Test. Activation function to make outputs fit in [-1, 1] range. Default = None. Coordinate with znorm.
     
 # Discriminator options:
 network_D:

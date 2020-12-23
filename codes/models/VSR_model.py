@@ -259,7 +259,9 @@ class VSRModel(BaseModel):
         ### Network forward, generate SR
         with self.cast():
             # inference
-            flow_L1, flow_L2, flow_L3, self.fake_H = self.netG(self.var_L)
+            inference = self.netG(self.var_L)
+            if len(inference) == 4:
+                flow_L1, flow_L2, flow_L3, self.fake_H = inference
         #/with self.cast():
 
         # batch (mixup) augmentations
@@ -305,6 +307,7 @@ class VSRModel(BaseModel):
                     # tmp_vis(centralHR)
                 else: #if self.var_L.shape[2] == 1:
                     centralSR = self.fake_H
+                    self.fake_H = self.fake_H[:, :, 0, :, :] if self.fake_H.ndim == 5 else self.fake_H
                     centralHR = self.var_H[:, self.idx_center, :, :, :]
                 
                 # regular losses
@@ -412,10 +415,14 @@ class VSRModel(BaseModel):
         self.netG.eval()
         with torch.no_grad():
             if self.is_train:
-                _, _, _, self.fake_H = self.netG(self.var_L)
+                inference = self.netG(self.var_L)
+                if len(inference) == 4:
+                    _, _, _, self.fake_H = inference
             else:
                 #self.fake_H = self.netG(self.var_L, isTest=True)
-                _, _, _, self.fake_H = self.netG(self.var_L)
+                inference = self.netG(self.var_L)
+                if len(inference) == 4:
+                    _, _, _, self.fake_H = inference
         self.netG.train()
 
     def get_current_log(self):
