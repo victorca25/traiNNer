@@ -194,9 +194,9 @@ def define_G(opt, step=0):
                                   sr_plus=opt_net.get('sr_plus', False), sr_sa=opt_net.get('sr_sa', True),
                                   sr_upinter_mode=opt_net.get('sr_upinter_mode', 'nearest'))
     elif which_model == 'sr3d_net':
-        from models.modules.architectures import SR3D_arch
-        netG = SR3D_arch.SR3D(scale=opt['scale'], in_nc=opt_net['in_nc'], out_nc=opt_net['out_nc'], 
-                              nf=opt_net['nf'])
+        from models.modules.architectures import SR3DNet_arch
+        netG = SR3DNet_arch.SR3DNet(scale=opt['scale'], in_nc=opt_net['in_nc'], out_nc=opt_net['out_nc'], 
+                                    nf=opt_net['nf'])
     elif which_model == 'rife_net':
         from models.modules.architectures import RIFE_arch
         netG = RIFE_arch.RIFE()

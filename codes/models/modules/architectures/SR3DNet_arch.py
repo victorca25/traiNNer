@@ -90,8 +90,8 @@ class SR3DNet(nn.Module):
 
         conv1 = self.lrelu(self.conv_input(x))
         conv2 = self.lrelu(self.conv_c(conv1)) + conv1
-        conv3 = self.lrelu(self.conv_c(conv2)) + conv2
-        conv4 = self.lrelu(self.conv_c(conv3)) + conv3
+        conv3 = self.lrelu(self.conv_c(conv2)) + conv1 + conv2
+        conv4 = self.lrelu(self.conv_c(conv3)) + conv1 + conv2 + conv3
         conv5 = self.lrelu(self.conv_c2(conv4))
         # print("conv5:",conv5.shape)
         conv6 = self.lrelu(self.scalec(conv5))

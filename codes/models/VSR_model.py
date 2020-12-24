@@ -48,7 +48,7 @@ class VSRModel(BaseModel):
         super(VSRModel, self).__init__(opt)
         train_opt = opt['train']
         self.scale = opt.get('scale', 4)
-        self.tensor_shape = opt.get('tensor_shape', 'TCHW')
+        self.tensor_shape = opt['datasets']['train'].get('tensor_shape', 'TCHW')
 
         # set if data should be normalized (-1,1) or not (0,1)
         if self.is_train:
@@ -200,10 +200,10 @@ class VSRModel(BaseModel):
             LR = data['LR'].view(b, -1, 1, h_lr, w_lr) # b, t, c, h, w
         elif len(data['LR'].size()) == 5: #for networks that work with 3 channel images
             if self.tensor_shape == 'CTHW':
-                _, _, n_frames, _, _ = data['LR'].size()
-            else:
-                _, n_frames, _, _, _ = data['LR'].size()
-            LR = data['LR'] # b, t, c, h, w
+                _, _, n_frames, _, _ = data['LR'].size() # b, c, t, h, w
+            else: # TCHW
+                _, n_frames, _, _, _ = data['LR'].size() # b, t, c, h, w
+            LR = data['LR']
 
         self.idx_center = (n_frames - 1) // 2
         self.n_frames = n_frames
@@ -264,7 +264,7 @@ class VSRModel(BaseModel):
         with self.cast():
             # inference
             self.fake_H = self.netG(self.var_L)
-            if len(self.fake_H) == 4:
+            if not isinstance(self.fake_H, torch.Tensor) and len(self.fake_H) == 4:
                 flow_L1, flow_L2, flow_L3, self.fake_H = self.fake_H
         #/with self.cast():
 
@@ -311,7 +311,6 @@ class VSRModel(BaseModel):
                     # tmp_vis(centralHR)
                 else: #if self.var_L.shape[2] == 1:
                     centralSR = self.fake_H
-                    centralSR = centralSR[:, :, 0, :, :] if centralSR.ndim == 5 else centralSR
                     centralHR = self.var_H[:, :, self.idx_center, :, :] if self.tensor_shape == 'CTHW' else self.var_H[:, self.idx_center, :, :, :]
                 
                 # regular losses
