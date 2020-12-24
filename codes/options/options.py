@@ -183,6 +183,10 @@ def parse(opt_path, is_train=True):
         
         if dataset.get('hr_noise_types', None) and dataset.get('hr_noise', None):
             dataset['hr_noise_types'] = parse2lists(dataset['hr_noise_types'])
+        
+        tensor_shape = dataset.get('tensor_shape', None)
+        if tensor_shape:
+            opt['tensor_shape'] = tensor_shape
 
     # path
     for key, path in opt['path'].items():

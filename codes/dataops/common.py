@@ -443,7 +443,7 @@ def np2tensor(img, bgr2rgb=True, data_range=1., normalize=False, change_range=Tr
     img = torch.from_numpy(np.ascontiguousarray(np.transpose(img, (2, 0, 1)))).float() #"HWC to CHW" and "numpy to tensor"
     if bgr2rgb:
         #BGR to RGB -> in tensor, if using OpenCV, else not needed. Only if image has colors.)
-        if img.shape[0] == 3 or img.shape[0] == 9: #RGB or 3xRGB
+        if img.shape[0] % 3 == 0: #RGB or MultixRGB (3xRGB, 5xRGB, etc. For video tensors.)
             img = bgr_to_rgb(img)
         elif img.shape[0] == 4: #RGBA
             img = bgra_to_rgba(img)

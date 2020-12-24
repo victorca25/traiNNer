@@ -48,7 +48,7 @@ class VSRModel(BaseModel):
         super(VSRModel, self).__init__(opt)
         train_opt = opt['train']
         self.scale = opt.get('scale', 4)
-        self.tensor_shape = opt['datasets']['train'].get('tensor_shape', 'TCHW')
+        self.tensor_shape = opt.get('tensor_shape', 'TCHW')
 
         # set if data should be normalized (-1,1) or not (0,1)
         if self.is_train:
@@ -313,6 +313,8 @@ class VSRModel(BaseModel):
                     centralSR = self.fake_H
                     centralHR = self.var_H[:, :, self.idx_center, :, :] if self.tensor_shape == 'CTHW' else self.var_H[:, self.idx_center, :, :, :]
                 
+                # tmp_vis(torch.cat((centralSR, centralHR), -1))
+
                 # regular losses
                 # loss_SR = criterion(self.fake_H, self.var_H[:, idx_center, :, :, :]) #torch.nn.MSELoss()
                 loss_results, self.log_dict = self.generatorlosses(centralSR, 

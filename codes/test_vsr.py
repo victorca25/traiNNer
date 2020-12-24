@@ -176,8 +176,6 @@ def main():
                     sr_img = ycbcr_to_rgb(torch.stack((visuals['SR'], SR_cb, SR_cr), -3))
                 else:
                     sr_img = visuals['SR']
-                    if test_loader.dataset.opt.get('tensor_shape', 'TCHW') == 'CTHW':
-                        sr_img = sr_img.squeeze()
             
             #if znorm the image range is [-1,1], Default: Image range is [0,1] # testing, each "dataset" can have a different name (not train, val or other)
             sr_img = tensor2np(sr_img, denormalize=znorm)  # uint8
