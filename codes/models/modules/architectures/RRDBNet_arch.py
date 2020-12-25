@@ -87,14 +87,13 @@ class RRDB(nn.Module):
 
     def forward(self, x):
         out = x
-        out = out.to(torch.device('cuda'))
         if hasattr(self, 'RDB1'):
             out = self.RDB1(out)
             out = self.RDB2(out)
             out = self.RDB3(out)
         else:
             for RDB in self.RDBs:
-                RDB = RDB.to(torch.device('cuda'))
+                RDB = RDB.to(x.device)
                 out = RDB(out)
         return out * 0.2 + x
 
