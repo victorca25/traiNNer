@@ -115,8 +115,9 @@
     "which_model_G": "RRDB_net" // RRDB_net (original ESRGAN arch) | MRRDB_net (modified/"new" arch) | sr_resnet
     , "norm_type": null
     , "mode": "CNA"
-    , "nf": 64 //# of discrim filters in the first conv layer
-    , "nb": 23
+    , "nf": 64 // number of discrim filters in the first conv layer
+    , "nb": 23 // number of RRDB blocks
+    , "nr": 3 //  number of residual layers in each RRDB block
     , "in_nc": 3 //# of input image channels: 3 for RGB and 1 for grayscale
     , "out_nc": 3 //# of output image channels: 3 for RGB and 1 for grayscale
     , "gc": 32

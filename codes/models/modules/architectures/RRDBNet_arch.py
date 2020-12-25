@@ -12,7 +12,7 @@ import functools
 ####################
 
 class RRDBNet(nn.Module):
-    def __init__(self, in_nc, out_nc, nf, nb, gc=32, upscale=4, norm_type=None, \
+    def __init__(self, in_nc, out_nc, nf, nb, nr=3, gc=32, upscale=4, norm_type=None, \
             act_type='leakyrelu', mode='CNA', upsample_mode='upconv', convtype='Conv2D', \
             finalact=None, gaussian_noise=False, plus=False):
         super(RRDBNet, self).__init__()
@@ -21,7 +21,7 @@ class RRDBNet(nn.Module):
             n_upscale = 1
 
         fea_conv = B.conv_block(in_nc, nf, kernel_size=3, norm_type=None, act_type=None, convtype=convtype)
-        rb_blocks = [RRDB(nf, kernel_size=3, gc=32, stride=1, bias=1, pad_type='zero', \
+        rb_blocks = [RRDB(nf, nr, kernel_size=3, gc=32, stride=1, bias=1, pad_type='zero', \
             norm_type=norm_type, act_type=act_type, mode='CNA', convtype=convtype, \
             gaussian_noise=gaussian_noise, plus=plus) for _ in range(nb)]
         LR_conv = B.conv_block(nf, nf, kernel_size=3, norm_type=norm_type, act_type=None, mode=mode, convtype=convtype)
@@ -65,24 +65,35 @@ class RRDB(nn.Module):
     (ESRGAN: Enhanced Super-Resolution Generative Adversarial Networks)
     '''
 
-    def __init__(self, nf, kernel_size=3, gc=32, stride=1, bias=1, pad_type='zero', \
+    def __init__(self, nf, nr=3, kernel_size=3, gc=32, stride=1, bias=1, pad_type='zero', \
             norm_type=None, act_type='leakyrelu', mode='CNA', convtype='Conv2D', \
             spectral_norm=False, gaussian_noise=False, plus=False):
         super(RRDB, self).__init__()
-        self.RDB1 = ResidualDenseBlock_5C(nf, kernel_size, gc, stride, bias, pad_type, \
-                norm_type, act_type, mode, convtype, spectral_norm=spectral_norm, \
-                gaussian_noise=gaussian_noise, plus=plus)
-        self.RDB2 = ResidualDenseBlock_5C(nf, kernel_size, gc, stride, bias, pad_type, \
-                norm_type, act_type, mode, convtype, spectral_norm=spectral_norm, \
-                gaussian_noise=gaussian_noise, plus=plus)
-        self.RDB3 = ResidualDenseBlock_5C(nf, kernel_size, gc, stride, bias, pad_type, \
-                norm_type, act_type, mode, convtype, spectral_norm=spectral_norm, \
-                gaussian_noise=gaussian_noise, plus=plus)
+        # This is for backwards compatibility with existing models
+        if nr == 3:
+            self.RDB1 = ResidualDenseBlock_5C(nf, kernel_size, gc, stride, bias, pad_type, \
+                    norm_type, act_type, mode, convtype, spectral_norm=spectral_norm, \
+                    gaussian_noise=gaussian_noise, plus=plus)
+            self.RDB2 = ResidualDenseBlock_5C(nf, kernel_size, gc, stride, bias, pad_type, \
+                    norm_type, act_type, mode, convtype, spectral_norm=spectral_norm, \
+                    gaussian_noise=gaussian_noise, plus=plus)
+            self.RDB3 = ResidualDenseBlock_5C(nf, kernel_size, gc, stride, bias, pad_type, \
+                    norm_type, act_type, mode, convtype, spectral_norm=spectral_norm, \
+                    gaussian_noise=gaussian_noise, plus=plus)
+        else:
+            self.RDBs = [ResidualDenseBlock_5C(nf, kernel_size, gc, stride, bias, pad_type,
+                                               norm_type, act_type, mode, convtype, spectral_norm=spectral_norm,
+                                               gaussian_noise=gaussian_noise, plus=plus) for _ in range(nr)]
 
     def forward(self, x):
-        out = self.RDB1(x)
-        out = self.RDB2(out)
-        out = self.RDB3(out)
+        out = x
+        if self.RDB1:
+            out = self.RDB1(out)
+            out = self.RDB2(out)
+            out = self.RDB3(out)
+        else:
+            for RDB in self.RDBs:
+                out = RDB(out)
         return out * 0.2 + x
 
 class ResidualDenseBlock_5C(nn.Module):
