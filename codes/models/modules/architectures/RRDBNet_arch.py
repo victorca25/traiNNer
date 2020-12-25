@@ -87,7 +87,7 @@ class RRDB(nn.Module):
 
     def forward(self, x):
         out = x
-        if self.RDB1 is not None:
+        if hasattr(self, 'RDB1'):
             out = self.RDB1(out)
             out = self.RDB2(out)
             out = self.RDB3(out)
