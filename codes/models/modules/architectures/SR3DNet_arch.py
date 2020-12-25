@@ -54,7 +54,7 @@ class SpaceToDepth(nn.Module):
 
 
 class SR3DNet(nn.Module):
-    def __init__(self, in_nc=3, out_nc=3, nf=64, scale=4):
+    def __init__(self, in_nc=3, out_nc=3, nf=64, nb=3, scale=4, n_frames=5):
         super(SR3DNet, self).__init__()
         '''
 
@@ -67,6 +67,10 @@ class SR3DNet(nn.Module):
         Depending on the # of frames, more or less conv_c2 have to be used. 
         By conv6, the shape should be: [1, 48, 1, 32, 32] for an input of shape [1, 3, n_frames, 32, 32] 
         and scale 4, which will be the same shape as bic_input, so they can be added correctly.
+
+        #TODO: Can add the nb variable for number of conv_c blocks (default: 3) and the number of c2 layers 
+        # is calculated from the number of frames
+
         '''
 
         self.scale = scale
@@ -77,7 +81,6 @@ class SR3DNet(nn.Module):
         self.scalec = nn.Conv3d(nf*in_nc, out_nc*scale*scale, 3, 1, [0,1,1], bias=True)
         
         #### upsampling (inverse pixelshuffle -> SpaceToDepth)
-        
         self.space2depth = SpaceToDepth(scale)
         self.depth2space = DepthToSpace(scale)
         
@@ -85,7 +88,7 @@ class SR3DNet(nn.Module):
 
     def forward(self, x):
         # x: b*n*c*h*w
-        _, n_frames, _, _, _ = x.size()
+        _, _, n_frames, _, _ = x.size()
         idx_center = (n_frames - 1) // 2
 
         conv1 = self.lrelu(self.conv_input(x))
