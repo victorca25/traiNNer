@@ -86,14 +86,17 @@ class RRDB(nn.Module):
                                                gaussian_noise=gaussian_noise, plus=plus) for _ in range(nr)]
 
     def forward(self, x):
-        out = x.to(torch.device('cuda'))
+        device = x.type()
+        out = x
+        out = out.to(device)
         if hasattr(self, 'RDB1'):
             out = self.RDB1(out)
             out = self.RDB2(out)
             out = self.RDB3(out)
         else:
             for RDB in self.RDBs:
-                out = RDB(out).to(torch.device('cuda'))
+                RDB = RDB.to(device)
+                out = RDB(out)
         return out * 0.2 + x
 
 class ResidualDenseBlock_5C(nn.Module):
