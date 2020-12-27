@@ -195,9 +195,9 @@ def get_box_kernel(kernel_size: int = 5, dim=2):
     if isinstance(kernel_size, numbers.Number):
         kernel_size = [kernel_size] * dim
 
-    kx: float=  float(kernel_size[0])
-    ky: float=  float(kernel_size[1])
-    box_kernel = torch.Tensor(np.ones((kx, ky)) / (kx*ky))
+    kx = kernel_size[0]
+    ky = kernel_size[1]
+    box_kernel = torch.Tensor(np.ones((kx, ky)) / (float(kx)*float(ky)))
 
     return box_kernel
 
@@ -529,6 +529,9 @@ def compute_padding(kernel_size):
          int, else, a tuple with an element for each dimension
     '''
     # 4 or 6 ints:  (padding_left, padding_right, padding_top, padding_bottom)
+    if isinstance(kernel_size, tuple):
+        kernel_size = list(kernel_size)
+    
     if isinstance(kernel_size, int):
         return kernel_size//2
     elif isinstance(kernel_size, list):
@@ -807,3 +810,47 @@ def grad_orientation(grad_y, grad_x):
     go = go * (360 / np.pi) + 180 # convert to degree
     go = torch.round(go / 45) * 45  # keep a split by 45
     return go
+
+def guided_filter(x, y, ks, eps=1e-2):
+    ''' Guided filter
+    This  is a kind of edge-preserving smoothing filter that can filter out noise 
+        or texture while retaining sharp edges. One key assumption of the guided 
+        filter is that the relation between guidance x and the filtering output 
+        is linear. 
+
+    Arguments:
+        x (tensor): guidance image with shape [b, c, h, w].
+        y (tensor): filtering input image with shape [b, c, h, w].
+        ks (int): kernel size for the box/mean filter. In reference to the 
+            window radius "r": kx = ky = ks = 2*r+1
+        eps (float): regularization ε, penalizing large A values
+    Returns:
+        output (tensor): filtered image
+
+    ref: https://en.wikipedia.org/wiki/Guided_filter
+    '''
+    
+    x_shape = x.shape
+    #y_shape = y.shape
+
+    # mean filter. The window size is defined by the kernel size.
+    box_kernel = get_box_kernel(kernel_size = ks).to(x.device)
+    N = filter2D(torch.ones((x_shape[-4], 1, x_shape[-2], x_shape[-1])), box_kernel).to(x.device)
+
+    # Note: similar to SSIM calculation
+    mean_x = filter2D(x, box_kernel) / N
+    mean_y = filter2D(y, box_kernel) / N
+    cov_xy = (filter2D(x*y, box_kernel) / N) - mean_x - mean_y # - mean_x*mean_y
+    var_x = (filter2D(x*x, box_kernel) / N) - mean_x - mean_x # - mean_x*mean_x
+
+    # linear coefficients A, b
+    A = cov_xy / (var_x + eps)
+    b = mean_y - A * mean_x # + x
+
+    mean_A = filter2D(A, box_kernel) / N
+    mean_b = filter2D(b, box_kernel) / N
+
+    output = mean_A * x + mean_b
+
+    return output
+
