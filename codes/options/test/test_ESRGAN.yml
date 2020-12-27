@@ -27,6 +27,7 @@ network_G:
   mode: CNA
   nf: 64
   nb: 23
+  nr: 3
   in_nc: 3
   out_nc: 3
   gc: 32

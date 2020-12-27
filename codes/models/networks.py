@@ -157,7 +157,7 @@ def define_G(opt, step=0):
         netG = RRDBNet_arch.RRDBNet(in_nc=opt_net['in_nc'], out_nc=opt_net['out_nc'], nf=opt_net['nf'], \
             nb=opt_net['nb'], gc=opt_net['gc'], upscale=opt_net['scale'], norm_type=opt_net['norm_type'], \
             act_type=act_type, mode=opt_net['mode'], upsample_mode='upconv', convtype=opt_net['convtype'], \
-            finalact=opt_net['finalact'], gaussian_noise=opt_net['gaussian'], plus=opt_net['plus'])
+            finalact=opt_net['finalact'], gaussian_noise=opt_net['gaussian'], plus=opt_net['plus'], nr=opt_net['nr'])
     elif which_model == 'MRRDB_net':  # Modified RRDB
         from models.modules.architectures import RRDBNet_arch
         netG = RRDBNet_arch.MRRDBNet(in_nc=opt_net['in_nc'], out_nc=opt_net['out_nc'], nf=opt_net['nf'], \
