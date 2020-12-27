@@ -81,20 +81,18 @@ class RRDB(nn.Module):
                     norm_type, act_type, mode, convtype, spectral_norm=spectral_norm, \
                     gaussian_noise=gaussian_noise, plus=plus)
         else:
-            self.RDBs = [ResidualDenseBlock_5C(nf, kernel_size, gc, stride, bias, pad_type,
-                                               norm_type, act_type, mode, convtype, spectral_norm=spectral_norm,
-                                               gaussian_noise=gaussian_noise, plus=plus) for _ in range(nr)]
+            RDB_list = [ResidualDenseBlock_5C(nf, kernel_size, gc, stride, bias, pad_type,
+                                              norm_type, act_type, mode, convtype, spectral_norm=spectral_norm,
+                                              gaussian_noise=gaussian_noise, plus=plus) for _ in range(nr)]
+            self.RDBs = nn.Sequential(*RDB_list)
 
     def forward(self, x):
-        out = x
         if hasattr(self, 'RDB1'):
-            out = self.RDB1(out)
+            out = self.RDB1(x)
             out = self.RDB2(out)
             out = self.RDB3(out)
         else:
-            for RDB in self.RDBs:
-                RDB = RDB.to(x.device)
-                out = RDB(out)
+            out = self.RDBs(x)
         return out * 0.2 + x
 
 class ResidualDenseBlock_5C(nn.Module):
