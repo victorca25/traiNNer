@@ -9,6 +9,7 @@ https://github.com/R08UST/Color_Conversion_pytorch/blob/master/differentiable_co
 import torch
 import math
 import cv2
+import numpy as np
 
 def bgr_to_rgb(image: torch.Tensor) -> torch.Tensor:
     # flip image channels
@@ -186,22 +187,22 @@ def color_shift(image1: torch.Tensor, image2: torch.Tensor, mode='uniform', alph
         Y (bool): choose if results will be combined with grayscale image converted 
             from RGB color image
     '''
-    r1: torch.Tensor = image1[..., 0, :, :]
-    g1: torch.Tensor = image1[..., 1, :, :]
-    b1: torch.Tensor = image1[..., 2, :, :]
+    r1: torch.Tensor = image1[..., 0:1, :, :]
+    g1: torch.Tensor = image1[..., 1:2, :, :]
+    b1: torch.Tensor = image1[..., 2:3, :, :]
 
-    r2: torch.Tensor = image2[..., 0, :, :]
-    g2: torch.Tensor = image2[..., 1, :, :]
-    b2: torch.Tensor = image2[..., 2, :, :]
+    r2: torch.Tensor = image2[..., 0:1, :, :]
+    g2: torch.Tensor = image2[..., 1:2, :, :]
+    b2: torch.Tensor = image2[..., 2:3, :, :]
 
     if mode == 'normal':
-        b_weight = torch.from_numpy(np.random.normal(shape=[1], mean=0.114, stddev=0.1)).to(image1.device)
-        g_weight = torch.from_numpy(np.random.normal(shape=[1], mean=0.587, stddev=0.1)).to(image1.device)
-        r_weight = torch.from_numpy(np.random.normal(shape=[1], mean=0.299, stddev=0.1)).to(image1.device)
+        r_weight = np.random.normal(loc=0.299, scale=0.1)
+        g_weight = np.random.normal(loc=0.587, scale=0.1)
+        b_weight = np.random.normal(loc=0.114, scale=0.1)
     elif mode == 'uniform':
-        b_weight = torch.from_numpy(np.random.uniform(shape=[1], minval=0.014, maxval=0.214)).to(image1.device)
-        g_weight = torch.from_numpy(np.random.uniform(shape=[1], minval=0.487, maxval=0.687)).to(image1.device)
-        r_weight = torch.from_numpy(np.random.uniform(shape=[1], minval=0.199, maxval=0.399)).to(image1.device)
+        r_weight = np.random.uniform(low=0.199, high=0.399)
+        g_weight = np.random.uniform(low=0.487, high=0.687)
+        b_weight = np.random.uniform(low=0.014, high=0.214)
     output1 = (b_weight*b1+g_weight*g1+r_weight*r1)/(b_weight+g_weight+r_weight)
     output2 = (b_weight*b2+g_weight*g2+r_weight*r2)/(b_weight+g_weight+r_weight)
     
