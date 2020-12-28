@@ -66,12 +66,16 @@ class DVDDataset(data.Dataset):
         
         if self.opt['phase'] == 'train':
             # Random Crop (reduce computing cost and adjust images to correct size first)
-            for img_hr in img_top, img_bot:
-                if img_hr.shape[0] > patch_size or img_hr.shape[1] > patch_size:
-                    crop_params, _ = vd.get_crop_params(img_top, patch_size, 1)
-                    img_top, _ = vd.apply_crop_params(HR=img_top, hr_crop_params=crop_params)
-                    img_bot, _ = vd.apply_crop_params(HR=img_bot, hr_crop_params=crop_params)
-                    img_in, _ = vd.apply_crop_params(HR=img_in, hr_crop_params=crop_params)
+            crop_params, _ = vd.get_crop_params(img_top, patch_size, 1)
+            # for img in img_in, img_top, img_bot:
+            #     if img.shape[0] > patch_size or img.shape[1] > patch_size:
+            #         img, _ = vd.apply_crop_params(HR=img, hr_crop_params=crop_params)
+            if img_in.shape[0] > patch_size or img_in.shape[1] > patch_size:
+                img_in, _ = vd.apply_crop_params(HR=img_in, hr_crop_params=crop_params)
+            if img_top.shape[0] > patch_size or img_top.shape[1] > patch_size:
+                img_top, _ = vd.apply_crop_params(HR=img_top, hr_crop_params=crop_params)
+            if img_bot.shape[0] > patch_size or img_bot.shape[1] > patch_size:
+                img_bot, _ = vd.apply_crop_params(HR=img_bot, hr_crop_params=crop_params)
             
         # Debug #TODO: use the debugging functions to visualize or save images instead
         # Save img_in, img_top, and img_bot images to a directory to visualize what is the result of the on the fly augmentations
