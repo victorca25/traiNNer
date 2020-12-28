@@ -21,6 +21,8 @@ def create_model(opt):
         from .VSR_model import VSRModel as M
     elif model == 'pbr':
         from .PBR_model import PBRModel as M
+    elif model == 'dvd':
+        from .DVD_model import DVDModel as M
     else:
         raise NotImplementedError('Model [{:s}] not recognized.'.format(model))
     m = M(opt)

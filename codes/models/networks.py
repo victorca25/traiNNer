@@ -216,6 +216,9 @@ def define_G(opt, step=0):
                             n_blocks=opt_net['n_blocks'], ngf=opt_net['ngf'], 
                             norm_type=opt_net['norm_type'], use_dropout=opt_net['use_dropout'],
                             upsample_mode=opt_net['upsample_mode'])
+    elif which_model == 'DVD_net':
+        from models.modules.architectures import DVDNet_arch
+        netG = DVDNet_arch.DVDNet(in_nc=opt_net['in_nc'], out_nc=opt_net['out_nc'], nf=opt_net['nf'])
     else:
         raise NotImplementedError('Generator model [{:s}] not recognized'.format(which_model))
 

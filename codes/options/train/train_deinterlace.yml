@@ -1,0 +1,153 @@
+name: debug_001_template # use "debug" or "debug_nochkp" in the name to run a test session and check everything is working. Does validation and state saving every 8 iterations.
+#name: 001_template # remove "debug" to run the real training session.
+use_tb_logger: true
+model: dvd
+gpu_ids: [0]
+use_amp: true
+use_swa: false
+
+# Dataset options:
+datasets:
+  train: 
+    name: REDS
+    mode: DVD
+
+    # Full pre-defined dataset
+    # dataroot_in: '../datasets/train/in' # Interlaced (combed) frames. If commented out, will be created OTF.
+    # dataroot_top: '../datasets/train/top' # Frames related to the top field
+    # dataroot_bottom: '../datasets/train/bottom' # Frames related to the bottom field
+
+    # Generate interlaced frames on-the-fly
+    dataroot_progressive: '../datasets/train/frames' # All frames from a progressive (non-interlaced) source.
+
+    use_shuffle: true
+    n_workers: 4 # 0 to disable CPU multithreading, or an integrer representing CPU threads to use for dataloading
+    batch_size: 8
+    virtual_batch_size: 8
+    HR_size: 128 # patch size. Default: 128. Needs to be coordinated with the patch size of the features network
+    image_channels: 3 # number of channels to load images in
+
+  # val: 
+  #   name: REDS_VAL
+  #   mode: DVD
+  #   dataroot_in: '../datasets/val/in' # Interlaced (combed) frames. If commented out, will be created OTF.
+  #   dataroot_top: '../datasets/val/top' # Frames related to the top field
+  #   dataroot_bottom: '../datasets/val/bottom' # Frames related to the bottom field
+
+path:
+    strict: false # true | false 
+    root: 'D:/Code/GitHub/BasicSR'
+    # pretrain_model_G: '../experiments/pretrained_models/1x_deint_test.pth'
+    # resume_state: '../experiments/1x_deint_test/training_state/latest.state'
+
+# Generator options:
+network_G:
+    strict: false # true | false # whether to load the model in strict mode or not
+
+    which_model_G: DVD_net 
+    nf: 64
+    in_nc: 3 # of input image channels: 3 for RGB and 1 for grayscale
+    out_nc: 3 # of output image channels: 3 for RGB and 1 for grayscale
+
+# Discriminator options:
+network_D:
+    strict: true # true | false # whether to load the model in strict mode or not
+
+    which_model_D: discriminator_vgg # discriminator_vgg_128 | discriminator_vgg | discriminator_vgg_128_fea (feature extraction) | discriminator_vgg_fea (feature extraction) | patchgan | multiscale
+    norm_type: batch
+    act_type: leakyrelu
+    mode: CNA # CNA | NAC
+    nf: 64
+    in_nc: 3
+    nlayer: 3 # only for patchgan and multiscale
+    num_D: 3 # only for multiscale
+
+# Schedulers options:
+train:
+    lr_G: 0.001 # 1e-4 # starting lr_g #Test, default: 1e-3
+    weight_decay_G: 0
+    beta1_G: 0.9
+    lr_D: 0.001 # 1e-4 # starting lr_d #Test, default: 1e-3
+    weight_decay_D: 0
+    beta1_D: 0.9
+
+    # For MultiStepLR (default):
+    lr_scheme: MultiStepLR
+    # lr_steps: [50000, 100000, 200000, 300000] # training from scratch
+    lr_steps_rel: [0.1, 0.2, 0.4, 0.6] # to use lr steps relative to % of training niter instead of fixed lr_steps
+    #lr_steps: [50000, 75000, 85000, 100000] #finetuning
+    lr_gamma: 0.5 # lr change at every step (multiplied by)
+
+    # For SWA scheduler
+    swa_start_iter: 375000 #Just reference: 75% of 500000. Can be any value, including 0 to start right away with a pretrained model.
+    # swa_start_iter_rel: 0.75 # to use swa_start_iter relative to % of training niter instead of fixed swa_start_iter
+    swa_lr: 1e-4 #Has to be ~order of magnitude of a stable lr for the regular scheduler
+    swa_anneal_epochs: 10
+    swa_anneal_strategy: "cos"
+    
+    # Losses:
+    pixel_criterion: l1 # "l1" | "l2" | "cb" | "elastic" | "relativel1" | "l1cosinesim" | "clipl1" #pixel loss
+    pixel_weight: 1e-2 # 1e-2 | 1
+    feature_criterion: l1 # "l1" | "l2" | "cb" | "elastic" #feature loss (VGG feature network)
+    feature_weight: 1
+    # cx_weight: 0.5
+    # cx_type: contextual
+    # cx_vgg_layers: {conv_3_2: 1, conv_4_2: 1}
+    # hfen_criterion: l1 # hfen: "l1" | "l2" | "rel_l1" | "rel_l2" #helps in deblurring and finding edges, lines
+    # hfen_weight: 1e-6 
+    # grad_type: grad-4d-l1 # 2d | 4d / - any of the pixel crit, ie "grad-2d-l1"
+    # grad_weight: 4e-1 # 4e-1
+    tv_type: 4D # "normal" | "4D" #helps in denoising, reducing upscale artefacts
+    tv_weight: 1e-5 # Change "tv_weight" so the l_g_tv is around 1e-02 - 1e-01
+    tv_norm: 1 # 1 for l1 (default) or 2 for l2.
+    # ssim_type: ssim # "ssim" | "ms-ssim" #helps to maintain luminance, contrast and covariance between SR and HR
+    # ssim_weight: 1
+    # lpips_weight: 1 # perceptual loss
+    # lpips_type: net-lin # net-lin | net *
+    # lpips_net: squeeze # "vgg" | "alex" | "squeeze" 
+    
+    # Experimental losses
+    # spl_type: spl # "spl" | "gpl" | "cpl"
+    # spl_weight: 0.1 # 1e-2 # SPL loss function. note: needs to add a cap in the generator (finalcap; For [0,1] range -> "finalcap": "clamp") or the overflow loss or it can become unstable.
+    # of_type: overflow # overflow loss function to force the images back into the [0, 1] range
+    # of_weight: 0.2
+    # fft_type: fft
+    # fft_weight: 0.1
+    # color_criterion: color-l1cosinesim # l1cosinesim naturally helps color consistency, so it is the best to use here, but others can be used as well
+    # color_weight: 1 # Loss based on the UV channels of YUV color space, helps preserve color consistency
+    # avg_criterion: avg-l1
+    # avg_weight: 5 # Averaging downscale loss
+    # ms_criterion: multiscale-l1
+    # ms_weight: 1e-2
+    
+    # Adversarial loss:
+    gan_type: vanilla # "vanilla" | "wgan-gp" | "lsgan" 
+    gan_weight: 5e-3 # * test: 7e-3
+    # freeze_loc: 4 # last feature layer location to freeze in discriminator. VGG-like Discs have 10 layers, patchgan has nlayer.
+    # for wgan-gp
+    # D_update_ratio: 1
+    # D_init_iters: 0
+    # gp_weigth: 10
+    # if using the discriminator_vgg_128_fea or discriminator_vgg_fea feature maps to calculate feature loss
+    # gan_featmaps: true # true | false
+    # dis_feature_criterion: cb # "l1" | "l2" | "cb" | "elastic" #discriminator feature loss
+    # dis_feature_weight: 0.01 # 1
+    
+    # Differentiable Augmentation for Data-Efficient GAN Training
+    # diffaug: true
+    # dapolicy: 'color,transl_zoom,flip,rotate,cutout' # smart "all" (translation, zoom_in and zoom_out are exclusive)
+    
+    # Other training options:
+    # finalcap: clamp # Test. Cap Generator outputs to fit in: [-1, 1] range ("tanh"), rescale tanh to [0,1] range ("scaltanh"), cap ("sigmoid") or clamp ("clamp") to [0,1] range. Default = None. Coordinate with znorm. Required for SPL if using image range [0,1]
+    manual_seed: 0
+    niter: 5e5
+    # warmup_iter: -1  # number of warm up iterations, -1 for no warm up
+    val_freq: 1000000000 # 5e3
+    # overwrite_val_imgs: true
+    # val_comparison: true
+    metrics: 'psnr,ssim,lpips' # select from: "psnr,ssim,lpips" or a combination separated by comma ","
+
+logger:
+    print_freq: 200
+    save_checkpoint_freq: 5e3
+    overwrite_chkp: false
