@@ -50,9 +50,9 @@ class DVDNet(nn.Module):
         conv_branch_bottom = nn.Conv2d(nf//2, nf//2, 3)
 
         final_branch_top = nn.Conv2d(
-            nf//2, out_nc, 3, stride=(2, 1))
+            nf//2, out_nc, 3, stride=(2, 1), padding=4, padding_mode='replicate')
         final_branch_bottom = nn.Conv2d(
-            nf//2, out_nc, 3, stride=(2, 1))
+            nf//2, out_nc, 3, stride=(2, 1), padding=4, padding_mode='replicate')
 
         self.model_y = nn.Sequential(h, conv_branch_top, final_branch_top)
         self.model_z = nn.Sequential(
