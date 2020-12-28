@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-def vertcal_upscale(x, upfield=True):
+def vertical_upscale(x, upfield=True):
 
     n, c, h, w = x.shape
     h *= 2
@@ -22,13 +22,13 @@ def replace_field(x, input_image, upfield=True):
 
     if upfield:
         # print(upper_input.shape, x.shape)
-        x = vertcal_upscale(x, upfield=False)
-        upper_input = vertcal_upscale(upper_input, upfield=True)
+        x = vertical_upscale(x, upfield=False)
+        upper_input = vertical_upscale(upper_input, upfield=True)
         # print(upper_input.shape, x.shape)
         out = x + upper_input
     else:
-        x = vertcal_upscale(x, upfield=True)
-        lower_input = vertcal_upscale(lower_input, upfield=False)
+        x = vertical_upscale(x, upfield=True)
+        lower_input = vertical_upscale(lower_input, upfield=False)
         out = x + lower_input
 
     return out
