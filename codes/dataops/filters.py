@@ -811,7 +811,8 @@ def grad_orientation(grad_y, grad_x):
     go = torch.round(go / 45) * 45  # keep a split by 45
     return go
 
-def guided_filter(x, y, ks, eps=1e-2):
+
+def guided_filter(x: torch.Tensor, y: torch.Tensor, ks=None, r=None, eps=1e-2):
     ''' Guided filter
     This  is a kind of edge-preserving smoothing filter that can filter out noise 
         or texture while retaining sharp edges. One key assumption of the guided 
@@ -822,14 +823,22 @@ def guided_filter(x, y, ks, eps=1e-2):
         x (tensor): guidance image with shape [b, c, h, w].
         y (tensor): filtering input image with shape [b, c, h, w].
         ks (int): kernel size for the box/mean filter. In reference to the 
-            window radius "r": kx = ky = ks = 2*r+1
+            window radius "r": kx = ky = ks = (2*r)+1
+        r (int): optional radius for the window. Can use instead of ks.
         eps (float): regularization ε, penalizing large A values
     Returns:
         output (tensor): filtered image
 
-    ref: https://en.wikipedia.org/wiki/Guided_filter
+    ref: http://kaiminghe.com/eccv10/index.html
+         https://en.wikipedia.org/wiki/Guided_filter
     '''
     
+    if not ks:
+        if r:
+            ks = (2*r)+1
+        else:
+            raise ValueError('Either kernel size (ks) or radius (r) for the window are required.')
+
     x_shape = x.shape
     #y_shape = y.shape
 
@@ -840,12 +849,12 @@ def guided_filter(x, y, ks, eps=1e-2):
     # Note: similar to SSIM calculation
     mean_x = filter2D(x, box_kernel) / N
     mean_y = filter2D(y, box_kernel) / N
-    cov_xy = (filter2D(x*y, box_kernel) / N) - mean_x - mean_y # - mean_x*mean_y
-    var_x = (filter2D(x*x, box_kernel) / N) - mean_x - mean_x # - mean_x*mean_x
+    cov_xy = (filter2D(x*y, box_kernel) / N) - mean_x*mean_y #Corrected from: - mean_x - mean_y
+    var_x = (filter2D(x*x, box_kernel) / N) - mean_x*mean_x #Corrected from: - mean_x - mean_x
 
     # linear coefficients A, b
     A = cov_xy / (var_x + eps)
-    b = mean_y - A * mean_x # + x
+    b = mean_y - A * mean_x # According to original GF paper, needs to add: "+ x"
 
     mean_A = filter2D(A, box_kernel) / N
     mean_b = filter2D(b, box_kernel) / N
@@ -853,4 +862,3 @@ def guided_filter(x, y, ks, eps=1e-2):
     output = mean_A * x + mean_b
 
     return output
-
