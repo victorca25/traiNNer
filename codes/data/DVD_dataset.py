@@ -7,6 +7,8 @@ import torch.utils.data as data
 import dataops.common as util
 import dataops.augmentations as augmentations
 
+from . import Vid_dataset as vd
+
 
 class DVDDataset(data.Dataset):
     '''
@@ -66,8 +68,10 @@ class DVDDataset(data.Dataset):
             # Random Crop (reduce computing cost and adjust images to correct size first)
             for img_hr in img_top, img_bot:
                 if img_hr.shape[0] > patch_size or img_hr.shape[1] > patch_size:
-                    img_top, img_bot, img_in = augmentations.random_crop_dvd(
-                        img_top, img_bot, img_in, patch_size)
+                    crop_params, _ = vd.get_crop_params(img_top, patch_size, 1)
+                    img_top, _ = vd.apply_crop_params(HR=img_top, hr_crop_params=crop_params)
+                    img_bot, _ = vd.apply_crop_params(HR=img_bot, hr_crop_params=crop_params)
+                    img_in, _ = vd.apply_crop_params(HR=img_in, hr_crop_params=crop_params)
             
         # Debug #TODO: use the debugging functions to visualize or save images instead
         # Save img_in, img_top, and img_bot images to a directory to visualize what is the result of the on the fly augmentations

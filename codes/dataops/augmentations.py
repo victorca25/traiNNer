@@ -502,20 +502,6 @@ def random_crop_pairs(img_HR, img_LR, HR_size, scale):
     
     return img_HR, img_LR
 
-
-def random_crop_dvd(img_top, img_bot, img_in, patch_size):
-    H, W, _ = img_in.shape
-
-    # randomly crop
-    rnd_h = random.randint(0, max(0, H - patch_size))
-    rnd_w = random.randint(0, max(0, W - patch_size))
-
-    img_in = img_in[rnd_h:rnd_h + patch_size, rnd_w:rnd_w + patch_size, ...]
-    img_top = img_top[rnd_h:rnd_h + patch_size, rnd_w:rnd_w + patch_size, ...]
-    img_bot = img_bot[rnd_h:rnd_h + patch_size, rnd_w:rnd_w + patch_size, ...]
-
-    return img_top, img_bot, img_in
-
 def cutout(image_origin, mask_size, p=0.5):
     if np.random.rand() > p:
         return image_origin
