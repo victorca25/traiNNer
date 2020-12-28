@@ -10,7 +10,7 @@ def vertical_upscale(x, upfield=True):
         out = torch.cat([t, torch.zeros_like(t)], 3)
     else:
         out = torch.cat([torch.zeros_like(t), t], 3)
-    out = torch.reshape(out, (n, c, h, w))
+    out = torch.reshape(out, (n, c, -1, w))
     return out
 
 
