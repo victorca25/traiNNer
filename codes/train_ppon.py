@@ -58,7 +58,6 @@ def main():
         logger.info('Set [resume_state] to ' + resume_state_path)
         logger.info('Resuming training from epoch: {}, iter: {}.'.format(
             resume_state['epoch'], resume_state['iter']))
-        options.check_resume(opt)  # check resume options
 
     logger.info(options.dict2str(opt))
     # tensorboard logger

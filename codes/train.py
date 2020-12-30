@@ -32,13 +32,11 @@ def main():
     # train from scratch OR resume training
     if opt['path']['resume_state']:
         if os.path.isdir(opt['path']['resume_state']):
-            resume_state_path = util.sorted_nicely(glob.glob(opt['path']['resume_state'] + '/*.state'))[-1]
+            opt['path']['resume_state'] = util.sorted_nicely(glob.glob(opt['path']['resume_state'] + '/*.state'))[-1]
         else:
-            resume_state_path = opt['path']['resume_state']
-        resume_state = torch.load(resume_state_path)
-        logger.info('Set [resume_state] to ' + resume_state_path)
+            opt['path']['resume_state'] = opt['path']['resume_state']
+        resume_state = torch.load(opt['path']['resume_state'])
         logger.info('Resuming training from epoch: %d, iter: %d.' % (resume_state['epoch'], resume_state['iter']))
-        options.check_resume(opt)
     else:  # training from scratch
         resume_state = None
         util.mkdir_and_rename(opt['path']['experiments_root'])  # rename old folder if exists

@@ -137,6 +137,19 @@ def parse(opt_path: str, is_train: bool = True) -> NoneDict:
     for key, path in opt['path'].items():
         if isinstance(path, str) and path:
             opt['path'][key] = os.path.normpath(os.path.expanduser(path))
+    if opt['path']['resume_state']:
+        logger = logging.getLogger('base')
+        if opt['path']['pretrain_model_G'] or opt['path']['pretrain_model_D']:
+            logger.warning('pretrain_model_* paths will be ignored when resuming training from a .state file.')
+        state_index = os.path.basename(opt['path']['resume_state']).split('.')[0]
+        opt['path']['pretrain_model_G'] = os.path.join(opt['path']['models'], state_index + '_G.pth')
+        logger.info('Overridden the value of [pretrain_model_G] to: ' + opt['path']['pretrain_model_G'])
+        if 'gan' in opt['model']:
+            opt['path']['pretrain_model_D'] = os.path.join(opt['path']['models'], state_index + '_D.pth')
+            logger.info('Overridden the value of [pretrain_model_D] to: ' + opt['path']['pretrain_model_D'])
+        if 'swa' in opt['model'] or opt['swa']:
+            opt['path']['pretrain_model_swaG'] = os.path.join(opt['path']['models'], state_index + '_swaG.pth')
+            logger.info('Overridden the value of [pretrain_model_swaG] to: ' + opt['path']['pretrain_model_swaG'])
 
     if is_train:
         experiments_root = os.path.join(opt['path']['root'], 'experiments', opt['name'])
@@ -217,22 +230,3 @@ def dict2str(opt: dict, indent_l: int = 1) -> str:
         else:
             msg += ' ' * (indent_l * 2) + k + ': ' + str(v) + '\n'
     return msg
-
-
-def check_resume(opt: dict):
-    """Check resume states and pretrain_model paths."""
-    # TODO: Should this be done within parse() instead? Only thing holding it back is the logger base
-    #       needs to be created (by the train code) before running this.
-    logger = logging.getLogger('base')
-    if opt['path']['resume_state']:
-        if opt['path']['pretrain_model_G'] or opt['path']['pretrain_model_D']:
-            logger.warning('pretrain_model_* paths will be ignored when resuming training from a .state file.')
-        state_idx = os.path.basename(opt['path']['resume_state']).split('.')[0]
-        opt['path']['pretrain_model_G'] = os.path.join(opt['path']['models'], state_idx + '_G.pth')
-        logger.info('Overridden the value of [pretrain_model_G] to: ' + opt['path']['pretrain_model_G'])
-        if 'gan' in opt['model']:
-            opt['path']['pretrain_model_D'] = os.path.join(opt['path']['models'], state_idx + '_D.pth')
-            logger.info('Overridden the value of [pretrain_model_D] to: ' + opt['path']['pretrain_model_D'])
-        if 'swa' in opt['model'] or opt['swa']:
-            opt['path']['pretrain_model_swaG'] = os.path.join(opt['path']['models'], state_idx + '_swaG.pth')
-            logger.info('Overridden the value of [pretrain_model_swaG] to: ' + opt['path']['pretrain_model_swaG'])
