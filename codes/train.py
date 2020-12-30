@@ -1,61 +1,57 @@
-import os.path
-import sys
-import math
 import argparse
-import time
-import random
-import numpy as np
-from collections import OrderedDict
+import glob
 import logging
+import math
+import os.path
+import random
+import time
 
 import torch
 
 import options.options as option
-from utils import util, metrics
 from data import create_dataloader, create_dataset
-from models import create_model
 from dataops.common import tensor2np
-        
+from models import create_model
+from utils import util, metrics
+
+
 def main():
     # options
     parser = argparse.ArgumentParser()
     parser.add_argument('-opt', type=str, required=True, help='Path to option JSON file.')
     opt = option.parse(parser.parse_args().opt, is_train=True)
     opt = option.dict_to_nonedict(opt)  # Convert to NoneDict, which return None for missing key.
-    
+
+    # config loggers. Before it, the log will not work
+    util.setup_logger(None, opt['path']['log'], 'train', level=logging.INFO, screen=True)
+    util.setup_logger('val', opt['path']['log'], 'val', level=logging.INFO)
+    logger = logging.getLogger('base')
+
     # train from scratch OR resume training
     if opt['path']['resume_state']:
         if os.path.isdir(opt['path']['resume_state']):
-            import glob
-            resume_state_path = util.sorted_nicely(glob.glob(os.path.normpath(opt['path']['resume_state']) + '/*.state'))[-1]
+            resume_state_path = glob.glob(os.path.normpath(opt['path']['resume_state']) + '/*.state')
+            resume_state_path = util.sorted_nicely(resume_state_path)[-1]
         else:
             resume_state_path = opt['path']['resume_state']
         resume_state = torch.load(resume_state_path)
+        logger.info('Set [resume_state] to ' + resume_state_path)
+        logger.info('Resuming training from epoch: %d, iter: %d.' % (resume_state['epoch'], resume_state['iter']))
+        option.check_resume(opt)
     else:  # training from scratch
         resume_state = None
         util.mkdir_and_rename(opt['path']['experiments_root'])  # rename old folder if exists
         util.mkdirs((path for key, path in opt['path'].items() if not key == 'experiments_root'
                      and 'pretrain_model' not in key and 'resume' not in key))
-    
-    # config loggers. Before it, the log will not work
-    util.setup_logger(None, opt['path']['log'], 'train', level=logging.INFO, screen=True)
-    util.setup_logger('val', opt['path']['log'], 'val', level=logging.INFO)
-    logger = logging.getLogger('base')
-    
-    if resume_state:
-        logger.info('Set [resume_state] to ' + resume_state_path)
-        logger.info('Resuming training from epoch: {}, iter: {}.'.format(
-            resume_state['epoch'], resume_state['iter']))
-        option.check_resume(opt)  # check resume options
 
     logger.info(option.dict2str(opt))
     # tensorboard logger
     if opt['use_tb_logger'] and 'debug' not in opt['name']:
         from tensorboardX import SummaryWriter
         try:
-            tb_logger = SummaryWriter(logdir='../tb_logger/' + opt['name']) #for version tensorboardX >= 1.7
+            tb_logger = SummaryWriter(logdir='../tb_logger/' + opt['name'])  # for version tensorboardX >= 1.7
         except:
-            tb_logger = SummaryWriter(log_dir='../tb_logger/' + opt['name']) #for version tensorboardX < 1.6
+            tb_logger = SummaryWriter(log_dir='../tb_logger/' + opt['name'])  # for version tensorboardX < 1.6
 
     # random seed
     seed = opt['train']['manual_seed']
@@ -104,7 +100,7 @@ def main():
         virtual_step = current_step * virtual_batch_size / batch_size \
             if virtual_batch_size and virtual_batch_size > batch_size else current_step
         model.resume_training(resume_state)  # handle optimizers and schedulers
-        model.update_schedulers(opt['train']) # updated schedulers in case JSON configuration has changed
+        model.update_schedulers(opt['train'])  # updated schedulers in case JSON configuration has changed
         del resume_state
         # start the iteration time when resuming
         t0 = time.time()
@@ -116,8 +112,8 @@ def main():
     # training
     logger.info('Start training from epoch: {:d}, iter: {:d}'.format(start_epoch, current_step))
     try:
-        for epoch in range(start_epoch, total_epochs*(virtual_batch_size//batch_size)):
-            for n, train_data in enumerate(train_loader,start=1):
+        for epoch in range(start_epoch, total_epochs * (virtual_batch_size // batch_size)):
+            for n, train_data in enumerate(train_loader, start=1):
 
                 if virtual_step == 0:
                     # first iteration start time
@@ -156,16 +152,20 @@ def main():
                 # update learning rate
                 if model.optGstep and model.optDstep and take_step:
                     model.update_learning_rate(current_step, warmup_iter=opt['train'].get('warmup_iter', -1))
-                
+
                 # save models and training states (changed to save models before validation)
                 if current_step % opt['logger']['save_checkpoint_freq'] == 0 and take_step:
-                    if model.swa: 
+                    if model.swa:
                         model.save(current_step, opt['logger']['overwrite_chkp'], loader=train_loader)
                     else:
                         model.save(current_step, opt['logger']['overwrite_chkp'])
-                    model.save_training_state(epoch + (n >= len(train_loader)), current_step, opt['logger']['overwrite_chkp'])
+                    model.save_training_state(
+                        epoch=epoch + (n >= len(train_loader)),
+                        iter_step=current_step,
+                        latest=opt['logger']['overwrite_chkp']
+                    )
                     logger.info('Models and training states saved.')
-                
+
                 # validation
                 if val_loader and current_step % opt['train']['val_freq'] == 0 and take_step:
                     val_sr_imgs_list = []
@@ -185,14 +185,12 @@ def main():
                         visuals = model.get_current_visuals()
                         sr_img = tensor2np(visuals['SR'], denormalize=opt['datasets']['train']['znorm'])
                         gt_img = tensor2np(visuals['HR'], denormalize=opt['datasets']['train']['znorm'])
-                        
+
                         # Save SR images for reference
                         if opt['train']['overwrite_val_imgs']:
-                            save_img_path = os.path.join(img_dir, '{:s}.png'.format(\
-                                img_name))
+                            save_img_path = os.path.join(img_dir, '%s.png' % img_name)
                         else:
-                            save_img_path = os.path.join(img_dir, '{:s}_{:d}.png'.format(\
-                                img_name, current_step))
+                            save_img_path = os.path.join(img_dir, '%s_%s.png' % (img_name, current_step))
 
                         # save single images or lr / sr comparison
                         if opt['train']['val_comparison']:
@@ -206,7 +204,7 @@ def main():
                         # TODO: test using tensor based metrics (batch) instead of numpy.
                         """
                         crop_size = opt['scale']
-                        val_metrics.calculate_metrics(sr_img, gt_img, crop_size = crop_size)  #, only_y=True)
+                        val_metrics.calculate_metrics(sr_img, gt_img, crop_size=crop_size)  # , only_y=True)
 
                     avg_metrics = val_metrics.get_averages()
                     del val_metrics
@@ -214,25 +212,25 @@ def main():
                     # log
                     logger_m = ''
                     for r in avg_metrics:
-                        #print(r)
-                        formatted_res = r['name'].upper()+': {:.5g}, '.format(r['average'])
+                        # print(r)
+                        formatted_res = r['name'].upper() + ': {:.5g}, '.format(r['average'])
                         logger_m += formatted_res
 
-                    logger.info('# Validation # '+logger_m[:-2])
+                    logger.info('# Validation # ' + logger_m[:-2])
                     logger_val = logging.getLogger('val')  # validation logger
-                    logger_val.info('<epoch:{:3d}, iter:{:8,d}> '.format(epoch, current_step)+logger_m[:-2])
+                    logger_val.info('<epoch:{:3d}, iter:{:8,d}> '.format(epoch, current_step) + logger_m[:-2])
                     # memory_usage = torch.cuda.memory_allocated()/(1024.0 ** 3) # in GB
-                    
+
                     # tensorboard logger
                     if opt['use_tb_logger'] and 'debug' not in opt['name']:
                         for r in avg_metrics:
                             tb_logger.add_scalar(r['name'], r['average'], current_step)
-                    
+
                     # # reset time for next iteration to skip the validation time from calculation
                     # t0 = time.time()
-                
+
                 if current_step % opt['logger']['print_freq'] == 0 and take_step or \
-                    (val_loader and current_step % opt['train']['val_freq'] == 0 and take_step):
+                        (val_loader and current_step % opt['train']['val_freq'] == 0 and take_step):
                     # reset time for next iteration to skip the validation time from calculation
                     t0 = time.time()
 
@@ -251,6 +249,7 @@ def main():
             model.save(current_step, True)
         model.save_training_state(epoch + (n >= len(train_loader)), current_step, True)
         logger.info('Training interrupted. Latest models and training states saved.')
+
 
 if __name__ == '__main__':
     main()
