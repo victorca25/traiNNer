@@ -1,3 +1,10 @@
+"""
+Calculate the PSNR and SSIM. Same as MATLAB's results.
+
+Terms:
+    GT: Ground-truth
+    Gen: Generated/Restored/Recovered images
+"""
 import glob
 import math
 import os
@@ -7,13 +14,6 @@ import numpy as np
 
 
 def main():
-    """
-    Calculate the PSNR and SSIM. Same as MATLAB's results.
-
-    Terms:
-        GT: Ground-truth
-        Gen: Generated/Restored/Recovered images
-    """
     # Config
     folder_gt = '/mnt/SSD/BasicSR_datasets/val_set5/Set5'
     folder_gen = '/home/Projects/BasicSR/results/RRDB_PSNR_x4/set5'
