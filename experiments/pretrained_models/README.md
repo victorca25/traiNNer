@@ -18,7 +18,7 @@ Through experiments, we found that
 
 are the best network settings.
 
-#### Qualitative results [PSNR/dB]
+#### Qualitative results \[PSNR/dB]
 
 `SRResNet_bicx4_in3nf64nb16.pth` is provided here and other pretrained models can be downloaded from [Google Drive](https://drive.google.com/drive/folders/1vg_baYuagOXEhpwQgu54lJOyU8u1DsMW?usp=sharing).
 
