@@ -27,7 +27,7 @@ Moreover, there are utils and userful scripts. A detailed description is provide
 
 ## Config
 
-#### [`options/`](https://github.com/xinntao/BasicSR/tree/master/codes/options) Configure the options for data loader, network structure, model, training strategies and etc.
+### [`options/`](https://github.com/xinntao/BasicSR/tree/master/codes/options) Configure the options for data loader, network structure, model, training strategies
 
 -   `json` file is used to configure options and [`options/options.py`](https://github.com/xinntao/BasicSR/blob/master/codes/options/options.py) will convert the json file to python dict.
 -   `json` file uses `null` for `None`; and supports `//` comments, i.e., in each line, contents after the `//` will be ignored. 
@@ -36,7 +36,7 @@ Moreover, there are utils and userful scripts. A detailed description is provide
 
 ## Data
 
-#### [`data/`](https://github.com/xinntao/BasicSR/tree/master/codes/data) A data loader to provide data for training, validation and testing.
+### [`data/`](https://github.com/xinntao/BasicSR/tree/master/codes/data) A data loader to provide data for training, validation and testing
 
 -   A separate data loader module. You can modify/create data loader to meet your own needs.
 -   Uses `cv2` package to do image processing, which provides rich operations.
@@ -46,14 +46,14 @@ Moreover, there are utils and userful scripts. A detailed description is provide
 
 ## Model
 
-#### [`models/`](https://github.com/xinntao/BasicSR/tree/master/codes/models) Construct different models for training and testing.
+### [`models/`](https://github.com/xinntao/BasicSR/tree/master/codes/models) Construct different models for training and testing
 
--   A model mainly consists of two parts - [network structure] and [model defination, e.g., loss definition, optimization and etc]. The network description is in the [Network part](#network).
+-   A model mainly consists of two parts - \[network structure] and \[model defination, e.g., loss definition, optimization and etc]. The network description is in the [Network part](#network).
 -   Based on the [`base_model.py`](https://github.com/xinntao/BasicSR/blob/master/codes/models/base_model.py), we define different models, e.g., [`SR_model.py`](https://github.com/xinntao/BasicSR/blob/master/codes/models/SR_model.py), [`SRGAN_model.py`](https://github.com/xinntao/BasicSR/blob/master/codes/models/SRGAN_model.py), [`SRRaGAN_model.py`](https://github.com/xinntao/BasicSR/blob/master/codes/models/SRRaGAN_model.py) and [`SFTGAN_ACD_model.py`](https://github.com/xinntao/BasicSR/blob/master/codes/models/SFTGAN_ACD_model.py).
 
 ## Network
 
-#### [`models/modules/`](https://github.com/xinntao/BasicSR/tree/master/codes/models/modules) Construct different network architectures.
+### [`models/modules/`](https://github.com/xinntao/BasicSR/tree/master/codes/models/modules) Construct different network architectures
 
 -   The network is constructed in [`models/network.py`](https://github.com/xinntao/BasicSR/blob/master/codes/models/networks.py) and the detailed structures are in [`models/modules`](https://github.com/xinntao/BasicSR/tree/master/codes/models/modules).
 -   We provide some useful blocks in [`block.py`](https://github.com/xinntao/BasicSR/blob/master/codes/models/modules/block.py) and it is flexible to construct your network structures with these pre-defined blocks.
@@ -61,7 +61,7 @@ Moreover, there are utils and userful scripts. A detailed description is provide
 
 ## Utils
 
-#### [`utils/`](https://github.com/xinntao/BasicSR/tree/master/codes/utils) Provide useful utilities.
+### [`utils/`](https://github.com/xinntao/BasicSR/tree/master/codes/utils) Provide useful utilities
 
 -   [logger.py](https://github.com/xinntao/BasicSR/blob/master/codes/utils/logger.py) provides logging service during training and testing.
 -   Support to use [tensorboard](https://www.tensorflow.org/programmers_guide/summaries_and_tensorboard) to visualize and compare training loss, validation PSNR and etc. Installationand usage can be found [here](https://github.com/xinntao/BasicSR/tree/master/codes/utils).
@@ -69,6 +69,6 @@ Moreover, there are utils and userful scripts. A detailed description is provide
 
 ## Scripts
 
-#### [`scripts/`](https://github.com/xinntao/BasicSR/tree/master/codes/scripts) Privide useful scripts.
+### [`scripts/`](https://github.com/xinntao/BasicSR/tree/master/codes/scripts) Privide useful scripts
 
 Details can be found [here](https://github.com/xinntao/BasicSR/tree/master/codes/scripts).
