@@ -50,7 +50,7 @@ def main():
         for data in test_loader:
             need_HR = False if test_loader.dataset.opt['dataroot_HR'] is None else True
 
-            model.feed_data(data, need_HR=need_HR)
+            model.feed_data(data, need_hr=need_HR)
             img_path = data['LR_path'][0]
             img_name = os.path.splitext(os.path.basename(img_path))[0]
 

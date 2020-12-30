@@ -32,7 +32,7 @@ def chop_forward2(lowres_img, model, scale, patch_size=200):
     with torch.no_grad():
         for p in range(n_patches):
             lowres_input = lowres_patches[p:p + 1]
-            model.feed_data_batch(lowres_input, need_HR=False)
+            model.feed_data_batch(lowres_input, need_hr=False)
             model.test()  # test
             visuals = model.get_current_visuals_batch(need_HR=False)
             prediction = visuals['SR']
@@ -171,7 +171,7 @@ def main():
                     sr_img = tensor2np(highres_output, denormalize=znorm)  # uint8
 
             else:  # will upscale each image in the batch without chopping
-                model.feed_data(data, need_HR=need_HR)
+                model.feed_data(data, need_hr=need_HR)
                 model.test()  # test
                 visuals = model.get_current_visuals(need_HR=need_HR)
 

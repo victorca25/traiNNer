@@ -148,7 +148,7 @@ def main():
                     sr_img = SR_y
             else:
                 # data
-                model.feed_data(data, need_HR=need_HR)
+                model.feed_data(data, need_hr=need_HR)
                 # SR_y = net(LR_y_cube).squeeze(0)
                 model.test()  # test
                 visuals = model.get_current_visuals(need_HR=need_HR)
