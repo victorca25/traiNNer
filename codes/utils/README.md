@@ -7,9 +7,11 @@
 You can turn it on/off in json option file with the key: `use_tb_logger`.
 
 ### Install
-1. `pip install tensorflow` - Maybe it is the easiest way to install tensorboard, though we will install tensorflow at the same time.
-1. `pip install tensorboard_logger` - install [tensorboard_logger](https://github.com/TeamHG-Memex/tensorboard_logger)
+
+1.  `pip install tensorflow` - Maybe it is the easiest way to install tensorboard, though we will install tensorflow at the same time.
+2.  `pip install tensorboard_logger` - install [tensorboard_logger](https://github.com/TeamHG-Memex/tensorboard_logger)
 
 ### Run
-1. In terminal: `tensorboard --logdir xxx/xxx`.
-1. Open TensorBoard UI at http://localhost:6006 in your browser
+
+1.  In terminal: `tensorboard --logdir xxx/xxx`.
+2.  Open TensorBoard UI at <http://localhost:6006> in your browser
