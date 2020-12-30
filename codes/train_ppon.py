@@ -10,7 +10,7 @@ import logging
 
 import torch
 
-import options.options as option
+import options
 from utils import util
 from data import create_dataloader, create_dataset
 from models import create_model
@@ -32,8 +32,8 @@ def main():
     # options
     parser = argparse.ArgumentParser()
     parser.add_argument('-opt', type=str, required=True, help='Path to option JSON file.')
-    opt = option.parse(parser.parse_args().opt, is_train=True)
-    opt = option.dict_to_nonedict(opt)  # Convert to NoneDict, which return None for missing key.
+    opt = options.parse(parser.parse_args().opt, is_train=True)
+    opt = options.dict_to_nonedict(opt)  # Convert to NoneDict, which return None for missing key.
     pytorch_ver = get_pytorch_ver()
     
     # train from scratch OR resume training
@@ -59,9 +59,9 @@ def main():
         logger.info('Set [resume_state] to ' + resume_state_path)
         logger.info('Resuming training from epoch: {}, iter: {}.'.format(
             resume_state['epoch'], resume_state['iter']))
-        option.check_resume(opt)  # check resume options
+        options.check_resume(opt)  # check resume options
 
-    logger.info(option.dict2str(opt))
+    logger.info(options.dict2str(opt))
     # tensorboard logger
     if opt['use_tb_logger'] and 'debug' not in opt['name']:
         from tensorboardX import SummaryWriter

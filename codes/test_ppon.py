@@ -6,7 +6,7 @@ import argparse
 import numpy as np
 from collections import OrderedDict
 
-import options.options as option
+import options
 import utils.util as util
 from data.util import bgr2ycbcr
 from data import create_dataset, create_dataloader
@@ -16,13 +16,13 @@ def main():
     # options
     parser = argparse.ArgumentParser()
     parser.add_argument('-opt', type=str, required=True, help='Path to options JSON file.')
-    opt = option.parse(parser.parse_args().opt, is_train=False)
+    opt = options.parse(parser.parse_args().opt, is_train=False)
     util.mkdirs((path for key, path in opt['path'].items() if not key == 'pretrain_model_G'))
-    opt = option.dict_to_nonedict(opt)
+    opt = options.dict_to_nonedict(opt)
 
     util.setup_logger(None, opt['path']['log'], 'test.log', level=logging.INFO, screen=True)
     logger = logging.getLogger('base')
-    logger.info(option.dict2str(opt))
+    logger.info(options.dict2str(opt))
     # Create test dataset and dataloader
     test_loaders = []
     for phase, dataset_opt in sorted(opt['datasets'].items()):
