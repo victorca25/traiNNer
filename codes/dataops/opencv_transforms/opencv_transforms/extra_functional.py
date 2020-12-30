@@ -452,7 +452,6 @@ def noise_dither_fs(img: np.ndarray, samplingF = 1):
     #Note: these are very slow for large images, must crop first before applying.    
     #Floyd-Steinberg
     re_fs = img.copy()
-    samplingF = 1
     
     for i in range(0, size[0]-1):
         for j in range(1, size[1]-1):
