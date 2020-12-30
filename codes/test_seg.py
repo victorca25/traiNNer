@@ -5,10 +5,10 @@ import cv2
 import numpy as np
 import torch
 import torchvision.utils
-from data.util import imresize, modcrop
 
 import models.modules.architectures.seg_arch as seg_arch
 import utils.util as util
+from codes.dataops.common import modcrop, imresize
 
 # options
 test_img_folder_name = 'samples'  # image folder name
