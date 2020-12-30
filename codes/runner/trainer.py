@@ -9,7 +9,7 @@ import torch
 from codes.data import create_dataset, create_dataloader
 from codes.dataops.common import tensor2np
 from codes.models import create_model
-from codes.scripts.classes.runner import Runner
+from codes.runner import Runner
 from codes.utils import metrics
 from codes.utils.util import sorted_nicely, mkdir_and_rename, save_img_comp, save_img
 
