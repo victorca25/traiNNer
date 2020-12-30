@@ -44,15 +44,18 @@ SCI_NOTATION_RE = re.compile(
 
 
 class NoneDict(dict):
-    """Ignore missing key exceptions, return None instead"""
+
+    """Dictionary class that ignores missing key's and returns None instead."""
 
     def __missing__(self, key):
+        """Override and simply return None instead of raising an exception."""
         return None
 
 
 def parse(opt_path: str, is_train: bool = True) -> NoneDict:
     """
     Parse options file.
+
     :param opt_path: Option file path. Can be JSON or YAML.
     :param is_train: Indicate whether in training or not.
     :returns: Parsed Options
@@ -85,7 +88,7 @@ def parse(opt_path: str, is_train: bool = True) -> NoneDict:
     opt['is_train'] = is_train
     opt['batch_multiplier'] = opt.get('batch_multiplier', None)
 
-    """datasets"""
+    # datasets
     for phase, dataset in opt['datasets'].items():
         # TODO: why allow phase to have _... in the first place?
         dataset['phase'] = phase.split('_')[0]
@@ -131,7 +134,7 @@ def parse(opt_path: str, is_train: bool = True) -> NoneDict:
         if dataset.get('tensor_shape', None):
             opt['tensor_shape'] = dataset.get('tensor_shape', None)
 
-    """path"""
+    # path
     for key, path in opt['path'].items():
         if isinstance(path, str) and path:
             opt['path'][key] = os.path.expanduser(path)
@@ -161,7 +164,7 @@ def parse(opt_path: str, is_train: bool = True) -> NoneDict:
         opt['path']['results_root'] = results_root
         opt['path']['log'] = results_root
 
-    """network_G"""
+    # network_G
     # TODO: Just take scale from the opt, instead of duplicating data
     opt['network_G']['scale'] = opt['scale']
 
@@ -183,7 +186,7 @@ def parse(opt_path: str, is_train: bool = True) -> NoneDict:
 
 
 def parse2lists(types: (dict, str, any)) -> (list, any):
-    """Converts dictionaries or single string options to lists that work with random choice"""
+    """Converts dictionaries or single string options to lists that work with random choice."""
     if isinstance(types, dict):
         types_list = []
         for k, v in types.items():
@@ -195,7 +198,7 @@ def parse2lists(types: (dict, str, any)) -> (list, any):
 
 
 def dict_to_nonedict(opt: (dict, list, any)) -> (NoneDict, list[NoneDict], any):
-    """Recursively convert to NoneDict, which returns None for missing keys"""
+    """Recursively convert to NoneDict, which returns None for missing keys."""
     if isinstance(opt, dict):
         return NoneDict(**{k: dict_to_nonedict(v) for k, v in opt.items()})
     elif isinstance(opt, list):
@@ -205,7 +208,7 @@ def dict_to_nonedict(opt: (dict, list, any)) -> (NoneDict, list[NoneDict], any):
 
 
 def dict2str(opt: dict, indent_l: int = 1) -> str:
-    """dict to string for logger"""
+    """Dictionary to string for logger."""
     msg = ''
     for k, v in opt.items():
         if isinstance(v, dict):
@@ -218,7 +221,7 @@ def dict2str(opt: dict, indent_l: int = 1) -> str:
 
 
 def check_resume(opt: dict):
-    """Check resume states and pretrain_model paths"""
+    """Check resume states and pretrain_model paths."""
     # TODO: Should this be done within parse() instead? Only thing holding it back is the logger base
     #       needs to be created (by the train code) before running this.
     logger = logging.getLogger('base')
