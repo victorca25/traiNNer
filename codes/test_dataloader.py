@@ -1,15 +1,13 @@
-HERE
-import time
 import math
+
 import numpy as np
 import torch
 import torchvision.utils
-from data import create_dataloader, create_dataset
-# from utils import util
 
 import dataops.common as util
-from dataops.debug import tmp_vis, describe_numpy, describe_tensor
-from dataops.colors import ycbcr_to_rgb, yuv_to_rgb
+from data import create_dataloader, create_dataset
+from dataops.colors import ycbcr_to_rgb
+from dataops.debug import tmp_vis
 
 # for segmentation
 # look_up table # RGB
@@ -47,15 +45,15 @@ def render(seg):
     return color
 
 
-def feed_data(data, need_HR=True, scale=4, device = 'cpu'):
+def feed_data(data, need_HR=True, scale=4, device='cpu'):
     # data
     if len(data['LR'].size()) == 4:
-        #for networks that work with 3 channel images
+        # for networks that work with 3 channel images
         b, n_frames, h_lr, w_lr = data['LR'].size()
-        LR = data['LR'].view(b, -1, 1, h_lr, w_lr) # b, t, c, h, w
+        LR = data['LR'].view(b, -1, 1, h_lr, w_lr)  # b, t, c, h, w
     elif len(data['LR'].size()) == 5:
         _, n_frames, _, _, _ = data['LR'].size()
-        LR = data['LR'] # b, t, c, h, w
+        LR = data['LR']  # b, t, c, h, w
 
     idx_center = (n_frames - 1) // 2
     n_frames = n_frames
@@ -64,7 +62,7 @@ def feed_data(data, need_HR=True, scale=4, device = 'cpu'):
     var_L = LR.to(device)
 
     # bicubic upscaled LR and center HR
-    if isinstance(data['HR_center'], torch.Tensor) and isinstance(data['LR_bicubic'], torch.Tensor): 
+    if isinstance(data['HR_center'], torch.Tensor) and isinstance(data['LR_bicubic'], torch.Tensor):
         var_H_center = data['HR_center'].to(device)
         var_LR_bic = data['LR_bicubic'].to(device)
 
@@ -72,16 +70,16 @@ def feed_data(data, need_HR=True, scale=4, device = 'cpu'):
         # HR images
         if len(data['HR'].size()) == 4:
             # b, _, h_hr, w_hr = data['HR'].size()
-            HR = data['HR'].view(b, -1, 1, h_lr * scale, w_lr * scale) # b, t, c, h, w
+            HR = data['HR'].view(b, -1, 1, h_lr * scale, w_lr * scale)  # b, t, c, h, w
         elif len(data['HR'].size()) == 5:
-            HR = data['HR'] # b, t, c, h, w #for networks that work with 3 channel images
-            
+            HR = data['HR']  # b, t, c, h, w #for networks that work with 3 channel images
+
         var_H = HR.to(device)
         # discriminator references
         input_ref = data.get('ref', data['HR'])
         if len(input_ref.size()) == 4:
             # b, _, h_hr, w_hr = input_ref.size()
-            input_ref = input_ref.view(b, -1, 1, h_lr * scale, w_lr * scale) # b, t, c, h, w
+            input_ref = input_ref.view(b, -1, 1, h_lr * scale, w_lr * scale)  # b, t, c, h, w
             var_ref = input_ref.to(device)
         elif len(input_ref.size()) == 5:
             var_ref = input_ref.to(device)
@@ -89,12 +87,12 @@ def feed_data(data, need_HR=True, scale=4, device = 'cpu'):
     return {'var_L': var_L, 'var_H': var_H, 'var_ref': var_ref, 'var_H_center': var_H_center, 'var_LR_bic': var_LR_bic}
 
 
-def combine_colors(fake_H, var_LR_bic, device = 'cpu'):
-    fake_H = fake_H[:, 0, :, :].to(device) # tmp
+def combine_colors(fake_H, var_LR_bic, device='cpu'):
+    fake_H = fake_H[:, 0, :, :].to(device)  # tmp
     tmp_vis(ycbcr_to_rgb(var_LR_bic), True)
     fake_H_cb = var_LR_bic[:, 1, :, :].to(device)
     fake_H_cr = var_LR_bic[:, 2, :, :].to(device)
-    centralSR = torch.stack((fake_H, fake_H_cb, fake_H_cr), -3) #.squeeze(1)
+    centralSR = torch.stack((fake_H, fake_H_cb, fake_H_cr), -3)  # .squeeze(1)
     centralSR = ycbcr_to_rgb(centralSR)
     tmp_vis(centralSR, True)
 
@@ -113,10 +111,10 @@ def main():
     # opt['dataroot_LR'] = None
     '''
 
-    opt['name'] = 'testA' 
+    opt['name'] = 'testA'
     opt['dataroot_HR'] = "../training/pbr/"
     opt['dataroot_LR'] = None
-    opt['lr_downscale'] = True 
+    opt['lr_downscale'] = True
     # opt['lr_downscale_types'] = [0, 999, 777] #776
     # opt['lr_downscale_types'] = [999]
     opt['lr_downscale_types'] = [777]
@@ -124,19 +122,19 @@ def main():
     opt['dataroot_kernels'] = "../training/kernels/results/"
 
     opt['subset_file'] = None
-    opt['mode'] = 'LRHRPBR' #'VLRHR'  # "LRHRC" | "LRHROTF" | "VLRHR" | 'LRHR' | 'LRHRseg_bg'
+    opt['mode'] = 'LRHRPBR'  # 'VLRHR'  # "LRHRC" | "LRHROTF" | "VLRHR" | 'LRHR' | 'LRHRseg_bg'
     opt['phase'] = 'train'  # 'train' | 'val'
     opt['use_shuffle'] = True
-    opt['n_workers'] = 0 #1 #8
+    opt['n_workers'] = 0  # 1 #8
     # opt['n_iters'] = 200000
-    opt['batch_size'] = 1 #16 #4
+    opt['batch_size'] = 1  # 16 #4
     # opt['virtual_batch_size'] = 4
-    opt['HR_size'] = 256 #512 #256 #128 #96
-    opt['scale'] = 1 #4 #2 #1 #4
-    opt['use_flip'] = False #True
-    opt['use_rot'] = False #True
+    opt['HR_size'] = 256  # 512 #256 #128 #96
+    opt['scale'] = 1  # 4 #2 #1 #4
+    opt['use_flip'] = False  # True
+    opt['use_rot'] = False  # True
     opt['color'] = 'RGB'
-    opt['data_type'] = 'img' #'lmdb'  # img lmdb
+    opt['data_type'] = 'img'  # 'lmdb'  # img lmdb
 
     # video:
     # opt['num_frames'] = 3
@@ -159,16 +157,16 @@ def main():
     # opt['lr_blur'] = True
     # opt['lr_blur_types'] = {"gaussian": 3, "average": 2, "clean": 6}
     # opt['lr_blur_types'] = ["gaussian", "average", "clean", "clean"]
-    
+
     opt['lr_noise'] = True
     # opt['lr_noise_types'] = ["gaussian", "JPEG", "quantize", "poisson", "dither", "s&p", "speckle", "clean"]
     # opt['lr_noise_types'] = ["patches", "quantize", "maxrgb"]
     # opt['lr_noise_types'] = ["JPEG"]
     opt['lr_noise_types'] = ["patches"]
-    
+
     opt['patch_noise']: True
-    opt['noise_data'] = "../training/noise_patches/normal/" #jpeg
-    
+    opt['noise_data'] = "../training/noise_patches/normal/"  # jpeg
+
     # opt['lr_noise2'] = True
     # opt['lr_noise_types2'] = ["gaussian", "JPEG", "poisson", "dither", "s&p", "speckle", "clean"]
     # opt['lr_noise_types2'] = ["gaussian", "JPEG"]
@@ -187,14 +185,14 @@ def main():
     train_set = create_dataset(opt)
     train_loader = create_dataloader(train_set, opt)
     nrow = int(math.sqrt(opt['batch_size']))
-    
+
     if save_samples:
-        util.mkdir('tmp')    
+        util.mkdir('tmp')
         if opt['phase'] == 'train':
             padding = 2
         else:
             padding = 0
-    
+
     for n, data in enumerate(train_loader, start=1):
         # test dataloader time
         # if i == 1:
@@ -205,7 +203,7 @@ def main():
         if n > 10:
             break
         print(n)
-        
+
         if isinstance(data['LR'], torch.Tensor):
             LR = data['LR']
             # print(LR.shape)
@@ -237,16 +235,16 @@ def main():
 
         if opt['mode'] == 'VLRHR':
             pass
-        
+
             # print(data['HR_center'].shape)
             # print(data['LR_bicubic'].shape)
-            
+
             # tmp_vis(data['HR_center'], True)
             # tmp_vis(data['LR_bicubic'], True)
 
             # fed_data = feed_data(data)
             # combine_colors(fed_data['var_H_center'], fed_data['var_LR_bic'])
-        
+
         if opt['mode'] == 'LRHRPBR':
             if isinstance(data['AO'], torch.Tensor):
                 tmp_vis(data['AO'], True)
@@ -260,6 +258,7 @@ def main():
                 tmp_vis(data['RE'], True)
             if isinstance(data['RO'], torch.Tensor):
                 tmp_vis(data['RO'], True)
+
 
 if __name__ == '__main__':
     main()

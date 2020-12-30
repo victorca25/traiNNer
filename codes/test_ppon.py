@@ -1,27 +1,27 @@
-import os
-import sys
-import logging
-import time
 import argparse
-import numpy as np
+import logging
+import os
+import time
 from collections import OrderedDict
 
-import options.options as option
-import utils.util as util
 from data.util import bgr2ycbcr
+
+import options
+import utils.util as util
 from data import create_dataset, create_dataloader
 from models import create_model
+
 
 def main():
     # options
     parser = argparse.ArgumentParser()
     parser.add_argument('-opt', type=str, required=True, help='Path to options file.')
-    opt = option.parse(parser.parse_args().opt, is_train=False)
+    opt = options.parse(parser.parse_args().opt, is_train=False)
     util.mkdirs((path for key, path in opt['path'].items() if not key == 'pretrain_model_G'))
 
     util.setup_logger(None, opt['path']['log'], 'test.log', level=logging.INFO, screen=True)
     logger = logging.getLogger('base')
-    logger.info(option.dict2str(opt))
+    logger.info(options.dict2str(opt))
     # Create test dataset and dataloader
     test_loaders = []
     for phase, dataset_opt in sorted(opt['datasets'].items()):
@@ -55,7 +55,7 @@ def main():
 
             model.test()  # test
             visuals = model.get_current_visuals(need_HR=need_HR)
-            
+
             img_c = util.tensor2img(visuals['img_c'])  # uint8
             img_s = util.tensor2img(visuals['img_s'])  # uint8
             img_p = util.tensor2img(visuals['img_p'])  # uint8
@@ -65,16 +65,15 @@ def main():
             if suffix:
                 save_c_img_path = os.path.join(dataset_dir, img_name + suffix + '_c.png')
                 save_s_img_path = os.path.join(dataset_dir, img_name + suffix + '_s.png')
-                save_p_img_path = os.path.join(dataset_dir, img_name + suffix + '_p.png')                
+                save_p_img_path = os.path.join(dataset_dir, img_name + suffix + '_p.png')
             else:
                 save_c_img_path = os.path.join(dataset_dir, img_name + '_c.png')
                 save_s_img_path = os.path.join(dataset_dir, img_name + '_s.png')
                 save_p_img_path = os.path.join(dataset_dir, img_name + '_p.png')
-            
+
             util.save_img(img_c, save_c_img_path)
             util.save_img(img_s, save_s_img_path)
             util.save_img(img_p, save_p_img_path)
-            
 
             # calculate PSNR and SSIM
             if need_HR:
@@ -100,8 +99,8 @@ def main():
                     ssim_y = util.calculate_ssim(cropped_sr_img_y * 255, cropped_gt_img_y * 255)
                     test_results['psnr_y'].append(psnr_y)
                     test_results['ssim_y'].append(ssim_y)
-                    logger.info('{:20s} - PSNR: {:.6f} dB; SSIM: {:.6f}; PSNR_Y: {:.6f} dB; SSIM_Y: {:.6f}.'\
-                        .format(img_name, psnr, ssim, psnr_y, ssim_y))
+                    logger.info('{:20s} - PSNR: {:.6f} dB; SSIM: {:.6f}; PSNR_Y: {:.6f} dB; SSIM_Y: {:.6f}.' \
+                                .format(img_name, psnr, ssim, psnr_y, ssim_y))
                 else:
                     logger.info('{:20s} - PSNR: {:.6f} dB; SSIM: {:.6f}.'.format(img_name, psnr, ssim))
             else:
@@ -111,13 +110,14 @@ def main():
             # Average PSNR/SSIM results
             ave_psnr = sum(test_results['psnr']) / len(test_results['psnr'])
             ave_ssim = sum(test_results['ssim']) / len(test_results['ssim'])
-            logger.info('----Average PSNR/SSIM results for {}----\n\tPSNR: {:.6f} dB; SSIM: {:.6f}\n'\
-                    .format(test_set_name, ave_psnr, ave_ssim))
+            logger.info('----Average PSNR/SSIM results for {}----\n\tPSNR: {:.6f} dB; SSIM: {:.6f}\n' \
+                        .format(test_set_name, ave_psnr, ave_ssim))
             if test_results['psnr_y'] and test_results['ssim_y']:
                 ave_psnr_y = sum(test_results['psnr_y']) / len(test_results['psnr_y'])
                 ave_ssim_y = sum(test_results['ssim_y']) / len(test_results['ssim_y'])
-                logger.info('----Y channel, average PSNR/SSIM----\n\tPSNR_Y: {:.6f} dB; SSIM_Y: {:.6f}\n'\
-                    .format(ave_psnr_y, ave_ssim_y))
+                logger.info('----Y channel, average PSNR/SSIM----\n\tPSNR_Y: {:.6f} dB; SSIM_Y: {:.6f}\n' \
+                            .format(ave_psnr_y, ave_ssim_y))
+
 
 if __name__ == '__main__':
     main()

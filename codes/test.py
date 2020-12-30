@@ -1,16 +1,15 @@
-import os
-import sys
-import logging
-import time
 import argparse
-import numpy as np
+import logging
+import os
+import time
 from collections import OrderedDict
 
 import options
 import utils.util as util
-from dataops.common import bgr2ycbcr, tensor2np
 from data import create_dataset, create_dataloader
+from dataops.common import bgr2ycbcr, tensor2np
 from models import create_model
+
 
 def main():
     # options
@@ -24,14 +23,14 @@ def main():
     logger.info(options.dict2str(opt))
     # Create test dataset and dataloader
     test_loaders = []
-    znorm = False #TMP
+    znorm = False  # TMP
     for phase, dataset_opt in sorted(opt['datasets'].items()):
         test_set = create_dataset(dataset_opt)
         test_loader = create_dataloader(test_set, dataset_opt)
         logger.info('Number of test images in [{:s}]: {:d}'.format(dataset_opt['name'], len(test_set)))
         test_loaders.append(test_loader)
         # Temporary, will turn znorm on for all the datasets. Will need to introduce a variable for each dataset and differentiate each one later in the loop.
-        if dataset_opt['znorm'] and znorm == False: 
+        if dataset_opt['znorm'] and znorm == False:
             znorm = True
 
     # Create model
@@ -60,9 +59,9 @@ def main():
             model.test()  # test
             visuals = model.get_current_visuals(need_HR=need_HR)
 
-            #if znorm the image range is [-1,1], Default: Image range is [0,1] # testing, each "dataset" can have a different name (not train, val or other)
-            sr_img = tensor2np(visuals['SR'],denormalize=znorm)  # uint8
-            
+            # if znorm the image range is [-1,1], Default: Image range is [0,1] # testing, each "dataset" can have a different name (not train, val or other)
+            sr_img = tensor2np(visuals['SR'], denormalize=znorm)  # uint8
+
             # save images
             suffix = opt['suffix']
             if suffix:
@@ -71,11 +70,11 @@ def main():
                 save_img_path = os.path.join(dataset_dir, img_name + '.png')
             util.save_img(sr_img, save_img_path)
 
-            #TODO: update to use metrics functions
+            # TODO: update to use metrics functions
             # calculate PSNR and SSIM
             if need_HR:
-                #if znorm the image range is [-1,1], Default: Image range is [0,1] # testing, each "dataset" can have a different name (not train, val or other)
-                gt_img = tensor2img(visuals['HR'],denormalize=znorm)  # uint8
+                # if znorm the image range is [-1,1], Default: Image range is [0,1] # testing, each "dataset" can have a different name (not train, val or other)
+                gt_img = tensor2img(visuals['HR'], denormalize=znorm)  # uint8
                 gt_img = gt_img / 255.
                 sr_img = sr_img / 255.
 
@@ -97,25 +96,26 @@ def main():
                     ssim_y = util.calculate_ssim(cropped_sr_img_y * 255, cropped_gt_img_y * 255)
                     test_results['psnr_y'].append(psnr_y)
                     test_results['ssim_y'].append(ssim_y)
-                    logger.info('{:20s} - PSNR: {:.6f} dB; SSIM: {:.6f}; PSNR_Y: {:.6f} dB; SSIM_Y: {:.6f}.'\
-                        .format(img_name, psnr, ssim, psnr_y, ssim_y))
+                    logger.info('{:20s} - PSNR: {:.6f} dB; SSIM: {:.6f}; PSNR_Y: {:.6f} dB; SSIM_Y: {:.6f}.' \
+                                .format(img_name, psnr, ssim, psnr_y, ssim_y))
                 else:
                     logger.info('{:20s} - PSNR: {:.6f} dB; SSIM: {:.6f}.'.format(img_name, psnr, ssim))
             else:
                 logger.info(img_name)
 
-        #TODO: update to use metrics functions
+        # TODO: update to use metrics functions
         if need_HR:  # metrics
             # Average PSNR/SSIM results
             ave_psnr = sum(test_results['psnr']) / len(test_results['psnr'])
             ave_ssim = sum(test_results['ssim']) / len(test_results['ssim'])
-            logger.info('----Average PSNR/SSIM results for {}----\n\tPSNR: {:.6f} dB; SSIM: {:.6f}\n'\
-                    .format(test_set_name, ave_psnr, ave_ssim))
+            logger.info('----Average PSNR/SSIM results for {}----\n\tPSNR: {:.6f} dB; SSIM: {:.6f}\n' \
+                        .format(test_set_name, ave_psnr, ave_ssim))
             if test_results['psnr_y'] and test_results['ssim_y']:
                 ave_psnr_y = sum(test_results['psnr_y']) / len(test_results['psnr_y'])
                 ave_ssim_y = sum(test_results['ssim_y']) / len(test_results['ssim_y'])
-                logger.info('----Y channel, average PSNR/SSIM----\n\tPSNR_Y: {:.6f} dB; SSIM_Y: {:.6f}\n'\
-                    .format(ave_psnr_y, ave_ssim_y))
+                logger.info('----Y channel, average PSNR/SSIM----\n\tPSNR_Y: {:.6f} dB; SSIM_Y: {:.6f}\n' \
+                            .format(ave_psnr_y, ave_ssim_y))
+
 
 if __name__ == '__main__':
     main()
