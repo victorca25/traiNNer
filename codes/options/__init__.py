@@ -138,7 +138,10 @@ def parse(opt_path: str, is_train: bool = True) -> NoneDict:
     # path
     for key, path in opt['path'].items():
         if isinstance(path, str) and path:
-            opt['path'][key] = os.path.normpath(os.path.expanduser(path))
+            path = os.path.normpath(os.path.expanduser(path))
+        opt['path'][key] = path
+        if os.path.isdir(path):
+            os.makedirs(path, exist_ok=True)
 
     # create loggers
     setup_logger(None, opt['path']['log'], 'train' if is_train else 'test', level=logging.INFO, screen=True)  # base

@@ -21,24 +21,24 @@ def main():
     args.add_argument('-opt', type=str, required=True, help='Path to option JSON file.')
     args = args.parse_args()
 
-    # config options file
+    # config
     opt = options.parse(args.opt, is_train=True)
-
     logger = logging.getLogger('base')
 
-    # train from scratch OR resume training
+    # prepare state
     if opt['path']['resume_state']:
+        # resume training
         if os.path.isdir(opt['path']['resume_state']):
             opt['path']['resume_state'] = util.sorted_nicely(glob.glob(opt['path']['resume_state'] + '/*.state'))[-1]
         else:
             opt['path']['resume_state'] = opt['path']['resume_state']
         resume_state = torch.load(opt['path']['resume_state'])
         logger.info('Resuming training from epoch: %d, iter: %d.' % (resume_state['epoch'], resume_state['iter']))
-    else:  # training from scratch
+    else:
+        # training from scratch
         resume_state = None
-        util.mkdir_and_rename(opt['path']['experiments_root'])  # rename old folder if exists
-        util.mkdirs((path for key, path in opt['path'].items() if not key == 'experiments_root'
-                     and 'pretrain_model' not in key and 'resume' not in key))
+        # rotate experiments folder
+        util.mkdir_and_rename(opt['path']['experiments_root'])
 
     logger.info(options.dict2str(opt))
     # tensorboard logger

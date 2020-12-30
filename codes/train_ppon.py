@@ -46,8 +46,6 @@ def main():
     else:  # training from scratch
         resume_state = None
         util.mkdir_and_rename(opt['path']['experiments_root'])  # rename old folder if exists
-        util.mkdirs((path for key, path in opt['path'].items() if not key == 'experiments_root'
-                     and 'pretrain_model' not in key and 'resume' not in key))
     
     # config loggers. Before it, the log will not work
     logger = logging.getLogger('base')
