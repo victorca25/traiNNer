@@ -66,7 +66,6 @@ def main():
     multi_upscale = opt['multi_upscale']
     scale = opt['scale']
 
-    util.setup_logger(None, opt['path']['log'], 'test.log', level=logging.INFO, screen=True)
     logger = logging.getLogger('base')
     logger.info(options.dict2str(opt))
     # Create test dataset and dataloader

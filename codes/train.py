@@ -24,9 +24,6 @@ def main():
     # config options file
     opt = options.parse(args.opt, is_train=True)
 
-    # create loggers
-    util.setup_logger(None, opt['path']['log'], 'train', level=logging.INFO, screen=True)
-    util.setup_logger('val', opt['path']['log'], 'val', level=logging.INFO)
     logger = logging.getLogger('base')
 
     # train from scratch OR resume training

@@ -50,8 +50,6 @@ def main():
                      and 'pretrain_model' not in key and 'resume' not in key))
     
     # config loggers. Before it, the log will not work
-    util.setup_logger(None, opt['path']['log'], 'train', level=logging.INFO, screen=True)
-    util.setup_logger('val', opt['path']['log'], 'val', level=logging.INFO)
     logger = logging.getLogger('base')
     
     if resume_state:

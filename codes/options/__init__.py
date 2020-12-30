@@ -5,6 +5,8 @@ import re
 import cv2
 
 # PAD_MOD
+from codes.utils.util import setup_logger
+
 CV2_BORDER_MAP = {
     'constant': cv2.BORDER_CONSTANT,
     'edge': cv2.BORDER_REPLICATE,
@@ -137,8 +139,14 @@ def parse(opt_path: str, is_train: bool = True) -> NoneDict:
     for key, path in opt['path'].items():
         if isinstance(path, str) and path:
             opt['path'][key] = os.path.normpath(os.path.expanduser(path))
+
+    # create loggers
+    setup_logger(None, opt['path']['log'], 'train' if is_train else 'test', level=logging.INFO, screen=True)  # base
+    if is_train:
+        setup_logger('val', opt['path']['log'], 'val', level=logging.INFO)
+    logger = logging.getLogger('base')
+
     if opt['path']['resume_state']:
-        logger = logging.getLogger('base')
         if opt['path']['pretrain_model_G'] or opt['path']['pretrain_model_D']:
             logger.warning('pretrain_model_* paths will be ignored when resuming training from a .state file.')
         state_index = os.path.basename(opt['path']['resume_state']).split('.')[0]
@@ -165,11 +173,13 @@ def parse(opt_path: str, is_train: bool = True) -> NoneDict:
         # force some options for quick debug testing if 'debug' is anywhere in the name
         # TODO: Why not just use a `debug: true` config parameter?
         if 'debug' in opt['name']:
+            logger.info('Debug mode enabled')
             opt['train']['val_freq'] = 8
             opt['logger']['print_freq'] = 2
             opt['logger']['save_checkpoint_freq'] = 8
             opt['train']['lr_decay_iter'] = 10
             if 'debug_nochkp' in opt['name']:
+                logger.debug('Checkpoint frequency set high (nochkp)')
                 opt['logger']['save_checkpoint_freq'] = 1000  # 10000000
     else:
         results_root = os.path.join(opt['path']['root'], 'results', opt['name'])
@@ -192,7 +202,7 @@ def parse(opt_path: str, is_train: bool = True) -> NoneDict:
     # export CUDA_VISIBLE_DEVICES
     gpu_list = ','.join(str(x) for x in opt['gpu_ids'])
     os.environ['CUDA_VISIBLE_DEVICES'] = gpu_list
-    print('export CUDA_VISIBLE_DEVICES=' + gpu_list)
+    logger.info('export CUDA_VISIBLE_DEVICES=' + gpu_list)
 
     return dict_to_nonedict(opt)
 
