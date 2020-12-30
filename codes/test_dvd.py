@@ -17,7 +17,7 @@ def main():
     # options
     parser = argparse.ArgumentParser()
     parser.add_argument('-opt', type=str, required=True,
-                        help='Path to options JSON file.')
+                        help='Path to options file.')
     opt = option.parse(parser.parse_args().opt, is_train=False)
     util.mkdirs(
         (path for key, path in opt['path'].items() if not key == 'pretrain_model_G'))

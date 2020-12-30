@@ -69,10 +69,9 @@ def chop_forward(x, model, scale, shave=16, min_size=5000, nGPUs=1, need_HR=Fals
 def main():
     # options
     parser = argparse.ArgumentParser()
-    parser.add_argument('-opt', type=str, required=True, help='Path to options JSON file.')
+    parser.add_argument('-opt', type=str, required=True, help='Path to options file.')
     opt = option.parse(parser.parse_args().opt, is_train=False)
     util.mkdirs((path for key, path in opt['path'].items() if not key == 'pretrain_model_G'))
-    opt = option.dict_to_nonedict(opt)
 
     util.setup_logger(None, opt['path']['log'], 'test.log', level=logging.INFO, screen=True)
     logger = logging.getLogger('base')

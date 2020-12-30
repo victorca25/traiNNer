@@ -58,10 +58,9 @@ def chop_forward2(lowres_img, model, scale, patch_size = 200):
 def main():
     # options
     parser = argparse.ArgumentParser()
-    parser.add_argument('-opt', type=str, required=True, help='Path to options JSON file.')
+    parser.add_argument('-opt', type=str, required=True, help='Path to options file.')
     opt = option.parse(parser.parse_args().opt, is_train=False)
     util.mkdirs((path for key, path in opt['path'].items() if not key == 'pretrain_model_G'))
-    opt = option.dict_to_nonedict(opt)
     chop2 = opt['chop']
     chop_patch_size = opt['chop_patch_size']
     multi_upscale = opt['multi_upscale']

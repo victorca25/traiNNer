@@ -32,8 +32,7 @@ def main():
     # options
     parser = argparse.ArgumentParser()
     parser.add_argument('-opt', type=str, required=True, help='Path to option JSON file.')
-    opt = option.parse(parser.parse_args().opt, is_train=True)
-    opt = option.dict_to_nonedict(opt)  # Convert to NoneDict, which return None for missing key.
+    opt = options.parse(parser.parse_args().opt, is_train=True)
     pytorch_ver = get_pytorch_ver()
     
     # train from scratch OR resume training

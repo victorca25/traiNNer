@@ -48,7 +48,7 @@ def parse2lists(types):
     return types
 
 
-def parse(opt_path, is_train=True):
+def parse(opt_path: str, is_train: bool = True) -> NoneDict:
     """Parse options file.
     Args:
         opt_path (str): Option file path. Can be JSON or YAML
@@ -59,20 +59,9 @@ def parse(opt_path, is_train=True):
 
     # check if configuration file exists
     if not os.path.isfile(opt_path):
-        if is_train:
-            probe_t = os.path.join("options","train", opt_path)
-            if not os.path.isfile(probe_t):
-                print("Configuration file {} not found.".format(opt_path))
-                os._exit(1)
-            else:
-                opt_path = probe_t
-        else: # test
-            probe_t = os.path.join("options","test", opt_path)
-            if not os.path.isfile(probe_t):
-                print("Configuration file {} not found.".format(opt_path))
-                os._exit(1)
-            else:
-                opt_path = probe_t
+        probe_t = os.path.join("options", "train" if is_train else "test", opt_path)
+        if not os.path.isfile(probe_t):
+            raise ValueError("Configuration file {} not found.".format(opt_path))
 
     ext = osp.splitext(opt_path)[1].lower()
     if ext == '.json':
@@ -84,14 +73,16 @@ def parse(opt_path, is_train=True):
                 line = line.split('//')[0] + '\n'
                 json_str += line
         opt = json.loads(json_str, object_pairs_hook=OrderedDict)
-    elif ext == '.yml' or ext == '.yaml':
+    elif ext in ['yml', 'yaml']:
         import yaml
         import re
         with open(opt_path, mode='r') as f:
             try:
-                from yaml import CLoader as Loader #CSafeLoader
+                # use SafeLoader's over Loader to prevent against arbitrary python object execution
+                # Use C loaders if possible, faster
+                from yaml import CLoader as Loader #CSafeLoader as Loader
             except ImportError:
-                from yaml import Loader #SafeLoader
+                from yaml import Loader #SafeLoader as Loader
             _mapping_tag = yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG
 
             def dict_constructor(loader, node):
@@ -115,83 +106,59 @@ def parse(opt_path, is_train=True):
     scale = opt.get('scale', 1)
     bm = opt.get('batch_multiplier', None)
 
-    # datasets
+    """datasets"""
     for phase, dataset in opt['datasets'].items():
         phase = phase.split('_')[0]
         dataset['phase'] = phase
         dataset['scale'] = scale
         is_lmdb = False
-        if 'dataroot_HR' in dataset and dataset['dataroot_HR'] is not None:
-            HR_images_paths = dataset['dataroot_HR']        
-            if type(HR_images_paths) is list:
-                dataset['dataroot_HR'] = []
-                for path in HR_images_paths:
-                    dataset['dataroot_HR'].append(os.path.expanduser(path))
-                    # if dataset['dataroot_HR'].endswith('lmdb'): #missing, how to check for lmdb with a list?
-                        # is_lmdb = True
-            elif type(HR_images_paths) is str:
-                dataset['dataroot_HR'] = os.path.expanduser(HR_images_paths)
-                if dataset['dataroot_HR'].endswith('lmdb'):
-                    is_lmdb = True
-        if 'dataroot_HR_bg' in dataset and dataset['dataroot_HR_bg'] is not None:
-            HR_images_paths = dataset['dataroot_HR_bg']        
-            if type(HR_images_paths) is list:
-                dataset['dataroot_HR_bg'] = []
-                for path in HR_images_paths:
-                    dataset['dataroot_HR_bg'].append(os.path.expanduser(path))
-            elif type(HR_images_paths) is str:
-                dataset['dataroot_HR_bg'] = os.path.expanduser(HR_images_paths)
-        if 'dataroot_LR' in dataset and dataset['dataroot_LR'] is not None:
-            LR_images_paths = dataset['dataroot_LR']
-            if type(LR_images_paths) is list:
-                dataset['dataroot_LR'] = []
-                for path in LR_images_paths:
-                    dataset['dataroot_LR'].append(os.path.expanduser(path))
-                    # if dataset['dataroot_HR'].endswith('lmdb'): #missing, how to check for lmdb with a list?
-                        # is_lmdb = True
-            elif type(LR_images_paths) is str:
-                dataset['dataroot_LR'] = os.path.expanduser(LR_images_paths)
-                if dataset['dataroot_LR'].endswith('lmdb'):
-                    is_lmdb = True
+        image_paths = ["HR", "HR_bg", "LR"]
+        for key in image_paths:
+            image_paths = dataset.get('dataroot_' + key, None)
+            if image_paths is not None:
+                if isinstance(image_paths, str):
+                    is_lmdb = os.path.splitext(image_paths)[1].lower() == ".lmdb"
+                    image_paths = [image_paths]
+                if isinstance(image_paths, list):
+                    image_paths = [os.path.expanduser(path) for path in image_paths]
+                    if len(image_paths) == 1:
+                        # if it's a single-item list, act as if it was a str instead of a list
+                        image_paths = image_paths[0]
+                    dataset['dataroot_' + key] = image_paths
+                else:
+                    raise ValueError("Unexpected path type: {}. Either a single \
+                        path or a list of paths are supported.".format(type(image_paths)))
         dataset['data_type'] = 'lmdb' if is_lmdb else 'img'
 
         if phase == 'train' and bm:
+            # compatibility with other forks
             dataset['virtual_batch_size'] = bm * dataset["batch_size"]
-
+        if dataset.get('virtual_batch_size', None):
+            dataset['virtual_batch_size'] = max(dataset['virtual_batch_size'], dataset["batch_size"])
+        
         if phase == 'train' and 'subset_file' in dataset and dataset['subset_file'] is not None:
             dataset['subset_file'] = os.path.expanduser(dataset['subset_file'])
 
         if 'lr_downscale_types' in dataset and dataset['lr_downscale_types'] is not None:
-            if(isinstance(dataset['lr_downscale_types'], str)):
+            if isinstance(dataset['lr_downscale_types'], str):
                 dataset['lr_downscale_types'] = [dataset['lr_downscale_types']]
-            downscale_types = []
-            for algo in dataset['lr_downscale_types']:
-                if type(algo) == str:
-                    downscale_types.append(_str_to_cv2_interpolation[algo.lower()])
-                else:
-                    downscale_types.append(algo)
-            dataset['lr_downscale_types'] = downscale_types
+            dataset['lr_downscale_types'] = [(
+                _str_to_cv2_interpolation[algo.lower()] if isinstance(algo, str) else algo
+            ) for algo in dataset['lr_downscale_types']]
 
-        if dataset.get('lr_blur_types', None) and dataset.get('lr_blur', None):
-            dataset['lr_blur_types'] = parse2lists(dataset['lr_blur_types'])
-        
-        if dataset.get('lr_noise_types', None) and dataset.get('lr_noise', None):
-            dataset['lr_noise_types'] = parse2lists(dataset['lr_noise_types'])
-        
-        if dataset.get('lr_noise_types2', None) and dataset.get('lr_noise2', None):
-            dataset['lr_noise_types2'] = parse2lists(dataset['lr_noise_types2'])
-        
-        if dataset.get('hr_noise_types', None) and dataset.get('hr_noise', None):
-            dataset['hr_noise_types'] = parse2lists(dataset['hr_noise_types'])
+        for k in ['lr_blur_types', 'lr_noise_types', 'lr_noise_types2', 'hr_noise_types']:
+            if dataset.get(k, None):
+                dataset[k] = parse2lists(dataset[k])
         
         tensor_shape = dataset.get('tensor_shape', None)
         if tensor_shape:
             opt['tensor_shape'] = tensor_shape
 
-    # path
+    """path"""
     for key, path in opt['path'].items():
         if path and key in opt['path']:
             opt['path'][key] = os.path.expanduser(path)
+    
     if is_train:
         experiments_root = os.path.join(opt['path']['root'], 'experiments', opt['name'])
         opt['path']['experiments_root'] = experiments_root
@@ -223,44 +190,37 @@ def parse(opt_path, is_train=True):
         opt['path']['results_root'] = results_root
         opt['path']['log'] = results_root
 
-    # network
+    """network_G"""
     opt['network_G']['scale'] = scale
 
     # relative learning rate and options
     if 'train' in opt:
         niter = opt['train']['niter']
-        if 'T_period_rel' in opt['train']:
-            opt['train']['T_period'] = [int(x * niter) for x in opt['train']['T_period_rel']]
-            opt['train'].pop('T_period_rel')
-        if 'restarts_rel' in opt['train']:
-            opt['train']['restarts'] = [int(x * niter) for x in opt['train']['restarts_rel']]
-            opt['train'].pop('restarts_rel')
-        if 'lr_steps_rel' in opt['train']:
-            opt['train']['lr_steps'] = [int(x * niter) for x in opt['train']['lr_steps_rel']]
-            opt['train'].pop('lr_steps_rel')
-        if 'lr_steps_inverse_rel' in opt['train']:
-            opt['train']['lr_steps_inverse'] = [int(x * niter) for x in opt['train']['lr_steps_inverse_rel']]
-            opt['train'].pop('lr_steps_inverse_rel')
+        for k in ['T_period', 'restarts', 'lr_steps', 'lr_steps_inverse']:
+            k_rel = k + '_rel'
+            if k_rel in opt['train']:
+                opt['train'][k] = [int(x * niter) for x in opt['train'][k_rel]]
+                opt['train'].pop(k_rel)
         if 'swa_start_iter_rel' in opt['train']:
             opt['train']['swa_start_iter'] = int(opt['train']['swa_start_iter_rel'] * niter)
             opt['train'].pop('swa_start_iter_rel')
-        # print(opt['train'])
     
     # export CUDA_VISIBLE_DEVICES
     gpu_list = ','.join(str(x) for x in opt['gpu_ids'])
     os.environ['CUDA_VISIBLE_DEVICES'] = gpu_list
     print('export CUDA_VISIBLE_DEVICES=' + gpu_list)
 
-    return opt
+    return dict_to_nonedict(opt)
 
 
 class NoneDict(dict):
+    """Ignore missing key exceptions, return None instead"""
     def __missing__(self, key):
         return None
 
 
-# convert to NoneDict, which return None for missing key.
-def dict_to_nonedict(opt):
+def dict_to_nonedict(opt: (dict, list, any)) -> (NoneDict, list[NoneDict], any):
+    """Recursively convert to NoneDict, which returns None for missing keys"""
     if isinstance(opt, dict):
         new_opt = dict()
         for key, sub_opt in opt.items():
@@ -272,7 +232,7 @@ def dict_to_nonedict(opt):
         return opt
 
 
-def dict2str(opt, indent_l=1):
+def dict2str(opt: dict, indent_l: int = 1) -> str:
     '''dict to string for logger'''
     msg = ''
     for k, v in opt.items():
@@ -296,22 +256,22 @@ def opt_get(opt=None, keys=[], default=None):
     return ret
 
 
-def check_resume(opt):
+def check_resume(opt: dict):
     '''Check resume states and pretrain_model paths'''
     logger = logging.getLogger('base')
     if opt['path']['resume_state']:
         if opt['path']['pretrain_model_G'] or opt['path']['pretrain_model_D']:
-            logger.warning('pretrain_model path will be ignored when resuming training.')
+            logger.warning('pretrain_model paths will be ignored when resuming training from a .state file.')
 
         state_idx = osp.basename(opt['path']['resume_state']).split('.')[0]
         opt['path']['pretrain_model_G'] = osp.join(opt['path']['models'],
                                                    '{}_G.pth'.format(state_idx))
-        logger.info('Set [pretrain_model_G] to ' + opt['path']['pretrain_model_G'])
+        logger.info('Set [pretrain_model_G] to {}'.format(opt['path']['pretrain_model_G']))
         if 'gan' in opt['model']:
             opt['path']['pretrain_model_D'] = osp.join(opt['path']['models'],
                                                        '{}_D.pth'.format(state_idx))
-            logger.info('Set [pretrain_model_D] to ' + opt['path']['pretrain_model_D'])
+            logger.info('Set [pretrain_model_D] to {}'.format(opt['path']['pretrain_model_D']))
         if 'swa' in opt['model'] or opt['swa']:
             opt['path']['pretrain_model_swaG'] = osp.join(opt['path']['models'],
                                                    '{}_swaG.pth'.format(state_idx))
-            logger.info('Set [pretrain_model_swaG] to ' + opt['path']['pretrain_model_swaG'])
+            logger.info('Set [pretrain_model_swaG] to {}'.format(opt['path']['pretrain_model_swaG']))
