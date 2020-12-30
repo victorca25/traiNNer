@@ -1,24 +1,18 @@
-import os
-import sys
-import logging
-import time
 import argparse
-import numpy as np
+import logging
+import os
+import time
 from collections import OrderedDict
-
-import options
-import utils.util as util
-from dataops.common import bgr2ycbcr, tensor2np
-from data import create_dataset, create_dataloader
-from models import create_model
 
 import torch
 from torch.autograd import Variable
-from torch.utils.data import DataLoader
 
+import options
+import utils.util as util
+from data import create_dataset, create_dataloader
 from dataops.colors import ycbcr_to_rgb
-from dataops.debug import tmp_vis, tmp_vis_flow, describe_numpy, describe_tensor
-
+from dataops.common import bgr2ycbcr, tensor2np
+from models import create_model
 
 
 def chop_forward(x, model, scale, shave=16, min_size=5000, nGPUs=1, need_HR=False):
@@ -32,7 +26,6 @@ def chop_forward(x, model, scale, shave=16, min_size=5000, nGPUs=1, need_HR=Fals
         x[:, :, :, (h - h_size):h, 0:w_size],
         x[:, :, :, (h - h_size):h, (w - w_size):w]]
 
-    
     if w_size * h_size < min_size:
         outputlist = []
         for i in range(0, 4, nGPUs):
@@ -63,9 +56,6 @@ def chop_forward(x, model, scale, shave=16, min_size=5000, nGPUs=1, need_HR=Fals
     return output
 
 
-
-
-
 def main():
     # options
     parser = argparse.ArgumentParser()
@@ -74,12 +64,12 @@ def main():
 
     logger = logging.getLogger('base')
     logger.info(options.dict2str(opt))
-    
+
     scale = opt.get('scale', 4)
-    
+
     # Create test dataset and dataloader
     test_loaders = []
-    znorm = False #TMP
+    znorm = False  # TMP
     # znorm_list = []
 
     '''
@@ -125,30 +115,30 @@ def main():
             img_name = os.path.splitext(os.path.basename(img_path))[0]
             # tmp_vis(data['LR'][:,1,:,:,:], True)
 
-            if  opt.get('chop_forward', None):
+            if opt.get('chop_forward', None):
                 # data
                 if len(data['LR'].size()) == 4:
                     b, n_frames, h_lr, w_lr = data['LR'].size()
-                    LR_y_cube = data['LR'].view(b, -1, 1, h_lr, w_lr) # b, t, c, h, w
-                elif len(data['LR'].size()) == 5: #for networks that work with 3 channel images
+                    LR_y_cube = data['LR'].view(b, -1, 1, h_lr, w_lr)  # b, t, c, h, w
+                elif len(data['LR'].size()) == 5:  # for networks that work with 3 channel images
                     _, n_frames, _, _, _ = data['LR'].size()
-                    LR_y_cube = data['LR'] # b, t, c, h, w
+                    LR_y_cube = data['LR']  # b, t, c, h, w
 
                 # print(LR_y_cube.shape)
                 # print(data['LR_bicubic'].shape)
 
                 # crop borders to ensure each patch can be divisible by 2
-                #TODO: this is modcrop, not sure if really needed, check (the dataloader already does modcrop)
+                # TODO: this is modcrop, not sure if really needed, check (the dataloader already does modcrop)
                 _, _, _, h, w = LR_y_cube.size()
-                h = int(h//16) * 16
-                w = int(w//16) * 16
+                h = int(h // 16) * 16
+                w = int(w // 16) * 16
                 LR_y_cube = LR_y_cube[:, :, :, :h, :w]
                 if isinstance(data['LR_bicubic'], torch.Tensor):
                     # SR_cb = data['LR_bicubic'][:, 1, :, :][:, :, :h * scale, :w * scale]
                     SR_cb = data['LR_bicubic'][:, 1, :h * scale, :w * scale]
                     # SR_cr = data['LR_bicubic'][:, 2, :, :][:, :, :h * scale, :w * scale]
                     SR_cr = data['LR_bicubic'][:, 2, :h * scale, :w * scale]
-                                
+
                 SR_y = chop_forward(LR_y_cube, model, scale, need_HR=need_HR).squeeze(0)
                 # SR_y = np.array(SR_y.data.cpu())
                 if test_loader.dataset.opt.get('srcolors', None):
@@ -167,16 +157,16 @@ def main():
                 # tmp_vis(visuals['SR'], True)
                 if test_loader.dataset.opt.get('y_only', None) and test_loader.dataset.opt.get('srcolors', None):
                     SR_cb = data['LR_bicubic'][:, 1, :, :]
-                    SR_cr = data['LR_bicubic'][:, 2, :, :]    
+                    SR_cr = data['LR_bicubic'][:, 2, :, :]
                     # tmp_vis(ds(SR_cb), True)
                     # tmp_vis(ds(SR_cr), True)
                     sr_img = ycbcr_to_rgb(torch.stack((visuals['SR'], SR_cb, SR_cr), -3))
                 else:
                     sr_img = visuals['SR']
-            
-            #if znorm the image range is [-1,1], Default: Image range is [0,1] # testing, each "dataset" can have a different name (not train, val or other)
+
+            # if znorm the image range is [-1,1], Default: Image range is [0,1] # testing, each "dataset" can have a different name (not train, val or other)
             sr_img = tensor2np(sr_img, denormalize=znorm)  # uint8
-            
+
             # save images
             suffix = opt['suffix']
             if suffix:
@@ -185,11 +175,11 @@ def main():
                 save_img_path = os.path.join(dataset_dir, img_name + '.png')
             util.save_img(sr_img, save_img_path)
 
-            #TODO: update to use metrics functions
+            # TODO: update to use metrics functions
             # calculate PSNR and SSIM
             if need_HR:
-                #if znorm the image range is [-1,1], Default: Image range is [0,1] # testing, each "dataset" can have a different name (not train, val or other)
-                gt_img = tensor2img(visuals['HR'],denormalize=znorm)  # uint8
+                # if znorm the image range is [-1,1], Default: Image range is [0,1] # testing, each "dataset" can have a different name (not train, val or other)
+                gt_img = tensor2img(visuals['HR'], denormalize=znorm)  # uint8
                 gt_img = gt_img / 255.
                 sr_img = sr_img / 255.
 
@@ -211,25 +201,26 @@ def main():
                     ssim_y = util.calculate_ssim(cropped_sr_img_y * 255, cropped_gt_img_y * 255)
                     test_results['psnr_y'].append(psnr_y)
                     test_results['ssim_y'].append(ssim_y)
-                    logger.info('{:20s} - PSNR: {:.6f} dB; SSIM: {:.6f}; PSNR_Y: {:.6f} dB; SSIM_Y: {:.6f}.'\
-                        .format(img_name, psnr, ssim, psnr_y, ssim_y))
+                    logger.info('{:20s} - PSNR: {:.6f} dB; SSIM: {:.6f}; PSNR_Y: {:.6f} dB; SSIM_Y: {:.6f}.' \
+                                .format(img_name, psnr, ssim, psnr_y, ssim_y))
                 else:
                     logger.info('{:20s} - PSNR: {:.6f} dB; SSIM: {:.6f}.'.format(img_name, psnr, ssim))
             else:
                 logger.info(img_name)
 
-        #TODO: update to use metrics functions
+        # TODO: update to use metrics functions
         if need_HR:  # metrics
             # Average PSNR/SSIM results
             ave_psnr = sum(test_results['psnr']) / len(test_results['psnr'])
             ave_ssim = sum(test_results['ssim']) / len(test_results['ssim'])
-            logger.info('----Average PSNR/SSIM results for {}----\n\tPSNR: {:.6f} dB; SSIM: {:.6f}\n'\
-                    .format(test_set_name, ave_psnr, ave_ssim))
+            logger.info('----Average PSNR/SSIM results for {}----\n\tPSNR: {:.6f} dB; SSIM: {:.6f}\n' \
+                        .format(test_set_name, ave_psnr, ave_ssim))
             if test_results['psnr_y'] and test_results['ssim_y']:
                 ave_psnr_y = sum(test_results['psnr_y']) / len(test_results['psnr_y'])
                 ave_ssim_y = sum(test_results['ssim_y']) / len(test_results['ssim_y'])
-                logger.info('----Y channel, average PSNR/SSIM----\n\tPSNR_Y: {:.6f} dB; SSIM_Y: {:.6f}\n'\
-                    .format(ave_psnr_y, ave_ssim_y))
+                logger.info('----Y channel, average PSNR/SSIM----\n\tPSNR_Y: {:.6f} dB; SSIM_Y: {:.6f}\n' \
+                            .format(ave_psnr_y, ave_ssim_y))
+
 
 if __name__ == '__main__':
     main()
