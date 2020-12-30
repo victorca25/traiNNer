@@ -12,14 +12,13 @@ from codes.dataops.common import modcrop, imresize
 
 # options
 test_img_folder_name = 'samples'  # image folder name
-
 test_img_folder = '../data/' + test_img_folder_name  # HR images
-save_prob_path = '../data/' + test_img_folder_name + '_segprob'  # probability maps
-save_byteimg_path = '../data/' + test_img_folder_name + '_byteimg'  # segmentation annotations
-save_colorimg_path = '../data/' + test_img_folder_name + '_colorimg'  # segmentaion color results
+save_prob_path = '../data/%s_segprob' % test_img_folder_name  # probability maps
+save_byte_img_path = '../data/%s_byteimg' % test_img_folder_name  # segmentation annotations
+save_color_img_path = '../data/%s_colorimg' % test_img_folder_name  # segmentation color results
 
 # make dirs
-util.mkdirs([save_prob_path, save_byteimg_path, save_colorimg_path])
+util.mkdirs([save_prob_path, save_byte_img_path, save_color_img_path])
 
 # load model
 seg_model = seg_arch.OutdoorSceneSeg()
@@ -45,21 +44,16 @@ lookup_table /= 255
 
 print('seg testing...')
 
-idx = 0
-for path in glob.glob(test_img_folder + '/*'):
-    idx += 1
-    basename = os.path.basename(path)
-    base = os.path.splitext(basename)[0]
-    print(idx, base)
-    # read image
+for i, path in enumerate(glob.glob(os.path.join(test_img_folder, '*'))):
+    filename = os.path.splitext(os.path.basename(path))[0]
+    print(i, filename)
+
     img = cv2.imread(path, cv2.IMREAD_UNCHANGED)
     img = modcrop(img, 8)
     if img.ndim == 2:
         img = np.expand_dims(img, axis=2)
     img = torch.from_numpy(np.transpose(img, (2, 0, 1))).float()
 
-    # matlab imresize
-    # the implementation is slower than matlab, can use matlab to generate first
     img_LR = imresize(img / 255, 1 / 4, antialiasing=True)
     img = imresize(img_LR, 4, antialiasing=True) * 255
 
@@ -71,25 +65,31 @@ for path in glob.glob(test_img_folder + '/*'):
     output = seg_model(img).detach().float().cpu().squeeze_()
 
     # prob
-    torch.save(output, os.path.join(save_prob_path, base + '_bic.pth'))  # 1x8xHxW
+    torch.save(output, os.path.join(save_prob_path, filename + '_bic.pth'))  # 1x8xHxW
 
     # byte img
     _, argmax = torch.max(output, 0)
     argmax = argmax.squeeze().byte()
-    cv2.imwrite(os.path.join(save_byteimg_path, base + '.png'), argmax.numpy())
+    cv2.imwrite(os.path.join(save_byte_img_path, filename + '.png'), argmax.numpy())
 
     # color img
     im_h, im_w = argmax.size()
     color = torch.FloatTensor(3, im_h, im_w).fill_(0)  # black
-    for i in range(8):
-        mask = torch.eq(argmax, i)
-        color.select(0, 0).masked_fill_(mask, lookup_table[i][0])  # R
-        color.select(0, 1).masked_fill_(mask, lookup_table[i][1])  # G
-        color.select(0, 2).masked_fill_(mask, lookup_table[i][2])  # B
+    for n in range(8):
+        mask = torch.eq(argmax, n)
+        color.select(0, 0).masked_fill_(mask, lookup_table[n][0])  # R
+        color.select(0, 1).masked_fill_(mask, lookup_table[n][1])  # G
+        color.select(0, 2).masked_fill_(mask, lookup_table[n][2])  # B
+
     # void
     mask = torch.eq(argmax, 255)
     color.select(0, 0).masked_fill_(mask, lookup_table[8][0])  # R
     color.select(0, 1).masked_fill_(mask, lookup_table[8][1])  # G
     color.select(0, 2).masked_fill_(mask, lookup_table[8][2])  # B
-    torchvision.utils.save_image(color, os.path.join(save_colorimg_path, base + '.png'), padding=0, \
-                                 normalize=False)
+
+    torchvision.utils.save_image(
+        color,
+        os.path.join(save_color_img_path, filename + '.png'),
+        padding=0,
+        normalize=False
+    )
