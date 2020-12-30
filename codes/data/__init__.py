@@ -1,25 +1,38 @@
-'''create dataset and dataloader'''
+"""Create dataset and dataloader"""
 import logging
+
 import torch.utils.data
 
-def create_dataloader(dataset, dataset_opt):
-    '''create dataloader '''
-    phase = dataset_opt['phase']
-    if phase == 'train':
-        return torch.utils.data.DataLoader(
-            dataset,
-            batch_size=dataset_opt['batch_size'],
-            shuffle=dataset_opt['use_shuffle'],
-            num_workers=dataset_opt['n_workers'],
-            drop_last=True,
-            pin_memory=True)
-    else:
-        return torch.utils.data.DataLoader(
-            dataset, batch_size=1, shuffle=False, num_workers=1, pin_memory=True)
 
+def create_dataloader(dataset: torch.utils.data.Dataset, dataset_opt: dict) -> torch.utils.data.DataLoader:
+    """
+    Create Dataloader
+    :param dataset: Dataset to use
+    :param dataset_opt: Dataset configuration from opt file
+    """
+    batch_size = 1
+    shuffle = False
+    num_workers = 1
+    drop_last = False
+    if dataset_opt['phase'] == 'train':
+        batch_size = dataset_opt['batch_size']
+        shuffle = dataset_opt['use_shuffle']
+        num_workers = dataset_opt['n_workers']
+        drop_last = True
+    return torch.utils.data.DataLoader(
+        dataset,
+        batch_size=batch_size,
+        shuffle=shuffle,
+        num_workers=num_workers,
+        drop_last=drop_last,
+        pin_memory=True
+    )
 
-def create_dataset(dataset_opt):
-    '''create dataset'''
+def create_dataset(dataset_opt: dict) -> torch.utils.data.Dataset:
+    """
+    Create Dataset
+    :param dataset_opt: Dataset configuration from opt file
+    """
     mode = dataset_opt['mode']
     if mode == 'LR':
         from data.LR_dataset import LRDataset as D
@@ -52,4 +65,3 @@ def create_dataset(dataset_opt):
     logger.info('Dataset [{:s} - {:s}] is created.'.format(dataset.__class__.__name__,
                                                            dataset_opt['name']))
     return dataset
-
