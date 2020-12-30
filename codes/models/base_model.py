@@ -58,7 +58,7 @@ class BaseModel():
         '''
         pass
 
-    def optimize_parameters(self):
+    def optimize_parameters(self, step):
         '''Calculate losses, gradients, and update network weights; called in every training iteration'''
         pass
 
