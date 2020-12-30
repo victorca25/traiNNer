@@ -138,16 +138,7 @@ def parse(opt_path: str, is_train: bool = True) -> NoneDict:
     # path
     for key, path in opt['path'].items():
         if isinstance(path, str) and path:
-            path = os.path.normpath(os.path.expanduser(path))
-        opt['path'][key] = path
-        if os.path.isdir(path):
-            os.makedirs(path, exist_ok=True)
-
-    # create loggers
-    setup_logger(None, opt['path']['log'], 'train' if is_train else 'test', level=logging.INFO, screen=True)  # base
-    if is_train:
-        setup_logger('val', opt['path']['log'], 'val', level=logging.INFO)
-    logger = logging.getLogger('base')
+            opt['path'][key] = os.path.normpath(os.path.expanduser(path))
 
     if opt['path']['resume_state']:
         if opt['path']['pretrain_model_G'] or opt['path']['pretrain_model_D']:
