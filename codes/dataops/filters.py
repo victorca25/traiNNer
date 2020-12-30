@@ -812,9 +812,11 @@ def grad_orientation(grad_y, grad_x):
     return go
 
 
-def guided_filter(x: torch.Tensor, y: torch.Tensor, ks=None, r=None, eps=1e-2):
-    ''' Guided filter
-    This  is a kind of edge-preserving smoothing filter that can filter out noise 
+def guided_filter(x: torch.Tensor, y: torch.Tensor, x_HR: torch.Tensor = None,
+                  ks=None, r=None, eps=1e-2, 
+                  box_kernel=None, mode='regular', conv_a=None):
+    ''' Guided filter / FastGuidedFilter function
+    This is a kind of edge-preserving smoothing filter that can filter out noise 
         or texture while retaining sharp edges. One key assumption of the guided 
         filter is that the relation between guidance x and the filtering output 
         is linear. 
@@ -822,29 +824,43 @@ def guided_filter(x: torch.Tensor, y: torch.Tensor, ks=None, r=None, eps=1e-2):
     Arguments:
         x (tensor): guidance image with shape [b, c, h, w].
         y (tensor): filtering input image with shape [b, c, h, w].
+        x_HR (tensor): optional high resolution guidance map for joint 
+            upsampling (for 'fast' or 'conv' modes)
         ks (int): kernel size for the box/mean filter. In reference to the 
             window radius "r": kx = ky = ks = (2*r)+1
         r (int): optional radius for the window. Can use instead of ks.
+        box_kernel (tensor): precalculated box_kernel (optional)
+        mode (str): select between the guided filter types: 'regular', 'fast'
+            or 'conv' (convolutional). 
+        conv_a (nn.Sequential): the convolutional layers to use for 'conv' 
+            mode to calculate the 'A' parameter
         eps (float): regularization ε, penalizing large A values
     Returns:
         output (tensor): filtered image
 
     ref: http://kaiminghe.com/eccv10/index.html
          https://en.wikipedia.org/wiki/Guided_filter
+         http://wuhuikai.me/DeepGuidedFilterProject/deep_guided_filter.pdf
     '''
     
-    if not ks:
-        if r:
-            ks = (2*r)+1
-        else:
-            raise ValueError('Either kernel size (ks) or radius (r) for the window are required.')
+    if not isinstance(box_kernel, torch.Tensor):
+    # get the box_kernel if not provided
+        if not ks:
+            if r:
+                ks = (2*r)+1
+            else:
+                raise ValueError('Either kernel size (ks) or radius (r) for the window are required.')
+        
+        # mean filter. The window size is defined by the kernel size.
+        box_kernel = get_box_kernel(kernel_size = ks)
 
     x_shape = x.shape
-    #y_shape = y.shape
+    # y_shape = y.shape
+    if isinstance(x_HR, torch.Tensor):
+        x_HR_shape = x_HR.shape
 
-    # mean filter. The window size is defined by the kernel size.
-    box_kernel = get_box_kernel(kernel_size = ks).to(x.device)
-    N = filter2D(torch.ones((x_shape[-4], 1, x_shape[-2], x_shape[-1])), box_kernel).to(x.device)
+    box_kernel = box_kernel.to(x.device)
+    N = filter2D(torch.ones((1, 1, x_shape[-2], x_shape[-1])), box_kernel).to(x.device)
 
     # Note: similar to SSIM calculation
     mean_x = filter2D(x, box_kernel) / N
@@ -853,12 +869,69 @@ def guided_filter(x: torch.Tensor, y: torch.Tensor, ks=None, r=None, eps=1e-2):
     var_x = (filter2D(x*x, box_kernel) / N) - mean_x*mean_x #Corrected from: - mean_x - mean_x
 
     # linear coefficients A, b
-    A = cov_xy / (var_x + eps)
+    if mode == 'conv':
+        A = conv_a(torch.cat([cov_xy, var_x], dim=1))
+    else: # regular or fast GuidedFilter
+        A = cov_xy / (var_x + eps)
     b = mean_y - A * mean_x # According to original GF paper, needs to add: "+ x"
 
-    mean_A = filter2D(A, box_kernel) / N
-    mean_b = filter2D(b, box_kernel) / N
-
-    output = mean_A * x + mean_b
+    ## mean_A; mean_b
+    if mode == 'fast' or mode == 'conv':
+        mean_A = F.interpolate(A, (x_HR_shape[-2], x_HR_shape[-1]), mode='bilinear', align_corners=True)
+        mean_b = F.interpolate(b, (x_HR_shape[-2], x_HR_shape[-1]), mode='bilinear', align_corners=True)
+        output = mean_A * x_HR + mean_b
+    else: # regular GuidedFilter
+        mean_A = filter2D(A, box_kernel) / N
+        mean_b = filter2D(b, box_kernel) / N
+        output = mean_A * x + mean_b
 
     return output
+
+
+class GuidedFilter(nn.Module):
+    ''' Differentiable GuidedFilter module
+    '''
+    def __init__(self, ks=None, r=None, eps=1e-2, mode='regular'): #eps=1e-8
+        super(GuidedFilter, self).__init__()
+        self.eps = eps
+        self.mode = mode
+        
+        if not ks and not r:
+            raise ValueError('Either kernel size (ks) or radius (r) for the window are required.')
+
+        if not ks and r:
+            self.ks = (2*r)+1
+        elif ks:
+            self.ks = ks
+        self.box_kernel = get_box_kernel(kernel_size = self.ks)
+            
+        if self.mode == 'conv':
+            self.conv_a = nn.Sequential(nn.Conv2d(6, 32, kernel_size=1, bias=False),
+                                        norm(32),
+                                        nn.ReLU(inplace=True),
+                                        nn.Conv2d(32, 32, kernel_size=1, bias=False),
+                                        norm(32),
+                                        nn.ReLU(inplace=True),
+                                        nn.Conv2d(32, 3, kernel_size=1, bias=False))
+        else:
+            self.conv_a = None
+        
+    def forward(self, x, y, x_HR=None):
+
+        n_x, c_x, h_x, w_x = x.size()
+        n_y, c_y, h_y, w_y = y.size()
+        assert n_x == n_y
+        assert c_x == 1 or c_x == c_y
+        assert h_x == h_y and w_x == w_y
+        assert h_x > self.ks and w_x > self.ks
+
+        if isinstance(x_HR, torch.Tensor):
+            n_hrx, c_hrx, h_hrx, w_hrx = x_HR.size()
+            assert n_y == n_hrx
+            assert c_x == c_hrx
+
+        return guided_filter(x, y, x_HR, box_kernel=self.box_kernel, 
+                                eps=self.eps, mode=self.mode, conv_a=self.conv_a)
+
+
+
