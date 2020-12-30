@@ -2,12 +2,12 @@ import glob
 import os.path
 
 import cv2
-import models.modules.sft_arch as sft
+import models.modules.architectures.sft_arch as sft
 import numpy as np
 import torch
-from data.util import imresize, modcrop
 
 import utils.util as util
+from codes.dataops.common import modcrop, imresize
 
 # model_path = '../experiments/pretrained_models/sft_net_torch.pth' # torch version
 model_path = '../experiments/pretrained_models/SFTGAN_bicx4_noBN_OST_bg.pth'  # pytorch training

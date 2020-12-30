@@ -4,11 +4,10 @@ import os
 import time
 from collections import OrderedDict
 
-from data.util import bgr2ycbcr
-
 import options
 import utils.util as util
 from data import create_dataset, create_dataloader
+from dataops.common import bgr2ycbcr
 from models import create_model
 
 
