@@ -43,7 +43,14 @@ SCI_NOTATION_RE = re.compile(
 )
 
 
-def parse(opt_path: str, is_train: bool = True) -> dict:
+class NoneDict(dict):
+    """Ignore missing key exceptions, return None instead"""
+
+    def __missing__(self, key):
+        return None
+
+
+def parse(opt_path: str, is_train: bool = True) -> NoneDict:
     """
     Parse options file.
     :param opt_path: Option file path. Can be JSON or YAML.
@@ -172,7 +179,7 @@ def parse(opt_path: str, is_train: bool = True) -> dict:
     os.environ['CUDA_VISIBLE_DEVICES'] = gpu_list
     print('export CUDA_VISIBLE_DEVICES=' + gpu_list)
 
-    return opt
+    return dict_to_nonedict(opt)
 
 
 def parse2lists(types: (dict, str, any)) -> (list, any):
@@ -185,13 +192,6 @@ def parse2lists(types: (dict, str, any)) -> (list, any):
     if isinstance(types, str):
         return [types]
     return types
-
-
-class NoneDict(dict):
-    """Ignore missing key exceptions, return None instead"""
-
-    def __missing__(self, key):
-        return None
 
 
 def dict_to_nonedict(opt: (dict, list, any)) -> (NoneDict, list[NoneDict], any):

@@ -18,7 +18,6 @@ def main():
     parser.add_argument('-opt', type=str, required=True, help='Path to options JSON file.')
     opt = options.parse(parser.parse_args().opt, is_train=False)
     util.mkdirs((path for key, path in opt['path'].items() if not key == 'pretrain_model_G'))
-    opt = options.dict_to_nonedict(opt)
 
     util.setup_logger(None, opt['path']['log'], 'test.log', level=logging.INFO, screen=True)
     logger = logging.getLogger('base')

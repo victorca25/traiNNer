@@ -20,7 +20,6 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-opt', type=str, required=True, help='Path to option JSON file.')
     opt = options.parse(parser.parse_args().opt, is_train=True)
-    opt = options.dict_to_nonedict(opt)  # Convert to NoneDict, which return None for missing key.
 
     # config loggers. Before it, the log will not work
     util.setup_logger(None, opt['path']['log'], 'train', level=logging.INFO, screen=True)
