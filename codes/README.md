@@ -11,7 +11,7 @@ Let us take the train commad `python train.py -opt options/train/train_esrgan.js
 -   [`train.py`](https://github.com/xinntao/BasicSR/blob/master/codes/train.py) is called. 
 -   Reads the configuration (a json file) in [`options/train/train_esrgan.json`](https://github.com/xinntao/BasicSR/blob/master/codes/options/train/train_esrgan.json), including the configurations for data loader, network, loss, training strategies and etc. The json file is processed by [`options/options.py`](https://github.com/xinntao/BasicSR/blob/master/codes/options/options.py).
 -   Creates the train and validation data loader. The data loader is constructed in [`data/__init__.py`](https://github.com/xinntao/BasicSR/blob/master/codes/data/__init__.py) according to different data modes.
--   Creates the model (is constructed in [`models/__init__.py`](https://github.com/xinntao/BasicSR/blob/master/codes/models/__init__.py) according to differnt model types). A model mainly consists of two parts - [network structure] and [model defination, e.g., loss definition, optimization and etc]. The network is constructed in [`models/network.py`](https://github.com/xinntao/BasicSR/blob/master/codes/models/networks.py) and the detailed structures are in [`models/modules`](https://github.com/xinntao/BasicSR/tree/master/codes/models/modules).
+-   Creates the model (is constructed in [`models/__init__.py`](https://github.com/xinntao/BasicSR/blob/master/codes/models/__init__.py) according to differnt model types). A model mainly consists of two parts - \[network structure] and \[model defination, e.g., loss definition, optimization and etc]. The network is constructed in [`models/network.py`](https://github.com/xinntao/BasicSR/blob/master/codes/models/networks.py) and the detailed structures are in [`models/modules`](https://github.com/xinntao/BasicSR/tree/master/codes/models/modules).
 -   Start to train the model. Other actions like logging, saving intermediate models, validation, updating learning rate and etc are also done during the training.  
 
 Moreover, there are utils and userful scripts. A detailed description is provided as follows.
@@ -42,7 +42,7 @@ Moreover, there are utils and userful scripts. A detailed description is provide
 -   Uses `cv2` package to do image processing, which provides rich operations.
 -   Supports reading files from image folder or `lmdb` file. For faster IO during training, recommand to create `lmdb` dataset first. More details including lmdb format, creation and usage can be found in our [lmdb wiki](https://github.com/xinntao/BasicSR/wiki/Faster-IO-speed).
 -   [`data/util.py`](https://github.com/xinntao/BasicSR/blob/master/codes/data/util.py) provides useful tools. For example, the `MATLAB bicubic` operation; rgb&lt;-->ycbcr as MATLAB. We also provide [MATLAB bicubic imresize wiki](https://github.com/xinntao/BasicSR/wiki/MATLAB-bicubic-imresize) and [Color conversion in SR wiki](https://github.com/xinntao/BasicSR/wiki/Color-conversion-in-SR).
--   Now, we convert the images to format NCHW, [0,1], RGB, torch float tensor.
+-   Now, we convert the images to format NCHW, \[0,1], RGB, torch float tensor.
 
 ## Model
 
