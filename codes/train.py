@@ -16,12 +16,15 @@ from utils import util, metrics
 
 
 def main():
-    # options
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-opt', type=str, required=True, help='Path to option JSON file.')
-    opt = options.parse(parser.parse_args().opt, is_train=True)
+    # arguments
+    args = argparse.ArgumentParser()
+    args.add_argument('-opt', type=str, required=True, help='Path to option JSON file.')
+    args = args.parse_args()
 
-    # config loggers. Before it, the log will not work
+    # config options file
+    opt = options.parse(args.opt, is_train=True)
+
+    # create loggers
     util.setup_logger(None, opt['path']['log'], 'train', level=logging.INFO, screen=True)
     util.setup_logger('val', opt['path']['log'], 'val', level=logging.INFO)
     logger = logging.getLogger('base')
