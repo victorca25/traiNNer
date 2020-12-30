@@ -2,6 +2,12 @@
 
 BasicSR (Basic Super Restoration) is an open source image and video restoration toolbox (super-resolution, denoising, deblurring and others) based on PyTorch.
 
+[![Python Version](https://img.shields.io/badge/python-3-informational?style=flat)](https://python.org)
+[![License](https://img.shields.io/github/license/victorca25/BasicSR?style=flat)](https://github.com/victorca25/BasicSR/blob/master/LICENSE)
+[![Codacy](https://app.codacy.com/project/badge/Grade/f4ad595a0ed54d3991cf4c51c708978c)](https://codacy.com/gh/rlaPHOENiX/BasicSR/dashboard?utm_source=github.com&utm_medium=referral&utm_content=rlaPHOENiX/BasicSR&utm_campaign=Badge_Grade)
+[![Issues](https://img.shields.io/github/issues/victorca25/BasicSR?style=flat)](https://github.com/victorca25/BasicSR/issues)
+[![PR's Accepted](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat)](https://makeapullrequest.com)
+
 This is a heavily modified fork of the original BasicSR. What you will find here: boilerplate code for training and testing computer vision (CV) models, different CV methods and strategies integrated in a single pipeline and modularity to add and remove components as needed, including new network architectures. A large rewrite of code was made to reduce code redundancy and duplicates, reorganize the code and make it more modular.
 
 Details of the supported architectures can be found [here](https://github.com/victorca25/BasicSR/blob/master/docs/architectures.md).
