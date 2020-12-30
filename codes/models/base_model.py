@@ -1,16 +1,20 @@
 import os
+from collections import Counter
+from copy import deepcopy
 from shutil import copyfile
+
 import torch
 import torch.nn as nn
-from copy import deepcopy
-from collections import Counter, OrderedDict
+
 from models.networks import model_val
 
 import logging
 logger = logging.getLogger('base')
 
-class BaseModel():
-    '''This class is an base class for models.
+
+class BaseModel:
+    """
+    This class is an base class for models.
     To create a subclass, you need to implement the following five functions:
         -- <__init__>:                      initialize the class; first call super(NewModel, self).__init__(opt)
         -- <feed_data>:                     unpack data from dataset and apply any preprocessing.
@@ -20,23 +24,26 @@ class BaseModel():
         -- <print_network>:                 -
         -- <save>:                          -
         -- <load>:                          -
-    '''
-    def __init__(self, opt):
-        '''Initialize the BaseModel class.
-        Parameters:
-            opt (Option class)-- stores all the experiment flags
+    """
+
+    def __init__(self, opt: dict):
+        """
+        Initialize the BaseModel class.
+
         When creating your custom class, you need to implement your own initialization.
         Then, you need to define:
             -- self.loss_names (str list):          specify the training losses that you want to plot and save.
             -- self.model_names (str list):         define networks used in our training.
             -- self.visual_names (str list):        specify the images that you want to display and save.
-            -- self.optimizers (optimizer list):    define and initialize optimizers. You can define 
-                                                    one optimizer for each network. If two networks are 
-                                                    updated at the same time, you can use itertools.chain 
+            -- self.optimizers (optimizer list):    define and initialize optimizers. You can define
+                                                    one optimizer for each network. If two networks are
+                                                    updated at the same time, you can use itertools.chain
                                                     to group them.
             -- self.schedulers (schedulers list):   a scheduler for each optimizer
             -- other model options
-        '''
+
+        :param opt: stores all the experiment flags
+        """
         self.opt = opt
         # self.device = torch.device('cuda' if opt['gpu_ids'] is not None else 'cpu')
         if opt['gpu_ids'] is not None:
@@ -45,7 +52,7 @@ class BaseModel():
             self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         else:
             self.device = 'cpu'
-        
+
         self.is_train = opt['is_train']
         self.schedulers = []
         self.optimizers = []
@@ -53,30 +60,31 @@ class BaseModel():
         self.swa_start_iter = None
         self.metric = 0  # used for learning rate policy 'plateau'
 
-    def feed_data(self, data):
-        '''Unpack input data from the dataloader and perform necessary pre-processing steps.
-        Parameters:
-            data (dict): includes the data itself and any metadata information.
-        '''
+    def feed_data(self, data: dict):
+        """
+        Unpack input data from the dataloader and perform necessary pre-processing steps.
+
+        :param data: includes the data itself and any metadata information.
+        """
         pass
 
     def optimize_parameters(self, step):
-        '''Calculate losses, gradients, and update network weights; called in every training iteration'''
+        """Calculate losses, gradients, and update network weights; called in every training iteration"""
         pass
 
     def get_current_visuals(self):
-        '''Return visualization images images for validation, visualization and logging'''
+        """Return visualization images images for validation, visualization and logging"""
         pass
 
     def get_current_losses(self):
-        '''Return traning losses. train.py will print out these errors on console, and save them to a file'''
+        """Return training losses. train.py will print out these errors on console, and save them to a file"""
         pass
         
-    def print_network(self, verbose=False):
-        '''Print the total number of parameters in the network and (if verbose) network architecture
+    def print_network(self, verbose: Bool = False):
+        """Print the total number of parameters in the network and (if verbose) network architecture
         Parameters:
             verbose (bool) -- if verbose: print the network architecture
-        '''
+        """
 
         for name in self.model_names:
             if isinstance(name, str):
@@ -133,10 +141,11 @@ class BaseModel():
         '''
 
     def save(self, iter_step, latest=None, loader=None):
-        '''Save all the networks to the disk.
-        Parameters:
-            iter_step (int) -- current epoch; used in the file name '%s_net_%s.pth' % (epoch, name)
-        '''
+        """
+        Save all the networks to the disk.
+
+        :param label: current epoch; used in the file name '%s_net_%s.pth' % (iter_step, name)
+        """
         for name in self.model_names:
             if isinstance(name, str):
                 net = getattr(self, 'net' + name)
@@ -162,8 +171,7 @@ class BaseModel():
             self.save_network(self.swa_model, 'swaG', iter_step, latest)
 
     def load(self):
-        '''Load all the networks from the disk.
-        '''
+        """Load all the networks from the disk"""
         for name in self.model_names:
             if isinstance(name, str):
                 net = getattr(self, 'net' + name)
@@ -193,36 +201,34 @@ class BaseModel():
                 logger.info('Loading pretrained model for SWA G [{:s}] ...'.format(load_path_swaG))
                 self.load_network(load_path_swaG, self.swa_model)
 
-    def _set_lr(self, lr_groups_l):
-        ''' Set learning rate for warmup.
-        Args:
-            lr_groups_l (list): List for lr_groups, one for each for an optimizer.
-        '''
+    def _set_lr(self, lr_groups_l: list):
+        """
+        Set learning rate for warmup.
+        :param lr_groups_l: List for lr_groups, one for each for an optimizer.
+        """
         for optimizer, lr_groups in zip(self.optimizers, lr_groups_l):
             for param_group, lr in zip(optimizer.param_groups, lr_groups):
                 param_group['lr'] = lr
 
     def _get_init_lr(self):
-        ''' get the initial lr, which is set by the scheduler (for warmup) 
-        '''
+        """Get the initial lr, which is set by the scheduler (for warmup)"""
         init_lr_groups_l = []
         for optimizer in self.optimizers:
             init_lr_groups_l.append([v['initial_lr'] for v in optimizer.param_groups])
         return init_lr_groups_l
 
-    def update_learning_rate(self, current_step=None, warmup_iter=-1):
-        ''' Update learning rate of all networks.
-        Args:
-            current_step (int): Current iteration.
-            warmup_iter (int)： Warmup iter numbers. -1 for no warmup.
-                Default： -1.
-        '''
+    def update_learning_rate(self, current_step: int = None, warmup_iter: int = -1):
+        """
+        Update learning rate of all networks.
+        :param current_step: Current iteration.
+        :param warmup_iter: Warmup iter numbers. -1 for no warmup.
+        """
         # SWA scheduler only steps if current_step > swa_start_iter
         if self.swa and current_step and isinstance(self.swa_start_iter, int) and current_step > self.swa_start_iter:
             self.swa_model.update_parameters(self.netG)
             self.swa_scheduler.step()
-            
-            #TODO: uncertain, how to deal with the discriminator schedule when the generator enters SWA regime
+
+            # TODO: uncertain, how to deal with the discriminator schedule when the generator enters SWA regime
             # alt 1): D continues with its normal scheduler (current option)
             # alt 2): D also trained using SWA scheduler
             # alt 3): D lr is not modified any longer (Should D be frozen?)
@@ -258,7 +264,8 @@ class BaseModel():
     def get_current_learning_rate(self, current_step=None):
         if torch.__version__ >= '1.4.0':
             # Note: SWA only works for torch.__version__ >= '1.6.0'
-            if self.swa and current_step and isinstance(self.swa_start_iter, int) and current_step > self.swa_start_iter:
+            if self.swa and current_step and isinstance(self.swa_start_iter,
+                                                        int) and current_step > self.swa_start_iter:
                 # SWA scheduler lr
                 return self.swa_scheduler.get_last_lr()[0]
             else:
@@ -268,45 +275,42 @@ class BaseModel():
             # return self.schedulers[0].get_lr()[0]
             return self.optimizers[0].param_groups[0]['lr']
 
-    def get_network_description(self, network):
-        '''Get the string and total parameters of the network'''
+    def get_network_description(self, network: nn.Module):
+        """Get the string and total parameters of the network"""
         if isinstance(network, (nn.DataParallel, nn.parallel.DistributedDataParallel)):
             network = network.module
         s = str(network)
         n = sum(map(lambda x: x.numel(), network.parameters()))
         return s, n
 
-    def requires_grad(self, model, flag: bool = True, target_layer=None, net_type=None):
-        '''Set requies_grad for all the networks. Use flag=False to avoid 
-            unnecessary computations
-        Parameters:
-            model (network)       -- the network to be updated
-            flag (bool)           -- whether the networks require gradients or not
-            target_layer (int)    -- (optional) for supported networks, can set a specific
-                                     layer up to which the defined flag will be set, for 
-                                     example, to freeze the network up to layer "target_layer"
-            net_type (str)        -- (optional) used with target_layer to identify what type 
-                                     of supported network it is.
-        '''
+    def requires_grad(self, model, flag: bool = True, target_layer: int = None, net_type: str = None):
+        """
+        Set requires_grad for all the networks. Use flag=False to avoid unnecessary computations
+        :param model: the network to be updated
+        :param flag: whether the networks require gradients or not
+        :param target_layer: (optional) for supported networks, can set a specific layer up to which the defined
+        flag will be set, for example, to freeze the network up to layer "target_layer"
+        :param net_type: (optional) used with target_layer to identify what type of supported network it is.
+        """
         # for p in model.parameters():
         #     p.requires_grad = flag
         for name, param in model.named_parameters():
             if target_layer is None:  # every layer
                 param.requires_grad = flag
-            else: #elif target_layer in name:  # target layer
+            else:  # elif target_layer in name:  # target layer
                 if net_type == 'D':
-                    if 'features.' in name: # vgg-d
-                        layer=f'features.{target_layer}.' 
-                    elif 'conv' in name: # vgg-fea-d
-                        layer=f'conv{target_layer}.' 
-                    elif 'model.' in name: # patch-d
-                        layer=f'model.{target_layer}.' 
+                    if 'features.' in name:  # vgg-d
+                        layer=f'features.{target_layer}.'
+                    elif 'conv' in name:  # vgg-fea-d
+                        layer=f'conv{target_layer}.'
+                    elif 'model.' in name:  # patch-d
+                        layer=f'model.{target_layer}.'
                 
                 if layer in name:
                     # print(name, layer)
                     param.requires_grad = flag
 
-    def save_network(self, network, network_label, iter_step, latest=None):
+    def save_network(self, network: nn.Module, network_label: str, iter_step: int, latest=False):
         if latest:
             save_filename = 'latest_{}.pth'.format(network_label)
         else:
@@ -320,24 +324,24 @@ class BaseModel():
         state_dict = network.state_dict()
         for key, param in state_dict.items():
             state_dict[key] = param.cpu()
-        try: #save model in the pre-1.4.0 non-zipped format
+        try:  # save model in the pre-1.4.0 non-zipped format
             torch.save(state_dict, save_path, _use_new_zipfile_serialization=False)
-        except: #pre 1.4.0, normal torch.save
+        except:  # pre 1.4.0, normal torch.save
             torch.save(state_dict, save_path)
 
-    def load_network(self, load_path, network, strict=True, submodule=None, model_type=None, param_key=None):
-        '''Load pretrained model into instantiated network.
-        Args:
-            load_path (str): The path of model to be loaded into the network.
-            network (nn.Module): the network.
-            strict (bool): Whether if the model will be strictly loaded.
-            submodule (str): Specify a submodule of the network to load the model into.
-            model_type (str): To do additional validations if needed (either 'G' or 'D').
-            param_key (str): The parameter key of loaded model. If set to
-                None, will use the root 'path'.
-        '''
-        
-        #Get bare model, especially under wrapping with DistributedDataParallel or DataParallel.
+    def load_network(self, load_path: str, network: nn.Module, strict: bool = True, submodule: str = None,
+                     model_type: str = None, param_key: str = None):
+        """
+        Load pretrained model into instantiated network.
+        :param load_path: The path of model to be loaded into the network.
+        :param network: the network.
+        :param strict: Whether if the model will be strictly loaded.
+        :param submodule: Specify a submodule of the network to load the model into.
+        :param model_type: To do additional validations if needed (either 'G' or 'D').
+        :param param_key: The parameter key of loaded model. If set to None, will use the root 'path'.
+        """
+
+        # Get bare model, especially under wrapping with DistributedDataParallel or DataParallel.
         if isinstance(network, (nn.DataParallel, nn.parallel.DistributedDataParallel)):
             network = network.module
         # network.load_state_dict(torch.load(load_path), strict=strict)
@@ -345,7 +349,7 @@ class BaseModel():
         # load into a specific submodule of the network
         if not (submodule is None or submodule.lower() == 'none'.lower()):
             network = network.__getattr__(submodule)
-        
+
         # load_net = torch.load(load_path)
         load_net = torch.load(
             load_path, map_location=lambda storage, loc: storage)
@@ -353,11 +357,11 @@ class BaseModel():
         # to allow loading state_dicts
         if 'state_dict' in load_net:
             load_net = load_net['state_dict']
-        
+
         # load specific keys of the model
         if param_key is not None:
             load_net = load_net[param_key]
-        
+
         # remove unnecessary 'module.' if needed
         for k, v in deepcopy(load_net).items():
             if k.startswith('module.'):
@@ -371,10 +375,11 @@ class BaseModel():
             load_net = model_val(
                 opt_net=self.opt,
                 state_dict=load_net,
-                model_type=model_type)
+                model_type=model_type
+            )
 
         network.load_state_dict(load_net, strict=strict)
-        
+
         # If loading a network with more parameters into a model with less parameters:
         # model = ABPN_v5(input_dim=3, dim=32)
         # model = model.to(device)
@@ -383,9 +388,9 @@ class BaseModel():
         # pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict}
         # model_dict.update(pretrained_dict)
         # model.load_state_dict(model_dict)
-    
-    def save_training_state(self, epoch, iter_step, latest=None):
-        '''Saves training state during training, which will be used for resuming'''
+
+    def save_training_state(self, epoch: int, iter_step: int, latest=False):
+        """Saves training state during training, which will be used for resuming"""
         state = {'epoch': epoch, 'iter': iter_step, 'schedulers': [], 'optimizers': []}
         for s in self.schedulers:
             state['schedulers'].append(s.state_dict())
@@ -406,8 +411,8 @@ class BaseModel():
             copyfile(save_path, prev_path)
         torch.save(state, save_path)
 
-    def resume_training(self, resume_state):
-        '''Resume the optimizers and schedulers for training'''
+    def resume_training(self, resume_state: dict):
+        """Resume the optimizers and schedulers for training"""
         resume_optimizers = resume_state['optimizers']
         resume_schedulers = resume_state['schedulers']
         assert len(resume_optimizers) == len(self.optimizers), 'Wrong lengths of optimizers'
@@ -415,7 +420,7 @@ class BaseModel():
         for i, o in enumerate(resume_optimizers):
             self.optimizers[i].load_state_dict(o)
         for i, s in enumerate(resume_schedulers):
-            if hasattr(self.schedulers[i], 'milestones'): # for schedulers without milestones attribute
+            if hasattr(self.schedulers[i], 'milestones'):  # for schedulers without milestones attribute
                 if isinstance(self.schedulers[i].milestones, Counter) and isinstance(s['milestones'], list):
                     s['milestones'] = Counter(s['milestones'])
             self.schedulers[i].load_state_dict(s)
@@ -425,59 +430,67 @@ class BaseModel():
                 resume_swa_scheduler = resume_state['swa_scheduler']
                 for i, s in enumerate(resume_swa_scheduler):
                     self.swa_scheduler.load_state_dict(s)
-    
-    #TODO: check all these updates 
-    def update_schedulers(self, train_opt):
-        '''Update scheduler parameters if they are changed in the JSON configuration'''
+
+    # TODO: check all these updates
+    def update_schedulers(self, train_opt: dict):
+        """Update scheduler parameters if they are changed in the JSON configuration"""
         if train_opt['lr_scheme'] == 'StepLR':
             for i, s in enumerate(self.schedulers):
                 if self.schedulers[i].step_size != train_opt['lr_step_size'] and train_opt['lr_step_size'] is not None:
-                    print("Updating step_size from {} to {}".format(self.schedulers[i].step_size, train_opt['lr_step_size']))
+                    print("Updating step_size from {} to {}".format(self.schedulers[i].step_size,
+                                                                    train_opt['lr_step_size']))
                     self.schedulers[i].step_size = train_opt['lr_step_size']
-                #common
-                if self.schedulers[i].gamma !=train_opt['lr_gamma'] and train_opt['lr_gamma'] is not None:
+                # common
+                if self.schedulers[i].gamma != train_opt['lr_gamma'] and train_opt['lr_gamma'] is not None:
                     print("Updating lr_gamma from {} to {}".format(self.schedulers[i].gamma, train_opt['lr_gamma']))
-                    self.schedulers[i].gamma =train_opt['lr_gamma']
+                    self.schedulers[i].gamma = train_opt['lr_gamma']
         if train_opt['lr_scheme'] == 'StepLR_Restart':
             for i, s in enumerate(self.schedulers):
-                if self.schedulers[i].step_sizes != train_opt['lr_step_sizes'] and train_opt['lr_step_sizes'] is not None:
-                    print("Updating step_sizes from {} to {}".format(self.schedulers[i].step_sizes, train_opt['lr_step_sizes']))
+                if self.schedulers[i].step_sizes != train_opt['lr_step_sizes'] and train_opt[
+                    'lr_step_sizes'] is not None:
+                    print("Updating step_sizes from {} to {}".format(self.schedulers[i].step_sizes,
+                                                                     train_opt['lr_step_sizes']))
                     self.schedulers[i].step_sizes = train_opt['lr_step_sizes']
                 if self.schedulers[i].restarts != train_opt['restarts'] and train_opt['restarts'] is not None:
                     print("Updating restarts from {} to {}".format(self.schedulers[i].restarts, train_opt['restarts']))
                     self.schedulers[i].restarts = train_opt['restarts']
-                if self.schedulers[i].restart_weights != train_opt['restart_weights'] and train_opt['restart_weights'] is not None:
-                    print("Updating restart_weights from {} to {}".format(self.schedulers[i].restart_weights, train_opt['restart_weights']))
+                if self.schedulers[i].restart_weights != train_opt['restart_weights'] and train_opt[
+                    'restart_weights'] is not None:
+                    print("Updating restart_weights from {} to {}".format(self.schedulers[i].restart_weights,
+                                                                          train_opt['restart_weights']))
                     self.schedulers[i].restart_weights = train_opt['restart_weights']
                 if self.schedulers[i].clear_state != train_opt['clear_state'] and train_opt['clear_state'] is not None:
-                    print("Updating clear_state from {} to {}".format(self.schedulers[i].clear_state, train_opt['clear_state']))
+                    print("Updating clear_state from {} to {}".format(self.schedulers[i].clear_state,
+                                                                      train_opt['clear_state']))
                     self.schedulers[i].clear_state = train_opt['clear_state']
-                #common
-                if self.schedulers[i].gamma !=train_opt['lr_gamma'] and train_opt['lr_gamma'] is not None:
+                # common
+                if self.schedulers[i].gamma != train_opt['lr_gamma'] and train_opt['lr_gamma'] is not None:
                     print("Updating lr_gamma from {} to {}".format(self.schedulers[i].gamma, train_opt['lr_gamma']))
-                    self.schedulers[i].gamma =train_opt['lr_gamma']
+                    self.schedulers[i].gamma = train_opt['lr_gamma']
         if train_opt['lr_scheme'] == 'MultiStepLR':
             for i, s in enumerate(self.schedulers):
                 if list(self.schedulers[i].milestones) != train_opt['lr_steps'] and train_opt['lr_steps'] is not None:
                     if not list(train_opt['lr_steps']) == sorted(train_opt['lr_steps']):
                         raise ValueError('lr_steps should be a list of'
-                             ' increasing integers. Got {}', train_opt['lr_steps'])
-                    print("Updating lr_steps from {} to {}".format(list(self.schedulers[i].milestones), train_opt['lr_steps']))
+                                         ' increasing integers. Got {}', train_opt['lr_steps'])
+                    print("Updating lr_steps from {} to {}".format(list(self.schedulers[i].milestones),
+                                                                   train_opt['lr_steps']))
                     if isinstance(self.schedulers[i].milestones, Counter):
                         self.schedulers[i].milestones = Counter(train_opt['lr_steps'])
                     else:
                         self.schedulers[i].milestones = train_opt['lr_steps']
-                #common
-                if self.schedulers[i].gamma !=train_opt['lr_gamma'] and train_opt['lr_gamma'] is not None:
+                # common
+                if self.schedulers[i].gamma != train_opt['lr_gamma'] and train_opt['lr_gamma'] is not None:
                     print("Updating lr_gamma from {} to {}".format(self.schedulers[i].gamma, train_opt['lr_gamma']))
-                    self.schedulers[i].gamma =train_opt['lr_gamma']
+                    self.schedulers[i].gamma = train_opt['lr_gamma']
         if train_opt['lr_scheme'] == 'MultiStepLR_Restart':
             for i, s in enumerate(self.schedulers):
                 if list(self.schedulers[i].milestones) != train_opt['lr_steps'] and train_opt['lr_steps'] is not None:
                     if not list(train_opt['lr_steps']) == sorted(train_opt['lr_steps']):
                         raise ValueError('lr_steps should be a list of'
-                             ' increasing integers. Got {}', train_opt['lr_steps'])
-                    print("Updating lr_steps from {} to {}".format(list(self.schedulers[i].milestones), train_opt['lr_steps']))
+                                         ' increasing integers. Got {}', train_opt['lr_steps'])
+                    print("Updating lr_steps from {} to {}".format(list(self.schedulers[i].milestones),
+                                                                   train_opt['lr_steps']))
                     if isinstance(self.schedulers[i].milestones, Counter):
                         self.schedulers[i].milestones = Counter(train_opt['lr_steps'])
                     else:
@@ -485,13 +498,16 @@ class BaseModel():
                 if self.schedulers[i].restarts != train_opt['restarts'] and train_opt['restarts'] is not None:
                     print("Updating restarts from {} to {}".format(self.schedulers[i].restarts, train_opt['restarts']))
                     self.schedulers[i].restarts = train_opt['restarts']
-                if self.schedulers[i].restart_weights != train_opt['restart_weights'] and train_opt['restart_weights'] is not None:
-                    print("Updating restart_weights from {} to {}".format(self.schedulers[i].restart_weights, train_opt['restart_weights']))
+                if self.schedulers[i].restart_weights != train_opt['restart_weights'] and train_opt[
+                    'restart_weights'] is not None:
+                    print("Updating restart_weights from {} to {}".format(self.schedulers[i].restart_weights,
+                                                                          train_opt['restart_weights']))
                     self.schedulers[i].restart_weights = train_opt['restart_weights']
                 if self.schedulers[i].clear_state != train_opt['clear_state'] and train_opt['clear_state'] is not None:
-                    print("Updating clear_state from {} to {}".format(self.schedulers[i].clear_state, train_opt['clear_state']))
+                    print("Updating clear_state from {} to {}".format(self.schedulers[i].clear_state,
+                                                                      train_opt['clear_state']))
                     self.schedulers[i].clear_state = train_opt['clear_state']
-                #common
-                if self.schedulers[i].gamma !=train_opt['lr_gamma'] and train_opt['lr_gamma'] is not None:
+                # common
+                if self.schedulers[i].gamma != train_opt['lr_gamma'] and train_opt['lr_gamma'] is not None:
                     print("Updating lr_gamma from {} to {}".format(self.schedulers[i].gamma, train_opt['lr_gamma']))
-                    self.schedulers[i].gamma =train_opt['lr_gamma']
+                    self.schedulers[i].gamma = train_opt['lr_gamma']
