@@ -44,7 +44,6 @@ SCI_NOTATION_RE = re.compile(
 
 
 class NoneDict(dict):
-
     """Dictionary class that ignores missing key's and returns None instead."""
 
     def __missing__(self, key):
