@@ -13,7 +13,7 @@ Most functions in Pytorch transforms are reimplemented, but there are some consi
 5.  Some new augmentations have been added, in comparison to Torchvision's and are indicated in **Support** with and asterisk.
 6.  **The outputs of the OpenCV versions are almost the same as the original one's (it's possible to test by running [test.py](/test.py)) directly with test images**.
 
-## Support:
+## Support
 
 From the original Torchvision transforms:
 
@@ -47,12 +47,12 @@ New transforms:
 
 ## Usage
 
-1) git clone <https://github.com/victorca25/opencv_transforms_torchvision.git> .
-2) Add `cvtorchvision` to your python path.
-3) Add `from opencv_transforms import transforms` in your python file.
-4) From here, almost everything should work exactly as the original `transforms`.
+1.  git clone <https://github.com/victorca25/opencv_transforms_torchvision.git> .
+2.  Add `cvtorchvision` to your python path.
+3.  Add `from opencv_transforms import transforms` in your python file.
+4.  From here, almost everything should work exactly as the original `transforms`.
 
-#### Example: Image resizing
+### Example: Image resizing
 
 ```python
 import numpy as np
@@ -63,7 +63,7 @@ image = resize(image)
 
 Should be 1.5 to 10 times faster than PIL. See benchmarks
 
-#### Example: Composing transformations
+### Example: Composing transformations
 
 ```py
 transform = transforms.Compose([
@@ -76,7 +76,7 @@ transform = transforms.Compose([
 
 More examples can be found in the  official Pytorch [tutorials](https://pytorch.org/tutorials/beginner/transfer_learning_tutorial.html).
 
-## Attention:
+## Attention
 
 As tested by YU-Zhiyang, the multiprocessing used in dataloader of Pytorch may have issues with lambda function in Windows as lambda function can't be pickled (<https://docs.python.org/3/library/pickle.html#what-can-be-pickled-and-unpickled>).
 
