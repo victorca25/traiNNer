@@ -1,3 +1,5 @@
+# BasicSR
+
 BasicSR (Basic Super Restoration) is an open source image and video restoration toolbox (super-resolution, denoising, deblurring and others) based on PyTorch.
 
 This is a heavily modified fork of the original BasicSR. What you will find here: boilerplate code for training and testing computer vision (CV) models, different CV methods and strategies integrated in a single pipeline and modularity to add and remove components as needed, including new network architectures. A large rewrite of code was made to reduce code redundancy and duplicates, reorganize the code and make it more modular.
@@ -57,7 +59,7 @@ WIP:
 -   Python package: [`pip install tensorboardX`](https://github.com/lanpa/tensorboardX), for visualizing curves.
 -   Python package: [`pip install lmdb`](https://github.com/jnwatson/py-lmdb), for lmdb database support.
 
-# Codes
+## Codes
 
 [`./codes`](https://github.com/victorca25/BasicSR/tree/master/codes). We provide a detailed explaination of the **code framework** in [`./codes`](https://github.com/victorca25/BasicSR/tree/master/codes).
 
@@ -72,7 +74,7 @@ We also provide:
 
 To extract the realistic kernels and noise patches, use the modified KernelGAN and patches extraction code in: [DLIP](https://github.com/victorca25/DLIP)
 
-# Usage
+## Usage
 
 ### Data and model preparation
 
@@ -80,39 +82,39 @@ The common **SR datasets** can be found in [Datasets](#datasets). Detailed data 
 
 We provide **pretrained models** in [Pretrained models](#pretrained-models).
 
-## How to Test
+### How to Test
 
-### For simple testing
+#### For simple testing
 
 The recommended way to get started with some of the models produced by the training codes available in this repository is by getting the pretrained models to be tested and either a GUI (for [ESRGAN models](https://github.com/n00mkrad/cupscale), for [video](https://github.com/n00mkrad/flowframes)) or a smaller repo for inference (for [ESRGAN](https://github.com/JoeyBallentine/ESRGAN), for [video](https://github.com/JoeyBallentine/Video-Inference)). 
 
 Otherwise, it is also possible to do inference of batches of images with the code in this repository as follow.
 
-### Test ESRGAN (SRGAN) models
+#### Test ESRGAN (SRGAN) models
 
 1.  Modify the configuration file `options/test/test_ESRGAN.yml` (or `options/test/test_ESRGAN.json`)
 2.  Run command: `python test.py -opt options/test/test_ESRGAN.yml` (or `python test.py -opt options/test/test_ESRGAN.json`)
 
-### Test SFTGAN models
+#### Test SFTGAN models
 
 1.  Obtain the segmentation probability maps: `python test_seg.py`
 2.  Run command: `python test_sftgan.py`
 
-### Test PPON models
+#### Test PPON models
 
 1.  Modify the configuration file `options/test/test_ESRGAN.yml` (or `options/test/test_ESRGAN.json`)
 2.  Run command: `python test_ppon.py -opt options/test/test_ESRGAN.yml` (or `python test_ppon.py -opt options/test/test_ESRGAN.json`)
 
-### Test VSR models
+#### Test VSR models
 
 1.  Modify the configuration file `options/test/test_video.yml`
 2.  Run command: `python test_vsr.py -opt options/test/test_video.yml`
 
-## How to Train
+### How to Train
 
 [How to train](https://github.com/victorca25/BasicSR/blob/master/docs/howtotrain.md)
 
-# Datasets
+## Datasets
 
 Several common SR datasets are list below. 
 
@@ -204,7 +206,7 @@ Several common SR datasets are list below.
 
 Any dataset can be augmented to expose the model to information that might not be available in the images, such a noise and blur. For this reason, [Data Augmentation](https://github.com/victorca25/BasicSR/wiki/Dataset-Augmentation) has been added to the options in this repository and it can be extended to include other types of augmentations.
 
-# Pretrained models
+## Pretrained models
 
 The most recent community pretrained models can be found in the [Wiki](https://upscale.wiki/wiki/Model_Database), [Discord](https://discord.gg/nbB4A5F) and [nmkd's models](https://nmkd.de/?esrgan).
 
