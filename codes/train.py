@@ -1,6 +1,6 @@
 import argparse
 
-from codes.runner import Trainer
+from codes.runner.trainer import Trainer
 
 
 def main():
