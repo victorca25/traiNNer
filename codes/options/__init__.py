@@ -104,7 +104,7 @@ def parse(opt_path: str, is_train: bool = True) -> NoneDict:
                 # TODO: lmdb support for list of paths, for that, is_lmdb (so data_type) would need to refer to each
                 #       specific dataroot_* item instead of "all". Or just force the user to have all items as an
                 #       lmdb, then it would be fine to use data_type how it is now.
-                image_paths = [os.path.expanduser(path) for path in image_paths]
+                image_paths = [os.path.normpath(os.path.expanduser(path)) for path in image_paths]
                 if len(image_paths) == 1:
                     # if it's a single-item list, might as well act as if it was a str instead of a list
                     image_paths = image_paths[0]
@@ -116,7 +116,7 @@ def parse(opt_path: str, is_train: bool = True) -> NoneDict:
             if dataset.get('batch_multiplier', None) is not None:
                 dataset['virtual_batch_size'] = dataset["batch_size"] * opt['batch_multiplier']
             if dataset.get('subset_file', None):
-                dataset['subset_file'] = os.path.expanduser(dataset['subset_file'])
+                dataset['subset_file'] = os.path.normpath(os.path.expanduser(dataset['subset_file']))
 
         if dataset.get('lr_downscale_types', None):
             if isinstance(dataset['lr_downscale_types'], str):
@@ -136,7 +136,7 @@ def parse(opt_path: str, is_train: bool = True) -> NoneDict:
     # path
     for key, path in opt['path'].items():
         if isinstance(path, str) and path:
-            opt['path'][key] = os.path.expanduser(path)
+            opt['path'][key] = os.path.normpath(os.path.expanduser(path))
 
     if is_train:
         experiments_root = os.path.join(opt['path']['root'], 'experiments', opt['name'])

@@ -39,7 +39,7 @@ def main():
     if opt['path']['resume_state']:
         if os.path.isdir(opt['path']['resume_state']):
             import glob
-            resume_state_path = util.sorted_nicely(glob.glob(os.path.normpath(opt['path']['resume_state']) + '/*.state'))[-1]
+            resume_state_path = util.sorted_nicely(glob.glob(opt['path']['resume_state'] + '/*.state'))[-1]
         else:
             resume_state_path = opt['path']['resume_state']
         resume_state = torch.load(resume_state_path)
