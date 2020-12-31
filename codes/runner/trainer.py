@@ -192,7 +192,7 @@ class Trainer(Runner):
                         )
                         self.logger.info('# Validation # %s', logger_m[:-2])
                         logger_val = logging.getLogger('val')
-                        logger_val.info('<epoch:{:3d}, iter:{:8,d}> %s', epoch, current_step, logger_m[:-2])
+                        logger_val.info('<epoch:{:3d}, iter:{:8,d}> {:s}'.format(epoch, current_step, logger_m[:-2]))
 
                         # tensorboard logger
                         if self.opt['use_tb_logger'] and 'debug' not in self.opt['name']:
