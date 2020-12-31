@@ -16,7 +16,7 @@ from codes.utils.util import sorted_nicely, mkdir_and_rename, save_img_comp, sav
 
 
 class Trainer(Runner):
-
+    """Starts a training session, initialized using Runner."""
     def __init__(self, config_path: str):
         super(Trainer).__init__(config_path, trainer=True)
 
@@ -160,9 +160,7 @@ class Trainer(Runner):
                             model.feed_data(val_data)
                             model.test()
 
-                            """
-                            Get Visuals
-                            """
+                            # Get Visuals
                             visuals = model.get_current_visuals()
                             sr_img = tensor2np(visuals['SR'], denormalize=self.opt['datasets']['train']['znorm'])
                             gt_img = tensor2np(visuals['HR'], denormalize=self.opt['datasets']['train']['znorm'])
@@ -180,9 +178,7 @@ class Trainer(Runner):
                             else:
                                 save_img(sr_img, save_img_path)
 
-                            """
-                            Get Metrics
-                            """
+                            # Get Metrics
                             # TODO: test using tensor based metrics (batch) instead of numpy.
                             crop_size = self.opt['scale']
                             val_metrics.calculate_metrics(sr_img, gt_img, crop_size=crop_size)

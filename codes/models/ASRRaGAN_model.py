@@ -197,18 +197,19 @@ class ASRRaGANModel(BaseModel):
             # """
 
             # LPIPS loss
-            """
-            lpips_spatial = False
-            if train_opt['lpips_spatial']:
-                #lpips_spatial = True if train_opt['lpips_spatial'] == True else False
-                lpips_spatial = True if train_opt['lpips_spatial'] else False
-            lpips_GPU = False
-            if train_opt['lpips_GPU']:
-                #lpips_GPU = True if train_opt['lpips_GPU'] == True else False
-                lpips_GPU = True if train_opt['lpips_GPU'] else False
-            #"""
-            # """
-            lpips_spatial = True  # False # Return a spatial map of perceptual distance. Meeds to use .mean() for the backprop if True, the mean distance is approximately the same as the non-spatial distance
+
+            # lpips_spatial = False
+            # if train_opt['lpips_spatial']:
+            #     #lpips_spatial = True if train_opt['lpips_spatial'] == True else False
+            #     lpips_spatial = True if train_opt['lpips_spatial'] else False
+            # lpips_GPU = False
+            # if train_opt['lpips_GPU']:
+            #     #lpips_GPU = True if train_opt['lpips_GPU'] == True else False
+            #     lpips_GPU = True if train_opt['lpips_GPU'] else False
+
+            # Return a spatial map of perceptual distance. Needs to use .mean() for the backprop if True, the
+            # mean distance is approximately the same as the non-spatial distance
+            lpips_spatial = True
             lpips_GPU = True  # Whether to use GPU for LPIPS calculations
             if train_opt['lpips_weight']:
                 if z_norm == True:  # if images are in [-1,1] range
@@ -429,29 +430,6 @@ class ASRRaGANModel(BaseModel):
         else:  # regular models without the final activation option
             self.fake_H = self.netG(self.var_L)
         l_g_total = 0
-
-        """ # Debug
-        print ("SR min. val: ", torch.min(self.fake_H))
-        print ("SR max. val: ", torch.max(self.fake_H))
-        
-        print ("LR min. val: ", torch.min(self.var_L))
-        print ("LR max. val: ", torch.max(self.var_L))
-        
-        print ("HR min. val: ", torch.min(self.var_H))
-        print ("HR max. val: ", torch.max(self.var_H))
-        #"""
-
-        """ #debug
-        #####################################################################
-        #test_save_img = False
-        # test_save_img = None
-        test_save_img = True
-        if test_save_img:
-            save_images(self.var_L, 0, "self.var_L")
-            save_images(self.var_H, 0, "self.var_H")
-            save_images(self.fake_H.detach(), 0, "self.fake_H")
-        #####################################################################
-        #"""
 
         if self.cri_gan:
             # D

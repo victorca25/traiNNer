@@ -90,7 +90,7 @@ class BaseModel:
         pass
 
     def load(self):
-        """Load all the networks from the disk"""
+        """Load all the networks from the disk."""
         pass
 
     def _set_lr(self, lr_groups_l: list):
@@ -177,7 +177,7 @@ class BaseModel:
 
     def requires_grad(self, model, flag=True, target_layer: int = None, net_type: str = None):
         """
-        Set requires_grad for all the networks. Use flag=False to avoid unnecessary computations
+        Set requires_grad for all the networks. Use flag=False to avoid unnecessary computations.
         :param model: the network to be updated
         :param flag: whether the networks require gradients or not
         :param target_layer: (optional) for supported networks, can set a specific layer up to which the defined
@@ -232,9 +232,8 @@ class BaseModel:
         :param model_type: To do additional validations if needed (either 'G' or 'D').
         :param param_key: The parameter key of loaded model. If set to None, will use the root 'path'.
         """
-
-        # Get bare model, especially under wrapping with DistributedDataParallel or DataParallel.
         if isinstance(network, (nn.DataParallel, nn.parallel.DistributedDataParallel)):
+            # Get bare model, especially under wrapping with DistributedDataParallel or DataParallel.
             network = network.module
         # network.load_state_dict(torch.load(load_path), strict=strict)
 

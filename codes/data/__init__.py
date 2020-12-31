@@ -6,7 +6,7 @@ import torch.utils.data
 
 def create_dataloader(dataset: torch.utils.data.Dataset, dataset_opt: dict) -> torch.utils.data.DataLoader:
     """
-    Create Dataloader
+    Create Dataloader.
     :param dataset: Dataset to use
     :param dataset_opt: Dataset configuration from opt file
     """
@@ -31,7 +31,7 @@ def create_dataloader(dataset: torch.utils.data.Dataset, dataset_opt: dict) -> t
 
 def create_dataset(dataset_opt: dict) -> torch.utils.data.Dataset:
     """
-    Create Dataset
+    Create Dataset.
     :param dataset_opt: Dataset configuration from opt file
     """
     m = dataset_opt['mode']
