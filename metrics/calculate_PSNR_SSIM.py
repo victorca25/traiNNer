@@ -9,8 +9,8 @@ import glob
 import os
 
 import cv2
-import numpy as np
 
+from codes.dataops.common import bgr2ycbcr
 from codes.utils.metrics import calculate_psnr, calculate_ssim
 
 
@@ -56,32 +56,6 @@ def main():
     print('Average: PSNR: {:.6f} dB, SSIM: {:.6f}'.format(
         sum(psnr_all) / len(psnr_all), sum(ssim_all) / len(ssim_all))
     )
-
-
-def bgr2ycbcr(img: np.ndarray, only_y: bool = True) -> np.ndarray:
-    """
-    Same as matlab rgb2ycbcr
-    Input:
-        uint8, [0, 255]
-        float, [0, 1]
-    :param img: Input image
-    :param only_y: Only return Y channel
-    """
-    in_img_type = img.dtype
-    img.astype(np.float32)
-    if in_img_type != np.uint8:
-        img *= 255.
-    # convert
-    if only_y:
-        rlt = np.dot(img, [24.966, 128.553, 65.481]) / 255.0 + 16.0
-    else:
-        rlt = np.matmul(img, [[24.966, 112.0, -18.214], [128.553, -74.203, -93.786],
-                              [65.481, -37.797, 112.0]]) / 255.0 + [16, 128, 128]
-    if in_img_type == np.uint8:
-        rlt = rlt.round()
-    else:
-        rlt /= 255.
-    return rlt.astype(in_img_type)
 
 
 if __name__ == '__main__':
