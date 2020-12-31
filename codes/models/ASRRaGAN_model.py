@@ -10,8 +10,8 @@ from torch.optim import lr_scheduler
 from . import networks
 from .base_model import BaseModel
 from .modules.LPIPS.perceptual_loss import PerceptualLoss
-from .modules.loss import GPLoss, CPLoss, CharbonnierLoss, ElasticLoss, RelativeL1, L1CosineSim, HFENLoss, TVLoss, \
-    GANLoss, GradientPenaltyLoss
+from .modules.loss import GPLoss, CPLoss, CharbonnierLoss, ElasticLoss, RelativeL1, L1CosineSim, TVLoss, GANLoss, \
+    GradientPenaltyLoss
 from .modules.ssim import SSIM, MS_SSIM
 from .schedulers import MultiStepLR_Restart, StepLR_Restart, CosineAnnealingLR_Restart
 
@@ -132,17 +132,18 @@ class ASRRaGANModel(BaseModel):
                 else:
                     pre_smooth = False  # train_opt['hfen_presmooth']
                 if l_hfen_type:
-                    if l_hfen_type == 'rel_l1' or l_hfen_type == 'rel_l2':
-                        relative = True
-                    else:
-                        relative = False  # True #train_opt['hfen_relative']
+                    relative = l_hfen_type in ['rel_l1', 'rel_l2']
                 if l_hfen_type:
-                    self.cri_hfen = HFENLoss(
-                        loss_f=l_hfen_type,
-                        device=self.device,
-                        pre_smooth=pre_smooth,
-                        relative=relative
-                    ).to(self.device)
+                    raise NotImplementedError('HFENLoss for ASRRaGAN needs to be fixed!')
+                    # TODO: HFENLoss has changed it's wanted arguments seemingly quite heavily
+                    #       possibly quite a while back, so I do not know what should be applicable
+                    #       for it now.
+                    # self.cri_hfen = HFENLoss(
+                    #     loss_f=l_hfen_type,
+                    #     device=self.device,
+                    #     pre_smooth=pre_smooth,
+                    #     relative=relative
+                    # ).to(self.device)
                 else:
                     raise NotImplementedError('Loss type [{:s}] not recognized.'.format(l_hfen_type))
                 self.l_hfen_w = train_opt['hfen_weight']
@@ -165,7 +166,10 @@ class ASRRaGANModel(BaseModel):
                     self.cri_tv = TVLoss(self.l_tv_w, p=tv_norm).to(self.device)
                 elif l_tv_type == '4D':
                     # Total Variation regularization in 4 directions
-                    self.cri_tv = TVLoss4D(self.l_tv_w).to(self.device)
+                    raise NotImplementedError('TVLoss4D for ASRRaGAN needs to be re-implemented!')
+                    # TODO: TVLoss4D function seems to have been MIA since like 1-2 years, I remember this
+                    #       being missing back in 2019 or so when I forked the code back then as well.
+                    # self.cri_tv = TVLoss4D(self.l_tv_w).to(self.device)
                 else:
                     raise NotImplementedError('Loss type [{:s}] not recognized.'.format(l_tv_type))
             else:
@@ -405,7 +409,7 @@ class ASRRaGANModel(BaseModel):
             input_ref = data['ref'] if 'ref' in data else data['HR']
             self.var_ref = input_ref.to(self.device)
 
-    def feed_data_batch(self, data, need_hr=True):
+    def feed_data_batch(self, data):
         # LR
         self.var_L = data
 

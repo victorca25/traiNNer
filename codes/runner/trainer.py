@@ -2,6 +2,7 @@ import glob
 import logging
 import math
 import os
+import sys
 import time
 
 import torch
@@ -17,7 +18,7 @@ from codes.utils.util import sorted_nicely, mkdir_and_rename, save_img_comp, sav
 class Trainer(Runner):
 
     def __init__(self, config_path: str):
-        super(Runner).__init__(config_path, trainer=True)
+        super(Trainer).__init__(config_path, trainer=True)
 
         # prepare state
         resume_state = None
@@ -29,9 +30,7 @@ class Trainer(Runner):
                     glob.glob(self.opt['path']['resume_state'] + '/*.state')
                 )[-1]
             resume_state = torch.load(self.opt['path']['resume_state'])
-            self.logger.info('Resuming training from epoch: %d, iter: %d.' % (
-                resume_state['epoch'], resume_state['iter']
-            ))
+            self.logger.info('Resuming training from epoch: %d, iter: %d.', resume_state['epoch'], resume_state['iter'])
         else:
             # training from scratch
             # rotate experiments folder
@@ -44,16 +43,16 @@ class Trainer(Runner):
             if phase not in ['train', 'val']:
                 raise NotImplementedError('Phase [%s] is not recognized.' % phase)
             datasets[phase] = create_dataset(dataset_opt)
-            if not len(datasets[phase]):
-                self.logger.error('Dataset [%s] for phase [%s] is empty.' % (dataset_opt['name'], phase))
-                exit(1)
+            if not datasets[phase]:
+                self.logger.error('Dataset [%s] for phase [%s] is empty.', dataset_opt['name'], phase)
+                sys.exit(1)
             self.logger.info(
                 'Number of {:s} images in [{:s}]: {:,d}'.format(phase, dataset_opt['name'], len(datasets[phase]))
             )
             dataloaders[phase] = create_dataloader(datasets[phase], dataset_opt)
         if not dataloaders:
             self.logger.error("No Dataloader has been created.")
-            exit(1)
+            sys.exit(1)
 
         # get training data
         total_iters = int(self.opt['train']['niter'])
@@ -195,9 +194,9 @@ class Trainer(Runner):
                         logger_m = ''.join(
                             '{:s}: {:.5g}, '.format(r['name'].upper(), r['average']) for r in avg_metrics
                         )
-                        self.logger.info('# Validation # ' + logger_m[:-2])
+                        self.logger.info('# Validation # %s', logger_m[:-2])
                         logger_val = logging.getLogger('val')
-                        logger_val.info('<epoch:{:3d}, iter:{:8,d}> '.format(epoch, current_step) + logger_m[:-2])
+                        logger_val.info('<epoch:{:3d}, iter:{:8,d}> %s', epoch, current_step, logger_m[:-2])
 
                         # tensorboard logger
                         if self.opt['use_tb_logger'] and 'debug' not in self.opt['name']:

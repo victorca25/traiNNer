@@ -1,12 +1,11 @@
 import logging
 import os
 import re
+import sys
 
 import cv2
 
 # PAD_MOD
-from codes.utils.util import setup_logger
-
 CV2_BORDER_MAP = {
     'constant': cv2.BORDER_CONSTANT,
     'edge': cv2.BORDER_REPLICATE,
@@ -61,10 +60,14 @@ def parse(opt_path: str, is_train: bool = True) -> NoneDict:
     :param is_train: Indicate whether in training or not.
     :returns: Parsed Options
     """
+    # logger may not be linked to a file yet, so it might not be saved to a log file
+    logger = logging.getLogger('base')
+
     if not os.path.isfile(opt_path):
         opt_path = os.path.join("options", "train" if is_train else "test", opt_path)
         if not os.path.isfile(opt_path):
-            raise ValueError("Configuration file %s not found." % opt_path)
+            logger.error("Configuration file %s not found." % opt_path)
+            sys.exit(1)
 
     ext = os.path.splitext(opt_path)[1][1:].lower()
     if ext == 'json':
@@ -173,7 +176,7 @@ def parse(opt_path: str, is_train: bool = True) -> NoneDict:
             opt['logger']['save_checkpoint_freq'] = 8
             opt['train']['lr_decay_iter'] = 10
             if 'debug_nochkp' in opt['name']:
-                logger.debug('Checkpoint frequency set high (nochkp)')
+                logger.info('Checkpoint frequency set high (nochkp)')
                 opt['logger']['save_checkpoint_freq'] = 1000  # 10000000
     else:
         results_root = os.path.join(opt['path']['root'], 'results', opt['name'])
@@ -217,10 +220,9 @@ def dict_to_nonedict(opt: (dict, list, any)) -> (NoneDict, list[NoneDict], any):
     """Recursively convert to NoneDict, which returns None for missing keys."""
     if isinstance(opt, dict):
         return NoneDict(**{k: dict_to_nonedict(v) for k, v in opt.items()})
-    elif isinstance(opt, list):
+    if isinstance(opt, list):
         return [dict_to_nonedict(sub_opt) for sub_opt in opt]
-    else:
-        return opt
+    return opt
 
 
 def dict2str(opt: dict, indent_l: int = 1) -> str:

@@ -55,5 +55,5 @@ def create_dataset(dataset_opt: dict) -> torch.utils.data.Dataset:
         raise NotImplementedError('Dataset [%s] is not recognized.' % m)
     dataset = Dataset(dataset_opt)
     logger = logging.getLogger('base')
-    logger.info('Dataset [%s - %s] is created.' % (dataset.__class__.__name__, dataset_opt['name']))
+    logger.info('Dataset [%s - %s] is created.', dataset.__class__.__name__, dataset_opt['name'])
     return dataset

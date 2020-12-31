@@ -1,6 +1,7 @@
 import logging
 import os
 import random
+import sys
 
 import numpy as np
 import torch
@@ -32,11 +33,11 @@ class Runner:
         # set seed
         seed = self.opt['train'].get('manual_seed', None)
         if seed is not None and seed != 0:
-            self.logger.info('Manual seed: %d' % seed)
+            self.logger.info('Manual seed: %d', seed)
             self.be_deterministic()
         else:
             seed = random.randint(1, 10000)
-            self.logger.info('Random seed (1-10000): %d' % seed)
+            self.logger.info('Random seed (1-10000): %d', seed)
         self.set_seed(seed)
 
     def __repr__(self) -> str:
@@ -55,8 +56,8 @@ class Runner:
         torch.backends.cudnn.benchmark = False
         torch.set_deterministic(True)
         if cublas_mode not in [':16:8', ':4096:8']:
-            self.logger.error("Invalid value [%s] for be_deterministic" % cublas_mode)
-            exit(1)
+            self.logger.error("Invalid value [%s] for be_deterministic", cublas_mode)
+            sys.exit(1)
         os.environ['CUBLAS_WORKSPACE_CONFIG'] = cublas_mode
         self.logger.warning(
             "Seed was specified, so to keep reproducibility as much as possible:\n"
