@@ -15,41 +15,40 @@ from codes.dataops.colors import bgr_to_rgb, bgra_to_rgba, rgb_to_bgr, rgba_to_b
 # Files & IO
 ####################
 
-###################### get image path list ######################
-
-IMG_EXTENSIONS = ['.jpg', '.JPG', '.jpeg', '.JPEG', '.png', '.PNG', '.ppm', '.PPM', '.bmp', '.BMP', '.dng', '.DNG',
-                  '.webp', '.npy', '.NPY']
+IMG_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.ppm', '.bmp', '.dng', '.webp', '.npy']
 
 
 def is_image_file(filename):
-    return any(filename.endswith(extension) for extension in IMG_EXTENSIONS)
+    return any(filename.lower().endswith(extension) for extension in IMG_EXTENSIONS)
 
 
 def _get_paths_from_images(path):
-    '''get image path list from image folder'''
-    assert os.path.isdir(path), '{:s} is not a valid directory'.format(path)
+    """Get image path list from image folder"""
+    if not os.path.isdir(path):
+        raise ValueError('%s is not a valid directory' % path)
     images = []
-    for dirpath, _, fnames in sorted(os.walk(path)):
-        for fname in sorted(fnames):
-            if is_image_file(fname):
-                img_path = os.path.join(dirpath, fname)
+    for dir_path, _, file_names in sorted(os.walk(path)):
+        for file_name in sorted(file_names):
+            if is_image_file(file_name):
+                img_path = os.path.join(dir_path, file_name)
                 images.append(img_path)
-    assert images, '{:s} has no valid image file'.format(path)
+    if not images:
+        raise ValueError('%s has no valid image file' % path)
     return images
 
 
 def _get_paths_from_lmdb(dataroot):
-    '''get image path list from lmdb'''
+    """Get image path list from lmdb"""
     import lmdb
     env = lmdb.open(dataroot, readonly=True, lock=False, readahead=False, meminit=False)
     keys_cache_file = os.path.join(dataroot, '_keys_cache.p')
     logger = logging.getLogger('base')
     if os.path.isfile(keys_cache_file):
-        logger.info('Read lmdb keys from cache: {}'.format(keys_cache_file))
+        logger.info('Read lmdb keys from cache: %s', keys_cache_file)
         keys = pickle.load(open(keys_cache_file, "rb"))
     else:
         with env.begin(write=False) as txn:
-            logger.info('Creating lmdb keys cache: {}'.format(keys_cache_file))
+            logger.info('Creating lmdb keys cache: %s', keys_cache_file)
             keys = [key.decode('ascii') for key, _ in txn.cursor()]
         pickle.dump(keys, open(keys_cache_file, 'wb'))
     paths = sorted([key for key in keys if not key.endswith('.meta')])
@@ -57,8 +56,10 @@ def _get_paths_from_lmdb(dataroot):
 
 
 def get_image_paths(data_type, dataroot):
-    '''get image path list
-    support lmdb or image files'''
+    """
+    Get image path list.
+    Supports lmdb files or image directories.
+    """
     env, paths = None, None
     if dataroot is not None:
         if data_type == 'lmdb':
@@ -66,50 +67,48 @@ def get_image_paths(data_type, dataroot):
         elif data_type == 'img':
             paths = sorted(_get_paths_from_images(dataroot))
         else:
-            raise NotImplementedError('data_type [{:s}] is not recognized.'.format(data_type))
+            raise NotImplementedError('data_type [%s] is not recognized.' % data_type)
     return env, paths
 
 
-###################### read images ######################
 def _read_lmdb_img(env, key, size=None):
-    '''read image from lmdb with key (w/ and w/o fixed size)
-    size: (C, H, W) tuple'''
+    """
+    Read image from lmdb with key (w/ and w/o fixed size).
+    size: (C, H, W) tuple.
+    """
     with env.begin(write=False) as txn:
         buf = txn.get(key.encode('ascii'))
         buf_meta = txn.get((key + '.meta').encode('ascii')).decode('ascii')
     img_flat = np.frombuffer(buf, dtype=np.uint8)
     if size:
-        C, H, W = size
+        c, h, w = size
     else:
-        H, W, C = [int(s) for s in buf_meta.split(',')]
-    img = img_flat.reshape(H, W, C)
-    return img
+        h, w, c = [int(s) for s in buf_meta.split(',')]
+    image = img_flat.reshape(h, w, c)
+    return image
 
 
 def read_img(env, path, out_nc=3, fix_channels=True, size=None):
-    '''
-        Reads image using cv2 (rawpy if dng), from lmdb bor from a buffer 
-        (path=buffer). Could also use using PIL instead of cv2.
-    Arguments:
-        path: image path or buffer to read
-        out_nc: Desired number of channels
-        fix_channels: changes the images to the desired number of channels
-        size: fixed size to use for lmbg (optional)
-    Output:
-        Numpy HWC, BGR, [0,255] by default 
-    '''
-
-    img = None
-    if env is None or env is 'img':  # img
-        if (path[-3:].lower() == 'dng'):  # if image is a DNG
+    """
+    Reads image using cv2 (rawpy if dng), from lmdb bor from a buffer (path=buffer).
+    Could also use PIL instead of cv2.
+    :param path: image path or buffer to read
+    :param out_nc: output number of channels
+    :param fix_channels: changes the images to the desired number of channels
+    :param size: fixed size to use for lmbg (optional)
+    :returns: Numpy HWC, BGR, [0,255] by default
+    """
+    image = None
+    if env is None or env is 'img':
+        if path[-3:].lower() == 'dng':  # if image is a DNG
             import rawpy
             with rawpy.imread(path) as raw:
-                img = raw.postprocess()
-        if (path[-3:].lower() == 'npy'):  # if image is a NPY numpy array
+                image = raw.postprocess()
+        if path[-3:].lower() == 'npy':  # if image is a NPY numpy array
             with open(path, 'rb') as f:
-                img = np.load(f)
+                image = np.load(f)
         else:  # else, if image can be read by cv2
-            img = cv2.imread(path, cv2.IMREAD_UNCHANGED)
+            image = cv2.imread(path, cv2.IMREAD_UNCHANGED)
         # TODO: add variable detecting if cv2 is not available and try PIL instead
         # elif: # using PIL instead of OpenCV
         # img = Image.open(path).convert('RGB')
@@ -117,9 +116,9 @@ def read_img(env, path, out_nc=3, fix_channels=True, size=None):
         # import matplotlib.pyplot as plt
         # img = (255*plt.imread(path)[:,:,:3]).astype('uint8')
     elif env is 'lmdb':
-        img = _read_lmdb_img(env, path, size)
+        image = _read_lmdb_img(env, path, size)
     elif env is 'buffer':
-        img = cv2.imdecode(path, cv2.IMREAD_UNCHANGED)
+        image = cv2.imdecode(path, cv2.IMREAD_UNCHANGED)
     else:
         raise NotImplementedError("Unsupported env: %s" % (env,))
 
@@ -127,16 +126,13 @@ def read_img(env, path, out_nc=3, fix_channels=True, size=None):
     #     raise ValueError(f"Failed to read image: {path}")
 
     if fix_channels:
-        img = fix_img_channels(img, out_nc)
+        image = fix_img_channels(image, out_nc)
 
-    return img
+    return image
 
 
 def fix_img_channels(img, out_nc):
-    '''
-        fix image channels to the expected number
-    '''
-
+    """Fix image channels to the expected number"""
     # if image has only 2 dimensions, add "channel" dimension (1)
     if img.ndim == 2:
         # img = img[..., np.newaxis] #alt
@@ -160,10 +156,10 @@ def fix_img_channels(img, out_nc):
 ####################
 
 def bgra2rgb(img):
-    '''
-        cv2.cvtColor(img, cv2.COLOR_BGRA2BGR) has an issue removing the alpha channel,
-        this gets rid of wrong transparent colors that can harm training
-    '''
+    """
+    cv2.cvtColor(img, cv2.COLOR_BGRA2BGR) has an issue removing the alpha channel,
+    this gets rid of wrong transparent colors that can harm training
+    """
     if img.shape[2] == 4:
         # b, g, r, a = cv2.split((img*255).astype(np.uint8))
         b, g, r, a = cv2.split((img.astype(np.uint8)))
@@ -201,12 +197,13 @@ def channel_convert(in_c, tar_type, img_list):
 
 
 def rgb2ycbcr(img, only_y=True):
-    '''same as matlab rgb2ycbcr
-    only_y: only return Y channel
+    """
+    Same as matlab rgb2ycbcr.
+    :param only_y: only return Y channel
     Input:
         uint8, [0, 255]
         float, [0, 1]
-    '''
+    """
     in_img_type = img.dtype
     img_ = img.astype(np.float32)
     if in_img_type != np.uint8:
@@ -304,15 +301,13 @@ def ycbcr2rgb_(img, only_y=True):
 
 
 def ycbcr2rgb(img, only_y=True):
-    '''
-    bgr version of matlab ycbcr2rgb
-    Python opencv library (cv2) cv2.COLOR_YCrCb2BGR has 
-    different parameters to MATLAB color convertion.
-
+    """
+    bgr version of matlab ycbcr2rgb.
+    Python opencv library (cv2) cv2.COLOR_YCrCb2BGR has different parameters to MATLAB color conversion.
     Input:
         uint8, [0, 255]
         float, [0, 1]
-    '''
+    """
     in_img_type = img.dtype
     img_ = img.astype(np.float32)
     if in_img_type != np.uint8:
@@ -403,21 +398,19 @@ def augment(img_list, hflip=True, rot=True):
 
 # TODO: Could also automatically detect the possible range with min and max, like in def ssim()
 def denorm(x, min_max=(-1.0, 1.0)):
-    '''
-        Denormalize from [-1,1] range to [0,1]
-        formula: xi' = (xi - mu)/sigma
-        Example: "out = (x + 1.0) / 2.0" for denorm 
-            range (-1,1) to (0,1)
-        for use with proper act in Generator output (ie. tanh)
-    '''
+    """
+    Denormalize from [-1,1] range to [0,1].
+    formula: xi' = (xi - mu)/sigma
+    Example: "out = (x + 1.0) / 2.0" for denorm range (-1,1) to (0,1)
+    for use with proper act in Generator output (ie. tanh)
+    """
     out = (x - min_max[0]) / (min_max[1] - min_max[0])
     if isinstance(x, torch.Tensor):
         return out.clamp(0, 1)
     elif isinstance(x, np.ndarray):
         return np.clip(out, 0, 1)
     else:
-        raise TypeError("Got unexpected object type, expected torch.Tensor or \
-        np.ndarray")
+        raise TypeError("Got unexpected object type, expected torch.Tensor or np.ndarray")
 
 
 def norm(x):
@@ -428,8 +421,7 @@ def norm(x):
     elif isinstance(x, np.ndarray):
         return np.clip(out, -1, 1)
     else:
-        raise TypeError("Got unexpected object type, expected torch.Tensor or \
-        np.ndarray")
+        raise TypeError("Got unexpected object type, expected torch.Tensor or np.ndarray")
 
 
 ####################
@@ -438,12 +430,11 @@ def norm(x):
 
 
 # 2tensor
-def np2tensor(img, bgr2rgb=True, data_range=1., normalize=False, change_range=True, add_batch=True):
+def np2tensor(img: np.ndarray, bgr2rgb=True, data_range=1., normalize=False, change_range=True, add_batch=True):
     """
     Converts a numpy image array into a Tensor array.
-    Parameters:
-        img (numpy array): the input image numpy array
-        add_batch (bool): choose if new tensor needs batch dimension added 
+    :param img: the input image numpy array
+    :param add_batch: choose if new tensor needs batch dimension added
     """
     if not isinstance(img, np.ndarray):  # images expected to be uint8 -> 255
         raise TypeError("Got unexpected object type, expected np.ndarray")
@@ -472,19 +463,16 @@ def np2tensor(img, bgr2rgb=True, data_range=1., normalize=False, change_range=Tr
 
 
 # 2np
-def tensor2np(img, rgb2bgr=True, remove_batch=True, data_range=255,
-              denormalize=False, change_range=True, imtype=np.uint8):
+def tensor2np(img, rgb2bgr=True, remove_batch=True, data_range=255, denormalize=False, change_range=True,
+              imtype=np.uint8) -> np.ndarray:
     """
     Converts a Tensor array into a numpy image array.
     Parameters:
-        img (tensor): the input image tensor array
-            4D(B,(3/1),H,W), 3D(C,H,W), or 2D(H,W), any range, RGB channel order
-        remove_batch (bool): choose if tensor of shape BCHW needs to be squeezed 
-        denormalize (bool): Used to denormalize from [-1,1] range back to [0,1]
-        imtype (type): the desired type of the converted numpy array (np.uint8 
-            default)
-    Output: 
-        img (np array): 3D(H,W,C) or 2D(H,W), [0,255], np.uint8 (default)
+    :param img: the input image tensor array 4D(B,(3/1),H,W), 3D(C,H,W), or 2D(H,W), any range, RGB channel order
+    :param remove_batch: choose if tensor of shape BCHW needs to be squeezed
+    :param denormalize: Used to denormalize from [-1,1] range back to [0,1]
+    :param imtype: the desired type of the converted numpy array (np.uint8 default)
+    :returns: 3D(H,W,C) or 2D(H,W), [0,255], np.uint8 (default)
     """
     if not isinstance(img, torch.Tensor):
         raise TypeError("Got unexpected object type, expected torch.Tensor")

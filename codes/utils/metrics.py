@@ -161,7 +161,7 @@ def calculate_psnr_torch(img1, img2, clip=False, max_val=1., only_y=False, singl
         mse = diff.pow(2).mean([-3, -2, -1])
         # mse = torch.mean((diff)**2,dim=[-3, -2, -1])
 
-    max_val_tensor: torch.Tensor = torch.tensor(max_val).to(img1.device).to(img1.dtype)
+    max_val_tensor = torch.tensor(max_val).to(img1.device).to(img1.dtype)
     return 10 * torch.log10(max_val_tensor ** 2 / mse)
 
 
