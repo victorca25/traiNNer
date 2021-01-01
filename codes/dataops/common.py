@@ -480,17 +480,18 @@ def tensor2np(img, rgb2bgr=True, remove_batch=True, data_range=255,
         #if n_dim == 4, has to convert to 3 dimensions, either removing batch or by creating a grid
         if n_dim == 4 and remove_batch:
             if img.shape[0] > 1:
-                # leave only the first image in the batch
+                # leave only the first image in the batch and remove batch dimension
                 img = img[0,...] 
             else:
                 # remove a fake batch dimension
-                img = img.squeeze()
-                # squeeze removes batch and channel of grayscale images (dimensions = 1)
-                if len(img.shape) < 3: 
-                    #add back the lost channel dimension
-                    img = img.unsqueeze(dim=0)
-        # convert images in batch (BCHW) to a grid of all images (C B*H B*W)
-        else:
+                img = img.squeeze(dim=0)
+                #TODO: the following 'if' should not be required
+                ## squeeze removes batch and channel of grayscale images (dimensions = 1)
+                # if len(img.shape) < 3: 
+                #     #add back the lost channel dimension
+                #     img = img.unsqueeze(dim=0)
+        elif n_dim == 4 and not remove_batch:
+            # convert images in batch (BCHW) to a grid of all images (C B*H B*W)
             n_img = len(img)
             img = make_grid(img, nrow=int(math.sqrt(n_img)), normalize=False)
         
@@ -502,7 +503,7 @@ def tensor2np(img, rgb2bgr=True, remove_batch=True, data_range=255,
             img_np = rgba_to_bgra(img).numpy()
         else:
             img_np = img.numpy()
-        img_np = np.transpose(img_np, (1, 2, 0))  # "CHW to HWC" -> # HWC, BGR
+        img_np = np.transpose(img_np, (1, 2, 0))  # CHW to HWC
     elif n_dim == 2:
         img_np = img.numpy()
     else:
