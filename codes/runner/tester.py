@@ -10,7 +10,7 @@ from codes.utils.util import save_img
 class Tester(Runner):
     """Starts a testing session, initialized using Runner."""
 
-    def __init__(self, config_path: str, visuals_sr, visuals_gt):
+    def __init__(self, config_path: str):
         super(Tester).__init__(config_path, trainer=False)
 
         # TODO: Needs the following implemented or fixed:
@@ -60,7 +60,7 @@ class Tester(Runner):
             del metrics
 
             # log
-            logger_m = ''.join(
-                '{:s}: {:.5g}, '.format(r['name'].upper(), r['average']) for r in avg_metrics
+            self.logger.info(
+                '# Validation # %s',
+                ''.join('{:s}: {:.5g}, '.format(r['name'].upper(), r['average']) for r in avg_metrics)[:-2]
             )
-            self.logger.info('# Validation # %s', logger_m[:-2])
