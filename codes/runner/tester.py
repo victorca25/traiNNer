@@ -50,10 +50,8 @@ class Tester(Runner):
                 save_img(bot_img, save_img_path + '_bot.png')
 
                 # Get Metrics
-                # TODO: test using tensor based metrics (batch) instead of numpy.
                 crop_size = self.opt['scale']
-                # TODO: fix the metrics calculation, sr_img and gt_img wasn't defined before
-                #       my changes either.
+                # TODO: fix the metrics calculation, sr_img and gt_img wasn't defined before my changes either.
                 metrics.calculate_metrics(sr_img, gt_img, crop_size=crop_size)
 
             avg_metrics = metrics.get_averages()

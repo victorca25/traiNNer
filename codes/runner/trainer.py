@@ -157,7 +157,6 @@ class Trainer(Runner):
                                 save_img(sr_img, save_img_path)
 
                             # Get Metrics
-                            # TODO: test using tensor based metrics (batch) instead of numpy.
                             crop_size = self.opt['scale']
                             val_metrics.calculate_metrics(sr_img, gt_img, crop_size=crop_size)
 
