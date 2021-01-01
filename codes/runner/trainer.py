@@ -14,7 +14,6 @@ from codes.utils.util import sorted_nicely, mkdir_and_rename, save_img_comp, sav
 
 
 class Trainer(Runner):
-
     """Starts a training session, initialized using Runner."""
 
     def __init__(self, config_path: str):
@@ -62,9 +61,14 @@ class Trainer(Runner):
 
         # training
         self.logger.info('Start training from epoch: {:d}, iter: {:d}'.format(start_epoch, current_step))
+        epoch = 0
+        data_pos = 0
         try:
-            for epoch in range(start_epoch, total_epochs * (virtual_batch_size // batch_size)):
-                for n, train_data in enumerate(dataloaders['train'], start=1):
+            for i in range(start_epoch, total_epochs * (virtual_batch_size // batch_size)):
+                epoch = i
+                for n, train_data in enumerate(self.dataloaders['train'], start=1):
+
+                    data_pos = n
 
                     if virtual_step == 0:
                         # first iteration start time
@@ -109,20 +113,24 @@ class Trainer(Runner):
                     # save models and training states (changed to save models before validation)
                     if current_step % self.opt['logger']['save_checkpoint_freq'] == 0 and take_step:
                         if model.swa:
-                            model.save(current_step, self.opt['logger']['overwrite_chkp'], loader=dataloaders['train'])
+                            model.save(
+                                current_step,
+                                self.opt['logger']['overwrite_chkp'],
+                                loader=self.dataloaders['train']
+                            )
                         else:
                             model.save(current_step, self.opt['logger']['overwrite_chkp'])
                         model.save_training_state(
-                            epoch=epoch + (n >= len(dataloaders['train'])),
+                            epoch=epoch + (data_pos >= len(self.dataloaders['train'])),
                             iter_step=current_step,
                             latest=self.opt['logger']['overwrite_chkp']
                         )
                         self.logger.info('Models and training states saved.')
 
                     # validation
-                    if dataloaders['val'] and current_step % self.opt['train']['val_freq'] == 0 and take_step:
+                    if self.dataloaders['val'] and current_step % self.opt['train']['val_freq'] == 0 and take_step:
                         val_metrics = metrics.MetricsDict(metrics=self.opt['train'].get('metrics', 'psnr'))
-                        for val_data in dataloaders['val']:
+                        for val_data in self.dataloaders['val']:
                             img_name = os.path.splitext(os.path.basename(val_data['LR_path'][0]))[0]
                             img_dir = os.path.join(self.opt['path']['val_images'], img_name)
                             os.makedirs(img_dir, exist_ok=True)
@@ -169,14 +177,15 @@ class Trainer(Runner):
                             for r in avg_metrics:
                                 self.tb_logger.add_scalar(r['name'], r['average'], current_step)
 
-                    if current_step % self.opt['logger']['print_freq'] == 0 and take_step or \
-                            (dataloaders['val'] and current_step % self.opt['train']['val_freq'] == 0 and take_step):
+                    if take_step and \
+                            ((current_step % self.opt['logger']['print_freq'] == 0) or
+                             (self.dataloaders['val'] and current_step % self.opt['train']['val_freq'] == 0)):
                         # reset time for next iteration to skip the validation time from calculation
                         t0 = time.time()
 
             self.logger.info('Saving the final model.')
             if model.swa:
-                model.save('latest', loader=dataloaders['train'])
+                model.save('latest', loader=self.dataloaders['train'])
             else:
                 model.save('latest')
             self.logger.info('End of training.')
@@ -184,10 +193,10 @@ class Trainer(Runner):
         except KeyboardInterrupt:
             # catch a KeyboardInterrupt and save the model and state to resume later
             if model.swa:
-                model.save(current_step, True, loader=dataloaders['train'])
+                model.save(current_step, True, loader=self.dataloaders['train'])
             else:
                 model.save(current_step, True)
-            model.save_training_state(epoch + (n >= len(dataloaders['train'])), current_step, True)
+            model.save_training_state(epoch + (data_pos >= len(self.dataloaders['train'])), current_step, True)
             self.logger.info('Training interrupted. Latest models and training states saved.')
 
     @staticmethod
