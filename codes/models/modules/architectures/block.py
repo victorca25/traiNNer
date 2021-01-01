@@ -60,7 +60,7 @@ class Swish(nn.Module):
           dimensions
         - Output: (N, *), same shape as the input
         """
-        super().__init__()
+        super(Swish).__init__()
         self.inplace = inplace
         # self.beta = beta # user-defined beta parameter, non-trainable
         # self.beta = beta * torch.nn.Parameter(torch.ones(1)) # learnable beta parameter, create a tensor out of beta
@@ -148,7 +148,7 @@ def pad(pad_type, padding):
     elif pad_type == 'replicate':
         layer = nn.ReplicationPad2d(padding)
     elif pad_type == 'zero':
-        PadLayer = nn.ZeroPad2d(padding)
+        layer = nn.ZeroPad2d(padding)
     else:
         raise NotImplementedError('padding layer [{:s}] is not implemented'.format(pad_type))
     return layer
@@ -170,11 +170,8 @@ class ConcatBlock(nn.Module):
         output = torch.cat((x, self.sub(x)), dim=1)
         return output
 
-    def __repr__(self):
-        tmpstr = 'Identity .. \n|'
-        modstr = self.sub.__repr__().replace('\n', '\n|')
-        tmpstr = tmpstr + modstr
-        return tmpstr
+    def __repr__(self) -> str:
+        return 'Identity .. \n|' + self.sub.__repr__().replace('\n', '\n|')
 
 
 class ShortcutBlock(nn.Module):
@@ -187,11 +184,8 @@ class ShortcutBlock(nn.Module):
         output = x + self.sub(x)
         return output
 
-    def __repr__(self):
-        tmpstr = 'Identity + \n|'
-        modstr = self.sub.__repr__().replace('\n', '\n|')
-        tmpstr = tmpstr + modstr
-        return tmpstr
+    def __repr__(self) -> str:
+        return 'Identity .. \n|' + self.sub.__repr__().replace('\n', '\n|')
 
 
 def sequential(*args):
@@ -210,9 +204,8 @@ def sequential(*args):
     return nn.Sequential(*modules)
 
 
-def conv_block(in_nc, out_nc, kernel_size, stride=1, dilation=1, groups=1, bias=True, \
-               pad_type='zero', norm_type=None, act_type='relu', mode='CNA', convtype='Conv2D', \
-               spectral_norm=False):
+def conv_block(in_nc, out_nc, kernel_size, stride=1, dilation=1, groups=1, bias=True, pad_type='zero', norm_type=None,
+               act_type='relu', mode='CNA', convtype='Conv2D', spectral_norm=False):
     """
     Conv layer with padding, normalization, activation
     mode: CNA --> Conv -> Norm -> Act
@@ -280,10 +273,7 @@ def make_layer(basic_block, num_basic_block, **kwarg):
     Returns:
         nn.Sequential: Stacked blocks in nn.Sequential.
     """
-    layers = []
-    for _ in range(num_basic_block):
-        layers.append(basic_block(**kwarg))
-    return nn.Sequential(*layers)
+    return nn.Sequential(*[basic_block(**kwarg) for _ in range(num_basic_block)])
 
 
 ####################
