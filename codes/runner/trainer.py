@@ -37,19 +37,17 @@ class Trainer(Runner):
             mkdir_and_rename(self.opt['path']['experiments_root'])
 
         # get dataloaders
-        datasets = {}
         dataloaders = {}
         for phase, dataset_opt in self.opt['datasets'].items():
             if phase not in ['train', 'val']:
                 raise NotImplementedError('Phase [%s] is not recognized.' % phase)
-            datasets[phase] = create_dataset(dataset_opt)
-            if not datasets[phase]:
-                self.logger.error('Dataset [%s] for phase [%s] is empty.', dataset_opt['name'], phase)
+            name = dataset_opt['name']
+            dataset = create_dataset(dataset_opt)
+            if not dataset:
+                self.logger.error('Dataset [%s] for phase [%s] is empty.', name, phase)
                 sys.exit(1)
-            self.logger.info(
-                'Number of {:s} images in [{:s}]: {:,d}'.format(phase, dataset_opt['name'], len(datasets[phase]))
-            )
-            dataloaders[phase] = create_dataloader(datasets[phase], dataset_opt)
+            self.logger.info('Number of {:s} images in [{:s}]: {:,d}'.format(phase, name, len(dataset)))
+            dataloaders[phase] = create_dataloader(dataset, dataset_opt)
         if not dataloaders:
             self.logger.error("No Dataloader has been created.")
             sys.exit(1)
@@ -57,7 +55,7 @@ class Trainer(Runner):
         # get training data
         total_iters = int(self.opt['train']['niter'])
         batch_size = self.opt['datasets']['train'].get('batch_size', 4)
-        batches = int(math.ceil(len(datasets['train']) / batch_size))
+        batches = int(math.ceil(len(dataloaders['train'].dataset) / batch_size))
         total_epochs = int(math.ceil(total_iters / batches))
         self.logger.info(
             'Total epochs needed: {:,d} ({:,d} batches) for iters {:,d}'.format(
