@@ -137,7 +137,7 @@ def calculate_psnr_torch(img1, img2, clip=False, max_val=1., only_y=False, singl
     """
     # clip assumes image in range [0,1]
     if img1.shape != img2.shape:
-        raise TypeError(f"Expected tensors of equal shapes, but got {img1.shape} and {img2.shape}")
+        raise TypeError("Expected tensors of equal shapes, but got %s and %s" % (img1.shape, img2.shape))
 
     img1 = img1.to(img2.dtype)
     if clip:
@@ -151,13 +151,15 @@ def calculate_psnr_torch(img1, img2, clip=False, max_val=1., only_y=False, singl
     if only_y and diff.shape[1] == 3:  # BCHW
         diff = rgb_to_grayscale(diff)
 
-    if single == True:  # single scalar result for batch
-        mse = torch.mean((diff) ** 2)
+    if single:
+        # single scalar result for batch
+        mse = torch.mean(diff ** 2)
         # mse = F.mse_loss(img1, img2, reduction='mean') #.pow(2)
         if mse == 0:
             return float('inf')
 
-    else:  # results for each image in batch
+    else:
+        # results for each image in batch
         mse = diff.pow(2).mean([-3, -2, -1])
         # mse = torch.mean((diff)**2,dim=[-3, -2, -1])
 
