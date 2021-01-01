@@ -105,7 +105,10 @@ def act(act_type, inplace=True, neg_slope=0.2, n_prelu=1, beta=1.0):
     return layer
 
 class Identity(nn.Module):
-    def forward(self, x):
+    def __init__(self, *kwargs):
+        super(Identity, self).__init__()
+
+    def forward(self, x, *kwargs):
         return x
 
 def norm(norm_type, nc):
@@ -127,6 +130,15 @@ def norm(norm_type, nc):
     else:
         raise NotImplementedError('normalization layer [{:s}] is not found'.format(norm_type))
     return layer
+
+
+def add_spectral_norm(module, use_spectral_norm=False):
+    """ Add spectral norm to any module passed if use_spectral_norm = True,
+    else, returns the original module without change
+    """
+    if use_spectral_norm:
+        return nn.utils.spectral_norm(module)
+    return module
 
 
 def pad(pad_type, padding):
@@ -257,6 +269,16 @@ def make_layer(basic_block, num_basic_block, **kwarg):
     for _ in range(num_basic_block):
         layers.append(basic_block(**kwarg))
     return nn.Sequential(*layers)
+
+
+class Mean(nn.Module):
+  def __init__(self, dim: list, keepdim=False):
+    super().__init__()
+    self.dim = dim
+    self.keepdim = keepdim
+
+  def forward(self, x):
+    return torch.mean(x, self.dim, self.keepdim)
 
 
 ####################

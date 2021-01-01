@@ -182,18 +182,18 @@ class SRRaGANModel(BaseModel):
             Configure FreezeD
             """
             if self.cri_gan:
+                self.feature_loc = None
                 loc = train_opt.get('freeze_loc', False)
-                disc = opt["network_D"].get('which_model_D', False)
-                if "discriminator_vgg" in disc and "fea" not in disc:
-                    loc = (loc*3)-2
-                elif "patchgan" in disc:
-                    loc = (loc*3)-1
-                #TODO: TMP, for now only tested with the vgg-like or patchgan discriminators
-                if "discriminator_vgg" in disc or "patchgan" in disc:
-                    self.feature_loc = loc
-                    logger.info('FreezeD enabled')
-                else:
-                    self.feature_loc = None
+                if loc:
+                    disc = opt["network_D"].get('which_model_D', False)
+                    if "discriminator_vgg" in disc and "fea" not in disc:
+                        loc = (loc*3)-2
+                    elif "patchgan" in disc:
+                        loc = (loc*3)-1
+                    #TODO: TMP, for now only tested with the vgg-like or patchgan discriminators
+                    if "discriminator_vgg" in disc or "patchgan" in disc:
+                        self.feature_loc = loc
+                        logger.info('FreezeD enabled')
 
         # print network
         """ 
