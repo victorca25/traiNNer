@@ -41,6 +41,10 @@ def create_dataset(dataset_opt):
         from data.DVD_dataset import DVDDataset as D
     elif mode == 'DVDI':
         from data.DVD_dataset import DVDIDataset as D
+    elif mode == 'aligned':
+        from data.aligned_dataset import AlignedDataset as D
+    elif mode == 'unaligned':
+        from data.unaligned_dataset import UnalignedDataset as D
     else:
         raise NotImplementedError('Dataset [{:s}] is not recognized.'.format(mode))
     dataset = D(dataset_opt)
