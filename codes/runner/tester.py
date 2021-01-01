@@ -32,7 +32,7 @@ class Tester(Runner):
             self.logger.info(
                 'Number of {:s} images in [{:s}]: {:,d}'.format(phase, name, len(dataset))
             )
-            dataloaders[name] = create_dataloader(dataset, dataset_opt)
+            dataloaders[phase] = create_dataloader(dataset, dataset_opt)
         if not dataloaders:
             self.logger.error("No Dataloader has been created.")
             sys.exit(1)
@@ -40,7 +40,8 @@ class Tester(Runner):
         # create model
         model = create_model(self.opt)
 
-        for name, dataloader in dataloaders.items():
+        for phase, dataloader in dataloaders.items():
+            name = dataloader.dataset.opt['name']
             self.logger.info('\nTesting [{:s}]...'.format(name))
             test_start_time = time.time()
             dataset_dir = os.path.join(self.opt['path']['results_root'], name)
