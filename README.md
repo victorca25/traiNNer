@@ -32,6 +32,7 @@ WIP:
 - Added option to use different image upscaling networks with the HR optical flow estimation for video (Pretrained using 3 frames and default ESRGAN as SR network [here](https://mega.nz/file/TwwEWD7Q#wCfUvVudI17weYc1JLeM3nTeK2xiMlVdc_JN1Nov3ac))
 - Initial integration of RIFE (https://arxiv.org/abs/2011.06294) architecture for Video Frame Interpolation (Converted trained model from three pickle files into a single pth model [here](https://mega.nz/file/DhBWgRYQ#hLkR4Eiks6s3ZvwLCl4eA57J3baR0eDXjyaV9yzmTeM))
 - Video ESRGAN (EVSRGAN) and SR3D networks using 3D convolution for video super-resolution, inspired on "3DSRnet: Video Super-resolution using 3D Convolutional Neural Networks" (https://arxiv.org/pdf/1812.09079.pdf). (EVSRGAN Pretrained using 3 frames and default arch options [here](https://u.pcloud.link/publink/show?code=XZ2Wg8XZebryABNV8Q0GsSE2ifkLdh9NzzaX))
+- Real-time Deep Video Deinterlacing (https://arxiv.org/pdf/1708.00187.pdf) training and testing codes implemented
 
 (Previous changes can be found [here](https://github.com/victorca25/BasicSR/blob/master/docs/changes.md))
     
