@@ -1,6 +1,5 @@
 import os
 import sys
-import time
 
 from codes.data import create_dataset, create_dataloader
 from codes.dataops.common import tensor2np
@@ -12,6 +11,7 @@ from codes.utils.util import save_img
 
 class Tester(Runner):
     """Starts a testing session, initialized using Runner."""
+
     def __init__(self, config_path: str, visuals_sr, visuals_gt):
         super(Tester).__init__(config_path, trainer=False)
 
@@ -43,7 +43,6 @@ class Tester(Runner):
         for phase, dataloader in dataloaders.items():
             name = dataloader.dataset.opt['name']
             self.logger.info('\nTesting [{:s}]...'.format(name))
-            test_start_time = time.time()
             dataset_dir = os.path.join(self.opt['path']['results_root'], name)
             os.makedirs(dataset_dir, exist_ok=True)
 
