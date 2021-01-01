@@ -14,47 +14,22 @@ from codes.utils.util import sorted_nicely, mkdir_and_rename, save_img_comp, sav
 
 
 class Trainer(Runner):
+
     """Starts a training session, initialized using Runner."""
 
     def __init__(self, config_path: str):
         super(Trainer).__init__(config_path, trainer=True)
 
-        # prepare state
-        resume_state = None
-        if self.opt['path']['resume_state']:
-            # resume training
-            if os.path.isdir(self.opt['path']['resume_state']):
-                # get newest state
-                self.opt['path']['resume_state'] = sorted_nicely(
-                    glob.glob(self.opt['path']['resume_state'] + '/*.state')
-                )[-1]
-            resume_state = torch.load(self.opt['path']['resume_state'])
-            self.logger.info('Resuming training from epoch: %d, iter: %d.', resume_state['epoch'], resume_state['iter'])
-        else:
-            # training from scratch
-            # rotate experiments folder
-            mkdir_and_rename(self.opt['path']['experiments_root'])
-
-        # get training data
-        total_iters = int(self.opt['train']['niter'])
-        batch_size = self.opt['datasets']['train'].get('batch_size', 4)
-        batches = int(math.ceil(len(self.dataloaders['train'].dataset) / batch_size))
-        total_epochs = int(math.ceil(total_iters / batches))
-        self.logger.info(
-            'Total epochs needed: {:,d} ({:,d} batches) for iters {:,d}'.format(
-                total_epochs, batches, total_iters
-            )
-        )
-
         # create model
         model = create_model(self.opt)
 
-        # resume training
+        t0 = None
+        start_epoch = 0
         current_step = 0
         virtual_step = 0
-        start_epoch = 0
+        batch_size = self.opt['datasets']['train'].get('batch_size', 4)
         virtual_batch_size = 0
-        t0 = None
+        resume_state = self.get_resume_state(self.opt['path']['resume_state'])
         if resume_state:
             start_epoch = resume_state['epoch']
             current_step = resume_state['iter']
@@ -64,12 +39,26 @@ class Trainer(Runner):
             # compute virtual batch size
             virtual_batch_size = self.opt['datasets']['train'].get('virtual_batch_size', batch_size)
             virtual_batch_size = virtual_batch_size if virtual_batch_size > batch_size else batch_size
+            # compute virtual step
             if virtual_batch_size > batch_size:
                 virtual_step = current_step * virtual_batch_size / batch_size
             else:
                 virtual_step = current_step
-            # start the iteration time when resuming
-            t0 = time.time()
+            t0 = time.time()  # start the iteration time when resuming
+            self.logger.info('Resuming training from epoch: %d, iter: %d.', start_epoch, current_step)
+        else:
+            # training from scratch, rotate experiments folder
+            mkdir_and_rename(self.opt['path']['experiments_root'])
+
+        # get training data
+        total_iters = int(self.opt['train']['niter'])
+        batches = int(math.ceil(len(self.dataloaders['train'].dataset) / batch_size))
+        total_epochs = int(math.ceil(total_iters / batches))
+        self.logger.info(
+            'Total epochs needed: {:,d} ({:,d} batches) for iters {:,d}'.format(
+                total_epochs, batches, total_iters
+            )
+        )
 
         # training
         self.logger.info('Start training from epoch: {:d}, iter: {:d}'.format(start_epoch, current_step))
@@ -200,3 +189,12 @@ class Trainer(Runner):
                 model.save(current_step, True)
             model.save_training_state(epoch + (n >= len(dataloaders['train'])), current_step, True)
             self.logger.info('Training interrupted. Latest models and training states saved.')
+
+    @staticmethod
+    def get_resume_state(state_file: str):
+        if not state_file:
+            return None
+        if os.path.isdir(state_file):
+            # get newest state
+            state_file = sorted_nicely(glob.glob(state_file + '/*.state'))[-1]
+        return torch.load(state_file)

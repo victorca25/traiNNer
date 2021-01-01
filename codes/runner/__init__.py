@@ -12,7 +12,9 @@ from codes.utils.util import setup_logger
 
 
 class Runner:
+
     """Handles the commonalities of training and testing code, as well as initialisation."""
+
     def __init__(self, config_path: str, trainer: bool):
         # parse config
         self.opt = options.parse(config_path, is_train=trainer)
