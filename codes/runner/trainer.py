@@ -151,7 +151,7 @@ class Trainer(Runner):
 
                     # validation
                     if dataloaders['val'] and current_step % self.opt['train']['val_freq'] == 0 and take_step:
-                        val_metrics = metrics.MetricsDict(metrics=self.opt['train'].get('metrics', None))
+                        val_metrics = metrics.MetricsDict(metrics=self.opt['train'].get('metrics', 'psnr'))
                         for val_data in dataloaders['val']:
                             img_name = os.path.splitext(os.path.basename(val_data['LR_path'][0]))[0]
                             img_dir = os.path.join(self.opt['path']['val_images'], img_name)
