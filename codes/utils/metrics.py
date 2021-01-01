@@ -217,54 +217,45 @@ def calculate_ssim(img1, img2, shave=4):
 
 
 def calculate_lpips(img1_im, img2_im, use_gpu=False, net='squeeze', spatial=False, model=None):
-    '''calculate Perceptual Metric using LPIPS 
+    """
+    Calculate Perceptual Metric using LPIPS.
     img1_im, img2_im: RGB image from [0,255]
-    img1, img2: RGB image from [-1,1]
-    '''
+
+    :param img1_im: RGB image from [0,255]
+    :param img2_im: RGB image from [0,255]
+    :param use_gpu: Use GPU CUDA for operations.
+    :param net: If no `model`, net to use when creating a PerceptualLoss model. 'squeeze' is much smaller, needs less
+                RAM to load and execute in CPU during training.
+    :param spatial: If no `model`, `spatial` to pass when creating a PerceptualLoss model.
+    :param model: Model to use for calculating metrics. If not set, a model will be created for you.
+    """
 
     # if not img1_im.shape == img2_im.shape:
-    # raise ValueError('Input images must have the same dimensions.')
+    #     raise ValueError('Input images must have the same dimensions.')
 
     if not model:
-        ## Initializing the model
-        # squeeze is much smaller, needs less RAM to load and execute in CPU during training
-
-        # model = models.PerceptualLoss(model='net-lin',net='alex',use_gpu=use_gpu,spatial=True)
-        # model = models.PerceptualLoss(model='net-lin',net='squeeze',use_gpu=use_gpu)
         model = PerceptualLoss(model='net-lin', net=net, use_gpu=use_gpu, spatial=spatial)
 
-    def _dist(img1, img2, use_gpu):
-
+    def _dist(image_1, image_2, use_gpu):
         # Load images to tensors
-        if isinstance(img1, np.ndarray):
-            img1 = im2tensor(img1)  # RGB image from [-1,1]  # TODO: change to np2tensor
-        if isinstance(img2, np.ndarray):
-            img2 = im2tensor(img2)  # RGB image from [-1,1]  # TODO: change to np2tensor
-
+        if isinstance(image_1, np.ndarray):
+            image_1 = im2tensor(image_1)  # RGB image from [-1,1]  # TODO: change to np2tensor
+        if isinstance(image_2, np.ndarray):
+            image_2 = im2tensor(image_2)  # RGB image from [-1,1]  # TODO: change to np2tensor
         # elif isinstance(img1, torch.Tensor):
 
-        if (use_gpu):
-            img1 = img1.cuda()
-            img2 = img2.cuda()
+        if use_gpu:
+            image_1 = image_1.cuda()
+            image_2 = image_2.cuda()
 
         # Compute distance
-        if spatial == False:
-            dist01 = model.forward(img2, img1)
-        else:
-            dist01 = model.forward(img2, img1).mean()  # Add .mean, if using add spatial=True
-        # print('Distance: %.3f'%dist01) #%.8f
+        forward = model.forward(image_2, image_1)
+        if spatial:
+            forward = forward.mean()
+        return forward
 
-        return dist01
-
-    distances = []
-    for img1, img2 in zip(img1_im, img2_im):
-        distances.append(_dist(img1, img2, use_gpu))
-
-    # distances = [_dist(img1,img2,use_gpu) for img1,img2 in zip(img1_im,img2_im)]
-
-    lpips = sum(distances) / len(distances)
-
-    return lpips
+    distances = [_dist(img1, img2, use_gpu) for img1, img2 in zip(img1_im, img2_im)]
+    return sum(distances) / len(distances)
 
 
 class StatsMeter:
