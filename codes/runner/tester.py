@@ -21,18 +21,18 @@ class Tester(Runner):
         #       - way to tell the Tester class what visuals to use for SR and GT
 
         # get dataloaders
-        datasets = {}
+        # TODO: Could probably be done within Runner, stored to self.dataloaders
         dataloaders = {}
         for phase, dataset_opt in self.opt['datasets'].items():
             name = dataset_opt['name']
-            datasets[name] = create_dataset(dataset_opt)
-            if not datasets[name]:
+            dataset = create_dataset(dataset_opt)
+            if not dataset:
                 self.logger.error('Dataset [%s] for phase [%s] is empty.', name, phase)
                 sys.exit(1)
             self.logger.info(
-                'Number of {:s} images in [{:s}]: {:,d}'.format(phase, name, len(datasets[name]))
+                'Number of {:s} images in [{:s}]: {:,d}'.format(phase, name, len(dataset))
             )
-            dataloaders[name] = create_dataloader(datasets[name], dataset_opt)
+            dataloaders[name] = create_dataloader(dataset, dataset_opt)
         if not dataloaders:
             self.logger.error("No Dataloader has been created.")
             sys.exit(1)
