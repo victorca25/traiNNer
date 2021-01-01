@@ -28,7 +28,6 @@ def create_dataloader(dataset: torch.utils.data.Dataset, dataset_opt: dict) -> t
         pin_memory=True
     )
 
-
 def create_dataset(dataset_opt: dict) -> torch.utils.data.Dataset:
     """
     Create Dataset.
@@ -51,6 +50,14 @@ def create_dataset(dataset_opt: dict) -> torch.utils.data.Dataset:
         from codes.data.Vid_dataset import VidTestsetLoader as Dataset
     elif m == 'LRHRPBR':
         from codes.data.LRHRPBR_dataset import LRHRDataset as Dataset
+    elif m == 'DVD':
+        from codes.data.DVD_dataset import DVDDataset as Dataset
+    elif m == 'DVDI':
+        from codes.data.DVD_dataset import DVDIDataset as Dataset
+    elif m == 'aligned':
+        from codes.data.aligned_dataset import AlignedDataset as Dataset
+    elif m == 'unaligned':
+        from codes.data.unaligned_dataset import UnalignedDataset as Dataset
     else:
         raise NotImplementedError('Dataset [%s] is not recognized.' % m)
     dataset = Dataset(dataset_opt)
