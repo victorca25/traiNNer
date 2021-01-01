@@ -7,6 +7,7 @@ import numpy as np
 import torch
 
 from codes import options
+from codes.data import create_dataset, create_dataloader
 from codes.utils.util import setup_logger
 
 
@@ -39,6 +40,21 @@ class Runner:
             seed = random.randint(1, 10000)
             self.logger.info('Random seed (1-10000): %d', seed)
         self.set_seed(seed)
+        # get dataloaders
+        self.dataloaders = {}
+        for phase, dataset_opt in self.opt['datasets'].items():
+            if trainer and phase not in ['train', 'val']:
+                raise NotImplementedError('Phase [%s] is not recognized.' % phase)
+            name = dataset_opt['name']
+            dataset = create_dataset(dataset_opt)
+            if not dataset:
+                self.logger.error('Dataset [%s] for phase [%s] is empty.', name, phase)
+                sys.exit(1)
+            self.logger.info('Number of {:s} images in [{:s}]: {:,d}'.format(phase, name, len(dataset)))
+            self.dataloaders[phase] = create_dataloader(dataset, dataset_opt)
+        if not self.dataloaders:
+            self.logger.error("No Dataloader has been created.")
+            sys.exit(1)
 
     def __repr__(self) -> str:
         return self._opt_to_string(self.opt)

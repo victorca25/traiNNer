@@ -2,12 +2,10 @@ import glob
 import logging
 import math
 import os
-import sys
 import time
 
 import torch
 
-from codes.data import create_dataset, create_dataloader
 from codes.dataops.common import tensor2np
 from codes.models import create_model
 from codes.runner import Runner
@@ -17,6 +15,7 @@ from codes.utils.util import sorted_nicely, mkdir_and_rename, save_img_comp, sav
 
 class Trainer(Runner):
     """Starts a training session, initialized using Runner."""
+
     def __init__(self, config_path: str):
         super(Trainer).__init__(config_path, trainer=True)
 
@@ -36,26 +35,10 @@ class Trainer(Runner):
             # rotate experiments folder
             mkdir_and_rename(self.opt['path']['experiments_root'])
 
-        # get dataloaders
-        dataloaders = {}
-        for phase, dataset_opt in self.opt['datasets'].items():
-            if phase not in ['train', 'val']:
-                raise NotImplementedError('Phase [%s] is not recognized.' % phase)
-            name = dataset_opt['name']
-            dataset = create_dataset(dataset_opt)
-            if not dataset:
-                self.logger.error('Dataset [%s] for phase [%s] is empty.', name, phase)
-                sys.exit(1)
-            self.logger.info('Number of {:s} images in [{:s}]: {:,d}'.format(phase, name, len(dataset)))
-            dataloaders[phase] = create_dataloader(dataset, dataset_opt)
-        if not dataloaders:
-            self.logger.error("No Dataloader has been created.")
-            sys.exit(1)
-
         # get training data
         total_iters = int(self.opt['train']['niter'])
         batch_size = self.opt['datasets']['train'].get('batch_size', 4)
-        batches = int(math.ceil(len(dataloaders['train'].dataset) / batch_size))
+        batches = int(math.ceil(len(self.dataloaders['train'].dataset) / batch_size))
         total_epochs = int(math.ceil(total_iters / batches))
         self.logger.info(
             'Total epochs needed: {:,d} ({:,d} batches) for iters {:,d}'.format(

@@ -1,7 +1,5 @@
 import os
-import sys
 
-from codes.data import create_dataset, create_dataloader
 from codes.dataops.common import tensor2np
 from codes.models import create_model
 from codes.runner import Runner
@@ -20,27 +18,10 @@ class Tester(Runner):
         #       - fix to metrics calculation
         #       - way to tell the Tester class what visuals to use for SR and GT
 
-        # get dataloaders
-        # TODO: Could probably be done within Runner, stored to self.dataloaders
-        dataloaders = {}
-        for phase, dataset_opt in self.opt['datasets'].items():
-            name = dataset_opt['name']
-            dataset = create_dataset(dataset_opt)
-            if not dataset:
-                self.logger.error('Dataset [%s] for phase [%s] is empty.', name, phase)
-                sys.exit(1)
-            self.logger.info(
-                'Number of {:s} images in [{:s}]: {:,d}'.format(phase, name, len(dataset))
-            )
-            dataloaders[phase] = create_dataloader(dataset, dataset_opt)
-        if not dataloaders:
-            self.logger.error("No Dataloader has been created.")
-            sys.exit(1)
-
         # create model
         model = create_model(self.opt)
 
-        for phase, dataloader in dataloaders.items():
+        for phase, dataloader in self.dataloaders.items():
             name = dataloader.dataset.opt['name']
             self.logger.info('\nTesting [{:s}]...'.format(name))
             dataset_dir = os.path.join(self.opt['path']['results_root'], name)
