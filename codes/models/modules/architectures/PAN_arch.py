@@ -4,108 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 # import models.archs.arch_util as arch_util
-
 from . import block as B
-
-
-
-class SelfAttentionBlock(nn.Module):
-    """ 
-        Implementation of Self attention Block according to paper 
-        'Self-Attention Generative Adversarial Networks' (https://arxiv.org/abs/1805.08318)
-        Flexible Self Attention (FSA) layer according to paper
-        Efficient Super Resolution For Large-Scale Images Using Attentional GAN (https://arxiv.org/pdf/1812.04821.pdf)
-          The FSA layer borrows the self attention layer from SAGAN, 
-          and wraps it with a max-pooling layer to reduce the size 
-          of the feature maps and enable large-size images to fit in memory.
-        Used in Generator and Discriminator Networks.
-    """
-
-    def __init__(self, in_dim, max_pool=False, poolsize = 4, spectral_norm=True, ret_attention=False): #in_dim = in_feature_maps
-        super(SelfAttentionBlock,self).__init__()
-
-        self.in_dim = in_dim
-        self.max_pool = max_pool
-        self.poolsize = poolsize
-        self.ret_attention = ret_attention
-        
-        if self.max_pool:
-            self.pooled = nn.MaxPool2d(kernel_size=self.poolsize, stride=self.poolsize) #kernel_size=4, stride=4
-            # Note: test using strided convolutions instead of MaxPool2d! :
-            #upsample_block_num = int(math.log(scale_factor, 2))
-            #self.pooled = nn.Conv2d .... strided conv
-        
-        self.conv_f = nn.Conv1d(in_channels = in_dim , out_channels = in_dim//8 , kernel_size= 1, padding = 0) #query_conv 
-        self.conv_g = nn.Conv1d(in_channels = in_dim , out_channels = in_dim//8 , kernel_size= 1, padding = 0) #key_conv 
-        self.conv_h = nn.Conv1d(in_channels = in_dim , out_channels = in_dim , kernel_size= 1, padding = 0) #value_conv 
-        
-        if spectral_norm:
-            self.conv_f = nn.utils.spectral_norm(self.conv_f)
-            self.conv_g = nn.utils.spectral_norm(self.conv_g)
-            self.conv_h = nn.utils.spectral_norm(self.conv_h)
-
-        self.gamma = nn.Parameter(torch.zeros(1)) # Trainable parameter
-        self.softmax  = nn.Softmax(dim = -1)
-        
-        # if self.max_pool: #Upscale to original size
-        #     self.upsample_o = B.Upsample(scale_factor=self.poolsize, mode='bilinear', align_corners=False) #bicubic (PyTorch > 1.0) | bilinear others.
-        #     # Note: test using strided convolutions instead of MaxPool2d! :
-        #     # upsample_o = [UpconvBlock(in_channels=in_dim, out_channels=in_dim, upscale_factor=2, mode='bilinear', act_type='leakyrelu') for _ in range(upsample_block_num)]
-        #     ## upsample_o.append(nn.Conv2d(nf, in_nc, kernel_size=9, stride=1, padding=4))
-        #     ## self.upsample_o = nn.Sequential(*upsample_o)
-            
-        
-    def forward(self,input):
-        """
-            inputs :
-                input : input feature maps( B X C X W X H)
-            returns :
-                out : self attention value + input feature 
-                attention: B X N X N (N is Width*Height)
-        """
-        
-        if self.max_pool: #Downscale with Max Pool
-            x = self.pooled(input)
-        else:
-            x = input
-            
-        batch_size, C, width, height = x.size()
-        
-        N = width * height
-        x = x.view(batch_size, -1, N)
-        f = self.conv_f(x) #proj_query  = self.query_conv(x).permute(0,2,1) # B X CX(N)
-        g = self.conv_g(x) #proj_key =  self.key_conv(x) # B X C x (*W*H)
-        h = self.conv_h(x) #proj_value = self.value_conv(x) # B X C X N
-
-        s =  torch.bmm(f.permute(0,2,1),g) # energy, transpose check #energy =  torch.bmm(proj_query,proj_key) # transpose check
-        attention = self.softmax(s) #beta # BX (N) X (N) #attention = self.softmax(energy) # BX (N) X (N) 
-        
-        #v1
-        #out = torch.bmm(h,attention) #out = torch.bmm(proj_value,attention.permute(0,2,1) )
-        out = torch.bmm(h,attention.permute(0,2,1))
-        #out = out.view((batch_size, C, width, height)) #out = out.view(batch_size,C,width,height)
-        out = out.view(batch_size, C, width, height) 
-        
-        # print("Out pre size: ", out.size()) # Output size
-        
-        if self.max_pool: #Upscale to original size
-            # out = self.upsample_o(out)
-            out = B.Upsample(size=(input.shape[2],input.shape[3]), mode='bicubic', align_corners=False)(out)
-        
-        # print("Out post size: ", out.size()) # Output size
-        # print("Original size: ", input.size()) # Original size
-        
-        out = self.gamma*out + input #Add original input
-        # print(self.gamma)
-        
-        if self.ret_attention:
-            return out, attention
-        else:
-            return out
-
-
-
-
 
 
 
@@ -238,7 +137,7 @@ class PAN(nn.Module):
 
         ### self-attention
         if self.self_attention:
-            self.FSA = SelfAttentionBlock(in_dim=nf, max_pool=max_pool, poolsize=poolsize, spectral_norm=spectral_norm)
+            self.FSA = B.SelfAttentionBlock(in_dim=nf, max_pool=max_pool, poolsize=poolsize, spectral_norm=spectral_norm)
         
         '''
         # original upsample
