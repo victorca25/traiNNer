@@ -90,6 +90,7 @@ def parse(opt_path: str, is_train: bool = True) -> NoneDict:
             opt = yaml.load(f, Loader=SafeLoader)
 
     opt['is_train'] = is_train
+    opt['scale'] = opt.get('scale', 4)
     opt['batch_multiplier'] = opt.get('batch_multiplier', None)
 
     # datasets
