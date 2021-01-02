@@ -39,8 +39,7 @@ _cv2_interpolation_from_str= {v:k for k,v in _cv2_interpolation_to_str.items()}
 def _is_pil_image(img):
     if accimage is not None:
         return isinstance(img, (Image.Image, accimage.Image))
-    else:
-        return isinstance(img, Image.Image)
+    return isinstance(img, Image.Image)
 
 
 def _is_tensor_image(img):
@@ -72,12 +71,11 @@ def to_tensor(pic):
         # backward compatibility
         if isinstance(img, torch.ByteTensor) or img.max() > 1 or img.dtype==torch.uint8:
             return img.float().div(255)
-        else:
-            try:
-                return to_tensor(np.array(pic))
-                #return img
-            except Exception:
-                raise TypeError('pic should be ndarray. Got {}'.format(type(pic)))
+        try:
+            return to_tensor(np.array(pic))
+            #return img
+        except Exception:
+            raise TypeError('pic should be ndarray. Got {}'.format(type(pic)))
     elif _is_tensor_image(pic):
         return pic
 
@@ -107,9 +105,7 @@ def to_cv_image(pic, mode=None):
                         'not {}'.format(type(npimg)))
     if mode is None:
         return npimg
-
-    else:
-        return cv2.cvtColor(npimg, mode)
+    return cv2.cvtColor(npimg, mode)
 
 
 def normalize(tensor, mean, std):
@@ -133,10 +129,9 @@ def normalize(tensor, mean, std):
         for t, m, s in zip(tensor, mean, std):
             t.sub_(m).div_(s)
         return tensor
-    elif _is_numpy_image(tensor):
+    if _is_numpy_image(tensor):
         return (tensor.astype(np.float32) - 255.0 * np.array(mean))/np.array(std)
-    else:
-        raise RuntimeError('Undefined type. Must be a numpy or a torch image.')
+    raise RuntimeError('Undefined type. Must be a numpy or a torch image.')
 
 
 def resize(img, size, interpolation='BILINEAR'):
@@ -177,8 +172,7 @@ def resize(img, size, interpolation='BILINEAR'):
         output = cv2.resize(img, dsize=(size[1], size[0]), interpolation=_cv2_interpolation_to_str[interpolation])
     if img.shape[2]==1:
         return output[:, :, np.newaxis]
-    else:
-        return output
+    return output
 
 
 def scale(*args, **kwargs):
@@ -201,11 +195,10 @@ def to_rgb_bgr(pic):
     if _is_numpy_image(pic) or _is_tensor_image(pic):
         img = pic[:, :, [2, 1, 0]]
         return img
-    else:
-        try:
-            return to_rgb_bgr(np.array(pic))
-        except Exception:
-            raise TypeError('pic should be numpy.ndarray or torch.Tensor. Got {}'.format(type(pic)))
+    try:
+        return to_rgb_bgr(np.array(pic))
+    except Exception:
+        raise TypeError('pic should be numpy.ndarray or torch.Tensor. Got {}'.format(type(pic)))
 
 
 def pad(img, padding, fill=0, padding_mode='constant'):
@@ -276,9 +269,8 @@ def pad(img, padding, fill=0, padding_mode='constant'):
     if img.shape[2]==1:
         return(cv2.copyMakeBorder(src=img, top=pad_top, bottom=pad_bottom, left=pad_left, right=pad_right,
                                  borderType=_cv2_pad_to_str[padding_mode], value=fill)[:,:,np.newaxis])
-    else:
-        return(cv2.copyMakeBorder(src=img, top=pad_top, bottom=pad_bottom, left=pad_left, right=pad_right,
-                                     borderType=_cv2_pad_to_str[padding_mode], value=fill))
+    return(cv2.copyMakeBorder(src=img, top=pad_top, bottom=pad_bottom, left=pad_left, right=pad_right,
+                                 borderType=_cv2_pad_to_str[padding_mode], value=fill))
 
 
 #def crop(img, i, j, h, w):
@@ -365,9 +357,8 @@ def hflip(img):
     # img[:,::-1] is much faster, but doesn't work with torch.from_numpy()!
     if img.shape[2]==1:
         return cv2.flip(img,1)[:,:,np.newaxis]
-    else:
-        #return img[:, ::-1, :] # test, appears to be faster 
-        return cv2.flip(img, 1)
+    #return img[:, ::-1, :] # test, appears to be faster 
+    return cv2.flip(img, 1)
 
 
 def vflip(img):
@@ -381,10 +372,9 @@ def vflip(img):
         raise TypeError('img should be numpy Image. Got {}'.format(type(img)))
     if img.shape[2]==1:
         return cv2.flip(img, 0)[:,:,np.newaxis]
-    else:
-        #return img[::-1, :, :] 
-        ##img[::-1] is much faster, but doesn't work with torch.from_numpy()!
-        return cv2.flip(img, 0)
+    #return img[::-1, :, :] 
+    ##img[::-1] is much faster, but doesn't work with torch.from_numpy()!
+    return cv2.flip(img, 0)
 
 
 def five_crop(img, size):
@@ -475,8 +465,7 @@ def adjust_brightness(img, brightness_factor):
     table = np.array([ i*brightness_factor for i in range (0,256)]).clip(0,255).astype('uint8')
     if img.shape[2]==1:
         return cv2.LUT(img, table)[:,:,np.newaxis]
-    else:
-        return cv2.LUT(img, table)
+    return cv2.LUT(img, table)
     
     # alt 2:
     # same thing but a bit slower
@@ -512,8 +501,7 @@ def adjust_contrast(img, contrast_factor):
     # img = enhancer.enhance(contrast_factor) #PIL
     if img.shape[2]==1:
         return cv2.LUT(img, table)[:,:,np.newaxis]
-    else:
-        return cv2.LUT(img,table)
+    return cv2.LUT(img,table)
 
     # alt 2:
     # same results
@@ -844,23 +832,7 @@ def affine(img, angle, translate, scale, shear, interpolation=cv2.INTER_LINEAR, 
 
     if img.shape[2]==1:
         return cv2.warpAffine(img, matrix, output_size[::-1],interpolation, borderMode=mode, borderValue=fillcolor)[:,:,np.newaxis]
-    else:
-        return cv2.warpAffine(img, matrix, output_size[::-1],interpolation, borderMode=mode, borderValue=fillcolor)
-
-    # alt 2: 
-    # gray_scale = False
-    # if len(img.shape) == 2:
-        # gray_scale = True
-        # img = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
-
-    # h, w, _ = img.shape
-    # center = (w * 0.5, h * 0.5)
-    # matrix = _get_affine_matrix(center, angle, translate, scale, shear)
-    # dst_img = cv2.warpAffine(img, matrix, (w, h), flags=INTER_MODE[resample],
-                             # borderMode=cv2.BORDER_CONSTANT, borderValue=fillcolor)
-    
-    # if gray_scale:
-        # dst_img = cv2.cvtColor(dst_img, cv2.COLOR_RGB2GRAY)
+    return cv2.warpAffine(img, matrix, output_size[::-1],interpolation, borderMode=mode, borderValue=fillcolor)
     # return dst_img.astype(imgtype)
 
 

@@ -183,17 +183,16 @@ def channel_convert(in_c, tar_type, img_list):
     if in_c == 3 and tar_type == 'gray':  # BGR to gray
         gray_list = [cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) for img in img_list]
         return [np.expand_dims(img, axis=2) for img in gray_list]
-    elif in_c == 3 and tar_type == 'RGB-LAB':  # RGB to LAB
+    if in_c == 3 and tar_type == 'RGB-LAB':  # RGB to LAB
         return [cv2.cvtColor(img, cv2.COLOR_BGR2LAB) for img in img_list]
-    elif in_c == 3 and tar_type == 'LAB-RGB':  # RGB to LAB
+    if in_c == 3 and tar_type == 'LAB-RGB':  # RGB to LAB
         return [cv2.cvtColor(img, cv2.COLOR_LAB2BGR) for img in img_list]
-    elif in_c == 3 and tar_type == 'y':  # BGR to y
+    if in_c == 3 and tar_type == 'y':  # BGR to y
         y_list = [bgr2ycbcr(img, only_y=True) for img in img_list]
         return [np.expand_dims(img, axis=2) for img in y_list]
-    elif in_c == 1 and tar_type == 'RGB':  # gray/y to BGR
+    if in_c == 1 and tar_type == 'RGB':  # gray/y to BGR
         return [cv2.cvtColor(img, cv2.COLOR_GRAY2BGR) for img in img_list]
-    else:
-        return img_list
+    return img_list
 
 
 def rgb2ycbcr(img, only_y=True):
@@ -259,8 +258,7 @@ def bgr2ycbcr(image: np.ndarray, only_y=True, separate=False):
     if separate:
         result = result.astype(in_img_type)
         return result[:, :, 0], result[:, :, 1], result[:, :, 2]  # Y, Cb, Cr
-    else:
-        return result.astype(in_img_type)
+    return result.astype(in_img_type)
 
 
 '''
@@ -407,10 +405,9 @@ def denorm(x, min_max=(-1.0, 1.0)):
     out = (x - min_max[0]) / (min_max[1] - min_max[0])
     if isinstance(x, torch.Tensor):
         return out.clamp(0, 1)
-    elif isinstance(x, np.ndarray):
+    if isinstance(x, np.ndarray):
         return np.clip(out, 0, 1)
-    else:
-        raise TypeError("Got unexpected object type, expected torch.Tensor or np.ndarray")
+    raise TypeError("Got unexpected object type, expected torch.Tensor or np.ndarray")
 
 
 def norm(x):
@@ -418,10 +415,9 @@ def norm(x):
     out = (x - 0.5) * 2.0
     if isinstance(x, torch.Tensor):
         return out.clamp(-1, 1)
-    elif isinstance(x, np.ndarray):
+    if isinstance(x, np.ndarray):
         return np.clip(out, -1, 1)
-    else:
-        raise TypeError("Got unexpected object type, expected torch.Tensor or np.ndarray")
+    raise TypeError("Got unexpected object type, expected torch.Tensor or np.ndarray")
 
 
 ####################

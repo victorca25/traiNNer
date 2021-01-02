@@ -271,8 +271,7 @@ def get_log_kernel(kernel_size: int = 5, sigma: float = None, dim: int = 2):
     '''
     if kernel_size ==5 and not sigma and dim == 2: 
         return get_log_kernel_5x5()
-    else:
-        return get_log_kernel2d(kernel_size, sigma, dim)
+    return get_log_kernel2d(kernel_size, sigma, dim)
 
 #TODO: use
 # Implementation of binarize operation (for edge detectors)
@@ -315,12 +314,11 @@ def get_laplacian_kernel_3x3(alt=False) -> torch.Tensor:
                     [-1,  8, -1],
                     [-1, -1, -1]
                 ])
-    else:
-        return torch.tensor([
-                    [0, 1, 0],
-                    [1,-4, 1],
-                    [0, 1, 0],
-                ])
+    return torch.tensor([
+                [0, 1, 0],
+                [1,-4, 1],
+                [0, 1, 0],
+            ])
 
 def get_gradient_kernel_3x3() -> torch.Tensor:
     """
@@ -426,8 +424,7 @@ def get_sobel_kernel(kernel_size=3):
     '''
     if kernel_size==3:
         return get_sobel_kernel_3x3()
-    else:
-        return get_sobel_kernel_2d(kernel_size)
+    return get_sobel_kernel_2d(kernel_size)
 
 
 
@@ -531,10 +528,10 @@ def compute_padding(kernel_size):
     # 4 or 6 ints:  (padding_left, padding_right, padding_top, padding_bottom)
     if isinstance(kernel_size, tuple):
         kernel_size = list(kernel_size)
-    
+
     if isinstance(kernel_size, int):
         return kernel_size//2
-    elif isinstance(kernel_size, list):
+    if isinstance(kernel_size, list):
         computed = [k // 2 for k in kernel_size]
 
         out_padding = []
@@ -726,8 +723,7 @@ class FilterHigh(nn.Module):
             img = self.filter_low(img)
         if self.normalize:
             return denorm(img)
-        else:
-            return img
+        return img
 
 #TODO: check how similar getting the gradient with get_gradient_kernel_3x3 is from the alternative displacing the image
 #ref from TF: https://github.com/tensorflow/tensorflow/blob/4386a6640c9fb65503750c37714971031f3dc1fd/tensorflow/python/ops/image_ops_impl.py#L3423

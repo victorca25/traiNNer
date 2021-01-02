@@ -1009,9 +1009,9 @@ def random_pix(size):
     #"""
     if size <= 64:
         return random.choice([-1,0,0,1]) #pixels_translation
-    elif size > 64 and size <= 96:
+    if size > 64 and size <= 96:
         return random.choice([-2,-1,0,0,1,2]) #pixels_translation
-    elif size > 96:
+    if size > 96:
         return random.choice([-3,-2,-1,0,0,1,2,3]) #pixels_translation
     #"""
     #return random.choice([-3,-2,-1,0,0,1,2,3]) #pixels_translation

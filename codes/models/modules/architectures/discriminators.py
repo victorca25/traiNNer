@@ -720,8 +720,7 @@ class MultiscaleDiscriminator(nn.Module):
             for i in range(len(model)):
                 result.append(model[i](result[-1]))
             return result[1:]
-        else:
-            return [model(input)]
+        return [model(input)]
 
     def forward(self, input):        
         num_D = self.num_D

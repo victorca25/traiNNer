@@ -300,8 +300,7 @@ class SSIM(nn.Module):
 
         if self.full:
             return ssim_val, cs
-        else:
-            return ssim_val
+        return ssim_val
 
 
 

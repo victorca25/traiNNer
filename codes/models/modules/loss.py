@@ -83,8 +83,7 @@ class GANLoss(nn.Module):
             return target_is_real
         if target_is_real:
             return torch.empty_like(input).fill_(self.real_label_val) #torch.ones_like(d_sr_out)
-        else:
-            return torch.empty_like(input).fill_(self.fake_label_val) #torch.zeros_like(d_sr_out)
+        return torch.empty_like(input).fill_(self.fake_label_val) #torch.zeros_like(d_sr_out)
 
     def forward(self, input, target_is_real, is_disc = None):
         """Calculate loss given Discriminator's output and grount truth labels.
@@ -106,13 +105,11 @@ class GANLoss(nn.Module):
                     new_loss = torch.mean(loss_tensor.view(bs, -1), dim=1)
                     loss += new_loss
                 return loss / len(input)
-            else:
-                if is_disc:
-                    input = -input if target_is_real else input
-                    return self.loss(1 + input).mean()
-                else:
-                    # assert target_is_real
-                    return (-input).mean()
+            if is_disc:
+                input = -input if target_is_real else input
+                return self.loss(1 + input).mean()
+            # assert target_is_real
+            return (-input).mean()
         else:
             target_label = self.get_target_label(input, target_is_real)
             loss = self.loss(input, target_label)
@@ -236,29 +233,28 @@ class TVLoss(nn.Module):
                 # calculate the scalar loss-value for tv loss
                 loss = loss.sum()/(2.0*batch_size) # averages the TV loss all the images in the batch (note: the division is not in TF version, only the sum reduction)
                 return loss
-            else: #'tv'
-                dy, dx  = get_image_gradients(x)
+            dy, dx  = get_image_gradients(x)
 
-                if len(dy.shape) == 3:
-                    # Sum for all axis. (None is an alias for all axis.)
-                    reduce_axes = None
-                    batch_size = 1
-                elif len(dy.shape) == 4:
-                    # Only sum for the last 3 axis.
-                    # This results in a 1-D tensor with the total variation for each image.
-                    reduce_axes = (-3, -2, -1)
-                    batch_size = x.size()[0]
-                #Compute the element-wise magnitude of a vector array
-                # Calculates the TV for each image in the batch
-                # Calculate the total variation by taking the absolute value of the
-                # pixel-differences and summing over the appropriate axis.
-                if self.p == 1:
-                    loss = dy.abs().sum(dim=reduce_axes) + dx.abs().sum(dim=reduce_axes)
-                elif self.p == 2:
-                    loss = torch.pow(dy,2).sum(dim=reduce_axes) + torch.pow(dx,2).sum(dim=reduce_axes)
-                # calculate the scalar loss-value for tv loss
-                loss = loss.sum()/batch_size # averages the TV loss all the images in the batch (note: the division is not in TF version, only the sum reduction)
-                return loss
+            if len(dy.shape) == 3:
+                # Sum for all axis. (None is an alias for all axis.)
+                reduce_axes = None
+                batch_size = 1
+            elif len(dy.shape) == 4:
+                # Only sum for the last 3 axis.
+                # This results in a 1-D tensor with the total variation for each image.
+                reduce_axes = (-3, -2, -1)
+                batch_size = x.size()[0]
+            #Compute the element-wise magnitude of a vector array
+            # Calculates the TV for each image in the batch
+            # Calculate the total variation by taking the absolute value of the
+            # pixel-differences and summing over the appropriate axis.
+            if self.p == 1:
+                loss = dy.abs().sum(dim=reduce_axes) + dx.abs().sum(dim=reduce_axes)
+            elif self.p == 2:
+                loss = torch.pow(dy,2).sum(dim=reduce_axes) + torch.pow(dx,2).sum(dim=reduce_axes)
+            # calculate the scalar loss-value for tv loss
+            loss = loss.sum()/batch_size # averages the TV loss all the images in the batch (note: the division is not in TF version, only the sum reduction)
+            return loss
         else:
             raise ValueError("Expected input tensor to be of ndim 3 or 4, but got " + str(len(img_shape)))
     
@@ -274,11 +270,10 @@ class GradientLoss(nn.Module):
             inputdy, inputdx, inputdp, inputdn = get_4dim_image_gradients(input)
             targetdy, targetdx, targetdp, targetdn = get_4dim_image_gradients(target) 
             return (self.criterion(inputdx, targetdx) + self.criterion(inputdy, targetdy) + \
-                    self.criterion(inputdp, targetdp) + self.criterion(inputdn, targetdn))/4
-        else: #'2d'
-            inputdy, inputdx = get_image_gradients(input)
-            targetdy, targetdx = get_image_gradients(target) 
-            return (self.criterion(inputdx, targetdx) + self.criterion(inputdy, targetdy))/2
+                            self.criterion(inputdp, targetdp) + self.criterion(inputdn, targetdn))/4
+        inputdy, inputdx = get_image_gradients(input)
+        targetdy, targetdx = get_image_gradients(target) 
+        return (self.criterion(inputdx, targetdx) + self.criterion(inputdy, targetdy))/2
 
 
 class ElasticLoss(nn.Module):

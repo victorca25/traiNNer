@@ -118,7 +118,7 @@ def rgb_to_yuv(input: torch.Tensor, consts='yuv'):
         y: torch.Tensor = Wr * r + Wg * g + Wb * b
         #(0.2989 * input[0] + 0.5870 * input[1] + 0.1140 * input[2]).to(img.dtype)
         return y
-    elif consts == 'yuvK':
+    if consts == 'yuvK':
         y: torch.Tensor = Wr * r + Wg * g + Wb * b
         u: torch.Tensor = Ur * r + Ug * g + Ub * b
         v: torch.Tensor = Vr * r + Vg * g + Vb * b
@@ -129,8 +129,7 @@ def rgb_to_yuv(input: torch.Tensor, consts='yuv'):
 
     if consts == 'uv': #returns only UV channels
         return torch.stack((u, v), -3)
-    else:
-        return torch.stack((y, u, v), -3)
+    return torch.stack((y, u, v), -3)
 
 def ycbcr_to_rgb(input: torch.Tensor):
     return yuv_to_rgb(input, consts = 'ycbcr')

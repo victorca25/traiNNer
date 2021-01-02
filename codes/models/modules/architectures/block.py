@@ -279,7 +279,7 @@ def conv_block(in_nc, out_nc, kernel_size, stride=1, dilation=1, groups=1, bias=
     if 'CNA' in mode:
         n = norm(norm_type, out_nc) if norm_type else None
         return sequential(p, c, n, a)
-    elif mode == 'NAC':
+    if mode == 'NAC':
         if norm_type is None and act_type is not None:
             a = act(act_type, inplace=False)
             # Important!

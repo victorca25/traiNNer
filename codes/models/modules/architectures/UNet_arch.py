@@ -157,8 +157,7 @@ class UnetSkipConnectionBlock(nn.Module):
     def forward(self, x):
         if self.outermost:
             return self.model(x)
-        else:   # add skip connections
-            return torch.cat([x, self.model(x)], 1)
+        return torch.cat([x, self.model(x)], 1)
 
 
 ####################

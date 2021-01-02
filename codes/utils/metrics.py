@@ -186,10 +186,10 @@ def calculate_ssim(a: np.ndarray, b: np.ndarray, shave: int = 4) -> float:
 
     if a.ndim == 2:
         return ssim(a, b).mean()
-    elif a.ndim == 3:
+    if a.ndim == 3:
         if a.shape[2] == 3:
             return ssim(a, b).mean()
-        elif a.shape[2] == 1:
+        if a.shape[2] == 1:
             return ssim(np.squeeze(a), np.squeeze(b))
     else:
         raise ValueError('Wrong input image dimensions.')

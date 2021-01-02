@@ -144,13 +144,11 @@ def get_loss_fn(loss_type=None,
     if loss_function:
         if recurrent:
             return loss_function.to(device)
-        else:
-            loss = {
-                    'name': loss_type,
-                    'weight': float(weight), #TODO: check if float is needed
-                    'function': loss_function.to(device)}
-            return loss
-                    
+        loss = {
+                'name': loss_type,
+                'weight': float(weight), #TODO: check if float is needed
+                'function': loss_function.to(device)}
+        return loss
 
 def check_loss_names(pixel_criterion=None, feature_criterion=None, feature_network=None, hfen_criterion=None, tv_type=None, tv_norm=None, lpips_criterion=None, lpips_network = None):
     """
@@ -172,11 +170,10 @@ def check_loss_names(pixel_criterion=None, feature_criterion=None, feature_netwo
     if hfen_criterion:
         if hfen_criterion == 'rel_l1' or hfen_criterion == 'rel_l2': #TODO, rel_l2 not available, easy to do
             hfen_criterion = 'hfen-relativel1'
-        #elif hfen_criterion == 'rel_l2':
+                #elif hfen_criterion == 'rel_l2':
             #hfen_criterion = 'hfen-relativel2'
             return hfen_criterion
-        else:
-            return 'hfen-{}'.format(hfen_criterion.lower())
+        return 'hfen-{}'.format(hfen_criterion.lower())
 
     #//, "tv_type": "normal" //helps in denoising, reducing upscale artefacts
     if tv_type and tv_norm:
@@ -224,10 +221,9 @@ class PerceptualLoss(nn.Module):
                 y = torch.flip(y, (3,))
         if self.criterion == 'lpips':
             return self.network(x, y, normalize=self.normalize).mean()
-        else:
-            fea_x = self.network(x)
-            fea_y = self.network(y).detach()
-            return self.criterion(fea_x, fea_y)
+        fea_x = self.network(x)
+        fea_y = self.network(y).detach()
+        return self.criterion(fea_x, fea_y)
 
 
 
@@ -267,7 +263,7 @@ class Adversarial(nn.Module):
 
         #tmp_vis(real) # to visualize the batch for debugging
         #tmp_vis(fake) # to visualize the batch for debugging
-        
+
         if stage == 'generator':
             # updating generator
             #For the Generator only if GAN is enabled, everything else can happen any time
@@ -278,7 +274,7 @@ class Adversarial(nn.Module):
                 if isinstance(pred_g_real, list):
                     feats_d_real = pred_g_real[1]
                     pred_g_real = pred_g_real[0].detach() # detach to avoid backpropagation to D
-                
+        
                 pred_g_fake = netD(fake, return_maps=self.use_featmaps)
                 #TODO: test. if is a list, its [pred_g_fake, feats_d_fake], else its just pred_g_fake
                 if isinstance(pred_g_fake, list) and self.use_featmaps:
@@ -298,7 +294,7 @@ class Adversarial(nn.Module):
                 pred_g_real = pred_g_real.detach() # detach to avoid backpropagation to D
                 l_g_gan = self.l_gan_w * (self.cri_gan(pred_g_real - torch.mean(pred_g_fake), False) +
                                             self.cri_gan(pred_g_fake - torch.mean(pred_g_real), True)) / 2
-            
+    
             # SRPGAN-like Features Perceptual loss, extracted from the discriminator
             if self.use_featmaps:
                 l_g_disfea = 0
@@ -306,51 +302,49 @@ class Adversarial(nn.Module):
                     l_g_disfea += self.cri_disfea['function'](sr_feat_map, hr_feat_map)
                 l_g_disfea = (self.cri_disfea['weight']*l_g_disfea)/len(sr_feat_map)
                 l_g_gan += l_g_disfea
-            
+    
             return l_g_gan
+        # updating discriminator
+        pred_d_real = netD(real)
+        pred_d_fake = netD(fake.detach())  # detach to avoid backpropagation to G
 
-        else: # elif stage == 'discriminator':
-            # updating discriminator
-            pred_d_real = netD(real)
-            pred_d_fake = netD(fake.detach())  # detach to avoid backpropagation to G
-            
-            if isinstance(pred_d_real, list) and isinstance(pred_d_fake, list):
-                # for multiscale discriminator
-                l_d_real = 0
-                l_d_fake = 0
-                for preds in zip(pred_d_real, pred_d_fake):
-                    l_d_real = self.cri_gan(preds[0][0] - torch.mean(preds[1][0]), True)
-                    l_d_fake = self.cri_gan(preds[1][0] - torch.mean(preds[0][0]), False)
-                pred_d_real = pred_d_real[0][0] # leave only the largest D for the logs
-                pred_d_fake = pred_d_fake[0][0] # leave only the largest D for the logs
-            else: # regular single scale discriminators
-                l_d_real = self.cri_gan(pred_d_real - torch.mean(pred_d_fake), True)
-                l_d_fake = self.cri_gan(pred_d_fake - torch.mean(pred_d_real), False)
+        if isinstance(pred_d_real, list) and isinstance(pred_d_fake, list):
+            # for multiscale discriminator
+            l_d_real = 0
+            l_d_fake = 0
+            for preds in zip(pred_d_real, pred_d_fake):
+                l_d_real = self.cri_gan(preds[0][0] - torch.mean(preds[1][0]), True)
+                l_d_fake = self.cri_gan(preds[1][0] - torch.mean(preds[0][0]), False)
+            pred_d_real = pred_d_real[0][0] # leave only the largest D for the logs
+            pred_d_fake = pred_d_fake[0][0] # leave only the largest D for the logs
+        else: # regular single scale discriminators
+            l_d_real = self.cri_gan(pred_d_real - torch.mean(pred_d_fake), True)
+            l_d_fake = self.cri_gan(pred_d_fake - torch.mean(pred_d_real), False)
 
-            l_d_total = (l_d_real + l_d_fake) / 2
+        l_d_total = (l_d_real + l_d_fake) / 2
 
-            #logs for losses and D outputs
-            gan_logs = {
-                    'l_d_real': l_d_real.item(),
-                    'l_d_fake': l_d_fake.item(),
-                    'D_real': torch.mean(pred_d_real.detach()).item(),
-                    'D_fake': torch.mean(pred_d_fake.detach()).item()
-                    }
+        #logs for losses and D outputs
+        gan_logs = {
+                'l_d_real': l_d_real.item(),
+                'l_d_fake': l_d_fake.item(),
+                'D_real': torch.mean(pred_d_real.detach()).item(),
+                'D_fake': torch.mean(pred_d_fake.detach()).item()
+                }
 
-            if self.gan_type == 'wgan-gp':
-                batch_size = real.size(0)
-                if self.random_pt.size(0) != batch_size:
-                    self.random_pt.resize_(batch_size, 1, 1, 1)
-                self.random_pt.uniform_()  # Draw random interpolation points
-                interp = self.random_pt * fake.detach() + (1 - self.random_pt) * real
-                interp.requires_grad = True
-                interp_crit = netD(interp)
-                l_d_gp = self.l_gp_w * self.cri_gp(interp, interp_crit)
-                l_d_total += l_d_gp
-                # attach gradient penalty loss to log
-                gan_logs['l_d_gp'] = l_d_gp.item()
-            
-            return l_d_total, gan_logs
+        if self.gan_type == 'wgan-gp':
+            batch_size = real.size(0)
+            if self.random_pt.size(0) != batch_size:
+                self.random_pt.resize_(batch_size, 1, 1, 1)
+            self.random_pt.uniform_()  # Draw random interpolation points
+            interp = self.random_pt * fake.detach() + (1 - self.random_pt) * real
+            interp.requires_grad = True
+            interp_crit = netD(interp)
+            l_d_gp = self.l_gp_w * self.cri_gp(interp, interp_crit)
+            l_d_total += l_d_gp
+            # attach gradient penalty loss to log
+            gan_logs['l_d_gp'] = l_d_gp.item()
+
+        return l_d_total, gan_logs
 
 
 class GeneratorLoss(nn.Module):

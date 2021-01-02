@@ -136,11 +136,10 @@ class SelfAttentionBlock(nn.Module):
         # print("Original size: ", input.size()) # Original size
         
         out = self.gamma*out + input #Add original input
-        
+
         if self.ret_attention:
             return out, attention
-        else:
-            return out
+        return out
 
 class ResidualBlock(nn.Module):
     """ Implementaion of Residual Block. Used in generator and discriminator networks. """
@@ -317,14 +316,13 @@ class ASRResNet(nn.Module):
             
         if outm=='scaltanh': # limit output range to [-1,1] range with tanh and rescale to [0,1] Idea from: https://github.com/goldhuang/SRGAN-PyTorch/blob/master/model.py
             return(torch.tanh(block8) + 1.0) / 2.0 # Normalize to [0,1]
-        elif outm=='tanh': # Normalize limit output to [-1,1] range
+        if outm=='tanh': # Normalize limit output to [-1,1] range
             return torch.tanh(block8)
-        elif outm=='sigmoid': # limit output to [0,1] range
+        if outm=='sigmoid': # limit output to [0,1] range
             return torch.sigmoid(block8)
-        elif outm=='clamp':
+        if outm=='clamp':
             return torch.clamp(block8, min=0.0, max=1.0)
-        else: #Default, no cap for the output
-            return block8
+        return block8
 
 
 
@@ -443,25 +441,21 @@ class ADiscriminator(nn.Module):
         x = self.act9(self.conv9(x))
         feature_maps.append(x)
         x = self.conv10(x)
-        
+
         # print(list(x.view(batch_size).size()))
         # print(list(x.size()))
         # print(list((x.view(-1,1).size())))
         # print(x.view(x.size(0), -1))
-        
+
         if out_features:
             # return torch.sigmoid(x.view(batch_size)), feature_maps # SRGAN and SRGAN + Features #print(list(x.view(batch_size).size())) = [8]
             return torch.sigmoid(x.view(batch_size, -1)), feature_maps # https://github.com/lycutter/SRGAN-SpectralNorm/blob/master/model.py doesn't use "sigmoid" cap
             # return x, feature_maps #pix2pix patch gan outputs the result directly, ESRGAN too, after x = x.view(x.size(0), -1) and x = self.classifier(x) #print(list(x.size())) = [8, 1, 1, 1]
             # return torch.sigmoid(x.view(-1,1)), feature_maps #https://github.com/mitulrm/SRGAN/blob/master/SR_GAN.ipynb # print(x.view(x.size(0), -1)) = [8, 1]
             # return torch.sigmoid(x.view(x.size(0), -1)), feature_maps # print(x.view(x.size(0), -1)) = a tensor with 8 values
-            
-        else:
-            # return torch.sigmoid(x.view(batch_size)) # SRGAN and SRGAN + Features
-            return torch.sigmoid(x.view(batch_size, -1)) # https://github.com/lycutter/SRGAN-SpectralNorm/blob/master/model.py doesn't use "sigmoid" cap
-            # return x #pix2pix patch gan outputs the result directly, ESRGAN too, after x = x.view(x.size(0), -1) and x = self.classifier(x)
-            # return torch.sigmoid(x.view(-1,1)) #https://github.com/mitulrm/SRGAN/blob/master/SR_GAN.ipynb
-            # return torch.sigmoid(x.view(x.size(0), -1)) 
+    
+        # return torch.sigmoid(x.view(batch_size)) # SRGAN and SRGAN + Features
+        return torch.sigmoid(x.view(batch_size, -1)) # https://github.com/lycutter/SRGAN-SpectralNorm/blob/master/model.py doesn't use "sigmoid" cap
         #return F.sigmoid(F.avg_pool2d(x, x.size()[2:])).view(x.size()[0], -1)
 
 
