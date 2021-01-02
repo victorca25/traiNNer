@@ -7,6 +7,7 @@ https://github.com/R08UST/Color_Conversion_pytorch/blob/master/differentiable_co
 
 
 import torch
+import torch.nn as nn
 import math
 import cv2
 import numpy as np
@@ -175,39 +176,69 @@ def srgb2rgb(imgs):
 
 
 
-def color_shift(image1: torch.Tensor, image2: torch.Tensor, mode='uniform', alpha=0.8, Y=False):
+def color_shift(image: torch.Tensor, mode='uniform', rgb_weights=None, alpha=0.8, Y=False):
     '''random color shift transformation
-    Applies the same color shift to two images (ie. pred and target) to decrease the 
-    influence of color and luminance.
+    Applies the same color shift to an image to decrease the influence of 
+        color and luminance for texture extraction.
     Arguments: 
-        image1 (tensor): first image to transform
-        image2 (tensor): second image to transform
+        image (tensor): image to transform
         mode (str): choose between 'normal' or 'uniform' random weights
+        rgb_weights (tensor): the precalculated random shift weights to apply
         alpha (float): weight to combine the random shift with standard grayscale
-        Y (bool): choose if results will be combined with grayscale image converted 
-            from RGB color image
+        Y (bool): choose if results will be calculated with random values centered 
+            around the grayscale conversion constants with sigma=0.1 (Y=false) or 
+            around 0.0 with sigma=1.0 ('β1, β2 and β3 ∼ U(−1,1)') and the combined 
+            with the grayscale image converted from RGB color image with interpolation 
+            factor 'alpha' (Y=true) for more control ('(1−α)(β1∗Ir+β2∗Ig+β3∗Ib)+α∗Y)').
+            With alpha=0.8, both options are equivalent.
     '''
-    r1: torch.Tensor = image1[..., 0:1, :, :]
-    g1: torch.Tensor = image1[..., 1:2, :, :]
-    b1: torch.Tensor = image1[..., 2:3, :, :]
+    r: torch.Tensor = image[..., 0:1, :, :]
+    g: torch.Tensor = image[..., 1:2, :, :]
+    b: torch.Tensor = image[..., 2:3, :, :]
 
-    r2: torch.Tensor = image2[..., 0:1, :, :]
-    g2: torch.Tensor = image2[..., 1:2, :, :]
-    b2: torch.Tensor = image2[..., 2:3, :, :]
-
-    if mode == 'normal':
-        r_weight = np.random.normal(loc=0.299, scale=0.1)
-        g_weight = np.random.normal(loc=0.587, scale=0.1)
-        b_weight = np.random.normal(loc=0.114, scale=0.1)
-    elif mode == 'uniform':
-        r_weight = np.random.uniform(low=0.199, high=0.399)
-        g_weight = np.random.uniform(low=0.487, high=0.687)
-        b_weight = np.random.uniform(low=0.014, high=0.214)
-    output1 = (b_weight*b1+g_weight*g1+r_weight*r1)/(b_weight+g_weight+r_weight)
-    output2 = (b_weight*b2+g_weight*g2+r_weight*r2)/(b_weight+g_weight+r_weight)
+    if not isinstance(rgb_weights, torch.Tensor):
+        rgb_weights = get_colorshift_weights(mode=mode, Y=Y)
     
+    rgb_weights = rgb_weights.to(image.device)
+    output = (rgb_weights[0]*r+rgb_weights[1]*g+rgb_weights[2]*b)/(rgb_weights.sum())
+
     if Y:
-        output1 = (1-alpha)*output1 + alpha*rgb_to_grayscale(image1)
-        output2 = (1-alpha)*output2 + alpha*rgb_to_grayscale(image2)
+        output = (1-alpha)*output + alpha*rgb_to_grayscale(image)
     
-    return output1, output2
+    return output
+
+def get_colorshift_weights(mode='uniform', Y=False):
+    if Y:
+        if mode == 'normal':
+            r_weight = np.random.normal(loc=0.0, scale=1.0)
+            g_weight = np.random.normal(loc=0.0, scale=1.0)
+            b_weight = np.random.normal(loc=0.0, scale=1.0)
+        elif mode == 'uniform':
+            r_weight = np.random.uniform(low=-1.0, high=1.0)
+            g_weight = np.random.uniform(low=-1.0, high=1.0)
+            b_weight = np.random.uniform(low=-1.0, high=1.0)
+    else:
+        if mode == 'normal':
+            r_weight = np.random.normal(loc=0.299, scale=0.1)
+            g_weight = np.random.normal(loc=0.587, scale=0.1)
+            b_weight = np.random.normal(loc=0.114, scale=0.1)
+        elif mode == 'uniform':
+            r_weight = np.random.uniform(low=0.199, high=0.399)
+            g_weight = np.random.uniform(low=0.487, high=0.687)
+            b_weight = np.random.uniform(low=0.014, high=0.214)
+    
+    return torch.Tensor([r_weight, g_weight, b_weight])
+
+class ColorShift(nn.Module):
+    ''' color shift class
+    '''
+    def __init__(self, mode='uniform', alpha=0.8, Y=False):
+        super(ColorShift, self).__init__()
+        self.mode = mode
+        self.alpha = alpha
+        self.Y = Y
+        
+    def forward(self, *img: torch.Tensor):
+        rgb_weights = get_colorshift_weights(mode=self.mode, Y=self.Y)
+        return (color_shift(im, self.mode, rgb_weights, self.alpha, self.Y) for im in img)
+

@@ -126,6 +126,8 @@ def norm(norm_type, nc):
     elif norm_type == 'instance':
         layer = nn.InstanceNorm2d(nc, affine=False)
         # norm_layer = functools.partial(nn.InstanceNorm2d, affine=False, track_running_stats=False)
+    # elif norm_type == 'layer':
+    #     return lambda num_features: nn.GroupNorm(1, num_features)
     elif norm_type == 'none':
         def norm_layer(x): return Identity()
     else:
