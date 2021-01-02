@@ -13,7 +13,8 @@ def main():
         #       These keys are being used, as that's what was used in the old test.py
         path_key='LR_path',
         wanted_visuals=['SR'],
-        metric_visuals=('SR', 'HR'))
+        metric_visuals=('SR', 'HR')
+    )
 
 
 if __name__ == '__main__':
