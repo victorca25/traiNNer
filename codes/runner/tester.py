@@ -10,7 +10,7 @@ from codes.utils.util import save_img
 class Tester(Runner):
     """Starts a testing session, initialized using Runner."""
 
-    def __init__(self, config_path: str):
+    def __init__(self, config_path: str, path_key: str):
         super(Tester).__init__(config_path, trainer=False)
 
         # TODO: Needs the following implemented or fixed:
@@ -32,7 +32,10 @@ class Tester(Runner):
                 need_hr = dataloader.dataset.opt['dataroot_HR'] is not None
 
                 model.feed_data(data, need_HR=need_hr)
-                img_path = data['in_path'][0]
+                # TODO: This key is from the dataset __getitem__, can we remove the need for this?
+                #       Simplifying this and making it universal (not caring which dataset/loader is being used)
+                #       Will also carry readability and general usability improvements to the dataset classes.
+                img_path = data[path_key][0]
                 img_name = os.path.splitext(os.path.basename(img_path))[0]
 
                 model.test()  # test
