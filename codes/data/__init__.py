@@ -10,15 +10,16 @@ def create_dataloader(dataset: torch.utils.data.Dataset, dataset_opt: dict) -> t
     :param dataset: Dataset to use
     :param dataset_opt: Dataset configuration from opt file
     """
-    batch_size = 1
-    shuffle = False
-    num_workers = 1
-    drop_last = False
     if dataset_opt['phase'] == 'train':
         batch_size = dataset_opt['batch_size']
         shuffle = dataset_opt['use_shuffle']
         num_workers = dataset_opt['n_workers']
         drop_last = True
+    else:
+        batch_size = 1
+        shuffle = False
+        num_workers = 1
+        drop_last = False
     return torch.utils.data.DataLoader(
         dataset,
         batch_size=batch_size,
