@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 
 from codes.models.modules.architectures.convolutions.partialconv2d import PartialConv2d
+from codes.models.modules.architectures.convolutions.deformconv2d import DeformConv2d
 from codes.models.networks import weights_init_normal, weights_init_xavier, weights_init_kaiming, \
     weights_init_orthogonal
 
@@ -109,7 +110,10 @@ def act(act_type, inplace=True, neg_slope=0.2, n_prelu=1, beta=1.0):
 
 
 class Identity(nn.Module):
-    def forward(self, x):
+    def __init__(self, *kwargs):
+        super(Identity, self).__init__()
+
+    def forward(self, x, *kwargs):
         return x
 
 
@@ -127,12 +131,23 @@ def norm(norm_type, nc):
     elif norm_type == 'instance':
         layer = nn.InstanceNorm2d(nc, affine=False)
         # norm_layer = functools.partial(nn.InstanceNorm2d, affine=False, track_running_stats=False)
+    # elif norm_type == 'layer':
+    #     return lambda num_features: nn.GroupNorm(1, num_features)
     elif norm_type == 'none':
         def norm_layer(x):
             return Identity()
     else:
         raise NotImplementedError('normalization layer [{:s}] is not found'.format(norm_type))
     return layer
+
+
+def add_spectral_norm(module, use_spectral_norm=False):
+    """ Add spectral norm to any module passed if use_spectral_norm = True,
+    else, returns the original module without change
+    """
+    if use_spectral_norm:
+        return nn.utils.spectral_norm(module)
+    return module
 
 
 def pad(pad_type, padding):
@@ -226,6 +241,16 @@ def conv_block(in_nc, out_nc, kernel_size, stride=1, dilation=1, groups=1, bias=
             dilation=dilation,
             bias=bias,
             groups=groups)
+    elif convtype == 'DeformConv2D':
+        c = DeformConv2d(
+            in_nc,
+            out_nc,
+            kernel_size=kernel_size,
+            stride=stride,
+            padding=padding,
+            dilation=dilation,
+            bias=bias,
+            groups=groups)
     elif convtype == 'Conv3D':
         c = nn.Conv3d(
             in_nc,
@@ -276,6 +301,16 @@ def make_layer(basic_block, num_basic_block, **kwarg):
     return nn.Sequential(*[basic_block(**kwarg) for _ in range(num_basic_block)])
 
 
+class Mean(nn.Module):
+    def __init__(self, dim: list, keepdim=False):
+        super().__init__()
+        self.dim = dim
+        self.keepdim = keepdim
+
+    def forward(self, x):
+        return torch.mean(x, self.dim, self.keepdim)
+
+
 ####################
 # initialize modules
 ####################
@@ -319,6 +354,26 @@ def default_init_weights(module_list, init_type='kaiming', scale=1, bias_fill=0,
 ####################
 
 class Upsample(nn.Module):
+    """
+    Upsamples a given multi-channel 1D (temporal), 2D (spatial) or 3D (volumetric) data.
+
+    The input data is assumed to be of the form
+    `minibatch x channels x [optional depth] x [optional height] x width`.
+
+    Args:
+        size (int or Tuple[int] or Tuple[int, int] or Tuple[int, int, int], optional):
+            output spatial sizes
+        scale_factor (float or Tuple[float] or Tuple[float, float] or Tuple[float, float, float], optional):
+            multiplier for spatial size. Has to match input size if it is a tuple.
+        mode (str, optional): the upsampling algorithm: one of ``'nearest'``,
+            ``'linear'``, ``'bilinear'``, ``'bicubic'`` and ``'trilinear'``.
+            Default: ``'nearest'``
+        align_corners (bool, optional): if ``True``, the corner pixels of the input
+            and output tensors are aligned, and thus preserving the values at
+            those pixels. This only has effect when :attr:`mode` is
+            ``'linear'``, ``'bilinear'``, or ``'trilinear'``. Default: ``False``
+    """
+
     # To prevent warning: nn.Upsample is deprecated
     # https://discuss.pytorch.org/t/which-function-is-better-for-upsampling-upsampling-or-interpolate/21811/8
     # From: https://pytorch.org/docs/stable/_modules/torch/nn/modules/upsampling.html#Upsample
@@ -467,3 +522,94 @@ class minibatch_std_concat_layer(nn.Module):
             vals = mean(vals, axis=0, keepdim=True).view(1, self.n, 1, 1)
         vals = vals.expand(*target_shape)
         return torch.cat([x, vals], 1)
+
+
+####################
+# Useful blocks
+####################
+
+class SelfAttentionBlock(nn.Module):
+    """ 
+    Implementation of Self attention Block according to paper
+    'Self-Attention Generative Adversarial Networks' (https://arxiv.org/abs/1805.08318)
+    Flexible Self Attention (FSA) layer according to paper
+    Efficient Super Resolution For Large-Scale Images Using Attentional GAN (https://arxiv.org/pdf/1812.04821.pdf)
+      The FSA layer borrows the self attention layer from SAGAN,
+      and wraps it with a max-pooling layer to reduce the size
+      of the feature maps and enable large-size images to fit in memory.
+    Used in Generator and Discriminator Networks.
+    """
+
+    def __init__(self, in_dim, max_pool=False, poolsize=4, spectral_norm=False, ret_attention=False):
+        # in_dim = in_feature_maps
+        super(SelfAttentionBlock, self).__init__()
+
+        self.in_dim = in_dim
+        self.max_pool = max_pool
+        self.poolsize = poolsize
+        self.ret_attention = ret_attention
+
+        if self.max_pool:
+            self.pooled = nn.MaxPool2d(kernel_size=self.poolsize, stride=self.poolsize)  # kernel_size=4, stride=4
+            # Note: can test using strided convolutions instead of MaxPool2d! :
+            # upsample_block_num = int(math.log(scale_factor, 2))
+            # self.pooled = nn.Conv2d .... strided conv
+            # upsample_o = [UpconvBlock(in_channels=in_dim, out_channels=in_dim, upscale_factor=2, mode='bilinear', act_type='leakyrelu') for _ in range(upsample_block_num)]
+            ## upsample_o.append(nn.Conv2d(nf, in_nc, kernel_size=9, stride=1, padding=4))
+            ## self.upsample_o = nn.Sequential(*upsample_o)
+
+            # self.upsample_o = B.Upsample(scale_factor=self.poolsize, mode='bilinear', align_corners=False) 
+
+        self.conv_f = add_spectral_norm(
+            nn.Conv1d(in_channels=in_dim, out_channels=in_dim // 8, kernel_size=1, padding=0),
+            use_spectral_norm=spectral_norm)  # query_conv
+        self.conv_g = add_spectral_norm(
+            nn.Conv1d(in_channels=in_dim, out_channels=in_dim // 8, kernel_size=1, padding=0),
+            use_spectral_norm=spectral_norm)  # key_conv
+        self.conv_h = add_spectral_norm(
+            nn.Conv1d(in_channels=in_dim, out_channels=in_dim, kernel_size=1, padding=0),
+            use_spectral_norm=spectral_norm)  # value_conv
+
+        self.gamma = nn.Parameter(torch.zeros(1))  # Trainable interpolation parameter
+        self.softmax = nn.Softmax(dim=-1)
+
+    def forward(self, input):
+        """
+            inputs :
+                input : input feature maps( B X C X W X H)
+            returns :
+                out : self attention value + input feature 
+                attention: B X N X N (N is Width*Height)
+        """
+
+        if self.max_pool:  # Downscale with Max Pool
+            x = self.pooled(input)
+        else:
+            x = input
+
+        batch_size, c, width, height = x.size()
+
+        n = width * height
+        x = x.view(batch_size, -1, n)
+        f = self.conv_f(x)  # proj_query  # B X CX(N)
+        g = self.conv_g(x)  # proj_key    # B X C x (*W*H)
+        h = self.conv_h(x)  # proj_value  # B X C X N
+
+        s = torch.bmm(f.permute(0, 2, 1), g)  # energy, transpose check
+        # get probabilities
+        attention = self.softmax(s)  # beta #attention # BX (N) X (N)
+
+        out = torch.bmm(h, attention.permute(0, 2, 1))
+        out = out.view(batch_size, c, width, height)
+
+        if self.max_pool:  # Upscale to original size
+            # out = self.upsample_o(out)
+            # bicubic (PyTorch > 1.0) | bilinear others.
+            out = Upsample(size=(input.shape[2], input.shape[3]), mode='bicubic', align_corners=False)(out)
+
+        out = self.gamma * out + input  # Add original input
+
+        if self.ret_attention:
+            return out, attention
+
+        return out

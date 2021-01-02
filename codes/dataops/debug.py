@@ -91,22 +91,57 @@ def timefunctions(runs = 1000, function=None, *args):
     #print(kernel.shape)
     return None
 
-def tmp_vis(img_t, to_np=True, rgb2bgr=True, remove_batch=False, save_dir=''):
+def tmp_vis(img_t, to_np=True, rgb2bgr=True, remove_batch=False, denormalize=False, 
+            save_dir='', tensor_shape='TCHW'):
     '''
         Visualization function that can be inserted at any point 
         in the code, works with tensor or np images
-        img_t: image
+        img_t: image (shape: [B, ..., W, H])
         save_dir: path to save image
+        tensor_shape: in the case of n_dim == 5, needs to provide the order
+            of the dimensions
     '''
     import cv2
     from dataops.common import tensor2np
 
-    if to_np:
-        img = tensor2np(img_t.detach(), rgb2bgr=rgb2bgr, remove_batch=remove_batch)
-    else:
-        img = img_t
-    print("out: ", img.shape)
+    if isinstance(img_t, torch.Tensor) and to_np:
+        n_dim = img_t.dim()
+        if n_dim == 5:
+            # "volumetric" tensor [B, _, _, H, W], where indexes [1] and [2] 
+            # can be (for example) either channels or time. Reduce to 4D tensor
+            # for visualization
+            if tensor_shape == 'CTHW':
+                _, _, n_frames, _, _ = img_t.size()
+                frames = []
+                for frame in range(n_frames):
+                    frames.append(img_t[:, :, frame:frame+1, :, :])
+                img_t = torch.cat(frames, -1)
+            elif tensor_shape == 'TCHW':
+                _, n_frames, _, _, _ = img_t.size()
+                frames = []
+                for frame in range(n_frames):
+                    frames.append(img_t[:, frame:frame+1, :, :, :])
+                img_t = torch.cat(frames, -1)
+            elif tensor_shape == 'CTHW_m':
+                # select only the middle frame of CTHW tensor
+                _, _, n_frames, _, _ = img_t.size()
+                center = (n_frames - 1) // 2
+                img_t = img_t[:, :, center, :, :]
+            elif tensor_shape == 'TCHW_m':
+                # select only the middle frame of TCHW tensor
+                _, n_frames, _, _, _ = img_t.size()
+                center = (n_frames - 1) // 2
+                img_t = img_t[:, center, :, :, :]
+            else:
+                TypeError("Unrecognized tensor_shape: {}".format(tensor_shape))
 
+        img = tensor2np(img_t.detach(), rgb2bgr=rgb2bgr, remove_batch=remove_batch, denormalize=denormalize)
+    elif isinstance(img_t, np.ndarray) and not to_np:
+        img = img_t
+    else:
+        raise TypeError("img_t type not supported, expected tensor or ndarray")
+    
+    print("out: ", img.shape)
     cv2.imshow('image', img)
     cv2.waitKey(0)
 

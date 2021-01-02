@@ -324,7 +324,9 @@ def define_D(opt):
             raise ValueError('VGG Discriminator size could not be parsed from the HR patch size. Check that the image patch size is either a power of 2 or 3 multiplied by a power of 2.')
     elif which_model == 'patchgan' or which_model == 'NLayerDiscriminator':
         from models.modules.architectures import discriminators
-        netD = discriminators.NLayerDiscriminator(input_nc=opt_net['in_nc'], ndf=opt_net['nf'], n_layers=opt_net['nlayer'])
+        netD = discriminators.NLayerDiscriminator(input_nc=opt_net['in_nc'], ndf=opt_net['nf'], 
+                n_layers=opt_net['nlayer'], patch=opt_net.get('patch_output', True), 
+                use_spectral_norm=opt_net.get('use_spectral_norm', False))
     elif which_model == 'pixelgan' or which_model == 'PixelDiscriminator':
         from models.modules.architectures import discriminators
         netD = discriminators.PixelDiscriminator(input_nc=opt_net['in_nc'], ndf=opt_net['nf'])
