@@ -72,59 +72,79 @@ class BaseModel():
         '''Return traning losses. train.py will print out these errors on console, and save them to a file'''
         pass
         
-    def print_network(self):
+    def print_network(self, verbose=False):
         '''Print the total number of parameters in the network and (if verbose) network architecture
         Parameters:
-            TODO: verbose (bool) -- if verbose: print the network architecture
+            verbose (bool) -- if verbose: print the network architecture
         '''
-        # Generator
-        s, n = self.get_network_description(self.netG)
-        if isinstance(self.netG, nn.DataParallel):
-            net_struc_str = '{} - {}'.format(self.netG.__class__.__name__,
-                                             self.netG.module.__class__.__name__)
-        else:
-            net_struc_str = '{}'.format(self.netG.__class__.__name__)
 
-        logger.info('Network G structure: {}, with parameters: {:,d}'.format(net_struc_str, n))
-        logger.info(s)
-        if self.is_train:
-            # Discriminator
-            if self.cri_gan:
-                s, n = self.get_network_description(self.netD)
-                if isinstance(self.netD, nn.DataParallel):
-                    net_struc_str = '{} - {}'.format(self.netD.__class__.__name__,
-                                                    self.netD.module.__class__.__name__)
+        for name in self.model_names:
+            if isinstance(name, str):
+                net = getattr(self, 'net' + name)
+                s, n = self.get_network_description(net)
+                if isinstance(net, nn.DataParallel):
+                    net_struc_str = '{} - {}'.format(net.__class__.__name__,
+                                                     net.module.__class__.__name__)
                 else:
-                    net_struc_str = '{}'.format(self.netD.__class__.__name__)
-
-                logger.info('Network D structure: {}, with parameters: {:,d}'.format(net_struc_str, n))
+                    net_struc_str = '{}'.format(net.__class__.__name__)
+            
+            logger.info('Network {} structure: {}, with parameters: {:,d}'.format(name, net_struc_str, n))
+            if verbose:
                 logger.info(s)
 
-            #TODO: feature network is not being trained, is it necessary to visualize? Maybe just name?
-            # maybe show the generatorlosses instead?
-            '''
-            if self.generatorlosses.cri_fea:  # F, Perceptual Network
-                #s, n = self.get_network_description(self.netF)
-                s, n = self.get_network_description(self.generatorlosses.netF) #TODO
-                #s, n = self.get_network_description(self.generatorlosses.loss_list.netF) #TODO
-                if isinstance(self.generatorlosses.netF, nn.DataParallel):
-                    net_struc_str = '{} - {}'.format(self.generatorlosses.netF.__class__.__name__,
-                                                    self.generatorlosses.netF.module.__class__.__name__)
-                else:
-                    net_struc_str = '{}'.format(self.generatorlosses.netF.__class__.__name__)
+        # # Generator
+        # s, n = self.get_network_description(self.netG)
+        # if isinstance(self.netG, nn.DataParallel):
+        #     net_struc_str = '{} - {}'.format(self.netG.__class__.__name__,
+        #                                      self.netG.module.__class__.__name__)
+        # else:
+        #     net_struc_str = '{}'.format(self.netG.__class__.__name__)
 
-                logger.info('Network F structure: {}, with parameters: {:,d}'.format(net_struc_str, n))
-                logger.info(s)
-            '''
+        # logger.info('Network G structure: {}, with parameters: {:,d}'.format(net_struc_str, n))
+        # logger.info(s)
+        # if self.is_train:
+        #     # Discriminator
+        #     if self.cri_gan:
+        #         s, n = self.get_network_description(self.netD)
+        #         if isinstance(self.netD, nn.DataParallel):
+        #             net_struc_str = '{} - {}'.format(self.netD.__class__.__name__,
+        #                                             self.netD.module.__class__.__name__)
+        #         else:
+        #             net_struc_str = '{}'.format(self.netD.__class__.__name__)
+
+        #         logger.info('Network D structure: {}, with parameters: {:,d}'.format(net_struc_str, n))
+        #         logger.info(s)
+
+        #TODO: feature network is not being trained, is it necessary to visualize? Maybe just name?
+        # maybe show the generatorlosses instead?
+        '''
+        if self.generatorlosses.cri_fea:  # F, Perceptual Network
+            #s, n = self.get_network_description(self.netF)
+            s, n = self.get_network_description(self.generatorlosses.netF) #TODO
+            #s, n = self.get_network_description(self.generatorlosses.loss_list.netF) #TODO
+            if isinstance(self.generatorlosses.netF, nn.DataParallel):
+                net_struc_str = '{} - {}'.format(self.generatorlosses.netF.__class__.__name__,
+                                                self.generatorlosses.netF.module.__class__.__name__)
+            else:
+                net_struc_str = '{}'.format(self.generatorlosses.netF.__class__.__name__)
+
+            logger.info('Network F structure: {}, with parameters: {:,d}'.format(net_struc_str, n))
+            logger.info(s)
+        '''
 
     def save(self, iter_step, latest=None, loader=None):
         '''Save all the networks to the disk.
         Parameters:
             iter_step (int) -- current epoch; used in the file name '%s_net_%s.pth' % (epoch, name)
         '''
-        self.save_network(self.netG, 'G', iter_step, latest)
-        if self.cri_gan:
-            self.save_network(self.netD, 'D', iter_step, latest)
+        for name in self.model_names:
+            if isinstance(name, str):
+                net = getattr(self, 'net' + name)
+                self.save_network(net, name, iter_step, latest)
+
+        # self.save_network(self.netG, 'G', iter_step, latest)
+        # if self.cri_gan:
+        #     self.save_network(self.netD, 'D', iter_step, latest)
         if self.swa:
             # when training with networks that use BN
             # # Update bn statistics for the swa_model only at the end of training
@@ -144,17 +164,27 @@ class BaseModel():
     def load(self):
         '''Load all the networks from the disk.
         '''
-        load_path_G = self.opt['path']['pretrain_model_G']
-        if load_path_G is not None:
-            logger.info('Loading pretrained model for G [{:s}] ...'.format(load_path_G))
-            strict = self.opt['network_G'].get('strict', None)
-            self.load_network(load_path_G, self.netG, strict, model_type='G')
-        if self.opt['is_train'] and self.opt['train']['gan_weight']:
-            load_path_D = self.opt['path']['pretrain_model_D']
-            if self.opt['is_train'] and load_path_D is not None:
-                logger.info('Loading pretrained model for D [{:s}] ...'.format(load_path_D))
-                strict = self.opt['network_D'].get('strict', None)
-                self.load_network(load_path_D, self.netD, model_type='D')
+        for name in self.model_names:
+            if isinstance(name, str):
+                net = getattr(self, 'net' + name)
+                load_path_opt = 'pretrain_model_{}'.format(name)
+                load_path = self.opt['path'][load_path_opt]
+                if load_path is not None:
+                    logger.info('Loading pretrained model for {} [{:s}] ...'.format(name, load_path))
+                    strict = self.opt['network_{}'.format(name)].get('strict', None)
+                    self.load_network(load_path, net, strict, model_type=name)
+
+        # load_path_G = self.opt['path']['pretrain_model_G']
+        # if load_path_G is not None:
+        #     logger.info('Loading pretrained model for G [{:s}] ...'.format(load_path_G))
+        #     strict = self.opt['network_G'].get('strict', None)
+        #     self.load_network(load_path_G, self.netG, strict, model_type='G')
+        # if self.opt['is_train'] and self.opt['train']['gan_weight']:
+        #     load_path_D = self.opt['path']['pretrain_model_D']
+        #     if self.opt['is_train'] and load_path_D is not None:
+        #         logger.info('Loading pretrained model for D [{:s}] ...'.format(load_path_D))
+        #         strict = self.opt['network_D'].get('strict', None)
+        #         self.load_network(load_path_D, self.netD, model_type='D')
 
     def load_swa(self):
         if self.opt['is_train'] and self.opt['use_swa']:

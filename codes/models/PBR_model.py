@@ -46,6 +46,12 @@ class PBRModel(BaseModel):
         if self.is_train:
             z_norm = opt['datasets']['train'].get('znorm', False)
         
+        # specify the models you want to load/save to the disk. The training/test scripts will call <BaseModel.save_networks> and <BaseModel.load_networks>
+        if self.is_train: # print/save/load both G and D during training
+            self.model_names = ['G', 'D']
+        else:  # during test time, only print/load G
+            self.model_names = ['G']
+        
         # define networks and load pretrained models
         self.netG = networks.define_G(opt).to(self.device)  # G
         if self.is_train:
@@ -173,7 +179,7 @@ class PBRModel(BaseModel):
         Network summary? Make optional with parameter
             could be an selector between traditional print_network() and summary()
         """
-        #self.print_network() #TODO
+        self.print_network(verbose=False) #TODO: pass verbose flag from config file
 
     def feed_data(self, data, need_HR=True):
         # LR images
