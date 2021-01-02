@@ -12,7 +12,7 @@ def create_dataloader(dataset: torch.utils.data.Dataset, dataset_opt: dict) -> t
     """
     batch_size = 1
     shuffle = False
-    num_workers = 0
+    num_workers = 1
     drop_last = False
     if dataset_opt['phase'] == 'train':
         batch_size = dataset_opt['batch_size']
@@ -28,6 +28,7 @@ def create_dataloader(dataset: torch.utils.data.Dataset, dataset_opt: dict) -> t
         pin_memory=True
     )
 
+#TODO: will modify later to automatically load datasets from name
 def create_dataset(dataset_opt: dict) -> torch.utils.data.Dataset:
     """
     Create Dataset.
