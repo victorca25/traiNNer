@@ -111,10 +111,10 @@ def read_img(env, path, out_nc=3, fix_channels=True, size=None):
             image = cv2.imread(path, cv2.IMREAD_UNCHANGED)
         # TODO: add variable detecting if cv2 is not available and try PIL instead
         # elif: # using PIL instead of OpenCV
-        # img = Image.open(path).convert('RGB')
+        #   img = Image.open(path).convert('RGB')
         # else: # For other images unrecognized by cv2
-        # import matplotlib.pyplot as plt
-        # img = (255*plt.imread(path)[:,:,:3]).astype('uint8')
+        #   import matplotlib.pyplot as plt
+        #   img = (255*plt.imread(path)[:,:,:3]).astype('uint8')
     elif env is 'lmdb':
         image = _read_lmdb_img(env, path, size)
     elif env is 'buffer':
