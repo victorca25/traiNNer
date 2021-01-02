@@ -35,8 +35,9 @@ def main():
         else:
             resume_state_path = opt['path']['resume_state']
         resume_state = torch.load(resume_state_path)
-        logger.info('Set [resume_state] to ' + resume_state_path)
-        logger.info('Resuming training from epoch: %d, iter: %d.' % (resume_state['epoch'], resume_state['iter']))
+        logger.info('Set [resume_state] to {}'.format(resume_state_path))
+        logger.info('Resuming training from epoch: {}, iter: {}.'.format(	
+            resume_state['epoch'], resume_state['iter']))
         option.check_resume(opt)
     else:  # training from scratch
         resume_state = None
@@ -100,7 +101,7 @@ def main():
         virtual_step = current_step * virtual_batch_size / batch_size \
             if virtual_batch_size and virtual_batch_size > batch_size else current_step
         model.resume_training(resume_state)  # handle optimizers and schedulers
-        model.update_schedulers(opt['train'])  # updated schedulers in case JSON configuration has changed
+        model.update_schedulers(opt['train'])  # updated schedulers in case configuration has changed
         del resume_state
         # start the iteration time when resuming
         t0 = time.time()
@@ -188,9 +189,9 @@ def main():
 
                         # Save SR images for reference
                         if opt['train']['overwrite_val_imgs']:
-                            save_img_path = os.path.join(img_dir, '%s.png' % img_name)
+                            save_img_path = os.path.join(img_dir, '{:s}.png'.format(img_name))
                         else:
-                            save_img_path = os.path.join(img_dir, '%s_%s.png' % (img_name, current_step))
+                            save_img_path = os.path.join(img_dir, '{:s}_{:d}.png'.format(img_name, current_step))
 
                         # save single images or lr / sr comparison
                         if opt['train']['val_comparison']:
