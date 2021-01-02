@@ -437,7 +437,7 @@ class VidTestsetLoader(Dataset):
         return len(self.video_list)-1
 
 
-class augmentation(object):
+class augmentation():
     def __call__(self, img_list, hflip=True, vflip=True, rot=True):
         # horizontal flip OR rotate
         hflip = hflip and random.random() < 0.5
