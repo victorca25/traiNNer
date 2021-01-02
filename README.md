@@ -4,7 +4,7 @@ BasicSR (Basic Super Restoration) is an open source image and video restoration 
 
 [![Python Version](https://img.shields.io/badge/python-3-informational?style=flat)](https://python.org)
 [![License](https://img.shields.io/github/license/victorca25/BasicSR?style=flat)](https://github.com/victorca25/BasicSR/blob/master/LICENSE)
-[![Codacy](https://app.codacy.com/project/badge/Grade/f4ad595a0ed54d3991cf4c51c708978c)](https://codacy.com/gh/rlaPHOENiX/BasicSR/dashboard?utm_source=github.com&utm_medium=referral&utm_content=rlaPHOENiX/BasicSR&utm_campaign=Badge_Grade)
+[![DeepSource](https://deepsource.io/gh/victorca25/BasicSR.svg/?label=active+issues&show_trend=true)](https://deepsource.io/gh/victorca25/BasicSR/?ref=repository-badge)
 [![Issues](https://img.shields.io/github/issues/victorca25/BasicSR?style=flat)](https://github.com/victorca25/BasicSR/issues)
 [![PR's Accepted](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat)](https://makeapullrequest.com)
 
