@@ -1,7 +1,8 @@
 from collections import OrderedDict
 import torch
 import torch.nn as nn
-from models.modules.architectures.convolutions.partialconv2d import PartialConv2d, DeformConv2d #TODO
+from models.modules.architectures.convolutions.partialconv2d import PartialConv2d #TODO
+from models.modules.architectures.convolutions.deformconv2d import DeformConv2d
 from models.networks import weights_init_normal, weights_init_kaiming, weights_init_orthogonal
 
 #from modules.architectures.convolutions.partialconv2d import PartialConv2d
