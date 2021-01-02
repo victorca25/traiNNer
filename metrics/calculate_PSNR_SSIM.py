@@ -32,8 +32,6 @@ def main():
 
         if test_y and im_gt.shape[2] == 3:
             # evaluate on Y channel in YCbCr color space
-            # TODO: Why? Is there some kind of benefit I'm not seeing here?
-            #       Was this done JUST because it returns only the Y channel in a convenient matter?
             im_gt = bgr2ycbcr(im_gt)
             im_gen = bgr2ycbcr(im_gen)
 
