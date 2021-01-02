@@ -1,7 +1,7 @@
 from collections import OrderedDict
 import torch
 import torch.nn as nn
-from models.modules.architectures.convolutions.partialconv2d import PartialConv2d #TODO
+from models.modules.architectures.convolutions.partialconv2d import PartialConv2d, DeformConv2d #TODO
 from models.networks import weights_init_normal, weights_init_kaiming, weights_init_orthogonal
 
 #from modules.architectures.convolutions.partialconv2d import PartialConv2d
@@ -231,6 +231,9 @@ def conv_block(in_nc, out_nc, kernel_size, stride=1, dilation=1, groups=1, bias=
     
     if convtype=='PartialConv2D':
         c = PartialConv2d(in_nc, out_nc, kernel_size=kernel_size, stride=stride, padding=padding, \
+               dilation=dilation, bias=bias, groups=groups)
+    elif convtype=='DeformConv2D':
+        c = DeformConv2d(in_nc, out_nc, kernel_size=kernel_size, stride=stride, padding=padding, \
                dilation=dilation, bias=bias, groups=groups)
     elif convtype=='Conv3D':
         c = nn.Conv3d(in_nc, out_nc, kernel_size=kernel_size, stride=stride, padding=padding, \
