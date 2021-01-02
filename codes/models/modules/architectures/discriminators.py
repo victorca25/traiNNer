@@ -3,7 +3,8 @@ import torch
 import torch.nn as nn
 import torchvision
 from . import block as B
-from . import spectral_norm as SN
+# from . import spectral_norm as SN
+from torch.nn.utils import spectral_norm as SN
 
 
 ####################
@@ -604,13 +605,16 @@ class NLayerDiscriminator(nn.Module):
 
     """
 
-    def __init__(self, input_nc, ndf=64, n_layers=3, norm_layer=nn.BatchNorm2d, use_sigmoid=False, getIntermFeat=False):
+    def __init__(self, input_nc, ndf=64, n_layers=3, norm_layer=nn.BatchNorm2d, 
+        use_sigmoid=False, getIntermFeat=False, patch=True, use_spectral_norm=False):
         """Construct a PatchGAN discriminator
         Parameters:
-            input_nc (int)  -- the number of channels in input images
-            ndf (int)       -- the number of filters in the last conv layer
-            n_layers (int)  -- the number of conv layers in the discriminator
-            norm_layer      -- normalization layer
+            input_nc (int): the number of channels in input images
+            ndf (int): the number of filters in the last conv layer
+            n_layers (int): the number of conv layers in the discriminator
+            norm_layer (nn.Module): normalization layer (if not using Spectral Norm)
+            patch (bool): Select between an patch or a linear output
+            use_spectral_norm (bool): Select if Spectral Norm will be used
         """
         super(NLayerDiscriminator, self).__init__()
         '''
@@ -619,6 +623,11 @@ class NLayerDiscriminator(nn.Module):
         else:
             use_bias = norm_layer == nn.InstanceNorm2d
         '''
+
+        if use_spectral_norm:
+            # disable Instance or Batch Norm if using Spectral Norm
+            norm_layer = B.Identity
+
         #self.getIntermFeat = getIntermFeat # not used for now
         #use_sigmoid not used for now
         #TODO: test if there are benefits by incorporating the use of intermediate features from pix2pixHD
@@ -627,14 +636,19 @@ class NLayerDiscriminator(nn.Module):
         kw = 4
         padw = 1 # int(np.ceil((kw-1.0)/2))
 
-        sequence = [nn.Conv2d(input_nc, ndf, kernel_size=kw, stride=2, padding=padw), nn.LeakyReLU(0.2, True)]
+        sequence = [B.add_spectral_norm(
+                        nn.Conv2d(input_nc, ndf, kernel_size=kw, stride=2, padding=padw), 
+                        use_spectral_norm), 
+                    nn.LeakyReLU(0.2, True)]
         nf_mult = 1
         nf_mult_prev = 1
         for n in range(1, n_layers):  # gradually increase the number of filters
             nf_mult_prev = nf_mult
             nf_mult = min(2 ** n, 8)
             sequence += [
-                nn.Conv2d(ndf * nf_mult_prev, ndf * nf_mult, kernel_size=kw, stride=2, padding=padw, bias=use_bias),
+                B.add_spectral_norm(
+                    nn.Conv2d(ndf * nf_mult_prev, ndf * nf_mult, kernel_size=kw, stride=2, padding=padw, bias=use_bias), 
+                    use_spectral_norm),
                 norm_layer(ndf * nf_mult),
                 nn.LeakyReLU(0.2, True)
             ]
@@ -642,12 +656,25 @@ class NLayerDiscriminator(nn.Module):
         nf_mult_prev = nf_mult
         nf_mult = min(2 ** n_layers, 8)
         sequence += [
-            nn.Conv2d(ndf * nf_mult_prev, ndf * nf_mult, kernel_size=kw, stride=1, padding=padw, bias=use_bias),
+            B.add_spectral_norm(
+                nn.Conv2d(ndf * nf_mult_prev, ndf * nf_mult, kernel_size=kw, stride=1, padding=padw, bias=use_bias), 
+                use_spectral_norm),
             norm_layer(ndf * nf_mult),
             nn.LeakyReLU(0.2, True)
         ]
 
-        sequence += [nn.Conv2d(ndf * nf_mult, 1, kernel_size=kw, stride=1, padding=padw)]  # output 1 channel prediction map
+        if patch:
+            # output patches as results
+            sequence += [B.add_spectral_norm(
+                nn.Conv2d(ndf * nf_mult, 1, kernel_size=kw, stride=1, padding=padw), 
+                use_spectral_norm)]  # output 1 channel prediction map
+        else:
+            # linear vector classification output
+            sequence += [B.Mean([1, 2]), nn.Linear(ndf * nf_mult, 1)]
+        
+        if use_sigmoid:
+            sequence += [nn.Sigmoid()]
+        
         self.model = nn.Sequential(*sequence)
 
     def forward(self, x):
