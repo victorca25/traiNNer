@@ -1,5 +1,9 @@
 import os
 
+import torch
+
+from codes.dataops.augmentations import chop_forward
+from codes.dataops.colors import ycbcr_to_rgb
 from codes.dataops.common import tensor2np
 from codes.models import create_model
 from codes.runner import Runner
@@ -31,15 +35,58 @@ class Tester(Runner):
             for data in dataloader:
                 need_hr = dataloader.dataset.opt['dataroot_HR'] is not None
 
-                model.feed_data(data, need_HR=need_hr)
+                if self.opt.get('chop_forward', False):
+                    lr_y_cube = None
+                    if len(data['LR'].size()) == 4:
+                        b, n_frames, h_lr, w_lr = data['LR'].size()
+                        lr_y_cube = data['LR'].view(b, -1, 1, h_lr, w_lr)  # b, t, c, h, w
+                    elif len(data['LR'].size()) == 5:
+                        # for networks that work with 3 channel images
+                        _, n_frames, _, _, _ = data['LR'].size()
+                        lr_y_cube = data['LR']  # b, t, c, h, w
+                    # else:
+                    #   TODO: handle else case
+
+                    # crop borders to ensure each patch can be divisible by 2
+                    # TODO: this is modcrop, not sure if really needed, check (the dataloader already does modcrop)
+                    _, _, _, h, w = lr_y_cube.size()
+                    scale = self.opt.get('scale', 4)
+                    h = int(h // 16) * 16
+                    w = int(w // 16) * 16
+                    lr_y_cube = lr_y_cube[:, :, :, :h, :w]
+                    sr_cb = None
+                    sr_cr = None
+                    if isinstance(data['LR_bicubic'], torch.Tensor):
+                        # sr_cb = data['LR_bicubic'][:, 1, :, :][:, :, :h * scale, :w * scale]
+                        sr_cb = data['LR_bicubic'][:, 1, :h * scale, :w * scale]
+                        # sr_cr = data['LR_bicubic'][:, 2, :, :][:, :, :h * scale, :w * scale]
+                        sr_cr = data['LR_bicubic'][:, 2, :h * scale, :w * scale]
+                    # else:
+                    #   TODO: handle else case
+
+                    sr_y = chop_forward(lr_y_cube, model, scale, need_hr=need_hr).squeeze(0)
+                    # sr_y = np.array(SR_y.data.cpu())
+                    visuals = {'SR': None}
+                    if dataloader.dataset.opt.get('srcolors', None):
+                        print(sr_y.shape, sr_cb.shape, sr_cr.shape)
+                        visuals['SR'] = ycbcr_to_rgb(torch.stack((sr_y, sr_cb, sr_cr), -3))
+                    else:
+                        visuals['SR'] = sr_y
+                else:
+                    model.feed_data(data, need_HR=need_hr)
+                    model.test()  # test
+                    visuals = model.get_current_visuals(need_HR=need_hr)
+
+                    if dataloader.dataset.opt.get('y_only', None) and dataloader.dataset.opt.get('srcolors', None):
+                        sr_cb = data['LR_bicubic'][:, 1, :, :]
+                        sr_cr = data['LR_bicubic'][:, 2, :, :]
+                        visuals['SR'] = ycbcr_to_rgb(torch.stack((visuals['SR'], sr_cb, sr_cr), -3))
+
                 # TODO: This key is from the dataset __getitem__, can we remove the need for this?
                 #       Simplifying this and making it universal (not caring which dataset/loader is being used)
                 #       Will also carry readability and general usability improvements to the dataset classes.
                 img_path = data[path_key][0]
                 img_name = os.path.splitext(os.path.basename(img_path))[0]
-
-                model.test()  # test
-                visuals = model.get_current_visuals(need_HR=need_hr)
 
                 # save images
                 save_img_path = os.path.join(dataset_dir, img_name + self.opt.get('suffix', ''))
