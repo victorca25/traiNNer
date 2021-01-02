@@ -10,8 +10,7 @@
 
 import torch
 import torch.nn.functional as F
-from torch import nn, cuda
-from torch.autograd import Variable
+from torch import nn
 
 class PartialConv2d(nn.Conv2d):
     def __init__(self, *args, **kwargs):

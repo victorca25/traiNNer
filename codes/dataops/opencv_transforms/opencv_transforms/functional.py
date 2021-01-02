@@ -1,7 +1,6 @@
 # from __future__ import division
 import torch
 import math
-import random
 # from PIL import Image, ImageOps, ImageEnhance, PILLOW_VERSION
 try:
     import accimage
@@ -11,7 +10,6 @@ except ImportError:
 import numpy as np
 import cv2
 import numbers
-import types
 import collections
 import warnings
 

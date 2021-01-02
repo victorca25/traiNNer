@@ -9,9 +9,6 @@ from models.modules.architectures.video import optical_flow_warp
 from models.modules.architectures.RRDBNet_arch import RRDBNet
 from models.modules.architectures.PAN_arch import PAN
 
-#TMP for debugging 
-from dataops.debug import tmp_vis, describe_numpy, describe_tensor
-
 #TODO: 
 # - change pixelshuffle upscales with available options in block (can also add pa_unconv with pixel attention)
 # - make the upscaling layers automatic

@@ -3,7 +3,7 @@
 import torch
 import numpy as np
 
-from dataops.flow_utils import flow2img, flow2rgb
+from dataops.flow_utils import flow2rgb
 
 # use these to debug the results from the image operations, to know if there 
 # are negative values, what are the min and max, mean, etc. Then know if a result 

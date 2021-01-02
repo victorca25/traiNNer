@@ -2,10 +2,7 @@
 
 import torch
 import torch.nn as nn
-import math
-import numbers
 import torch.nn.functional as F
-import numpy as np
 
 #import pdb
 
@@ -13,7 +10,7 @@ from models.modules.architectures.perceptual import VGG_Model
 from models.modules.architectures.video import optical_flow_warp
 from dataops.filters import *
 from dataops.colors import *
-from dataops.common import norm, denorm
+from dataops.common import denorm
 
 
 class CharbonnierLoss(nn.Module):

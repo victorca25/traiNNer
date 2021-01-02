@@ -2,12 +2,10 @@ import os.path
 import random
 import numpy as np
 import cv2
-import torch
 import torch.utils.data as data
 import dataops.common as util
 
 import dataops.augmentations as augmentations
-from dataops.debug import tmp_vis, describe_numpy, describe_tensor
 
 
 class LRHRDataset(data.Dataset):

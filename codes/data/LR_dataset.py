@@ -1,5 +1,3 @@
-import numpy as np
-import torch
 import torch.utils.data as data
 import dataops.common as util
 

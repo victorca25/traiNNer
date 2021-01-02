@@ -1,6 +1,4 @@
 from __future__ import absolute_import
-
-import os
 import logging
 from collections import OrderedDict
 
@@ -15,8 +13,6 @@ logger = logging.getLogger('base')
 from . import losses
 from . import optimizers
 from . import schedulers
-
-from dataops.batchaug import BatchAug
 from dataops.filters import FilterHigh, FilterLow #, FilterX
 
 load_amp = (hasattr(torch.cuda, "amp") and hasattr(torch.cuda.amp, "autocast"))
