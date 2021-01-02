@@ -161,17 +161,9 @@ class ASRRaGANModel(BaseModel):
                     tv_norm = train_opt['tv_norm']
                 else:
                     tv_norm = 1
-
-                if l_tv_type == 'normal':
-                    self.cri_tv = TVLoss(self.l_tv_w, p=tv_norm).to(self.device)
-                elif l_tv_type == '4D':
-                    # Total Variation regularization in 4 directions
-                    raise NotImplementedError('TVLoss4D for ASRRaGAN needs to be re-implemented!')
-                    # TODO: TVLoss4D function seems to have been MIA since like 1-2 years, I remember this
-                    #       being missing back in 2019 or so when I forked the code back then as well.
-                    # self.cri_tv = TVLoss4D(self.l_tv_w).to(self.device)
-                else:
-                    raise NotImplementedError('Loss type [{:s}] not recognized.'.format(l_tv_type))
+                if l_tv_type not in ['normal', '4D']:
+                    raise NotImplementedError('Loss type [%s] not recognized.' % l_tv_type)
+                self.cri_tv = TVLoss(self.l_tv_w, p=tv_norm).to(self.device)
             else:
                 logger.info('Remove TV loss.')
                 self.cri_tv = None
