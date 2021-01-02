@@ -86,11 +86,10 @@ class PNetLin(nn.Module):
         val = res[0]
         for l in range(1,self.L):
             val += res[l]
-        
+
         if(retPerLayer):
             return (val, res)
-        else:
-            return val
+        return val
 
 class ScalingLayer(nn.Module):
     def __init__(self):
@@ -157,7 +156,7 @@ class L2(FakeNet):
             (N,C,X,Y) = in0.size()
             value = torch.mean(torch.mean(torch.mean((in0-in1)**2,dim=1).view(N,1,X,Y),dim=2).view(N,1,1,Y),dim=3).view(N)
             return value
-        elif(self.colorspace=='Lab'):
+        if(self.colorspace=='Lab'):
             value = util.l2(util.tensor2np(util.tensor2tensorlab(in0.data,to_norm=False)), 
                 util.tensor2np(util.tensor2tensorlab(in1.data,to_norm=False)), range=100.).astype('float')
             ret_var = Variable( torch.Tensor((value,) ) )

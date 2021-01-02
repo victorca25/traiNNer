@@ -93,8 +93,7 @@ def rand_vflip(img: torch.Tensor, img2: torch.Tensor = None, prob: float = 0.5) 
             img2 = img2.flip(-2)
     if img2 is not None:
         return img, img2
-    else:    
-        return img
+    return img
 
 def rand_hflip(img: torch.Tensor, img2: torch.Tensor = None, prob: float = 0.5) -> torch.Tensor:
     """Horizontally flip the given the Image Tensor randomly.
@@ -114,8 +113,7 @@ def rand_hflip(img: torch.Tensor, img2: torch.Tensor = None, prob: float = 0.5) 
             img2 = img2.flip(-1) 
     if img2 is not None:
         return img, img2
-    else:    
-        return img
+    return img
 
 def rand_90(img: torch.Tensor, img2: torch.Tensor = None, prob: float = 0.5) -> torch.Tensor:
     """ Randomly rotate the given the Image Tensor 90 degrees clockwise or 
@@ -145,8 +143,7 @@ def rand_90(img: torch.Tensor, img2: torch.Tensor = None, prob: float = 0.5) -> 
             img2 = torch.rot90(img2, -1, dims=[2,3])
     if img2 is not None:
         return img, img2
-    else:
-        return img
+    return img
 
 def zoom_out(img: torch.Tensor, anisotropic=False, padding='constant'): #scale=2 #'reflect'
     ''' Random zoom in of Tensor image

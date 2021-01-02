@@ -94,17 +94,16 @@ def optical_flow_warp(image, flow,
 
     if not isinstance(mask, np.ndarray):
         return output
-    else:
-        # using 'mask' parameter prevents using the masked regions
-        mask = (1 - mask).astype(np.bool)
+    # using 'mask' parameter prevents using the masked regions
+    mask = (1 - mask).astype(np.bool)
     
-        mask = torch.autograd.Variable(torch.ones(x.size())).cuda()
-        mask = nn.functional.grid_sample(grid, output) 
+    mask = torch.autograd.Variable(torch.ones(x.size())).cuda()
+    mask = nn.functional.grid_sample(grid, output) 
 
-        mask = mask.masked_fill_(mask < 0.999, 0)
-        mask = mask.masked_fill_(mask > 0, 1)
+    mask = mask.masked_fill_(mask < 0.999, 0)
+    mask = mask.masked_fill_(mask > 0, 1)
 
-        return output * mask
+    return output * mask
 
 
     

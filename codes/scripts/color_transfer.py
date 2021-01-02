@@ -21,12 +21,10 @@ def read_image(image):
     if isinstance(image, str):
         # read images as BGR
         return cv2.imread(image, cv2.IMREAD_COLOR)
-    elif isinstance(image, np.ndarray):
+    if isinstance(image, np.ndarray):
         # use np image
         return image
-    #elif pil .Image...:
-    else:
-        raise ValueError("Unexpected image type. Either a path or a np.ndarray are supported")
+    raise ValueError("Unexpected image type. Either a path or a np.ndarray are supported")
 
 
 def scale_img(source=None, target=None):
@@ -45,8 +43,7 @@ def expand_img(image=None):
     # expand dimensions if grayscale
     if len(image.shape) < 3:
         return image[:,:,np.newaxis]
-    else:
-        return image
+    return image
     
 
 def _imstats(image, calc='direct'):

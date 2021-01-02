@@ -476,10 +476,9 @@ def model_val(opt_net=None, state_dict=None, model_type=None):
         model = opt_get(opt_net, ['network_G', 'which_model_G'])
         if model == 'RRDB_net': # tonormal
             return mod2normal(state_dict)
-        elif model == 'MRRDB_net': # tomod
+        if model == 'MRRDB_net': # tomod
             return normal2mod(state_dict)
-        else:
-            return state_dict
+        return state_dict
     elif model_type == 'D':
         # no particular Discriminator validation at the moment
         # model = opt_get(opt_net, ['network_G', 'which_model_D'])

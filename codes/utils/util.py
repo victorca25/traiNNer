@@ -133,10 +133,9 @@ def merge_imgs(img_list):
                 img_list_res.append(img)
         
         return cv2.hconcat(img_list_res)
-    elif isinstance(img_list, np.ndarray):
+    if isinstance(img_list, np.ndarray):
         return img_list
-    else:
-        raise NotImplementedError('To merge images img_list should be a list of cv2 images.')
+    raise NotImplementedError('To merge images img_list should be a list of cv2 images.')
 
 def save_img_comp(img_list, img_path, mode='RGB'):
     '''

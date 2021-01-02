@@ -268,9 +268,8 @@ class BaseModel:
                                                         int) and current_step > self.swa_start_iter:
                 # SWA scheduler lr
                 return self.swa_scheduler.get_last_lr()[0]
-            else:
-                # Regular G scheduler lr
-                return self.schedulers[0].get_last_lr()[0]
+            # Regular G scheduler lr
+            return self.schedulers[0].get_last_lr()[0]
         else:
             # return self.schedulers[0].get_lr()[0]
             return self.optimizers[0].param_groups[0]['lr']

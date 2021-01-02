@@ -13,7 +13,7 @@ def conv(in_planes, out_planes, kernel_size=3, stride=1, padding=1, dilation=1, 
                     padding=padding, dilation=dilation, bias=True),
             nn.PReLU(out_planes)
         )
-    elif mode == 'ifnet':
+    if mode == 'ifnet':
         return nn.Sequential(
             nn.Conv2d(in_planes, out_planes, kernel_size=kernel_size, stride=stride,
                     padding=padding, dilation=dilation, bias=False),
@@ -36,7 +36,7 @@ def conv_wo_act(in_planes, out_planes, kernel_size=3, stride=1, padding=1, dilat
             nn.Conv2d(in_planes, out_planes, kernel_size=kernel_size, stride=stride,
                     padding=padding, dilation=dilation, bias=True),
         )
-    elif mode == 'ifnet':
+    if mode == 'ifnet':
         return nn.Sequential(
             nn.Conv2d(in_planes, out_planes, kernel_size=kernel_size, stride=stride,
                     padding=padding, dilation=dilation, bias=False),
@@ -215,6 +215,5 @@ class RIFE(nn.Module):
         pred = torch.clamp(pred, 0, 1)
         if training:
             return pred, mask, merged_img, warped_img0, warped_img1, warped_img0_gt, warped_img1_gt
-        else:
-            return pred
+        return pred
 

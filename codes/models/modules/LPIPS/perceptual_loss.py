@@ -94,8 +94,7 @@ def tensorlab2tensor(lab_tensor,return_inbnd=False):
         mask = 1.*np.isclose(lab_back,lab,atol=2.)
         mask = np2tensor(np.prod(mask,axis=2)[:,:,np.newaxis])
         return (im2tensor(rgb_back),mask)
-    else:
-        return im2tensor(rgb_back)
+    return im2tensor(rgb_back)
 
 def rgb2lab(input):
     from skimage import color

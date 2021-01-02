@@ -83,5 +83,4 @@ class PartialConv2d(nn.Conv2d):
 
         if self.return_mask:
             return output, self.update_mask
-        else:
-            return output
+        return output

@@ -47,17 +47,16 @@ class RRDBNet(nn.Module):
 
     def forward(self, x, outm=None):
         x = self.model(x)
-        
+
         if outm=='scaltanh': # limit output range to [-1,1] range with tanh and rescale to [0,1] Idea from: https://github.com/goldhuang/SRGAN-PyTorch/blob/master/model.py
             return(torch.tanh(x) + 1.0) / 2.0
-        elif outm=='tanh': # limit output to [-1,1] range
+        if outm=='tanh': # limit output to [-1,1] range
             return torch.tanh(x)
-        elif outm=='sigmoid': # limit output to [0,1] range
+        if outm=='sigmoid': # limit output to [0,1] range
             return torch.sigmoid(x)
-        elif outm=='clamp':
+        if outm=='clamp':
             return torch.clamp(x, min=0.0, max=1.0)
-        else: #Default, no cap for the output
-            return x
+        return x
 
 class RRDB(nn.Module):
     '''
@@ -159,8 +158,7 @@ class ResidualDenseBlock_5C(nn.Module):
         x5 = self.conv5(torch.cat((x, x1, x2, x3, x4), 1))
         if self.noise:
             return self.noise(x5.mul(0.2) + x)
-        else:
-            return x5 * 0.2 + x
+        return x5 * 0.2 + x
 
 
 ####################

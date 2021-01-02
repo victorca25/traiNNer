@@ -180,12 +180,12 @@ class CosineAnnealingLR_Restart(_LRScheduler):
     def get_lr(self):
         if self.last_epoch == 0:
             return self.base_lrs
-        elif self.last_epoch in self.restarts:
+        if self.last_epoch in self.restarts:
             self.last_restart = self.last_epoch
             self.T_max = self.T_period[self.restarts.index(self.last_epoch) + 1]
             weight = self.restart_weights[self.restarts.index(self.last_epoch)]
             return [group['initial_lr'] * weight for group in self.optimizer.param_groups]
-        elif (self.last_epoch - self.last_restart - 1 - self.T_max) % (2 * self.T_max) == 0:
+        if (self.last_epoch - self.last_restart - 1 - self.T_max) % (2 * self.T_max) == 0:
             return [
                 group['lr'] + (base_lr - self.eta_min) * (1 - math.cos(math.pi / self.T_max)) / 2
                 for base_lr, group in zip(self.base_lrs, self.optimizer.param_groups)
