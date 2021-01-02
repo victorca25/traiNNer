@@ -43,7 +43,7 @@ _cv2_pad_to_str = {'constant':cv2.BORDER_CONSTANT,
                   }
 
 
-class Compose(object):
+class Compose():
     """Composes several transforms together.
     
     Args:
@@ -73,7 +73,7 @@ class Compose(object):
         return format_string
 
 
-class ToTensor(object):
+class ToTensor():
     """Convert a ``numpy.ndarray`` to tensor.
 
     Converts a numpy.ndarray (H x W x C) in the range
@@ -93,7 +93,7 @@ class ToTensor(object):
         return self.__class__.__name__ + '()'
 
 
-class ToCVImage(object):
+class ToCVImage():
     """Convert a tensor or an to ndarray Image.
 
     Converts a torch.*Tensor of shape C x H x W or a numpy ndarray of shape
@@ -117,7 +117,7 @@ class ToCVImage(object):
         return F.to_cv_image(pic, self.mode)
 
 
-class Normalize(object):
+class Normalize():
     """Normalize a tensor image with mean and standard deviation.
     Given mean: ``(M1,...,Mn)`` and std: ``(S1,..,Sn)`` for ``n`` channels, this transform
     will normalize each channel of the input ``torch.*Tensor`` i.e.
@@ -148,7 +148,7 @@ class Normalize(object):
         return self.__class__.__name__ + '(mean={0}, std={1})'.format(self.mean, self.std)
 
 
-class Resize(object):
+class Resize():
     """Resize the input numpy ndarray to the given size.
 
     Args:
@@ -201,7 +201,7 @@ class Scale(Resize):
         super(Scale, self).__init__(*args, **kwargs)
 
 
-class CenterCrop(object):
+class CenterCrop():
     """Crops the given numpy ndarray at the center.
 
     Args:
@@ -229,7 +229,7 @@ class CenterCrop(object):
         return self.__class__.__name__ + '(size={0})'.format(self.size)
 
 
-class Pad(object):
+class Pad():
     """Pad the given numpy ndarray on all sides with the given "pad" value.
 
     Args:
@@ -279,7 +279,7 @@ class Pad(object):
             format(self.padding, self.fill, self.padding_mode)
 
 
-class Lambda(object):
+class Lambda():
     """Apply a user-defined lambda as a transform.
     Attention: The multiprocessing used in dataloader of pytorch is not friendly with lambda function in Windows
     Args:
@@ -298,7 +298,7 @@ class Lambda(object):
     def __repr__(self):
         return self.__class__.__name__ + '()'
 
-class RandomTransforms(object):
+class RandomTransforms():
     """Base class for a list of transformations with randomness
     Args:
         transforms (list or tuple): list of transformations
@@ -367,7 +367,7 @@ class RandomChoice(RandomTransforms):
         return t(img)
 
 
-class RandomCrop(object):
+class RandomCrop():
     """Crop the given numpy ndarray at a random location.
 
     Args:
@@ -459,7 +459,7 @@ class RandomCrop(object):
         return self.__class__.__name__ + '(size={0}, padding={1})'.format(self.size, self.padding)
 
 
-class RandomHorizontalFlip(object):
+class RandomHorizontalFlip():
     """Horizontally flip the given CV Image randomly with a given probability.
 
     Args:
@@ -485,7 +485,7 @@ class RandomHorizontalFlip(object):
         return self.__class__.__name__ + '(p={})'.format(self.p)
 
 
-class RandomVerticalFlip(object):
+class RandomVerticalFlip():
     """Vertically flip the given CV Image randomly with a given probability.
 
     Args:
@@ -510,7 +510,7 @@ class RandomVerticalFlip(object):
         return self.__class__.__name__ + '(p={})'.format(self.p)
 
 
-class RandomResizedCrop(object):
+class RandomResizedCrop():
     """Crop the given numpy ndarray to random size and aspect ratio.
 
     A crop of random size (default: of 0.08 to 1.0) of the original size and a random
@@ -594,7 +594,7 @@ class RandomSizedCrop(RandomResizedCrop):
                       "please use transforms.RandomResizedCrop instead.")
         super(RandomSizedCrop, self).__init__(*args, **kwargs)
 
-class FiveCrop(object):
+class FiveCrop():
     """Crop the given numpy ndarray into four corners and the central crop
 
     .. Note::
@@ -631,7 +631,7 @@ class FiveCrop(object):
         return self.__class__.__name__ + '(size={0})'.format(self.size)
 
 
-class TenCrop(object):
+class TenCrop():
     """Crop the given numpy ndarray into four corners and the central crop plus the flipped version of
     these (horizontal flipping is used by default)
     
@@ -674,7 +674,7 @@ class TenCrop(object):
         return self.__class__.__name__ + '(size={0}, vertical_flip={1})'.format(self.size, self.vertical_flip)
 
 
-class LinearTransformation(object):
+class LinearTransformation():
     """Transform a tensor image with a square transformation matrix computed
     offline.
     Given transformation_matrix, will flatten the torch.*Tensor, compute the dot
@@ -718,7 +718,7 @@ class LinearTransformation(object):
         return format_string
 
 
-class ColorJitter(object):
+class ColorJitter():
     """Randomly change the brightness, contrast and saturation of an image.
     Args:
         brightness (float or tuple of float (min, max)): How much to jitter brightness.
@@ -825,7 +825,7 @@ class ColorJitter(object):
         return format_string
 
 
-class RandomRotation(object):
+class RandomRotation():
     """Rotate the image by angle.
     Args:
         degrees (sequence or float or int): Range of degrees to select from.
@@ -890,7 +890,7 @@ class RandomRotation(object):
         return format_string
 
 
-class RandomAffine(object):
+class RandomAffine():
     """Random affine transformation of the image keeping center invariant
     Args:
         degrees (sequence or float or int): Range of degrees to select from.
@@ -1017,7 +1017,7 @@ class RandomAffine(object):
         return s.format(name=self.__class__.__name__, **d)
 
 
-class Grayscale(object):
+class Grayscale():
     """Convert image to grayscale.
     Args:
         num_output_channels (int): (1 or 3) number of channels desired for output image
@@ -1045,7 +1045,7 @@ class Grayscale(object):
         return self.__class__.__name__ + '(num_output_channels={0})'.format(self.num_output_channels)
 
 
-class RandomGrayscale(object):
+class RandomGrayscale():
     """Randomly convert image to grayscale with a probability of p (default 0.1).
     Args:
         p (float): probability that image should be converted to grayscale.
@@ -1078,7 +1078,7 @@ class RandomGrayscale(object):
         return self.__class__.__name__ + '(p={0})'.format(self.p)
 
 
-class RandomAffine6(object):
+class RandomAffine6():
     """Random affine transformation of the image keeping center invariant
 
     Args:
@@ -1185,7 +1185,7 @@ class RandomAffine6(object):
         return s.format(name=self.__class__.__name__, **d)
 
 
-class RandomErasing(object):
+class RandomErasing():
     """ Randomly selects a rectangle region in an image and erases its pixels.
     'Random Erasing Data Augmentation' by Zhong et al. See https://arxiv.org/pdf/1708.04896.pdf
     Args:
@@ -1305,7 +1305,7 @@ class RandomErasing(object):
 #############################################################################################
 
 
-class Cutout(object):
+class Cutout():
     def __init__(self, p=0.5, inplace=False, mask_size=10):
         assert isinstance(mask_size, (int))
         if p < 0 or p > 1:
@@ -1348,7 +1348,7 @@ class Cutout(object):
         return img
 
 
-class RandomPerspective(object):
+class RandomPerspective():
     """Random perspective transformation of the image keeping center invariant
         Args:
             fov(float): range of wide angle = 90+-fov
@@ -1458,7 +1458,7 @@ class RandomPerspective(object):
         return s.format(name=self.__class__.__name__, **d)
 
 
-class RandomGaussianNoise(object):
+class RandomGaussianNoise():
     """Applying gaussian noise on the given CV Image randomly with a given probability.
 
         Args:
@@ -1515,7 +1515,7 @@ class RandomGaussianNoise(object):
         return self.__class__.__name__ + '(p={})'.format(self.p)
 
 
-class RandomPoissonNoise(object):
+class RandomPoissonNoise():
     """Applying Poisson noise on the given CV Image randomly with a given probability.
 
         Args:
@@ -1542,7 +1542,7 @@ class RandomPoissonNoise(object):
         return self.__class__.__name__ + '(p={})'.format(self.p)
 
 
-class RandomSPNoise(object):
+class RandomSPNoise():
     """Applying salt and pepper noise on the given CV Image randomly with a given probability.
 
         Args:
@@ -1572,7 +1572,7 @@ class RandomSPNoise(object):
         return self.__class__.__name__ + '(p={})'.format(self.p)
 
 
-class RandomSpeckleNoise(object):
+class RandomSpeckleNoise():
     """Applying speckle noise on the given CV Image randomly with a given probability.
 
         Args:
@@ -1625,7 +1625,7 @@ class RandomSpeckleNoise(object):
     def __repr__(self):
         return self.__class__.__name__ + '(p={})'.format(self.p)
 
-class RandomJPEGNoise(object):
+class RandomJPEGNoise():
     """Applying JPEG compression on the given CV Image randomly with a given probability.
 
         Args:
@@ -1676,7 +1676,7 @@ class RandomJPEGNoise(object):
         return self.__class__.__name__ + '(p={})'.format(self.p)
 
 #TBD
-class RandomQuantizeNoise(object):
+class RandomQuantizeNoise():
     pass
 
 #TBD
@@ -1696,7 +1696,7 @@ class RandomNoise(RandomTransforms):
 
 
 
-class RandomAverageBlur(object):
+class RandomAverageBlur():
     """Applying Average blurring filter on the given CV Image randomly with a given probability.
 
         Args:
@@ -1746,7 +1746,7 @@ class RandomAverageBlur(object):
         return img
 
 #The function needs some fixing
-class RandomBilateralBlur(object):
+class RandomBilateralBlur():
     """Applying Bilateral blurring filter on the given CV Image randomly with a given probability.
 
         Args:
@@ -1820,7 +1820,7 @@ class RandomBilateralBlur(object):
         return img
 
 
-class RandomBoxBlur(object):
+class RandomBoxBlur():
     """Applying Box blurring filter on the given CV Image randomly with a given probability.
 
         Args:
@@ -1869,7 +1869,7 @@ class RandomBoxBlur(object):
             return EF.box_blur(img, kernel_size=self.kernel_size)
         return img
 
-class RandomGaussianBlur(object):
+class RandomGaussianBlur():
     """Applying Gaussian blurring filter on the given CV Image randomly with a given probability.
 
         Args:
@@ -1918,7 +1918,7 @@ class RandomGaussianBlur(object):
             return EF.gaussian_blur(img, kernel_size=self.kernel_size)
         return img
 
-class BayerDitherNoise(object):
+class BayerDitherNoise():
     r"""Adds colored bayer dithering noise to the image.
     Args:
         p (float): probability of the image being noised. Default value is 0.5
@@ -1943,7 +1943,7 @@ class BayerDitherNoise(object):
     def __repr__(self):
         return self.__class__.__name__ + '(p={})'.format(self.p)
 
-class FSDitherNoise(object):
+class FSDitherNoise():
     r"""Adds colored Floyd–Steinberg dithering noise to the image.
     Args:
         p (float): probability of the image being noised. Default value is 0.5
@@ -1970,7 +1970,7 @@ class FSDitherNoise(object):
     def __repr__(self):
         return self.__class__.__name__ + '(p={})'.format(self.p)
 
-class AverageBWDitherNoise(object):
+class AverageBWDitherNoise():
     r"""Adds black and white average dithering noise to the image.
     Args:
         p (float): probability of the image being noised. Default value is 0.5
@@ -1995,7 +1995,7 @@ class AverageBWDitherNoise(object):
     def __repr__(self):
         return self.__class__.__name__ + '(p={})'.format(self.p)
 
-class BayerBWDitherNoise(object):
+class BayerBWDitherNoise():
     r"""Adds black and white Bayer dithering noise to the image.
     Args:
         p (float): probability of the image being noised. Default value is 0.5
@@ -2020,7 +2020,7 @@ class BayerBWDitherNoise(object):
     def __repr__(self):
         return self.__class__.__name__ + '(p={})'.format(self.p)
 
-class BinBWDitherNoise(object):
+class BinBWDitherNoise():
     r"""Adds black and white binary dithering noise to the image.
     Args:
         p (float): probability of the image being noised. Default value is 0.5
@@ -2045,7 +2045,7 @@ class BinBWDitherNoise(object):
     def __repr__(self):
         return self.__class__.__name__ + '(p={})'.format(self.p)
 
-class FSBWDitherNoise(object):
+class FSBWDitherNoise():
     r"""Adds black and white Floyd–Steinberg dithering noise to the image.
     Args:
         p (float): probability of the image being noised. Default value is 0.5
@@ -2072,7 +2072,7 @@ class FSBWDitherNoise(object):
     def __repr__(self):
         return self.__class__.__name__ + '(p={})'.format(self.p)
 
-class RandomBWDitherNoise(object):
+class RandomBWDitherNoise():
     r"""Adds black and white random dithering noise to the image.
     Args:
         p (float): probability of the image being noised. Default value is 0.5
@@ -2098,7 +2098,7 @@ class RandomBWDitherNoise(object):
         return self.__class__.__name__ + '(p={})'.format(self.p)
 
 
-class FilterMaxRGB(object):
+class FilterMaxRGB():
     r"""The Max RGB filter is used to visualize which channel contributes most to a given area of an image. 
         Can be used for simple color-based segmentation.
         More infotmation on: https://www.pyimagesearch.com/2015/09/28/implementing-the-max-rgb-filter-in-opencv/
@@ -2126,7 +2126,7 @@ class FilterMaxRGB(object):
     def __repr__(self):
         return self.__class__.__name__ + '(p={})'.format(self.p)
 
-class FilterColorBalance(object):
+class FilterColorBalance():
     r"""Simple color balance algorithm (similar to Photoshop "auto levels")
         More infotmation on: 
         https://gist.github.com/DavidYKay/9dad6c4ab0d8d7dbf3dc#gistcomment-3025656
@@ -2168,7 +2168,7 @@ class FilterColorBalance(object):
     def __repr__(self):
         return self.__class__.__name__ + '(p={})'.format(self.p)
 
-class FilterUnsharp(object):
+class FilterUnsharp():
     r"""Unsharp mask filter, used to sharpen images to make edges and interfaces look crisper.
         More infotmation on: 
         https://www.idtools.com.au/unsharp-masking-python-opencv/
@@ -2205,7 +2205,7 @@ class FilterUnsharp(object):
         return self.__class__.__name__ + '(p={})'.format(self.p)
 
 
-class FilterCanny(object):
+class FilterCanny():
     r"""Automatic Canny filter for edge detection
     Args:
         img (numpy ndarray): Image to be filtered.
@@ -2237,7 +2237,7 @@ class FilterCanny(object):
         return self.__class__.__name__ + '(p={})'.format(self.p)
 
 
-class SimpleQuantize(object):
+class SimpleQuantize():
     r"""Simple (fast) color quantization, alternative to proper quantization (TBD)
     Args:
         img (numpy ndarray): Image to be quantized.

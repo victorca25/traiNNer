@@ -27,7 +27,7 @@ def Scale(img=None, scale: int = None, algo=None, ds_kernel=None, resize_type=No
     return resize(np.copy(img)), resize_type
 
 
-class MLResize(object):
+class MLResize():
     """Resize the input numpy ndarray to the given size using the Matlab-like
     algorithm (warning an order of magnitude slower than OpenCV).
 
@@ -208,7 +208,7 @@ def get_pad(img, size: int, fill = 0, padding_mode: str ='constant'):
 
 
 
-class RandomQuantize(object):
+class RandomQuantize():
     r"""Color quantization using MiniSOM
     Args:
         img (numpy ndarray): Image to be quantized.
@@ -279,7 +279,7 @@ class RandomQuantize(object):
         return self.__class__.__name__ + '(p={})'.format(self.p)
 
 
-class KernelDownscale(object):
+class KernelDownscale():
     '''
     Use the previously extracted realistic kernels to downscale images with
 

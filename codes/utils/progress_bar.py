@@ -3,7 +3,7 @@ from shutil import get_terminal_size
 import time
 
 
-class ProgressBar(object):
+class ProgressBar():
     '''A progress bar which can print the progress
     modified from https://github.com/hellock/cvbase/blob/master/cvbase/progress.py
     '''
