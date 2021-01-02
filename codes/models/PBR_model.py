@@ -47,16 +47,15 @@ class PBRModel(BaseModel):
             z_norm = opt['datasets']['train'].get('znorm', False)
         
         # specify the models you want to load/save to the disk. The training/test scripts will call <BaseModel.save_networks> and <BaseModel.load_networks>
-        if self.is_train: # print/save/load both G and D during training
-            self.model_names = ['G', 'D']
-        else:  # during test time, only print/load G
-            self.model_names = ['G']
+        # for training and testing, a generator 'G' is needed 
+        self.model_names = ['G']
         
         # define networks and load pretrained models
         self.netG = networks.define_G(opt).to(self.device)  # G
         if self.is_train:
             self.netG.train()
             if train_opt['gan_weight']:
+                self.model_names.append('D') # add discriminator to the network list
                 self.netD = networks.define_D(opt).to(self.device)  # D
                 self.netD.train()
         self.load()  # load G and D if needed
