@@ -2,7 +2,7 @@ from math import sqrt
 
 from numpy import (array, unravel_index, nditer, linalg, random, subtract,
                    power, exp, pi, zeros, arange, outer, meshgrid, dot,
-                   logical_and, mean, std, cov, argsort, linspace, transpose)
+                   logical_and, cov, argsort, linspace, transpose)
 from collections import defaultdict, Counter
 from warnings import warn
 from sys import stdout

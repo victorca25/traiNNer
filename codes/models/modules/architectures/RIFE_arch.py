@@ -1,9 +1,6 @@
 import torch
 import torch.nn as nn
-import numpy as np
-from torch.optim import AdamW
 import torch.optim as optim
-import itertools
 import torch.nn.functional as F
 
 from models.modules.architectures.video import warp

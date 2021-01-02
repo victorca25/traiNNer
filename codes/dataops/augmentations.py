@@ -3,7 +3,6 @@ import argparse
 
 import os
 import os.path
-import sys
 import glob
 
 import numpy as np

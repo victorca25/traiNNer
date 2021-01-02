@@ -1,6 +1,4 @@
 from __future__ import absolute_import
-
-import os
 import logging
 from collections import OrderedDict
 
@@ -15,14 +13,11 @@ logger = logging.getLogger('base')
 from . import losses
 from . import optimizers
 from . import schedulers
-
-from dataops.batchaug import BatchAug
 from dataops.filters import FilterHigh, FilterLow #, FilterX
 from dataops.colors import ycbcr_to_rgb
 
 # TODO: TMP
 import torch.nn.functional as F
-from dataops.debug import tmp_vis, tmp_vis_flow, describe_numpy, describe_tensor
 
 
 load_amp = (hasattr(torch.cuda, "amp") and hasattr(torch.cuda.amp, "autocast"))

@@ -3,8 +3,6 @@ from . import swa
 from . import schedulers
 from . import optimizers
 from . import losses
-
-import os
 import logging
 from collections import OrderedDict
 

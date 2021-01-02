@@ -8,8 +8,6 @@ https://github.com/R08UST/Color_Conversion_pytorch/blob/master/differentiable_co
 
 import torch
 import torch.nn as nn
-import math
-import cv2
 import numpy as np
 
 def bgr_to_rgb(image: torch.Tensor) -> torch.Tensor:
