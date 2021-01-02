@@ -6,6 +6,8 @@ from copy import deepcopy
 from collections import Counter, OrderedDict
 from models.networks import model_val
 
+import logging
+logger = logging.getLogger('base')
 
 class BaseModel():
     '''This class is an base class for models.
@@ -77,17 +79,51 @@ class BaseModel():
         '''
         pass
 
-    def save(self, label):
+    def save(self, iter_step, latest=None, loader=None):
         '''Save all the networks to the disk.
         Parameters:
-            label/iter_step (int) -- current epoch; used in the file name '%s_net_%s.pth' % (epoch, name)
+            iter_step (int) -- current epoch; used in the file name '%s_net_%s.pth' % (epoch, name)
         '''
-        pass
+        self.save_network(self.netG, 'G', iter_step, latest)
+        if self.cri_gan:
+            self.save_network(self.netD, 'D', iter_step, latest)
+        if self.swa:
+            # when training with networks that use BN
+            # # Update bn statistics for the swa_model only at the end of training
+            # if not isinstance(iter_step, int): #TODO: not sure if it should be done only at the end
+            self.swa_model = self.swa_model.cpu()
+            torch.optim.swa_utils.update_bn(loader, self.swa_model)
+            self.swa_model = self.swa_model.cuda()
+            # Check swa BN statistics
+            # for module in self.swa_model.modules():
+            #     if isinstance(module, torch.nn.modules.batchnorm._BatchNorm):
+            #         print(module.running_mean)
+            #         print(module.running_var)
+            #         print(module.momentum)
+            #         break
+            self.save_network(self.swa_model, 'swaG', iter_step, latest)
 
     def load(self):
         '''Load all the networks from the disk.
         '''
-        pass
+        load_path_G = self.opt['path']['pretrain_model_G']
+        if load_path_G is not None:
+            logger.info('Loading pretrained model for G [{:s}] ...'.format(load_path_G))
+            strict = self.opt['network_G'].get('strict', None)
+            self.load_network(load_path_G, self.netG, strict, model_type='G')
+        if self.opt['is_train'] and self.opt['train']['gan_weight']:
+            load_path_D = self.opt['path']['pretrain_model_D']
+            if self.opt['is_train'] and load_path_D is not None:
+                logger.info('Loading pretrained model for D [{:s}] ...'.format(load_path_D))
+                strict = self.opt['network_D'].get('strict', None)
+                self.load_network(load_path_D, self.netD, model_type='D')
+
+    def load_swa(self):
+        if self.opt['is_train'] and self.opt['use_swa']:
+            load_path_swaG = self.opt['path']['pretrain_model_swaG']
+            if self.opt['is_train'] and load_path_swaG is not None:
+                logger.info('Loading pretrained model for SWA G [{:s}] ...'.format(load_path_swaG))
+                self.load_network(load_path_swaG, self.swa_model)
 
     def _set_lr(self, lr_groups_l):
         ''' Set learning rate for warmup.

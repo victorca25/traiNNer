@@ -518,20 +518,3 @@ class PBRModel(BaseModel):
                 logger.info('Network F structure: {}, with parameters: {:,d}'.format(net_struc_str, n))
                 logger.info(s)
             '''
-
-    def load(self):
-        load_path_G = self.opt['path']['pretrain_model_G']
-        if load_path_G is not None:
-            logger.info('Loading pretrained model for G [{:s}] ...'.format(load_path_G))
-            strict = self.opt['path'].get('strict', None)
-            self.load_network(load_path_G, self.netG, strict)
-        if self.opt['is_train'] and self.opt['train']['gan_weight']:
-            load_path_D = self.opt['path']['pretrain_model_D']
-            if self.opt['is_train'] and load_path_D is not None:
-                logger.info('Loading pretrained model for D [{:s}] ...'.format(load_path_D))
-                self.load_network(load_path_D, self.netD)
-
-    def save(self, iter_step, latest=None):
-        self.save_network(self.netG, 'G', iter_step, latest)
-        if self.cri_gan:
-            self.save_network(self.netD, 'D', iter_step, latest)
