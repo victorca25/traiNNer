@@ -71,13 +71,51 @@ class BaseModel():
     def get_current_losses(self):
         '''Return traning losses. train.py will print out these errors on console, and save them to a file'''
         pass
-
+        
     def print_network(self):
         '''Print the total number of parameters in the network and (if verbose) network architecture
         Parameters:
             TODO: verbose (bool) -- if verbose: print the network architecture
         '''
-        pass
+        # Generator
+        s, n = self.get_network_description(self.netG)
+        if isinstance(self.netG, nn.DataParallel):
+            net_struc_str = '{} - {}'.format(self.netG.__class__.__name__,
+                                             self.netG.module.__class__.__name__)
+        else:
+            net_struc_str = '{}'.format(self.netG.__class__.__name__)
+
+        logger.info('Network G structure: {}, with parameters: {:,d}'.format(net_struc_str, n))
+        logger.info(s)
+        if self.is_train:
+            # Discriminator
+            if self.cri_gan:
+                s, n = self.get_network_description(self.netD)
+                if isinstance(self.netD, nn.DataParallel):
+                    net_struc_str = '{} - {}'.format(self.netD.__class__.__name__,
+                                                    self.netD.module.__class__.__name__)
+                else:
+                    net_struc_str = '{}'.format(self.netD.__class__.__name__)
+
+                logger.info('Network D structure: {}, with parameters: {:,d}'.format(net_struc_str, n))
+                logger.info(s)
+
+            #TODO: feature network is not being trained, is it necessary to visualize? Maybe just name?
+            # maybe show the generatorlosses instead?
+            '''
+            if self.generatorlosses.cri_fea:  # F, Perceptual Network
+                #s, n = self.get_network_description(self.netF)
+                s, n = self.get_network_description(self.generatorlosses.netF) #TODO
+                #s, n = self.get_network_description(self.generatorlosses.loss_list.netF) #TODO
+                if isinstance(self.generatorlosses.netF, nn.DataParallel):
+                    net_struc_str = '{} - {}'.format(self.generatorlosses.netF.__class__.__name__,
+                                                    self.generatorlosses.netF.module.__class__.__name__)
+                else:
+                    net_struc_str = '{}'.format(self.generatorlosses.netF.__class__.__name__)
+
+                logger.info('Network F structure: {}, with parameters: {:,d}'.format(net_struc_str, n))
+                logger.info(s)
+            '''
 
     def save(self, iter_step, latest=None, loader=None):
         '''Save all the networks to the disk.
