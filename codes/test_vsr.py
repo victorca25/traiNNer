@@ -15,45 +15,6 @@ from dataops.common import bgr2ycbcr, tensor2np
 from models import create_model
 
 
-def chop_forward(x, model, scale, shave=16, min_size=5000, nGPUs=1, need_HR=False):
-    # divide into 4 patches
-    b, n, c, h, w = x.size()
-    h_half, w_half = h // 2, w // 2
-    h_size, w_size = h_half + shave, w_half + shave
-    inputlist = [
-        x[:, :, :, 0:h_size, 0:w_size],
-        x[:, :, :, 0:h_size, (w - w_size):w],
-        x[:, :, :, (h - h_size):h, 0:w_size],
-        x[:, :, :, (h - h_size):h, (w - w_size):w]]
-
-    if w_size * h_size < min_size:
-        outputlist = []
-        for i in range(0, 4, nGPUs):
-            input_batch = torch.cat(inputlist[i:(i + nGPUs)], dim=0)
-            model.netG.eval()
-            with torch.no_grad():
-                _, _, _, output_batch = model.netG(input_batch)
-            outputlist.append(output_batch.data)
-    else:
-        outputlist = [
-            chop_forward(patch, model, scale, shave, min_size, nGPUs) \
-            for patch in inputlist]
-
-    h, w = scale * h, scale * w
-    h_half, w_half = scale * h_half, scale * w_half
-    h_size, w_size = scale * h_size, scale * w_size
-    shave *= scale
-
-    # output = Variable(x.data.new(1, 1, h, w), volatile=True) #UserWarning: volatile was removed and now has no effect. Use `with torch.no_grad():` instead.
-    with torch.no_grad():
-        # output = Variable(x.data.new(1, 1, h, w))
-        output = Variable(x.data.new(1, c, h, w))
-    output[:, :, 0:h_half, 0:w_half] = outputlist[0][:, :, 0:h_half, 0:w_half]
-    output[:, :, 0:h_half, w_half:w] = outputlist[1][:, :, 0:h_half, (w_size - w + w_half):w_size]
-    output[:, :, h_half:h, 0:w_half] = outputlist[2][:, :, (h_size - h + h_half):h_size, 0:w_half]
-    output[:, :, h_half:h, w_half:w] = outputlist[3][:, :, (h_size - h + h_half):h_size, (w_size - w + w_half):w_size]
-
-    return output
 
 
 def main():
