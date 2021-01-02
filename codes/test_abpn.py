@@ -47,9 +47,10 @@ def chop_forward2(lowres_img, model, scale, patch_size=200):
 
 def main():
     # options
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-opt', type=str, required=True, help='Path to options JSON file.')
-    opt = options.parse(parser.parse_args().opt, is_train=False)
+    args = argparse.ArgumentParser()
+    args.add_argument('-i', type=str, required=True, help='Path to option file.')
+    args = args.parse_args()
+    opt = options.parse(args.i, is_train=False)
     chop2 = opt['chop']
     chop_patch_size = opt['chop_patch_size']
     multi_upscale = opt['multi_upscale']

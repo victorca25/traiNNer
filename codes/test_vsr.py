@@ -57,10 +57,10 @@ def chop_forward(x, model, scale, shave=16, min_size=5000, nGPUs=1, need_HR=Fals
 
 
 def main():
-    # options
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-opt', type=str, required=True, help='Path to options JSON file.')
-    opt = options.parse(parser.parse_args().opt, is_train=False)
+    args = argparse.ArgumentParser()
+    args.add_argument('-i', type=str, required=True, help='Path to option file.')
+    args = args.parse_args()
+    opt = options.parse(args.i, is_train=False)
 
     logger = logging.getLogger('base')
     logger.info(options.dict2str(opt))
