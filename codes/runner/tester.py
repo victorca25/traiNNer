@@ -12,7 +12,15 @@ from codes.utils.util import save_img
 
 
 class Tester(Runner):
-    """Starts a testing session, initialized using Runner."""
+    """
+    Starts a testing session, initialized using Runner.
+
+    :param config_path: Options file path.
+    :param path_key: Key of the dataset data to use for obtaining output filename. Expects a path string.
+    :param wanted_visuals: Keys of the visuals you want to save to a file.
+    :param metric_visuals: Keys of the visuals you want to compare against each other with chosen metrics.
+        Only two keys should be provided. Any more is an error.
+    """
 
     def __init__(self, config_path: str, path_key: str, wanted_visuals: list[str], metric_visuals: tuple[str, str]):
         super(Tester).__init__(config_path, trainer=False)
