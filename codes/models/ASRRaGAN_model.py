@@ -126,26 +126,7 @@ class ASRRaGANModel(BaseModel):
             # HFEN loss
             # """
             if train_opt['hfen_weight']:
-                l_hfen_type = train_opt['hfen_criterion']
-                if train_opt['hfen_presmooth']:
-                    pre_smooth = train_opt['hfen_presmooth']
-                else:
-                    pre_smooth = False  # train_opt['hfen_presmooth']
-                if l_hfen_type:
-                    if l_hfen_type == 'rel_l1' or l_hfen_type == 'rel_l2':
-                        relative = True
-                    else:
-                        relative = False  # True #train_opt['hfen_relative']
-                if l_hfen_type:
-                    self.cri_hfen = HFENLoss(
-                        loss_f=l_hfen_type,
-                        device=self.device,
-                        pre_smooth=pre_smooth,
-                        relative=relative
-                    ).to(self.device)
-                else:
-                    raise NotImplementedError('Loss type [{:s}] not recognized.'.format(l_hfen_type))
-                self.l_hfen_w = train_opt['hfen_weight']
+                raise NotImplementedError('HFENLoss for ASRRaGAN needs to be updated')
             else:
                 logger.info('Remove HFEN loss.')
                 self.cri_hfen = None
@@ -162,10 +143,10 @@ class ASRRaGANModel(BaseModel):
                     tv_norm = 1
 
                 if l_tv_type == 'normal':
-                    self.cri_tv = TVLoss(self.l_tv_w, p=tv_norm).to(self.device)
+                    self.cri_tv = TVLoss(self.l_tv_w, tv_type='tv', p=tv_norm).to(self.device)
                 elif l_tv_type == '4D':
                     # Total Variation regularization in 4 directions
-                    self.cri_tv = TVLoss4D(self.l_tv_w).to(self.device)
+                    self.cri_tv = TVLoss(self.l_tv_w, tv_type='dtv', p=tv_norm).to(self.device)
                 else:
                     raise NotImplementedError('Loss type [{:s}] not recognized.'.format(l_tv_type))
             else:
