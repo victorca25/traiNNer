@@ -10,7 +10,7 @@ import logging
 
 import torch
 
-import options.options as option
+import options
 from utils import util
 from data import create_dataloader, create_dataset
 from models import create_model
@@ -58,9 +58,9 @@ def main():
         logger.info('Set [resume_state] to ' + resume_state_path)
         logger.info('Resuming training from epoch: {}, iter: {}.'.format(
             resume_state['epoch'], resume_state['iter']))
-        option.check_resume(opt)  # check resume options
+        options.check_resume(opt)  # check resume options
 
-    logger.info(option.dict2str(opt))
+    logger.info(options.dict2str(opt))
     # tensorboard logger
     if opt['use_tb_logger'] and 'debug' not in opt['name']:
         from tensorboardX import SummaryWriter

@@ -8,7 +8,7 @@ import time
 
 import torch
 
-import options.options as option
+import options
 from data import create_dataloader, create_dataset
 from dataops.common import tensor2np
 from models import create_model
@@ -37,14 +37,14 @@ def main():
         logger.info('Set [resume_state] to {}'.format(resume_state_path))
         logger.info('Resuming training from epoch: {}, iter: {}.'.format(	
             resume_state['epoch'], resume_state['iter']))
-        option.check_resume(opt)
+        options.check_resume(opt)
     else:  # training from scratch
         resume_state = None
         util.mkdir_and_rename(opt['path']['experiments_root'])  # rename old folder if exists
         util.mkdirs((path for key, path in opt['path'].items() if not key == 'experiments_root'
                      and 'pretrain_model' not in key and 'resume' not in key))
 
-    logger.info(option.dict2str(opt))
+    logger.info(options.dict2str(opt))
     # tensorboard logger
     if opt['use_tb_logger'] and 'debug' not in opt['name']:
         from tensorboardX import SummaryWriter
