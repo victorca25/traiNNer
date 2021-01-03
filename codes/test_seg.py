@@ -13,10 +13,10 @@ from dataops.common import modcrop, imresize
 # options
 test_img_folder_name = 'samples'  # image folder name
 
-test_img_folder = '../data/' + test_img_folder_name  # HR images
-save_prob_path = '../data/' + test_img_folder_name + '_segprob'  # probability maps
-save_byteimg_path = '../data/' + test_img_folder_name + '_byteimg'  # segmentation annotations
-save_colorimg_path = '../data/' + test_img_folder_name + '_colorimg'  # segmentaion color results
+test_img_folder = '../data/{}'.format(test_img_folder_name)  # HR images
+save_prob_path = '../data/{}_segprob'.format(test_img_folder_name)  # probability maps
+save_byteimg_path = '../data/{}_byteimg'.format(test_img_folder_name)  # segmentation annotations
+save_colorimg_path = '../data/{}_colorimg'.format(test_img_folder_name)  # segmentaion color results
 
 # make dirs
 util.mkdirs([save_prob_path, save_byteimg_path, save_colorimg_path])
@@ -58,8 +58,8 @@ for path in glob.glob(test_img_folder + '/*'):
         img = np.expand_dims(img, axis=2)
     img = torch.from_numpy(np.transpose(img, (2, 0, 1))).float()
 
-    # matlab imresize
-    # the implementation is slower than matlab, can use matlab to generate first
+    # matlab imresize 
+    # the implementation is slower than matlab, can use matlab to generate first 
     img_LR = imresize(img / 255, 1 / 4, antialiasing=True)
     img = imresize(img_LR, 4, antialiasing=True) * 255
 
