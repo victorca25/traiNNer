@@ -60,7 +60,7 @@ class BaseModel():
         '''
         pass
 
-    def optimize_parameters(self):
+    def optimize_parameters(self, step):
         '''Calculate losses, gradients, and update network weights; called in every training iteration'''
         pass
 
@@ -276,7 +276,7 @@ class BaseModel():
         n = sum(map(lambda x: x.numel(), network.parameters()))
         return s, n
 
-    def requires_grad(self, model, flag=True, target_layer=None, net_type=None):
+    def requires_grad(self, model, flag: bool = True, target_layer=None, net_type=None):
         '''Set requies_grad for all the networks. Use flag=False to avoid 
             unnecessary computations
         Parameters:
@@ -295,12 +295,12 @@ class BaseModel():
                 param.requires_grad = flag
             else: #elif target_layer in name:  # target layer
                 if net_type == 'D':
-                    if 'features.' in name: #vgg-d
-                        layer=f'features.{target_layer}.'
+                    if 'features.' in name: # vgg-d
+                        layer=f'features.{target_layer}.' 
                     elif 'conv' in name: # vgg-fea-d
-                        layer=f'conv{target_layer}.'
+                        layer=f'conv{target_layer}.' 
                     elif 'model.' in name: # patch-d
-                        layer=f'model.{target_layer}.'
+                        layer=f'model.{target_layer}.' 
                 
                 if layer in name:
                     # print(name, layer)
