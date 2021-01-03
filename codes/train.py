@@ -18,7 +18,7 @@ from utils import util, metrics
 def main():
     # options
     parser = argparse.ArgumentParser()
-    parser.add_argument('-opt', type=str, required=True, help='Path to option JSON file.')
+    parser.add_argument('-opt', type=str, required=True, help='Path to option file.')
     opt = options.parse(parser.parse_args().opt, is_train=True)
 
     # config loggers. Before it, the log will not work

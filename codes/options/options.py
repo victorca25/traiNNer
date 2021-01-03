@@ -1,5 +1,4 @@
 import os
-import os.path as osp
 import logging
 from collections import OrderedDict
 import cv2
@@ -55,7 +54,7 @@ def parse(opt_path: str, is_train: bool = True) -> NoneDict:
         if not os.path.isfile(probe_t):
             raise ValueError("Configuration file {} not found.".format(opt_path))
 
-    ext = osp.splitext(opt_path)[1].lower()
+    ext = os.path.splitext(opt_path)[1].lower()
     if ext == '.json':
         import json
         # remove comments starting with '//'
@@ -257,15 +256,15 @@ def check_resume(opt: dict):
         if opt['path']['pretrain_model_G'] or opt['path']['pretrain_model_D']:
             logger.warning('pretrain_model paths will be ignored when resuming training from a .state file.')
 
-        state_idx = osp.basename(opt['path']['resume_state']).split('.')[0]
-        opt['path']['pretrain_model_G'] = os.path.normpath(osp.join(opt['path']['models'],
+        state_idx = os.path.basename(opt['path']['resume_state']).split('.')[0]
+        opt['path']['pretrain_model_G'] = os.path.normpath(os.path.join(opt['path']['models'],
                                                    '{}_G.pth'.format(state_idx)))
         logger.info('Set [pretrain_model_G] to {}'.format(opt['path']['pretrain_model_G']))
         if 'gan' in opt['model']:
-            opt['path']['pretrain_model_D'] = os.path.normpath(osp.join(opt['path']['models'],
+            opt['path']['pretrain_model_D'] = os.path.normpath(os.path.join(opt['path']['models'],
                                                        '{}_D.pth'.format(state_idx)))
             logger.info('Set [pretrain_model_D] to {}'.format(opt['path']['pretrain_model_D']))
         if 'swa' in opt['model'] or opt['swa']:
-            opt['path']['pretrain_model_swaG'] = os.path.normpath(osp.join(opt['path']['models'],
+            opt['path']['pretrain_model_swaG'] = os.path.normpath(os.path.join(opt['path']['models'],
                                                    '{}_swaG.pth'.format(state_idx)))
             logger.info('Set [pretrain_model_swaG] to {}'.format(opt['path']['pretrain_model_swaG']))

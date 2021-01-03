@@ -1,11 +1,11 @@
 from collections import OrderedDict
+
 import torch
 import torch.nn as nn
 from models.modules.architectures.convolutions.partialconv2d import PartialConv2d #TODO
 from models.modules.architectures.convolutions.deformconv2d import DeformConv2d
-from models.networks import weights_init_normal, weights_init_kaiming, weights_init_orthogonal
+from models.networks import weights_init_normal, weights_init_xavier, weights_init_kaiming, weights_init_orthogonal
 
-#from modules.architectures.convolutions.partialconv2d import PartialConv2d
 
 ####################
 # Basic blocks
@@ -13,7 +13,7 @@ from models.networks import weights_init_normal, weights_init_kaiming, weights_i
 
 # Swish activation funtion
 def swish_func(x, beta=1.0):
-    '''
+    """
     "Swish: a Self-Gated Activation Function"
     Searching for Activation Functions (https://arxiv.org/abs/1710.05941)
     
@@ -24,14 +24,14 @@ def swish_func(x, beta=1.0):
       (unit step), and multiplying that by x gives us f(x)=2max(0,x), which 
       is the ReLU multiplied by a constant factor of 2, so Swish becomes like 
       the ReLU function.
-        
+    
     Including beta, Swish can be loosely viewed as a smooth function that 
       nonlinearly interpolate between identity (linear) and ReLU function.
       The degree of interpolation can be controlled by the model if beta is 
       set as a trainable parameter.
-      
+    
     Alt: 1.78718727865 * (x * sigmoid(x) - 0.20662096414)
-    '''
+    """
     
     # In-place implementation, may consume less GPU memory: 
     """ 
@@ -43,7 +43,7 @@ def swish_func(x, beta=1.0):
     
     # Normal out-of-place implementation:
     #"""
-    return x * torch.sigmoid(beta*x)
+    return x * torch.sigmoid(beta * x)
     #"""
     
 # Swish module
@@ -51,24 +51,24 @@ class Swish(nn.Module):
     
     __constants__ = ['beta', 'slope', 'inplace']
     
-    def __init__(self, beta = 1.0, slope = 1.67653251702, inplace=False):
-        '''
+    def __init__(self, beta=1.0, slope=1.67653251702, inplace=False):
+        """
         Shape:
         - Input: (N, *) where * means, any number of additional
           dimensions
         - Output: (N, *), same shape as the input
-        '''
-        super().__init__()
+        """
+        super(Swish).__init__()
         self.inplace = inplace
-        #self.beta = beta # user-defined beta parameter, non-trainable
-        #self.beta = beta * torch.nn.Parameter(torch.ones(1)) # learnable beta parameter, create a tensor out of beta
+        # self.beta = beta # user-defined beta parameter, non-trainable
+        # self.beta = beta * torch.nn.Parameter(torch.ones(1)) # learnable beta parameter, create a tensor out of beta
         self.beta = torch.nn.Parameter(torch.tensor(beta)) # learnable beta parameter, create a tensor out of beta
         self.beta.requiresGrad = True # set requiresGrad to true to make it trainable
 
-        self.slope = slope/2 # user-defined "slope", non-trainable
-        #self.slope = slope * torch.nn.Parameter(torch.ones(1)) # learnable slope parameter, create a tensor out of slope
-        #self.slope = torch.nn.Parameter(torch.tensor(slope)) # learnable slope parameter, create a tensor out of slope
-        #self.slope.requiresGrad = True # set requiresGrad to true to true to make it trainable
+        self.slope = slope / 2 # user-defined "slope", non-trainable
+        # self.slope = slope * torch.nn.Parameter(torch.ones(1)) # learnable slope parameter, create a tensor out of slope
+        # self.slope = torch.nn.Parameter(torch.tensor(slope)) # learnable slope parameter, create a tensor out of slope
+        # self.slope.requiresGrad = True # set requiresGrad to true to true to make it trainable
     
     def forward(self, input):
         """
@@ -81,7 +81,7 @@ class Swish(nn.Module):
             return 2 * self.slope * swish_func(input, self.beta)
         """
         return 2 * self.slope * swish_func(input, self.beta)
-        
+
 
 def act(act_type, inplace=True, neg_slope=0.2, n_prelu=1, beta=1.0):
     # helper selecting activation
@@ -95,15 +95,16 @@ def act(act_type, inplace=True, neg_slope=0.2, n_prelu=1, beta=1.0):
         layer = nn.LeakyReLU(neg_slope, inplace)
     elif act_type == 'prelu':
         layer = nn.PReLU(num_parameters=n_prelu, init=neg_slope)
-    elif act_type == 'Tanh' or act_type == 'tanh' : # [-1, 1] range output
+    elif act_type == 'Tanh' or act_type == 'tanh':  # [-1, 1] range output
         layer = nn.Tanh()
-    elif act_type == 'sigmoid': # [0, 1] range output
+    elif act_type == 'sigmoid':  # [0, 1] range output
         layer = nn.Sigmoid()
     elif act_type == 'swish':
-        layer = Swish(beta=beta,inplace=inplace)
+        layer = Swish(beta=beta, inplace=inplace)
     else:
         raise NotImplementedError('activation layer [{:s}] is not found'.format(act_type))
     return layer
+
 
 class Identity(nn.Module):
     def __init__(self, *kwargs):
@@ -111,6 +112,7 @@ class Identity(nn.Module):
 
     def forward(self, x, *kwargs):
         return x
+
 
 def norm(norm_type, nc):
     """Return a normalization layer
@@ -145,10 +147,10 @@ def add_spectral_norm(module, use_spectral_norm=False):
 
 
 def pad(pad_type, padding):
-    '''
+    """
     helper selecting padding layer
     if padding is 'zero', can be done with conv layers
-    '''
+    """
     pad_type = pad_type.lower()
     if padding == 0:
         return None
@@ -157,7 +159,7 @@ def pad(pad_type, padding):
     elif pad_type == 'replicate':
         layer = nn.ReplicationPad2d(padding)
     elif pad_type == 'zero':
-        PadLayer = nn.ZeroPad2d(padding)
+        layer = nn.ZeroPad2d(padding)
     else:
         raise NotImplementedError('padding layer [{:s}] is not implemented'.format(pad_type))
     return layer
@@ -180,14 +182,11 @@ class ConcatBlock(nn.Module):
         return output
 
     def __repr__(self):
-        tmpstr = 'Identity .. \n|'
-        modstr = self.sub.__repr__().replace('\n', '\n|')
-        tmpstr = tmpstr + modstr
-        return tmpstr
+        return 'Identity .. \n|' + self.sub.__repr__().replace('\n', '\n|')
 
 
 class ShortcutBlock(nn.Module):
-    #Elementwise sum the output of a submodule to its input
+    # Elementwise sum the output of a submodule to its input
     def __init__(self, submodule):
         super(ShortcutBlock, self).__init__()
         self.sub = submodule
@@ -197,10 +196,7 @@ class ShortcutBlock(nn.Module):
         return output
 
     def __repr__(self):
-        tmpstr = 'Identity + \n|'
-        modstr = self.sub.__repr__().replace('\n', '\n|')
-        tmpstr = tmpstr + modstr
-        return tmpstr
+        return 'Identity + \n|' + self.sub.__repr__().replace('\n', '\n|')
 
 
 def sequential(*args):
@@ -222,11 +218,11 @@ def sequential(*args):
 def conv_block(in_nc, out_nc, kernel_size, stride=1, dilation=1, groups=1, bias=True, \
                pad_type='zero', norm_type=None, act_type='relu', mode='CNA', convtype='Conv2D', \
                spectral_norm=False):
-    '''
+    """
     Conv layer with padding, normalization, activation
     mode: CNA --> Conv -> Norm -> Act
         NAC --> Norm -> Act --> Conv (Identity Mappings in Deep Residual Networks, ECCV16)
-    '''
+    """
     assert mode in ['CNA', 'NAC', 'CNAC'], 'Wrong conv mode [{:s}]'.format(mode)
     padding = get_valid_padding(kernel_size, dilation)
     p = pad(pad_type, padding) if pad_type and pad_type != 'zero' else None
@@ -307,7 +303,7 @@ def default_init_weights(module_list, init_type='kaiming', scale=1, bias_fill=0,
             gain for 'orthogonal' and xavier
     """
     
-    #TODO
+    # TODO
     # logger.info('Initialization method [{:s}]'.format(init_type))
     if not isinstance(module_list, list):
         module_list = [module_list]
@@ -349,10 +345,10 @@ class Upsample(nn.Module):
             those pixels. This only has effect when :attr:`mode` is
             ``'linear'``, ``'bilinear'``, or ``'trilinear'``. Default: ``False``
     """
-    #To prevent warning: nn.Upsample is deprecated
-    #https://discuss.pytorch.org/t/which-function-is-better-for-upsampling-upsampling-or-interpolate/21811/8
-    #From: https://pytorch.org/docs/stable/_modules/torch/nn/modules/upsampling.html#Upsample
-    #Alternative: https://discuss.pytorch.org/t/using-nn-function-interpolate-inside-nn-sequential/23588/2?u=ptrblck
+    # To prevent warning: nn.Upsample is deprecated
+    # https://discuss.pytorch.org/t/which-function-is-better-for-upsampling-upsampling-or-interpolate/21811/8
+    # From: https://pytorch.org/docs/stable/_modules/torch/nn/modules/upsampling.html#Upsample
+    # Alternative: https://discuss.pytorch.org/t/using-nn-function-interpolate-inside-nn-sequential/23588/2?u=ptrblck
     
     def __init__(self, size=None, scale_factor=None, mode="nearest", align_corners=None):
         super(Upsample, self).__init__()
@@ -363,11 +359,11 @@ class Upsample(nn.Module):
         self.mode = mode
         self.size = size
         self.align_corners = align_corners
-        #self.interp = nn.functional.interpolate
+        # self.interp = nn.functional.interpolate
     
     def forward(self, x):
         return nn.functional.interpolate(x, size=self.size, scale_factor=self.scale_factor, mode=self.mode, align_corners=self.align_corners)
-        #return self.interp(x, size=self.size, scale_factor=self.scale_factor, mode=self.mode, align_corners=self.align_corners)
+        # return self.interp(x, size=self.size, scale_factor=self.scale_factor, mode=self.mode, align_corners=self.align_corners)
     
     def extra_repr(self):
         if self.scale_factor is not None:
@@ -379,11 +375,11 @@ class Upsample(nn.Module):
 
 def pixelshuffle_block(in_nc, out_nc, upscale_factor=2, kernel_size=3, stride=1, bias=True, \
                         pad_type='zero', norm_type=None, act_type='relu', convtype='Conv2D'):
-    '''
+    """
     Pixel shuffle layer
     (Real-Time Single Image and Video Super-Resolution Using an Efficient Sub-Pixel Convolutional
     Neural Network, CVPR17)
-    '''
+    """
     conv = conv_block(in_nc, out_nc * (upscale_factor ** 2), kernel_size, stride, bias=bias, \
                         pad_type=pad_type, norm_type=None, act_type=None, convtype=convtype)
     pixel_shuffle = nn.PixelShuffle(upscale_factor)
@@ -394,20 +390,20 @@ def pixelshuffle_block(in_nc, out_nc, upscale_factor=2, kernel_size=3, stride=1,
 
 def upconv_block(in_nc, out_nc, upscale_factor=2, kernel_size=3, stride=1, bias=True, \
                 pad_type='zero', norm_type=None, act_type='relu', mode='nearest', convtype='Conv2D'):
-    '''
+    """
     Upconv layer described in https://distill.pub/2016/deconv-checkerboard/
     Example to replace deconvolutions: 
         - from: nn.ConvTranspose2d(in_nc, out_nc, kernel_size=4, stride=2, padding=1)
         - to: upconv_block(in_nc, out_nc,kernel_size=3, stride=1, act_type=None)
-    '''
-    #upsample = nn.Upsample(scale_factor=upscale_factor, mode=mode)
+    """
+    # upsample = nn.Upsample(scale_factor=upscale_factor, mode=mode)
     upscale_factor = (1, upscale_factor, upscale_factor) if convtype == 'Conv3D' else upscale_factor
     upsample = Upsample(scale_factor=upscale_factor, mode=mode) #Updated to prevent the "nn.Upsample is deprecated" Warning
     conv = conv_block(in_nc, out_nc, kernel_size, stride, bias=bias, \
                         pad_type=pad_type, norm_type=norm_type, act_type=act_type, convtype=convtype)
     return sequential(upsample, conv)
 
-#PPON
+# PPON
 def conv_layer(in_channels, out_channels, kernel_size, stride=1, dilation=1, groups=1):
     padding = int((kernel_size - 1) / 2) * dilation
     return nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding=padding, bias=True, dilation=dilation, groups=groups)
@@ -416,12 +412,12 @@ def conv_layer(in_channels, out_channels, kernel_size, stride=1, dilation=1, gro
 
 
 ####################
-#ESRGANplus
+# ESRGANplus
 ####################
 
 class GaussianNoise(nn.Module):
     def __init__(self, sigma=0.1, is_relative_detach=False):
-        super().__init__()
+        super(GaussianNoise).__init__()
         self.sigma = sigma
         self.is_relative_detach = is_relative_detach
         self.noise = torch.tensor(0, dtype=torch.float).to(torch.device('cuda'))
@@ -437,7 +433,7 @@ def conv1x1(in_planes, out_planes, stride=1):
     return nn.Conv2d(in_planes, out_planes, kernel_size=1, stride=stride, bias=False)
 
 
-#TODO: Not used:
+# TODO: Not used:
 # https://github.com/github-pengge/PyTorch-progressive_growing_of_gans/blob/master/models/base_model.py
 class minibatch_std_concat_layer(nn.Module):
     def __init__(self, averaging='all'):

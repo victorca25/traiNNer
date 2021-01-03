@@ -69,7 +69,7 @@ def main():
         test_loaders.append(test_loader)
         # Temporary, will turn znorm on for all the datasets. Will need to introduce a variable for each dataset and differentiate each one later in the loop.
         # if dataset_opt['znorm'] and znorm == False: 
-        # znorm = True
+        #    znorm = True
 
     # Create model
     model = create_model(opt)

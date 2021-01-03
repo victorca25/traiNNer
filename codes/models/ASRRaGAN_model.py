@@ -407,29 +407,6 @@ class ASRRaGANModel(BaseModel):
             self.fake_H = self.netG(self.var_L)
         l_g_total = 0
 
-        """ # Debug
-        print ("SR min. val: ", torch.min(self.fake_H))
-        print ("SR max. val: ", torch.max(self.fake_H))
-        
-        print ("LR min. val: ", torch.min(self.var_L))
-        print ("LR max. val: ", torch.max(self.var_L))
-        
-        print ("HR min. val: ", torch.min(self.var_H))
-        print ("HR max. val: ", torch.max(self.var_H))
-        #"""
-
-        """ #debug
-        #####################################################################
-        #test_save_img = False
-        # test_save_img = None
-        test_save_img = True
-        if test_save_img:
-            save_images(self.var_L, 0, "self.var_L")
-            save_images(self.var_H, 0, "self.var_H")
-            save_images(self.fake_H.detach(), 0, "self.fake_H")
-        #####################################################################
-        #"""
-
         if self.cri_gan:
             # D
             for p in self.netD.parameters():

@@ -69,19 +69,19 @@ class BaseModel:
         pass
 
     def optimize_parameters(self, step):
-        """Calculate losses, gradients, and update network weights; called in every training iteration"""
+        """Calculate losses, gradients, and update network weights; called in every training iteration."""
         pass
 
     def get_current_visuals(self):
-        """Return visualization images images for validation, visualization and logging"""
+        """Return visualization images images for validation, visualization and logging."""
         pass
 
     def get_current_losses(self):
-        """Return training losses. train.py will print out these errors on console, and save them to a file"""
+        """Return training losses. train.py will print out these errors on console, and save them to a file."""
         pass
         
     def print_network(self, verbose: bool = False):
-        """Print the total number of parameters in the network and (if verbose) network architecture
+        """Print the total number of parameters in the network and (if verbose) network architecture.
         Parameters:
             verbose (bool) -- if verbose: print the network architecture
         """
@@ -142,9 +142,9 @@ class BaseModel:
 
     def save(self, iter_step, latest=None, loader=None):
         """
-        Save all the networks to the disk.
+        Save all the networks to disk.
 
-        :param label: current epoch; used in the file name '%s_net_%s.pth' % (iter_step, name)
+        :param iter_step: current iteration; used in the file name '%s_net_%s.pth' % (iter_step, name)
         """
         for name in self.model_names:
             if isinstance(name, str):
@@ -171,7 +171,7 @@ class BaseModel:
             self.save_network(self.swa_model, 'swaG', iter_step, latest)
 
     def load(self):
-        """Load all the networks from the disk"""
+        """Load all the networks from disk."""
         for name in self.model_names:
             if isinstance(name, str):
                 net = getattr(self, 'net' + name)
@@ -211,7 +211,7 @@ class BaseModel:
                 param_group['lr'] = lr
 
     def _get_init_lr(self):
-        """Get the initial lr, which is set by the scheduler (for warmup)"""
+        """Get the initial lr, which is set by the scheduler (for warmup)."""
         init_lr_groups_l = []
         for optimizer in self.optimizers:
             init_lr_groups_l.append([v['initial_lr'] for v in optimizer.param_groups])
@@ -285,7 +285,7 @@ class BaseModel:
 
     def requires_grad(self, model, flag: bool = True, target_layer: int = None, net_type: str = None):
         """
-        Set requires_grad for all the networks. Use flag=False to avoid unnecessary computations
+        Set requires_grad for all the networks. Use flag=False to avoid unnecessary computations.
         :param model: the network to be updated
         :param flag: whether the networks require gradients or not
         :param target_layer: (optional) for supported networks, can set a specific layer up to which the defined
@@ -433,7 +433,7 @@ class BaseModel:
 
     # TODO: check all these updates
     def update_schedulers(self, train_opt: dict):
-        """Update scheduler parameters if they are changed in the JSON configuration"""
+        """Update scheduler parameters if they are changed in the configuration"""
         if train_opt['lr_scheme'] == 'StepLR':
             for i, s in enumerate(self.schedulers):
                 if self.schedulers[i].step_size != train_opt['lr_step_size'] and train_opt['lr_step_size'] is not None:

@@ -9,6 +9,7 @@ import utils.util as util
 from data import create_dataset, create_dataloader
 from dataops.common import bgr2ycbcr, tensor2np
 from models import create_model
+from utils.metrics import calculate_psnr, calculate_ssim
 
 
 def main():
@@ -29,7 +30,8 @@ def main():
         test_loader = create_dataloader(test_set, dataset_opt)
         logger.info('Number of test images in [{:s}]: {:d}'.format(dataset_opt['name'], len(test_set)))
         test_loaders.append(test_loader)
-        # Temporary, will turn znorm on for all the datasets. Will need to introduce a variable for each dataset and differentiate each one later in the loop.
+        # TODO: Temporary, will turn znorm on for all the datasets. 
+        # Will need to introduce a variable for each dataset and differentiate each one later in the loop.
         if dataset_opt['znorm'] and znorm == False:
             znorm = True
 
@@ -59,7 +61,8 @@ def main():
             model.test()  # test
             visuals = model.get_current_visuals(need_HR=need_HR)
 
-            # if znorm the image range is [-1,1], Default: Image range is [0,1] # testing, each "dataset" can have a different name (not train, val or other)
+            # TODO: testing, each "dataset" can have a different name (not train, val or other)
+            # if znorm the image range is [-1,1], Default: Image range is [0,1]
             sr_img = tensor2np(visuals['SR'], denormalize=znorm)  # uint8
 
             # save images
@@ -73,7 +76,8 @@ def main():
             # TODO: update to use metrics functions
             # calculate PSNR and SSIM
             if need_HR:
-                # if znorm the image range is [-1,1], Default: Image range is [0,1] # testing, each "dataset" can have a different name (not train, val or other)
+                # TODO: testing, each "dataset" can have a different name (not train, val or other)
+                # if znorm the image range is [-1,1], Default: Image range is [0,1]
                 gt_img = tensor2img(visuals['HR'], denormalize=znorm)  # uint8
                 gt_img = gt_img / 255.
                 sr_img = sr_img / 255.
@@ -82,8 +86,8 @@ def main():
                 cropped_sr_img = sr_img[crop_border:-crop_border, crop_border:-crop_border, :]
                 cropped_gt_img = gt_img[crop_border:-crop_border, crop_border:-crop_border, :]
 
-                psnr = util.calculate_psnr(cropped_sr_img * 255, cropped_gt_img * 255)
-                ssim = util.calculate_ssim(cropped_sr_img * 255, cropped_gt_img * 255)
+                psnr = calculate_psnr(cropped_sr_img * 255, cropped_gt_img * 255)
+                ssim = calculate_ssim(cropped_sr_img * 255, cropped_gt_img * 255)
                 test_results['psnr'].append(psnr)
                 test_results['ssim'].append(ssim)
 
@@ -92,8 +96,8 @@ def main():
                     gt_img_y = bgr2ycbcr(gt_img, only_y=True)
                     cropped_sr_img_y = sr_img_y[crop_border:-crop_border, crop_border:-crop_border]
                     cropped_gt_img_y = gt_img_y[crop_border:-crop_border, crop_border:-crop_border]
-                    psnr_y = util.calculate_psnr(cropped_sr_img_y * 255, cropped_gt_img_y * 255)
-                    ssim_y = util.calculate_ssim(cropped_sr_img_y * 255, cropped_gt_img_y * 255)
+                    psnr_y = calculate_psnr(cropped_sr_img_y * 255, cropped_gt_img_y * 255)
+                    ssim_y = calculate_ssim(cropped_sr_img_y * 255, cropped_gt_img_y * 255)
                     test_results['psnr_y'].append(psnr_y)
                     test_results['ssim_y'].append(ssim_y)
                     logger.info('{:20s} - PSNR: {:.6f} dB; SSIM: {:.6f}; PSNR_Y: {:.6f} dB; SSIM_Y: {:.6f}.' \
