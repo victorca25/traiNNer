@@ -80,7 +80,7 @@ class BaseModel:
         """Return training losses. train.py will print out these errors on console, and save them to a file"""
         pass
         
-    def print_network(self, verbose: Bool = False):
+    def print_network(self, verbose: bool = False):
         """Print the total number of parameters in the network and (if verbose) network architecture
         Parameters:
             verbose (bool) -- if verbose: print the network architecture
