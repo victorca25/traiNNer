@@ -29,7 +29,7 @@ def main():
     # train from scratch OR resume training
     if opt['path']['resume_state']:
         if os.path.isdir(opt['path']['resume_state']):
-            resume_state_path = glob.glob(os.path.normpath(opt['path']['resume_state']) + '/*.state')
+            resume_state_path = glob.glob(opt['path']['resume_state'] + '/*.state')
             resume_state_path = util.sorted_nicely(resume_state_path)[-1]
         else:
             resume_state_path = opt['path']['resume_state']

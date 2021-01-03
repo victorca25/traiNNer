@@ -27,11 +27,9 @@ _str_to_cv2_interpolation = {'nearest':cv2.INTER_NEAREST,
                          'matlab_bicubic':777,
                          'realistic':999}
 
-def parse2lists(types):
-    """ Converts dictionaries or single string options to lists that
-        work with random choice
-    """
-
+def parse2lists(types: (dict, str, any)) -> (list, any):
+    """Converts dictionaries or single string options to lists that 
+    work with random choice."""
     if(isinstance(types, dict)):
         types_list = []
         for k, v in types.items():
@@ -39,12 +37,6 @@ def parse2lists(types):
         types = types_list
     elif(isinstance(types, str)):
         types = [types]
-    # else:
-    #     raise TypeError("Unrecognized blur type, must be list, dict or a string")
-
-    # if(isinstance(types, list)):
-    #     pass
-
     return types
 
 
@@ -73,7 +65,7 @@ def parse(opt_path: str, is_train: bool = True) -> NoneDict:
                 line = line.split('//')[0] + '\n'
                 json_str += line
         opt = json.loads(json_str, object_pairs_hook=OrderedDict)
-    elif ext in ['yml', 'yaml']:
+    elif ext in ['.yml', '.yaml']:
         import yaml
         import re
         with open(opt_path, mode='r') as f:
@@ -103,10 +95,10 @@ def parse(opt_path: str, is_train: bool = True) -> NoneDict:
             opt = yaml.load(f, Loader=Loader)
 
     opt['is_train'] = is_train
-    scale = opt.get('scale', 1)
+    scale = opt.get('scale', 4)
     bm = opt.get('batch_multiplier', None)
 
-    """datasets"""
+    # datasets
     for phase, dataset in opt['datasets'].items():
         phase = phase.split('_')[0]
         dataset['phase'] = phase
@@ -120,7 +112,7 @@ def parse(opt_path: str, is_train: bool = True) -> NoneDict:
                     is_lmdb = os.path.splitext(image_paths)[1].lower() == ".lmdb"
                     image_paths = [image_paths]
                 if isinstance(image_paths, list):
-                    image_paths = [os.path.expanduser(path) for path in image_paths]
+                    image_paths = [os.path.normpath(os.path.expanduser(path)) for path in image_paths]
                     if len(image_paths) == 1:
                         # if it's a single-item list, act as if it was a str instead of a list
                         image_paths = image_paths[0]
@@ -137,7 +129,7 @@ def parse(opt_path: str, is_train: bool = True) -> NoneDict:
             dataset['virtual_batch_size'] = max(dataset['virtual_batch_size'], dataset["batch_size"])
         
         if phase == 'train' and 'subset_file' in dataset and dataset['subset_file'] is not None:
-            dataset['subset_file'] = os.path.expanduser(dataset['subset_file'])
+            dataset['subset_file'] = os.path.normpath(os.path.expanduser(dataset['subset_file']))
 
         if 'lr_downscale_types' in dataset and dataset['lr_downscale_types'] is not None:
             if isinstance(dataset['lr_downscale_types'], str):
@@ -154,10 +146,10 @@ def parse(opt_path: str, is_train: bool = True) -> NoneDict:
         if tensor_shape:
             opt['tensor_shape'] = tensor_shape
 
-    """path"""
+    # path
     for key, path in opt['path'].items():
         if path and key in opt['path']:
-            opt['path'][key] = os.path.expanduser(path)
+            opt['path'][key] = os.path.normpath(os.path.expanduser(path))
     
     if is_train:
         experiments_root = os.path.join(opt['path']['root'], 'experiments', opt['name'])
@@ -190,7 +182,7 @@ def parse(opt_path: str, is_train: bool = True) -> NoneDict:
         opt['path']['results_root'] = results_root
         opt['path']['log'] = results_root
 
-    """network_G"""
+    # network_G
     opt['network_G']['scale'] = scale
 
     # relative learning rate and options
@@ -214,8 +206,9 @@ def parse(opt_path: str, is_train: bool = True) -> NoneDict:
 
 
 class NoneDict(dict):
-    """Ignore missing key exceptions, return None instead"""
+    """Dictionary class that ignores missing key's and returns None instead."""
     def __missing__(self, key):
+        """Override and simply return None instead of raising an exception."""
         return None
 
 
@@ -233,7 +226,7 @@ def dict_to_nonedict(opt: (dict, list, any)) -> (NoneDict, list[NoneDict], any):
 
 
 def dict2str(opt: dict, indent_l: int = 1) -> str:
-    '''dict to string for logger'''
+    """Dictionary to string for logger."""
     msg = ''
     for k, v in opt.items():
         if isinstance(v, dict):
@@ -260,18 +253,19 @@ def check_resume(opt: dict):
     '''Check resume states and pretrain_model paths'''
     logger = logging.getLogger('base')
     if opt['path']['resume_state']:
+        opt['path']['resume_state'] = os.path.normpath(opt['path']['resume_state'])
         if opt['path']['pretrain_model_G'] or opt['path']['pretrain_model_D']:
             logger.warning('pretrain_model paths will be ignored when resuming training from a .state file.')
 
         state_idx = osp.basename(opt['path']['resume_state']).split('.')[0]
-        opt['path']['pretrain_model_G'] = osp.join(opt['path']['models'],
-                                                   '{}_G.pth'.format(state_idx))
+        opt['path']['pretrain_model_G'] = os.path.normpath(osp.join(opt['path']['models'],
+                                                   '{}_G.pth'.format(state_idx)))
         logger.info('Set [pretrain_model_G] to {}'.format(opt['path']['pretrain_model_G']))
         if 'gan' in opt['model']:
-            opt['path']['pretrain_model_D'] = osp.join(opt['path']['models'],
-                                                       '{}_D.pth'.format(state_idx))
+            opt['path']['pretrain_model_D'] = os.path.normpath(osp.join(opt['path']['models'],
+                                                       '{}_D.pth'.format(state_idx)))
             logger.info('Set [pretrain_model_D] to {}'.format(opt['path']['pretrain_model_D']))
         if 'swa' in opt['model'] or opt['swa']:
-            opt['path']['pretrain_model_swaG'] = osp.join(opt['path']['models'],
-                                                   '{}_swaG.pth'.format(state_idx))
+            opt['path']['pretrain_model_swaG'] = os.path.normpath(osp.join(opt['path']['models'],
+                                                   '{}_swaG.pth'.format(state_idx)))
             logger.info('Set [pretrain_model_swaG] to {}'.format(opt['path']['pretrain_model_swaG']))
