@@ -39,6 +39,26 @@ def parse2lists(types: (dict, str, any)) -> (list, any):
     return types
 
 
+class NoneDict(dict):
+    """Dictionary class that ignores missing key's and returns None instead."""
+    def __missing__(self, key):
+        """Override and simply return None instead of raising an exception."""
+        return None
+
+
+def dict_to_nonedict(opt: (dict , list, any)) -> (NoneDict, list, any):
+    """Recursively convert to NoneDict, which returns None for missing keys."""
+    if isinstance(opt, dict):
+        new_opt = dict()
+        for key, sub_opt in opt.items():
+            new_opt[key] = dict_to_nonedict(sub_opt)
+        return NoneDict(**new_opt)
+    elif isinstance(opt, list):
+        return [dict_to_nonedict(sub_opt) for sub_opt in opt]
+    else:
+        return opt
+
+
 def parse(opt_path: str, is_train: bool = True) -> NoneDict:
     """Parse options file.
     Args:
@@ -50,8 +70,8 @@ def parse(opt_path: str, is_train: bool = True) -> NoneDict:
 
     # check if configuration file exists
     if not os.path.isfile(opt_path):
-        probe_t = os.path.join("options", "train" if is_train else "test", opt_path)
-        if not os.path.isfile(probe_t):
+        opt_path = os.path.join("options", "train" if is_train else "test", opt_path)
+        if not os.path.isfile(opt_path):
             raise ValueError("Configuration file {} not found.".format(opt_path))
 
     ext = os.path.splitext(opt_path)[1].lower()
@@ -202,26 +222,6 @@ def parse(opt_path: str, is_train: bool = True) -> NoneDict:
     print('export CUDA_VISIBLE_DEVICES=' + gpu_list)
 
     return dict_to_nonedict(opt)
-
-
-class NoneDict(dict):
-    """Dictionary class that ignores missing key's and returns None instead."""
-    def __missing__(self, key):
-        """Override and simply return None instead of raising an exception."""
-        return None
-
-
-def dict_to_nonedict(opt: (dict, list, any)) -> (NoneDict, list[NoneDict], any):
-    """Recursively convert to NoneDict, which returns None for missing keys"""
-    if isinstance(opt, dict):
-        new_opt = dict()
-        for key, sub_opt in opt.items():
-            new_opt[key] = dict_to_nonedict(sub_opt)
-        return NoneDict(**new_opt)
-    elif isinstance(opt, list):
-        return [dict_to_nonedict(sub_opt) for sub_opt in opt]
-    else:
-        return opt
 
 
 def dict2str(opt: dict, indent_l: int = 1) -> str:

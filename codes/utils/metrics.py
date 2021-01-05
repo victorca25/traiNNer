@@ -20,7 +20,8 @@ class MetricsDict():
         self.lpips = None
         
         self.metrics_list = []
-        for metric.lower() in metrics.split(','):  # default='psnr' +
+        for metric in metrics.split(','):  # default='psnr' +
+            metric = metric.lower()
             if metric == 'psnr':
                 self.psnr = True
                 self.metrics_list.append({'name': 'psnr'})

@@ -417,7 +417,7 @@ def conv_layer(in_channels, out_channels, kernel_size, stride=1, dilation=1, gro
 
 class GaussianNoise(nn.Module):
     def __init__(self, sigma=0.1, is_relative_detach=False):
-        super(GaussianNoise).__init__()
+        super().__init__()
         self.sigma = sigma
         self.is_relative_detach = is_relative_detach
         self.noise = torch.tensor(0, dtype=torch.float).to(torch.device('cuda'))

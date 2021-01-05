@@ -10,34 +10,10 @@ from data import create_dataset, create_dataloader
 from dataops.common import bgr2ycbcr, tensor2np
 from models import create_model
 from utils.metrics import calculate_psnr, calculate_ssim
+from train import parse_options, dir_check, configure_loggers, get_dataloaders
 
 
-def main():
-    # options
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-opt', type=str, required=True, help='Path to options file.')
-    opt = options.parse(parser.parse_args().opt, is_train=False)
-    util.mkdirs((path for key, path in opt['path'].items() if not key == 'pretrain_model_G'))
-
-    util.setup_logger(None, opt['path']['log'], 'test.log', level=logging.INFO, screen=True)
-    logger = logging.getLogger('base')
-    logger.info(options.dict2str(opt))
-    # Create test dataset and dataloader
-    test_loaders = []
-    znorm = False  # TMP
-    for phase, dataset_opt in sorted(opt['datasets'].items()):
-        test_set = create_dataset(dataset_opt)
-        test_loader = create_dataloader(test_set, dataset_opt)
-        logger.info('Number of test images in [{:s}]: {:d}'.format(dataset_opt['name'], len(test_set)))
-        test_loaders.append(test_loader)
-        # TODO: Temporary, will turn znorm on for all the datasets. 
-        # Will need to introduce a variable for each dataset and differentiate each one later in the loop.
-        if dataset_opt['znorm'] and znorm == False:
-            znorm = True
-
-    # Create model
-    model = create_model(opt)
-
+def test_loop(model, opt, test_loaders, znorm, logger):
     for test_loader in test_loaders:
         test_set_name = test_loader.dataset.opt['name']
         logger.info('\nTesting [{:s}]...'.format(test_set_name))
@@ -120,6 +96,21 @@ def main():
                 logger.info('----Y channel, average PSNR/SSIM----\n\tPSNR_Y: {:.6f} dB; SSIM_Y: {:.6f}\n' \
                             .format(ave_psnr_y, ave_ssim_y))
 
+def main():
+    
+    is_train=False
+    opt = parse_options(is_train=is_train)
+    dir_check(opt, is_train=is_train)
+    logger = configure_loggers(opt, is_train=is_train)
+
+    test_loaders, znorm = get_dataloaders(opt, is_train=is_train, logger=logger)
+
+    # Create model
+    model = create_model(opt)
+
+    test_loop(model, opt, test_loaders, znorm, logger)
+
+    
 
 if __name__ == '__main__':
     main()
