@@ -58,14 +58,22 @@ class MetricsDict():
             img1 = img1[crop_size:-crop_size, crop_size:-crop_size, ...]
             img2 = img2[crop_size:-crop_size, crop_size:-crop_size, ...]
 
+            calculations = {}
             for _, m in enumerate(self.metrics_list):
                 if m['name'] == 'psnr':
-                    self.psnr_total(calculate_psnr(img1, img2, False))
+                    psnr = calculate_psnr(img1, img2, False)
+                    self.psnr_total(psnr)
+                    calculations['psnr'] = psnr
                 elif m['name'] == 'ssim':
-                    self.ssim_total(calculate_ssim(img1, img2, False))
+                    ssim = calculate_ssim(img1, img2, False)
+                    self.ssim_total(ssim)
+                    calculations['ssim'] = ssim
                 elif m['name'] == 'lpips' and not only_y:  # single channel images not supported by LPIPS
-                    self.lpips_total(calculate_lpips([img1], [img2], model=self.lpips_model).item())
+                    lpips = calculate_lpips([img1], [img2], model=self.lpips_model).item()
+                    self.lpips_total(lpips)
+                    calculations['lpips'] = lpips
         self.count += 1
+        return calculations
 
     def reset(self):
         self.count = 0

@@ -359,7 +359,7 @@ class VSRModel(BaseModel):
             # high precision generator losses (can be affected by AMP half precision)
             if self.precisegeneratorlosses.loss_list:
                 precise_loss_results, self.log_dict = self.precisegeneratorlosses(
-                        self.fake_H, self.var_H, self.log_dict, self.f_low)
+                        centralSR, centralHR, self.log_dict, self.f_low)
                 l_g_total += sum(precise_loss_results)/self.accumulations
             
             if self.amp:

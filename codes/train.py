@@ -18,34 +18,61 @@ from utils import util, metrics
 def parse_options(is_train=True):
     # options
     parser = argparse.ArgumentParser()
-    parser.add_argument('-opt', type=str, required=True, help='Path to options file.')
-    return options.parse(parser.parse_args().opt, is_train=is_train)
+    parser.add_argument(
+        '-opt', type=str, required=True, help='Path to options file.')
+
+    args = parser.parse_args()
+    opt = options.parse(args.opt, is_train=is_train)
+
+    return opt
 
 
-def dir_check(opt, is_train=True):
-    if is_train:
+def dir_check(opt):
+    if opt['is_train']:
         # starting from scratch, needs to create training directory
         if not opt['path']['resume_state']:
             util.mkdir_and_rename(opt['path']['experiments_root'])  # rename old folder if exists
             util.mkdirs((path for key, path in opt['path'].items() if not key == 'experiments_root'
                         and 'pretrain_model' not in key and 'resume' not in key))
     else:
+        # create testing directory
         util.mkdirs((path for key, path in opt['path'].items() if not key == 'pretrain_model_G'))
 
 
-def configure_loggers(opt=None, is_train=True):
-    if is_train:
+def configure_loggers(opt=None):
+    if opt['is_train']:
         # config loggers. Before it, the log will not work
-        util.setup_logger(None, opt['path']['log'], 'train', level=logging.INFO, screen=True)
-        util.setup_logger('val', opt['path']['log'], 'val', level=logging.INFO)
+        util.get_root_logger(None, opt['path']['log'], 'train', level=logging.INFO, screen=True)
+        util.get_root_logger('val', opt['path']['log'], 'val', level=logging.INFO)
     else:
-        util.setup_logger(None, opt['path']['log'], 'test.log', level=logging.INFO, screen=True)
-    logger = logging.getLogger('base')
+        util.get_root_logger(None, opt['path']['log'], 'test', level=logging.INFO, screen=True)
+    logger = util.get_root_logger()
     logger.info(options.dict2str(opt))
-    return logger
+    
+    # initialize tensorboard logger
+    tb_logger = None
+    if opt['use_tb_logger'] and 'debug' not in opt['name']:
+        logdir = os.path.join(self.opt['path']['root'], 'tb_logger', self.opt['name'])
+        try:
+            # official PyTorch tensorboard
+            from torch.utils.tensorboard import SummaryWriter
+            tb_logger = SummaryWriter(log_dir=log_dir)
+            return tb_logger
+        except:
+            from tensorboardX import SummaryWriter
+            try:
+                # for version tensorboardX >= 1.7
+                tb_logger = SummaryWriter(logdir=log_dir)
+            except:
+                # for version tensorboardX < 1.6
+                tb_logger = SummaryWriter(log_dir=log_dir)
+    
+    return {"tb_logger": tb_logger}
 
 
-def resume_check(opt, logger=None):
+def get_resume_state(opt):
+    logger = util.get_root_logger()
+
     # train from scratch OR resume training
     if opt['path']['resume_state']:
         if os.path.isdir(opt['path']['resume_state']):
@@ -63,72 +90,73 @@ def resume_check(opt, logger=None):
     return resume_state
 
 
-def tensorboard_logging(opt):
-    # tensorboard logger
-    tb_logger = None
-    if opt['use_tb_logger'] and 'debug' not in opt['name']:
-        from tensorboardX import SummaryWriter
-        try:
-            tb_logger = SummaryWriter(logdir='../tb_logger/' + opt['name'])  # for version tensorboardX >= 1.7
-        except:
-            tb_logger = SummaryWriter(log_dir='../tb_logger/' + opt['name'])  # for version tensorboardX < 1.6
-    return tb_logger
-
-
-def get_random_seed(opt, logger):
-    # random seed
+def get_random_seed(opt):
+    logger = util.get_root_logger()
+    # set random seed
     seed = opt['train']['manual_seed']
     if seed is None:
         seed = random.randint(1, 10000)
+        opt['train']['manual_seed'] = seed
     logger.info('Random seed: {}'.format(seed))
     util.set_random_seed(seed)
-    return seed
+    return opt
 
 
-def get_dataloaders(opt, is_train=True, logger=None):
-    if is_train:
-        # create train and val dataloader
-        val_loader = False
-        for phase, dataset_opt in opt['datasets'].items():
-            if phase == 'train':
-                train_set = create_dataset(dataset_opt)
-                batch_size = dataset_opt.get('batch_size', 4)
-                virtual_batch_size = dataset_opt.get('virtual_batch_size', batch_size)
-                virtual_batch_size = virtual_batch_size if virtual_batch_size > batch_size else batch_size
-                train_size = int(math.ceil(len(train_set) / batch_size))
-                logger.info('Number of train images: {:,d}, iters: {:,d}'.format(
-                    len(train_set), train_size))
-                total_iters = int(opt['train']['niter'])
-                total_epochs = int(math.ceil(total_iters / train_size))
-                logger.info('Total epochs needed: {:d} for iters {:,d}'.format(
-                    total_epochs, total_iters))
-                train_loader = create_dataloader(train_set, dataset_opt)
-            elif phase == 'val':
-                val_set = create_dataset(dataset_opt)
-                val_loader = create_dataloader(val_set, dataset_opt)
-                logger.info('Number of val images in [{:s}]: {:d}'.format(dataset_opt['name'],
-                                                                        len(val_set)))
-            else:
-                raise NotImplementedError('Phase [{:s}] is not recognized.'.format(phase))
-        assert train_loader is not None
-        return train_loader, batch_size, virtual_batch_size, total_iters, total_epochs, val_loader
-    else:
-        # Create test dataset and dataloader
-        test_loaders = []
-        znorm = False  # TMP
-        for phase, dataset_opt in sorted(opt['datasets'].items()):
-            test_set = create_dataset(dataset_opt)
-            test_loader = create_dataloader(test_set, dataset_opt)
-            logger.info('Number of test images in [{:s}]: {:d}'.format(dataset_opt['name'], len(test_set)))
-            test_loaders.append(test_loader)
-        # TODO: Temporary, will turn znorm on for all the datasets. 
-        # Will need to introduce a variable for each dataset and differentiate each one later in the loop.
-            if dataset_opt['znorm'] and znorm == False: 
-                znorm = True
-        return test_loaders, znorm
+def get_dataloaders(opt):
+    logger = util.get_root_logger()
+    
+    # Create datasets and dataloaders
+    dataloaders = {}
+    data_params = {}
+    znorm = {}
+    for phase, dataset_opt in opt['datasets'].items():
+        if opt['is_train'] and phase not in ['train', 'val']:
+            raise NotImplementedError('Phase [{:s}] is not recognized.'.format(phase))
+        
+        name = dataset_opt['name']
+        dataset = create_dataset(dataset_opt)
+
+        if not dataset:
+            raise Exception('Dataset "{}" for phase "{}" is empty.'.format(name, phase))
+
+        dataloaders[phase] = create_dataloader(dataset, dataset_opt)
+
+        if opt['is_train'] and phase == 'train':
+            batch_size = dataset_opt.get('batch_size', 4)
+            virtual_batch_size = dataset_opt.get('virtual_batch_size', batch_size)
+            virtual_batch_size = virtual_batch_size if virtual_batch_size > batch_size else batch_size
+            train_size = int(math.ceil(len(dataset) / batch_size))
+            logger.info('Number of train images: {:,d}, iters: {:,d}'.format(
+                len(dataset), train_size))
+            total_iters = int(opt['train']['niter'])
+            total_epochs = int(math.ceil(total_iters / train_size))
+            logger.info('Total epochs needed: {:d} for iters {:,d}'.format(
+                total_epochs, total_iters))
+            data_params = {
+                "batch_size": batch_size, 
+                "virtual_batch_size": virtual_batch_size, 
+                "total_iters": total_iters, 
+                "total_epochs": total_epochs
+            }
+            assert dataset is not None
+        else:
+            logger.info('Number of {:s} images in [{:s}]: {:,d}'.format(phase, name, len(dataset)))
+            if phase != 'val':
+                znorm[name] = dataset_opt.get('znorm', False)                    
+    
+    if not opt['is_train']:
+        data_params['znorm'] = znorm
+
+    if not dataloaders:
+        raise Exception("No Dataloader has been created.")
+
+    return dataloaders, data_params
 
 
-def resume_training(opt, model, resume_state, batch_size, virtual_batch_size):
+def resume_training(opt, model, resume_state, data_params):
+    batch_size = data_params['batch_size'] 
+    virtual_batch_size = data_params['virtual_batch_size']
+
     # resume training
     if resume_state:
         start_epoch = resume_state['epoch']
@@ -139,22 +167,38 @@ def resume_training(opt, model, resume_state, batch_size, virtual_batch_size):
         model.update_schedulers(opt['train'])  # updated schedulers in case configuration has changed
         del resume_state
     else:
+        start_epoch = 0
         current_step = 0
         virtual_step = 0
-        start_epoch = 0
-    return start_epoch, current_step, virtual_step 
+    return {"start_epoch": start_epoch, "current_step": current_step, "virtual_step": virtual_step}
 
 
-def training_loop(model, opt, start_epoch, current_step, virtual_step, batch_size, virtual_batch_size,
-            total_iters, total_epochs, train_loader, val_loader, logger, tb_logger):
-    # start the first iteration time
-    t0 = time.time()
+def fit(model, opt, dataloaders, steps_states, data_params, loggers):
+    # read data_params
+    batch_size = data_params['batch_size']
+    virtual_batch_size = data_params['virtual_batch_size']
+    total_iters = data_params['total_iters']
+    total_epochs = data_params['total_epochs']
+
+    # read steps_states
+    start_epoch = steps_states["start_epoch"]
+    current_step = steps_states["current_step"]
+    virtual_step = steps_states["virtual_step"]
+
+    # read loggers
+    logger = util.get_root_logger()
+    tb_logger = loggers["tb_logger"]
     
     # training
     logger.info('Start training from epoch: {:d}, iter: {:d}'.format(start_epoch, current_step))
     try:
+        # outer loop for different epochs
         for epoch in range(start_epoch, total_epochs * (virtual_batch_size // batch_size)):
-            for n, train_data in enumerate(train_loader, start=1):
+            t0 = time.time()  # start the iteration time
+            epoch_start_time = time.time()  # start the epoch time
+
+            # inner iteration loop within one epoch
+            for n, train_data in enumerate(dataloaders['train'], start=1):
 
                 virtual_step += 1
                 take_step = False
@@ -165,14 +209,15 @@ def training_loop(model, opt, start_epoch, current_step, virtual_step, batch_siz
                         break
 
                 # training
-                model.feed_data(train_data)
-                model.optimize_parameters(virtual_step)
+                model.feed_data(train_data)  # unpack data from dataset and apply preprocessing
+                model.optimize_parameters(virtual_step)  # calculate loss functions, get gradients, update network weights
 
                 # log
                 if current_step % opt['logger']['print_freq'] == 0 and take_step:
                     # iteration end time 
                     t1 = time.time()
 
+                    # print training losses and save logging information to disk
                     logs = model.get_current_log()
                     message = '<epoch:{:3d}, iter:{:8,d}, lr:{:.3e}, i_time: {:.4f} sec.> '.format(
                         epoch, current_step, model.get_current_learning_rate(current_step), (t1 - t0))
@@ -190,40 +235,38 @@ def training_loop(model, opt, start_epoch, current_step, virtual_step, batch_siz
                 if model.optGstep and model.optDstep and take_step:
                     model.update_learning_rate(current_step, warmup_iter=opt['train'].get('warmup_iter', -1))
                 
-                # save models and training states (changed to save models before validation)
+                # save latest models and training states every <save_checkpoint_freq> iterations
                 if current_step % opt['logger']['save_checkpoint_freq'] == 0 and take_step:
                     if model.swa: 
-                        model.save(current_step, opt['logger']['overwrite_chkp'], loader=train_loader)
+                        model.save(current_step, opt['logger']['overwrite_chkp'], loader=dataloaders['train'])
                     else:
                         model.save(current_step, opt['logger']['overwrite_chkp'])
                     model.save_training_state(
-                        epoch=epoch + (n >= len(train_loader)),
+                        epoch=epoch + (n >= len(dataloaders['train'])),
                         iter_step=current_step,
                         latest=opt['logger']['overwrite_chkp']
                     )
                     logger.info('Models and training states saved.')
 
                 # validation
-                if val_loader and current_step % opt['train']['val_freq'] == 0 and take_step:
-                    val_sr_imgs_list = []
-                    val_gt_imgs_list = []
+                if dataloaders['val'] and current_step % opt['train']['val_freq'] == 0 and take_step:
                     val_metrics = metrics.MetricsDict(metrics=opt['train'].get('metrics', None))
-                    for val_data in val_loader:
-                        img_name = os.path.splitext(os.path.basename(val_data['LR_path'][0]))[0]
-                        img_dir = os.path.join(opt['path']['val_images'], img_name)
-                        util.mkdir(img_dir)
-
-                        model.feed_data(val_data)
-                        model.test()
+                    for val_data in dataloaders['val']:
+                        
+                        model.feed_data(val_data)  # unpack data from data loader
+                        model.test()  # run inference
 
                         """
                         Get Visuals
                         """
-                        visuals = model.get_current_visuals()
+                        visuals = model.get_current_visuals()  # get image results
                         sr_img = tensor2np(visuals['SR'], denormalize=opt['datasets']['train']['znorm'])
                         gt_img = tensor2np(visuals['HR'], denormalize=opt['datasets']['train']['znorm'])
 
                         # Save SR images for reference
+                        img_name = os.path.splitext(os.path.basename(val_data['LR_path'][0]))[0]
+                        img_dir = os.path.join(opt['path']['val_images'], img_name)
+                        util.mkdir(img_dir)
                         if opt['train']['overwrite_val_imgs']:
                             save_img_path = os.path.join(img_dir, '{:s}.png'.format(img_name))
                         else:
@@ -240,8 +283,7 @@ def training_loop(model, opt, start_epoch, current_step, virtual_step, batch_siz
                         Get Metrics
                         # TODO: test using tensor based metrics (batch) instead of numpy.
                         """
-                        crop_size = opt['scale']
-                        val_metrics.calculate_metrics(sr_img, gt_img, crop_size=crop_size)  # , only_y=True)
+                        val_metrics.calculate_metrics(sr_img, gt_img, crop_size=opt['scale'])  # , only_y=True)
 
                     avg_metrics = val_metrics.get_averages()
                     del val_metrics
@@ -249,7 +291,6 @@ def training_loop(model, opt, start_epoch, current_step, virtual_step, batch_siz
                     # log
                     logger_m = ''
                     for r in avg_metrics:
-                        # print(r)
                         formatted_res = r['name'].upper() + ': {:.5g}, '.format(r['average'])
                         logger_m += formatted_res
 
@@ -267,13 +308,17 @@ def training_loop(model, opt, start_epoch, current_step, virtual_step, batch_siz
                     # t0 = time.time()
                 
                 if current_step % opt['logger']['print_freq'] == 0 and take_step or \
-                        (val_loader and current_step % opt['train']['val_freq'] == 0 and take_step):
+                        (dataloaders['val'] and current_step % opt['train']['val_freq'] == 0 and take_step):
                     # reset time for next iteration to skip the validation time from calculation
                     t0 = time.time()
+            
+            logger.info('End of epoch {} / {} \t Time Taken: {} sec'.format(
+                epoch, total_epochs, time.time() - epoch_start_time))
+
 
         logger.info('Saving the final model.')
         if model.swa:
-            model.save('latest', loader=train_loader)
+            model.save('latest', loader=dataloaders['train'])
         else:
             model.save('latest')
         logger.info('End of training.')
@@ -281,43 +326,46 @@ def training_loop(model, opt, start_epoch, current_step, virtual_step, batch_siz
     except KeyboardInterrupt:
         # catch a KeyboardInterrupt and save the model and state to resume later
         if model.swa:
-            model.save(current_step, True, loader=train_loader)
+            model.save(current_step, True, loader=dataloaders['train'])
         else:
             model.save(current_step, True)
-        model.save_training_state(epoch + (n >= len(train_loader)), current_step, True)
+        model.save_training_state(epoch + (n >= len(dataloaders['train'])), current_step, True)
         logger.info('Training interrupted. Latest models and training states saved.')
     
 
 def main():
+    # parse training options
     opt = parse_options()
-    
+
+    # create the training directory if needed
     dir_check(opt)
 
-    logger = configure_loggers(opt)
+    # configure loggers
+    loggers = configure_loggers(opt)
 
-    resume_state = resume_check(opt)
+    # set random seed
+    opt = get_random_seed(opt)
 
-    logger.info(options.dict2str(opt))
-    
-    tb_logger = tensorboard_logging(opt)
-
-    seed = get_random_seed(opt, logger)
+    # resume state or create directories if needed
+    resume_state = get_resume_state(opt)
 
     # if the model does not change and input sizes remain the same during training then there may be benefit 
     # from setting torch.backends.cudnn.benchmark = True, otherwise it may stall training
     torch.backends.cudnn.benchmark = True
     # torch.backends.cudnn.deterministic = True
+    # torch.autograd.set_detect_anomaly(True)
 
-    train_loader, batch_size, virtual_batch_size, total_iters, total_epochs, val_loader = get_dataloaders(opt, logger=logger)
+    # create dataloaders
+    dataloaders, data_params = get_dataloaders(opt)
 
-    # create model
+    # create and setup model: load and print networks; create schedulers/optimizer; init
     model = create_model(opt)
 
-    start_epoch, current_step, virtual_step = resume_training(opt, model, resume_state, batch_size, virtual_batch_size)
+    # resume training if needed
+    steps_states = resume_training(opt, model, resume_state, data_params)
 
-    # training
-    training_loop(model, opt, start_epoch, current_step, virtual_step, batch_size, virtual_batch_size,
-            total_iters, total_epochs, train_loader, val_loader, logger, tb_logger)
+    # start training loop with configured options
+    fit(model, opt, dataloaders, steps_states, data_params, loggers)
 
 
 if __name__ == '__main__':

@@ -45,20 +45,24 @@ def set_random_seed(seed):
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
 
-def setup_logger(logger_name, root, phase, level=logging.INFO, screen=False):
-    '''set up logger'''
-    l = logging.getLogger(logger_name)
+def get_root_logger(logger_name=None, root=None, phase=None, level=logging.INFO, screen=False):
+    """Set up logger. logger_name=None defaults to name 'base' """
+    logger = logging.getLogger(logger_name)
+    # if the logger has been initialized, just return the base logger
+    if not logger_name and logger.hasHandlers():
+        return logger
+    
     formatter = logging.Formatter(
         '%(asctime)s.%(msecs)03d - %(levelname)s: %(message)s', datefmt='%y-%m-%d %H:%M:%S')
     log_file = os.path.join(root, phase + '_{}.log'.format(get_timestamp()))
     fh = logging.FileHandler(log_file, mode='w')
     fh.setFormatter(formatter)
-    l.setLevel(level)
-    l.addHandler(fh)
+    logger.setLevel(level)
+    logger.addHandler(fh)
     if screen:
         sh = logging.StreamHandler()
         sh.setFormatter(formatter)
-        l.addHandler(sh)
+        logger.addHandler(sh)
 
 def sorted_nicely( l ):
     convert = lambda text: int(text) if text.isdigit() else text
