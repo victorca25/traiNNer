@@ -107,6 +107,13 @@ class SRRaGANModel(BaseModel):
             # print(self.generatorlosses.loss_list)
 
             # Discriminator loss:
+            # SRPGAN-like Features Perceptual loss, extracted from the discriminator
+            # self.cri_disfea is the feature loss extracted from feature maps in the discriminator
+            # will be enabled if the feature maps are enabled in the discriminator
+            # self.cri_gan = nn.BCEWithLogitsLoss() # SASRGAN: https://github.com/mitulrm/SRGAN/blob/master/SR_GAN.ipynb    
+                    # Note: VGG features order of magnitude is around 1 and the sum of the feature_maps losses
+                    # is around order of magnitude of 6. The 0.000001 is to make them roughly equivalent.
+                    # l_g_disfea += 0.00001 * self.l_disfea_w * self.cri_disfea(sr_feat_map, hr_feat_map)
             if train_opt['gan_type'] and train_opt['gan_weight']:
                 self.cri_gan = True
                 diffaug = train_opt.get('diffaug', None)
