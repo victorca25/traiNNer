@@ -1,66 +1,147 @@
 # Code Framework
-The overall code framework is shown in the following figure. It mainly consists of four parts - `Config`, `Data`, `Model` and `Network`.
+
+The overall code framework is shown in the following figure. It mainly consists of four parts - [Config], [Data],
+[Model], and [Network].
 
 <p align="center">
    <img src="https://github.com/xinntao/public_figures/blob/master/BasicSR/code_framework.png" height="450">
 </p>
 
-Let us take the train commad `python train.py -opt options/train/train_esrgan.json` for example. A sequence of actions will be done after this command. 
+For example, once [train.py] is called (i.e. `python train.py -opt options/train/train_template.yml`), a sequence of actions will follow this command:
 
-- [`train.py`](https://github.com/xinntao/BasicSR/blob/master/codes/train.py) is called. 
-- Reads the configuration (a json file) in [`options/train/train_esrgan.json`](https://github.com/xinntao/BasicSR/blob/master/codes/options/train/train_esrgan.json), including the configurations for data loader, network, loss, training strategies and etc. The json file is processed by [`options/options.py`](https://github.com/xinntao/BasicSR/blob/master/codes/options/options.py).
-- Creates the train and validation data loader. The data loader is constructed in [`data/__init__.py`](https://github.com/xinntao/BasicSR/blob/master/codes/data/__init__.py) according to different data modes.
-- Creates the model (is constructed in [`models/__init__.py`](https://github.com/xinntao/BasicSR/blob/master/codes/models/__init__.py) according to differnt model types). A model mainly consists of two parts - [network structure] and [model defination, e.g., loss definition, optimization and etc]. The network is constructed in [`models/network.py`](https://github.com/xinntao/BasicSR/blob/master/codes/models/networks.py) and the detailed structures are in [`models/modules`](https://github.com/xinntao/BasicSR/tree/master/codes/models/modules).
-- Start to train the model. Other actions like logging, saving intermediate models, validation, updating learning rate and etc are also done during the training.  
+1.  [Config] - Reads the configuration from [/options/train/train_template.yml] which is a [YAML] file. Then passes
+    the configuration values from it down through the following steps.
+2.  [Data] - Creates the train and validation dataloaders.
+3.  [Model] - Creates the chosen model.
+4.  [Network] - Creates the chosen network.
+5.  Finally [train.py] - Starts to train the model. Other actions like logging, saving intermediate models, validation, updating
+    learning rate, e.t.c. are also done during training.
 
-Moreover, there are utils and userful scripts. A detailed description is provided as follows.
+Moreover, there are also [Utilities](#utils) and [Useful script](#scripts) available to use for various operations,
+like configuring your dataset.
 
+[train.py]: https://github.com/victorca25/BasicSR/blob/master/codes/train.py
 
-## Table of Contents
-1. [Config](#config)
-1. [Data](#data)
-1. [Model](#model)
-1. [Network](#network)
-1. [Utils](#utils)
-1. [Scripts](#scripts)
+[/options/train/train_template.yml]: https://github.com/victorca25/BasicSR/blob/master/codes/options/train/train_template.yml
+
+[/options]: https://github.com/victorca25/BasicSR/tree/master/codes/options
+
+[Config]: #config
+
+[Data]: #data
+
+[Model]: #model
+
+[Network]: #network
+
+[YAML]: https://yaml.org
 
 ## Config
-#### [`options/`](https://github.com/xinntao/BasicSR/tree/master/codes/options) Configure the options for data loader, network structure, model, training strategies and etc.
 
-- `json` file is used to configure options and [`options/options.py`](https://github.com/xinntao/BasicSR/blob/master/codes/options/options.py) will convert the json file to python dict.
-- `json` file uses `null` for `None`; and supports `//` comments, i.e., in each line, contents after the `//` will be ignored. 
-- Supports `debug` mode, i.e, model name start with `debug_` will trigger the debug mode.
-- The configuration file and descriptions can be found in [`options`](https://github.com/xinntao/BasicSR/tree/master/codes/options).
+### [/options] Configure the options for data loader, network structure, losses, training strategies and other components
+
+-   [YAML] (or JSON) files are used to configure options and [/options/options.py] will convert the file to a python
+    dictionary (where missing keys return `None` instead of `Exception`).
+-   [YAML] files use `~` for `None`; and officially supports comments with `#`. (JSON files use `null` for `None`; and supports `//` comments instead).
+-   Supports `debug` mode, i.e, if the model name contains `debug`, it will trigger debug mode.
+-   The configuration file and descriptions can be found in [/options].
+
+[/options/options.py]: https://github.com/victorca25/BasicSR/blob/master/codes/options/options.py
 
 ## Data
-#### [`data/`](https://github.com/xinntao/BasicSR/tree/master/codes/data) A data loader to provide data for training, validation and testing.
 
-- A separate data loader module. You can modify/create data loader to meet your own needs.
-- Uses `cv2` package to do image processing, which provides rich operations.
-- Supports reading files from image folder or `lmdb` file. For faster IO during training, recommand to create `lmdb` dataset first. More details including lmdb format, creation and usage can be found in our [lmdb wiki](https://github.com/xinntao/BasicSR/wiki/Faster-IO-speed).
-- [`data/util.py`](https://github.com/xinntao/BasicSR/blob/master/codes/data/util.py) provides useful tools. For example, the `MATLAB bicubic` operation; rgb<-->ycbcr as MATLAB. We also provide [MATLAB bicubic imresize wiki](https://github.com/xinntao/BasicSR/wiki/MATLAB-bicubic-imresize) and [Color conversion in SR wiki](https://github.com/xinntao/BasicSR/wiki/Color-conversion-in-SR).
-- Now, we convert the images to format NCHW, [0,1], RGB, torch float tensor.
+### [/data] A data loader to provide data for training, validation, and testing
+
+-   A separate data loader module. You can modify/create data loader to meet your own needs. The data loaders are 
+    constructed in [/data/\_\_init__.py].
+-   [/dataops] hosts a large variety of data operations, like: filters, colors, images augmentation, batch augmentations, 
+    differential augmentations, and others that can be used at different points of the architecture when needed.
+-   By default, the package uses [cv2] package to do image processing, which provides rich operations. However, it is 
+    possible to integrate other options if required.
+-   Supports reading files from image folder or [lmdb] file. For faster IO during training (even if on an SSD) it is
+    recommended to create and use an [lmdb] dataset if possible.
+-   [/dataops/common.py] provides useful tools. For example, the `MATLAB bicubic` operation; rgb&lt;-->ycbcr as MATLAB. We
+    also provide [MATLAB bicubic imresize wiki] and [Color conversion in SR wiki].
+-   The standard tensor format used is NCHW, \[0,1], RGB, torch float tensor, but they can be normalized using the `znorm` 
+    option if needed.
+
+[/data]: https://github.com/victorca25/BasicSR/tree/master/codes/data
+
+[/data/\_\_init__.py]: https://github.com/victorca25/BasicSR/blob/master/codes/data/__init__.py
+
+[/dataops]: https://github.com/victorca25/BasicSR/tree/master/codes/dataops
+
+[/dataops/common.py]: https://github.com/victorca25/BasicSR/blob/master/codes/dataops/common.py
+
+[cv2]: https://github.com/skvark/opencv-python
+
+[lmdb]: https://en.wikipedia.org/wiki/Lightning_Memory-Mapped_Database
+
+[MATLAB bicubic imresize wiki]: https://github.com/xinntao/BasicSR/wiki/MATLAB-bicubic-imresize
+
+[Color conversion in SR wiki]: https://github.com/xinntao/BasicSR/wiki/Color-conversion-in-SR
 
 ## Model
-#### [`models/`](https://github.com/xinntao/BasicSR/tree/master/codes/models) Construct different models for training and testing.
 
-- A model mainly consists of two parts - [network structure] and [model defination, e.g., loss definition, optimization and etc]. The network description is in the [Network part](#network).
-- Based on the [`base_model.py`](https://github.com/xinntao/BasicSR/blob/master/codes/models/base_model.py), we define different models, e.g., [`SR_model.py`](https://github.com/xinntao/BasicSR/blob/master/codes/models/SR_model.py), [`SRGAN_model.py`](https://github.com/xinntao/BasicSR/blob/master/codes/models/SRGAN_model.py), [`SRRaGAN_model.py`](https://github.com/xinntao/BasicSR/blob/master/codes/models/SRRaGAN_model.py) and [`SFTGAN_ACD_model.py`](https://github.com/xinntao/BasicSR/blob/master/codes/models/SFTGAN_ACD_model.py).
+### [/models] Construct different models for training and testing
+
+-   The chosen model is constructed in [/models/\_\_init__.py] according to selected model type. 
+-   A model mainly consists of two parts - a [Network] structure, and a [Model] definition (e.g. loss configuration,
+    optimization step, e.t.c.).
+-   Based on the [/models/base_model.py], we define different models, e.g., [SRRaGAN], [SFTGAN_ACD], [VSR].
+-   [SRRaGAN] is used to train super resolution models (ESRGAN, PAN, SRGAN, etc), but based on it, additional 
+    models that require specific parameters optimization strategy or options can be defined, such as [PPON].
+
+[/models]: https://github.com/victorca25/BasicSR/tree/master/codes/models
+
+[/models/\_\_init__.py]: https://github.com/victorca25/BasicSR/blob/master/codes/models/__init__.py
+
+[/models/base_model.py]: https://github.com/victorca25/BasicSR/blob/master/codes/models/base_model.py
+
+[SRRaGAN]: https://github.com/victorca25/BasicSR/blob/master/codes/models/SRRaGAN_model.py
+
+[PPON]: https://github.com/victorca25/BasicSR/blob/master/codes/models/ppon_model.py
+
+[VSR]: https://github.com/victorca25/BasicSR/blob/master/codes/models/VSR_model.py
+
+[SFTGAN_ACD]: https://github.com/victorca25/BasicSR/blob/master/codes/models/SFTGAN_ACD_model.py
 
 ## Network
-#### [`models/modules/`](https://github.com/xinntao/BasicSR/tree/master/codes/models/modules) Construct different network architectures.
 
-- The network is constructed in [`models/network.py`](https://github.com/xinntao/BasicSR/blob/master/codes/models/networks.py) and the detailed structures are in [`models/modules`](https://github.com/xinntao/BasicSR/tree/master/codes/models/modules).
-- We provide some useful blocks in [`block.py`](https://github.com/xinntao/BasicSR/blob/master/codes/models/modules/block.py) and it is flexible to construct your network structures with these pre-defined blocks.
-- You can also easily write your own network architecture in a seperate file like [`sft_arch.py`](https://github.com/xinntao/BasicSR/blob/master/codes/models/modules/sft_arch.py). 
+### [/models/modules] Construct different network architectures
+
+-   The network is constructed in [/models/network.py] and the detailed structures are in [/models/modules/architectures].
+-   Some useful blocks can be found in [/models/modules/architectures/block.py], which in general are common to multiple 
+    networks and it is flexible to construct your network structures with these pre-defined blocks.
+-   You can also easily write your own network architecture in a separate file like [/models/modules/architectures/sft_arch.py]
+    or [/models/modules/architectures/PAN_arch.py].
+
+[/models/modules/architectures/]: https://github.com/victorca25/BasicSR/tree/master/codes/models/modules/architectures
+
+[/models/modules/architectures/block.py]: https://github.com/victorca25/BasicSR/blob/master/codes/models/modules/architectures/block.py
+
+[/models/modules/architectures/sft_arch.py]: https://github.com/victorca25/BasicSR/blob/master/codes/models/modules/architectures/sft_arch.py
+
+[/models/modules/architectures/PAN_arch.py]: https://github.com/victorca25/BasicSR/blob/master/codes/models/modules/architectures/PAN_arch.py
+
+[/models/network.py]: https://github.com/victorca25/BasicSR/blob/master/codes/models/networks.py
 
 ## Utils
-#### [`utils/`](https://github.com/xinntao/BasicSR/tree/master/codes/utils) Provide useful utilities.
 
-- [logger.py](https://github.com/xinntao/BasicSR/blob/master/codes/utils/logger.py) provides logging service during training and testing.
-- Support to use [tensorboard](https://www.tensorflow.org/programmers_guide/summaries_and_tensorboard) to visualize and compare training loss, validation PSNR and etc. Installationand usage can be found [here](https://github.com/xinntao/BasicSR/tree/master/codes/utils).
-- [progress_bar.py](https://github.com/xinntao/BasicSR/blob/master/codes/utils/progress_bar.py) provides a progress bar which can print the progress. 
+### [/utils] Provides useful utilities
+
+-   [/utils/util.py] provides logging service during training and testing.
+-   [/utils/progress_bar.py] provides a progress bar which can print the progress.
+-   Support to use [tensorboard] to visualize and compare training loss, validation PSNR, SSIM, LPIPS, e.t.c.
+
+[/utils]: https://github.com/victorca25/BasicSR/tree/master/codes/utils
+
+[/utils/util.py]: https://github.com/victorca25/BasicSR/blob/master/codes/utils/util.py
+
+[/utils/progress_bar.py]: https://github.com/victorca25/BasicSR/blob/master/codes/utils/progress_bar.py
+
+[tensorboard]: https://tensorflow.org/programmers_guide/summaries_and_tensorboard
 
 ## Scripts
-#### [`scripts/`](https://github.com/xinntao/BasicSR/tree/master/codes/scripts) Privide useful scripts.
-Details can be found [here](https://github.com/xinntao/BasicSR/tree/master/codes/scripts).
+
+### [/scripts](https://github.com/victorca25/BasicSR/tree/master/codes/scripts) Provides useful scripts
