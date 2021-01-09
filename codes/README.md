@@ -116,7 +116,9 @@ like configuring your dataset.
 -   You can also easily write your own network architecture in a separate file like [/models/modules/architectures/sft_arch.py]
     or [/models/modules/architectures/PAN_arch.py].
 
-[/models/modules/architectures/]: https://github.com/victorca25/BasicSR/tree/master/codes/models/modules/architectures
+[/models/modules]: https://github.com/victorca25/BasicSR/tree/master/codes/models/modules
+
+[/models/modules/architectures]: https://github.com/victorca25/BasicSR/tree/master/codes/models/modules/architectures
 
 [/models/modules/architectures/block.py]: https://github.com/victorca25/BasicSR/blob/master/codes/models/modules/architectures/block.py
 
