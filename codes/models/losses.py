@@ -509,7 +509,7 @@ class GeneratorLoss(nn.Module):
             self.loss_list.append(cri_avg)
 
 
-    def forward(self, sr, hr, log_dict, fsfilter = None):
+    def forward(self, sr, hr, log_dict, fsfilter=None, selector=[]):
         if fsfilter: #low-pass filter
             hr_f = fsfilter(hr)
             sr_f = fsfilter(sr)
@@ -520,8 +520,20 @@ class GeneratorLoss(nn.Module):
         #tmp_vis(sr_f)
         #tmp_vis(hr_f)
 
+        if selector:
+            loss_list = []
+            for selected_loss in selector:
+                for i, l in enumerate(self.loss_list):
+                    if l['function']:
+                        if l['name'].find(selected_loss) >= 0:
+                            if selected_loss == 'pix' and l['name'].find('pix-multiscale') >= 0:
+                                continue
+                            loss_list.append(l)
+        else:
+            loss_list = self.loss_list
+
         loss_results = []
-        for i, l in enumerate(self.loss_list):
+        for i, l in enumerate(loss_list):
             if l['function']:
                 if fsfilter: # branch selecting the ones that should use LPF
                     if l['name'].find('tv') >= 0 or l['name'].find('overflow') >= 0:
@@ -647,7 +659,7 @@ class PreciseGeneratorLoss(nn.Module):
             cri_fft = get_loss_fn(fft_type, fft_weight, device = device)
             self.loss_list.append(cri_fft)
 
-    def forward(self, sr, hr, log_dict, fsfilter = None):
+    def forward(self, sr, hr, log_dict, fsfilter=None, selector=[]):
         # make sure both sr and hr are not in float16 or int, change to float32 (torch.float32/torch.float)
         # in some cases could even need torch.float64/torch.double, may have to add the case here
         if sr.dtype == torch.float16 or sr.dtype == torch.int8 or sr.dtype == torch.int32:
@@ -670,8 +682,20 @@ class PreciseGeneratorLoss(nn.Module):
         #tmp_vis(sr_f)
         #tmp_vis(hr_f)
 
+        if selector:
+            loss_list = []
+            for selected_loss in selector:
+                for i, l in enumerate(self.loss_list):
+                    if l['function']:
+                        if l['name'].find(selected_loss) >= 0:
+                            if selected_loss == 'pix' and l['name'].find('pix-multiscale') >= 0:
+                                continue
+                            loss_list.append(l)
+        else:
+            loss_list = self.loss_list
+
         loss_results = []
-        for i, l in enumerate(self.loss_list):
+        for i, l in enumerate(loss_list):
             if l['function']:
                 if fsfilter: # branch selecting the ones that should use LPF
                     if l['name'].find('tv') >= 0 or l['name'].find('overflow') >= 0:

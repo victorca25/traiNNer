@@ -56,7 +56,7 @@ def create_model(opt, step=0, verbose=True):
 
     model = opt['model']
     #TODO: temporary fix to match names when needed. Should be deprecated.
-    if model == 'srgan' or model == 'srragan_hfen' or model == 'lpips':
+    if model == 'srgan' or model == 'sr':
         model = 'srragan'
     elif model == 'vsrgan':
         model = 'vsr'

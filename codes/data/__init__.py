@@ -4,16 +4,16 @@ import logging
 import torch.utils.data
 
 
-def create_dataloader(dataset: torch.utils.data.Dataset, dataset_opt: dict) -> torch.utils.data.DataLoader:
+def create_dataloader(dataset: torch.utils.data.Dataset, dataset_opt: dict, gpu_ids: list = []) -> torch.utils.data.DataLoader:
     """
     Create Dataloader.
     :param dataset: Dataset to use
     :param dataset_opt: Dataset configuration from opt file
     """
-    if dataset_opt['phase'] == 'train':
+    if dataset_opt.get('phase', 'test') == 'train':
         batch_size = dataset_opt['batch_size']
         shuffle = dataset_opt['use_shuffle']
-        num_workers = dataset_opt['n_workers']
+        num_workers = dataset_opt['n_workers'] * len(gpu_ids)
         drop_last = True
     else:
         batch_size = 1

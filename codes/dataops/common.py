@@ -525,48 +525,173 @@ def tensor2np(img, rgb2bgr=True, remove_batch=True, data_range=255,
 
 
 ####################
-# Prepare Images
+# Convert (Tensor) Images to Patches
 ####################
-# https://github.com/sunreef/BlindSR/blob/master/src/image_utils.py
-def patchify_tensor(features, patch_size, overlap=10):
-    batch_size, channels, height, width = features.size()
 
-    effective_patch_size = patch_size - overlap
-    n_patches_height = (height // effective_patch_size)
-    n_patches_width = (width // effective_patch_size)
+def extract_patches_2d(img, patch_shape, step=[1.0,1.0], batch_first=False):
+    """
+    Convert a 4D tensor into a 5D tensor of patches (crops) of the original tensor.
+    Uses unfold to extract sliding local blocks from an batched input tensor.
+    
+    Arguments:
+        img: the image batch to crop
+        patch_shape: tuple with the shape of the last two dimensions (H,W) 
+            after crop
+        step: the size of the step used to slide the blocks in each dimension.
+            If each value 0.0 < step < 1.0, the overlap will be relative to the
+            patch size * step
+        batch_first: return tensor with batch as the first dimension or the 
+            second
 
-    if n_patches_height * effective_patch_size < height:
-        n_patches_height += 1
-    if n_patches_width * effective_patch_size < width:
-        n_patches_width += 1
+    Reference: 
+    https://gist.github.com/dem123456789/23f18fd78ac8da9615c347905e64fc78
+    """
+    patch_H, patch_W = patch_shape[0], patch_shape[1]
+    
+    # pad to fit patch dimensions
+    if(img.size(2) < patch_H):
+        num_padded_H_Top = (patch_H - img.size(2)) // 2
+        num_padded_H_Bottom = patch_H - img.size(2) - num_padded_H_Top
+        padding_H = nn.ConstantPad2d((0, 0, num_padded_H_Top, num_padded_H_Bottom), 0)
+        img = padding_H(img)
+    if(img.size(3) < patch_W):
+        num_padded_W_Left = (patch_W - img.size(3)) // 2
+        num_padded_W_Right = patch_W - img.size(3) - num_padded_W_Left
+        padding_W = nn.ConstantPad2d((num_padded_W_Left, num_padded_W_Right, 0, 0), 0)
+        img = padding_W(img)
+    
+    # steps to overlay crops of the images
+    step_int = [0, 0]
+    step_int[0] = int(patch_H * step[0]) if(isinstance(step[0], float)) else step[0]
+    step_int[1] = int(patch_W * step[1]) if(isinstance(step[1], float)) else step[1]
+    
+    patches_fold_H = img.unfold(2, patch_H, step_int[0])
+    if((img.size(2) - patch_H) % step_int[0] != 0):
+        patches_fold_H = torch.cat((patches_fold_H,
+                                    img[:, :, -patch_H:, :].permute(0, 1, 3, 2).unsqueeze(2)),dim=2)
+    
+    patches_fold_HW = patches_fold_H.unfold(3, patch_W, step_int[1])
+    if((img.size(3) - patch_W) % step_int[1] != 0):
+        patches_fold_HW = torch.cat((patches_fold_HW,
+                                     patches_fold_H[:, :, :, -patch_W:, :].permute(0, 1, 2, 4, 3).unsqueeze(3)), dim=3)
+    
+    patches = patches_fold_HW.permute(2, 3, 0, 1, 4, 5)
+    patches = patches.reshape(-1, img.size(0), img.size(1), patch_H, patch_W)
+    
+    if(batch_first):
+        patches = patches.permute(1, 0, 2, 3, 4)
+    return patches
 
-    patches = []
-    for b in range(batch_size):
-        for h in range(n_patches_height):
-            for w in range(n_patches_width):
-                patch_start_height = min(h * effective_patch_size, height - patch_size)
-                patch_start_width = min(w * effective_patch_size, width - patch_size)
-                patches.append(features[b:b+1, :,
-                               patch_start_height: patch_start_height + patch_size,
-                               patch_start_width: patch_start_width + patch_size])
-    return torch.cat(patches, 0)
 
-def recompose_tensor(patches, full_height, full_width, overlap=10):
+def reconstruct_from_patches_2d(patches, img_shape, step=[1.0,1.0], batch_first=False):
+    """
+    Reconstruct a batch of images from the cropped patches. 
+    Inverse operation from extract_patches_2d(). 
 
+    Arguments: 
+        patches: the patches tensor
+        img_shape: tuple with the sizes of the last two dimensions (H,W)
+            of the resulting images. If the patches dimensions have
+            changed (scaled), must provide the final dimensions
+            i.e. [H * scale, W * scale]
+        step: same step used in extract_patches_2d
+        batch_first: if the incoming tensor has batch as the first
+            dimension or not
+    """
+    if(batch_first):
+        patches = patches.permute(1, 0, 2, 3, 4)
+    
+    patch_H, patch_W = patches.size(3), patches.size(4)
+    img_size = (patches.size(1), patches.size(2),max(img_shape[0], patch_H), max(img_shape[1], patch_W))
+    
+    step_int = [0, 0]
+    step_int[0] = int(patch_H * step[0]) if(isinstance(step[0], float)) else step[0]
+    step_int[1] = int(patch_W * step[1]) if(isinstance(step[1], float)) else step[1]
+    
+    nrow, ncol = 1 + (img_size[-2] - patch_H)//step_int[0], 1 + (img_size[-1] - patch_W)//step_int[1]
+    r_nrow = nrow + 1 if((img_size[2] - patch_H) % step_int[0] != 0) else nrow
+    r_ncol = ncol + 1 if((img_size[3] - patch_W) % step_int[1] != 0) else ncol
+    
+    patches = patches.reshape(r_nrow, r_ncol, img_size[0], img_size[1], patch_H, patch_W)
+    
+    img = torch.zeros(img_size, device = patches.device)
+    
+    overlap_counter = torch.zeros(img_size, device = patches.device)
+    
+    for i in range(nrow):
+        for j in range(ncol):
+            img[:, :, i * step_int[0]:i * step_int[0] + patch_H, j * step_int[1]:j * step_int[1] + patch_W] += patches[i, j,]
+            overlap_counter[:, :, i * step_int[0]:i * step_int[0] + patch_H, j * step_int[1]:j * step_int[1] + patch_W] += 1
+    if((img_size[2] - patch_H) % step_int[0] != 0):
+        for j in range(ncol):
+            img[:, :, -patch_H:, j * step_int[1]:j * step_int[1] + patch_W] += patches[-1, j,]
+            overlap_counter[:, :, -patch_H:, j * step_int[1]:j * step_int[1] + patch_W] += 1
+    if((img_size[3] - patch_W) % step_int[1] != 0):
+        for i in range(nrow):
+            img[:, :, i * step_int[0]:i*step_int[0] + patch_H, -patch_W:] += patches[i, -1,]
+            overlap_counter[:, :, i * step_int[0]:i * step_int[0] + patch_H, -patch_W:] += 1
+    if((img_size[2] - patch_H) % step_int[0] != 0 and (img_size[3] - patch_W) % step_int[1] != 0):
+        img[:, :, -patch_H:, -patch_W:] += patches[-1, -1,]
+        overlap_counter[:, :, -patch_H:, -patch_W:] += 1
+    img /= overlap_counter
+    
+    # remove the extra padding if image is smaller than the patch sizes
+    if(img_shape[0] < patch_H):
+        num_padded_H_Top = (patch_H - img_shape[0])//2
+        num_padded_H_Bottom = patch_H - img_shape[0] - num_padded_H_Top
+        img = img[:, :, num_padded_H_Top:-num_padded_H_Bottom,]
+    if(img_shape[1] < patch_W):
+        num_padded_W_Left = (patch_W - img_shape[1])//2
+        num_padded_W_Right = patch_W - img_shape[1] - num_padded_W_Left
+        img = img[:, :, :, num_padded_W_Left:-num_padded_W_Right]
+    
+    return img
+
+
+def recompose_tensor(patches, height, width, step=[1.0,1.0], scale=1):
+    """ Reconstruct images that have been cropped to patches.
+    Unlike reconstruct_from_patches_2d(), this function allows to 
+    use blending between the patches if they were generated a 
+    step between 0.5 (50% overlap) and 1.0 (0% overlap), 
+    relative to the original patch size
+
+    Arguments:
+        patches: the image patches
+        height: the original image height
+        width: the original image width
+        step: the overlap step factor, from 0.5 to 1.0
+        scale: the scale at which the patches are in relation to the 
+            original image
+
+    References:
+    https://github.com/sunreef/BlindSR/blob/master/src/image_utils.py
+    https://gist.github.com/dem123456789/23f18fd78ac8da9615c347905e64fc78
+
+    """
+
+    assert isinstance(step, float) and step >= 0.5 and step <= 1.0
+
+    full_height = scale * height
+    full_width = scale * width
     batch_size, channels, patch_size, _ = patches.size()
-    effective_patch_size = patch_size - overlap
-    n_patches_height = (full_height // effective_patch_size)
-    n_patches_width = (full_width // effective_patch_size)
+    overlap = scale * int(round((1.0 - step) * (patch_size / scale)))
+    # print("patch_size:", patch_size) #TODO
+    # print("overlap:", overlap) #TODO
 
-    if n_patches_height * effective_patch_size < full_height:
-        n_patches_height += 1
-    if n_patches_width * effective_patch_size < full_width:
-        n_patches_width += 1
+    effective_patch_size = int(step * patch_size)
+    patch_H, patch_W = patches.size(2), patches.size(3)
+    img_size = (patches.size(0), patches.size(1), max(full_height, patch_H), max(full_width, patch_W))
 
-    n_patches = n_patches_height * n_patches_width
-    if batch_size % n_patches != 0:
-        print("Error: The number of patches provided to the recompose function does not match the number of patches in each image.")
-    final_batch_size = batch_size // n_patches
+    step = [step, step]
+    step_int = [0, 0]
+    step_int[0] = int(patch_H * step[0])
+    step_int[1] = int(patch_W * step[1])
+
+    nrow, ncol = 1 + (img_size[-2] - patch_H)//step_int[0], 1 + (img_size[-1] - patch_W)//step_int[1]
+    n_patches_height = nrow + 1 if((img_size[2] - patch_H) % step_int[0] != 0) else nrow
+    n_patches_width = ncol + 1 if((img_size[3] - patch_W) % step_int[1] != 0) else ncol
+
+    final_batch_size = batch_size // (n_patches_height * n_patches_width)
 
     blending_in = torch.linspace(0.1, 1.0, overlap)
     blending_out = torch.linspace(1.0, 0.1, overlap)
@@ -589,6 +714,7 @@ def recompose_tensor(patches, full_height, full_width, overlap=10):
         blending_patch = blending_patch.cuda()
         blending_image = blending_image.cuda()
         recomposed_tensor = recomposed_tensor.cuda()
+    
     patch_index = 0
     for b in range(final_batch_size):
         for h in range(n_patches_height):
@@ -600,11 +726,6 @@ def recompose_tensor(patches, full_height, full_width, overlap=10):
     recomposed_tensor /= blending_image
 
     return recomposed_tensor
-
-
-
-
-
 
 
 

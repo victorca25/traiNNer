@@ -11,7 +11,7 @@ def get_optimizers(cri_gan=None, netD=None, netG=None, train_opt=None, logger=No
         if v.requires_grad:
             optim_params.append(v)
         else:
-            logger.warning('Params [{:s}] will not optimize.'.format(k))
+            logger.warning('Params [{:s}] will not be optimized.'.format(k))
     
     wd_G = train_opt['weight_decay_G'] if train_opt['weight_decay_G'] else 0
     optim_G = train_opt['optim_G'] if train_opt['optim_G'] else 'adam'

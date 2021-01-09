@@ -12,6 +12,17 @@ import logging
 logger = logging.getLogger('base')
 
 
+class nullcast():
+    #nullcontext:
+    #https://github.com/python/cpython/commit/0784a2e5b174d2dbf7b144d480559e650c5cf64c
+    def __init__(self):
+        pass
+    def __enter__(self):
+        pass
+    def __exit__(self, *excinfo):
+        pass
+
+
 class BaseModel:
     """
     This class is an base class for models.

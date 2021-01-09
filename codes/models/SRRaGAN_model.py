@@ -8,7 +8,7 @@ import torch
 import torch.nn as nn
 
 import models.networks as networks
-from .base_model import BaseModel
+from .base_model import BaseModel, nullcast
 
 logger = logging.getLogger('base')
 
@@ -19,6 +19,7 @@ from . import swa
 
 from dataops.batchaug import BatchAug
 from dataops.filters import FilterHigh, FilterLow #, FilterX
+from dataops.common import extract_patches_2d, recompose_tensor
 
 load_amp = (hasattr(torch.cuda, "amp") and hasattr(torch.cuda.amp, "autocast"))
 if load_amp:
@@ -26,16 +27,6 @@ if load_amp:
     logger.info('AMP library available')
 else:
     logger.info('AMP library not available')
-
-class nullcast():
-    #nullcontext:
-    #https://github.com/python/cpython/commit/0784a2e5b174d2dbf7b144d480559e650c5cf64c
-    def __init__(self):
-        pass
-    def __enter__(self):
-        pass
-    def __exit__(self, *excinfo):
-        pass
 
 
 class SRRaGANModel(BaseModel):
@@ -221,7 +212,17 @@ class SRRaGANModel(BaseModel):
     def feed_data_batch(self, data, need_HR=True):
         # LR
         self.var_L = data
+
+    def forward(self, data=None):
+        """Run forward pass; called by <optimize_parameters> and <test> functions."""
+        if isinstance(data, torch.Tensor):
+            return self.netG(data)
         
+        if self.outm: #if the model has the final activation option
+            self.fake_H = self.netG(self.var_L, outm=self.outm)
+        else: #regular models without the final activation option
+            self.fake_H = self.netG(self.var_L)  # G(LR)
+
     def optimize_parameters(self, step):       
         # G
         # freeze discriminator while generator is trained to prevent BP
@@ -239,10 +240,7 @@ class SRRaGANModel(BaseModel):
         
         ### Network forward, generate SR
         with self.cast():
-            if self.outm: #if the model has the final activation option
-                self.fake_H = self.netG(self.var_L, outm=self.outm)
-            else: #regular models without the final activation option
-                self.fake_H = self.netG(self.var_L)
+            self.forward()
         #/with self.cast():
 
         # batch (mixup) augmentations
@@ -255,13 +253,13 @@ class SRRaGANModel(BaseModel):
         Calculate and log losses
         """
         loss_results = []
-        # training generator and discriminator        
+        # training generator and discriminator
         # update generator (on its own if only training generator or alternatively if training GAN)
         if (self.cri_gan is not True) or (step % self.D_update_ratio == 0 and step > self.D_init_iters):
             with self.cast(): # Casts operations to mixed precision if enabled, else nullcontext
                 # regular losses
                 loss_results, self.log_dict = self.generatorlosses(self.fake_H, self.var_H, self.log_dict, self.f_low)
-                l_g_total += sum(loss_results)/self.accumulations
+                l_g_total += sum(loss_results) / self.accumulations
 
                 if self.cri_gan:
                     # adversarial loss
@@ -269,14 +267,14 @@ class SRRaGANModel(BaseModel):
                         self.fake_H, self.var_ref, netD=self.netD, 
                         stage='generator', fsfilter = self.f_high) # (sr, hr)
                     self.log_dict['l_g_gan'] = l_g_gan.item()
-                    l_g_total += l_g_gan/self.accumulations
+                    l_g_total += l_g_gan / self.accumulations
 
             #/with self.cast():
             # high precision generator losses (can be affected by AMP half precision)
             if self.precisegeneratorlosses.loss_list:
                 precise_loss_results, self.log_dict = self.precisegeneratorlosses(
                         self.fake_H, self.var_H, self.log_dict, self.f_low)
-                l_g_total += sum(precise_loss_results)/self.accumulations
+                l_g_total += sum(precise_loss_results) / self.accumulations
             
             if self.amp:
                 # call backward() on scaled loss to create scaled gradients.
@@ -344,20 +342,22 @@ class SRRaGANModel(BaseModel):
                 self.optDstep = True
 
     def test(self):
+        """Forward function used in test time.
+        This function wraps <forward> function in no_grad() so intermediate steps 
+        for backprop are not saved.
+        """
         self.netG.eval()
         with torch.no_grad():
-            if self.is_train:
-                self.fake_H = self.netG(self.var_L)
-            else:
-                #self.fake_H = self.netG(self.var_L, isTest=True)
-                self.fake_H = self.netG(self.var_L)
+            self.forward()
         self.netG.train()
 
     def test_x8(self):
+        """Geometric self-ensemble forward function used in test time.
+        Will upscale each image 8 times in different rotations/flips 
+        and average the results into a single image.
+        """
         # from https://github.com/thstkdgus35/EDSR-PyTorch
         self.netG.eval()
-        for k, v in self.netG.named_parameters():
-            v.requires_grad = False
 
         def _transform(v, op):
             # if self.precision != 'single': v = v.float()
@@ -377,7 +377,8 @@ class SRRaGANModel(BaseModel):
         lr_list = [self.var_L]
         for tf in 'v', 'h', 't':
             lr_list.extend([_transform(t, tf) for t in lr_list])
-        sr_list = [self.netG(aug) for aug in lr_list]
+        with torch.no_grad():
+            sr_list = [self.forward(aug) for aug in lr_list]
         for i in range(len(sr_list)):
             if i > 3:
                 sr_list[i] = _transform(sr_list[i], 't')
@@ -388,24 +389,53 @@ class SRRaGANModel(BaseModel):
 
         output_cat = torch.cat(sr_list, dim=0)
         self.fake_H = output_cat.mean(dim=0, keepdim=True)
-
-        for k, v in self.netG.named_parameters():
-            v.requires_grad = True
         self.netG.train()
 
+    def test_chop(self, patch_size=200, step=1.0):
+        """Chop forward function used in test time.
+        Converts large images into patches of size (patch_size, patch_size).
+        Make sure the patch size is small enough that your GPU memory is sufficient.
+        Examples: patch_size = 200 for BlindSR, 64 for ABPN
+        """
+        batch_size, channels, img_height, img_width = self.var_L.size()
+        # if (patch_size * (1.0 - step)) % 1 < 0.5:
+        #     patch_size += 1
+        patch_size = min(img_height, img_width, patch_size)
+        scale = self.opt['scale']
+
+        img_patches = extract_patches_2d(img=self.var_L, 
+                                        patch_shape=(patch_size, patch_size), 
+                                        step=[step, step], 
+                                        batch_first=True).squeeze(0)
+        
+        n_patches = img_patches.size(0)
+        highres_patches = []
+
+        self.netG.eval()
+        with torch.no_grad():
+            for p in range(n_patches):
+                lowres_input = img_patches[p:p + 1]
+                prediction = self.forward(lowres_input)
+                highres_patches.append(prediction)
+
+        highres_patches = torch.cat(highres_patches, 0)
+
+        self.fake_H = recompose_tensor(highres_patches, img_height, 
+                                        img_width, step=step, scale=scale)
+        self.netG.train()
+    
     def get_current_log(self):
+        """Return traning losses / errors. train.py will print out these on the 
+        console, and save them to a file"""
         return self.log_dict
 
     def get_current_visuals(self, need_HR=True):
+        """Return visualization images."""
         out_dict = OrderedDict()
         out_dict['LR'] = self.var_L.detach()[0].float().cpu()
         out_dict['SR'] = self.fake_H.detach()[0].float().cpu()
         if need_HR:
             out_dict['HR'] = self.var_H.detach()[0].float().cpu()
-        #TODO for PPON ?
-        #if get stages 1 and 2
-            #out_dict['SR_content'] = ...
-            #out_dict['SR_structure'] = ...
         return out_dict
 
     def get_current_visuals_batch(self, need_HR=True):
@@ -414,8 +444,4 @@ class SRRaGANModel(BaseModel):
         out_dict['SR'] = self.fake_H.detach().float().cpu()
         if need_HR:
             out_dict['HR'] = self.var_H.detach().float().cpu()
-        #TODO for PPON ?
-        #if get stages 1 and 2
-            #out_dict['SR_content'] = ...
-            #out_dict['SR_structure'] = ...
         return out_dict

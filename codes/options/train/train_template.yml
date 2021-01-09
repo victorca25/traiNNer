@@ -288,12 +288,15 @@ train:
     # dis_feature_criterion: cb # "l1" | "l2" | "cb" | "elastic" #discriminator feature loss
     # dis_feature_weight: 0.01 # 1
     
-    # For PPON
-    # train_phase: 1 # Training starting phase, can skip the first phases
-    # phase1_s: 100 # 5000 #100 #5000 #138000 #-1 to skip. Need to coordinate with the LR steps. #COBranch: lr =  2e−4, decreased by the factor of 2 for every 1000 epochs (1.38e+5 iterations) 138k
-    # phase2_s: 200 # 10000 #200 #10000 #172500 #-1 to skip. Need to coordinate with the LR steps. #SOBranch: λ = 1e+3 (?), lr = 1e−4 and halved at every 250 epochs (3.45e+4iterations) 34.5k
-    # phase3_s: 5000000 # 207000 #-1 to skip. Need to coordinate with the LR steps. #POBranch: η = 5e−3,  lr = 1e−4 and halved at every 250 epochs (3.45e+4iterations) 34.5k
-    # phase4_s: 100100
+    # For PPON:
+    # Need to coordinate with the LR steps. From the paper, the parameters used were: 
+    # COBranch: lr =  2e−4, decreased by the factor of 2 for every 1000 epochs (~1.38e+5 iterations) 138k, lr_steps: [200, 400, 600, 800]
+    # SOBranch: λ = 1e+3 (?), lr = 1e−4 and halved at every 250 epochs for 300 epochs (~3.5e+4 iterations) 35k, lr_steps: [100, 150, 200, 250]
+    # POBranch: η = 5e−3,  lr = 1e−4 and halved at every 250 epochs for 300 epochs (~3.5e+4 iterations) 35k, lr_steps: [100, 150, 200, 250]
+    # p1_losses: ["pix"] # from the paper: l1 pixel_weigh: 1
+    # p2_losses: ["pix-multiscale", "ms-ssim"] # from the paper: multiscale_weight: 1, ms-ssim_weight: 1
+    # p3_losses: ["contextual"] # from the paper: VGG feature_weight: 1 gan_weight: 0.005
+    # ppon_stages: [1000, 2000] # [50000, 75000] # from the paper: ~[173000, 200000] from scratch
     
     # Differentiable Augmentation for Data-Efficient GAN Training
     # diffaug: true

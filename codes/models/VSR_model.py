@@ -8,7 +8,7 @@ import torch
 import torch.nn as nn
 
 import models.networks as networks
-from .base_model import BaseModel
+from .base_model import BaseModel, nullcast
 
 logger = logging.getLogger('base')
 
@@ -31,16 +31,6 @@ if load_amp:
     logger.info('AMP library available')
 else:
     logger.info('AMP library not available')
-
-class nullcast():
-    #nullcontext:
-    #https://github.com/python/cpython/commit/0784a2e5b174d2dbf7b144d480559e650c5cf64c
-    def __init__(self):
-        pass
-    def __enter__(self):
-        pass
-    def __exit__(self, *excinfo):
-        pass
 
 
 class VSRModel(BaseModel):
@@ -445,10 +435,6 @@ class VSRModel(BaseModel):
         out_dict['SR'] = self.fake_H.detach()[0].float().cpu()
         if need_HR:
             out_dict['HR'] = self.var_H.detach()[0].float().cpu()
-        #TODO for PPON ?
-        #if get stages 1 and 2
-            #out_dict['SR_content'] = ...
-            #out_dict['SR_structure'] = ...
         return out_dict
 
     def get_current_visuals_batch(self, need_HR=True):
@@ -458,8 +444,4 @@ class VSRModel(BaseModel):
         out_dict['SR'] = self.fake_H.detach().float().cpu()
         if need_HR:
             out_dict['HR'] = self.var_H.detach().float().cpu()
-        #TODO for PPON ?
-        #if get stages 1 and 2
-            #out_dict['SR_content'] = ...
-            #out_dict['SR_structure'] = ...
         return out_dict

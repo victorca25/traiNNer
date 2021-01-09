@@ -41,7 +41,17 @@ def test_loop(model, opt, dataloaders, data_params):
             img_name = os.path.splitext(os.path.basename(img_path))[0]
 
             # test with eval mode. This only affects layers like batchnorm and dropout.
-            model.test()  # run inference
+            test_mode = opt.get('test_mode', None)
+            if test_mode == 'x8':
+                # geometric self-ensemble
+                model.test_x8()
+            elif test_mode == 'chop':
+                # chop images in patches/crops, to reduce VRAM usage
+                model.test_chop(patch_size=opt.get('chop_patch_size', 100), 
+                                step=opt.get('chop_step', 0.9))
+            else:
+                # normal inference
+                model.test()  # run inference
             visuals = model.get_current_visuals(need_HR=need_HR)  # get image results
 
             sr_img = tensor2np(visuals['SR'], denormalize=znorm)  # uint8

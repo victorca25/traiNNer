@@ -50,23 +50,25 @@ def configure_loggers(opt=None):
     logger.info(options.dict2str(opt))
     
     # initialize tensorboard logger
-    tb_logger = None
-    if opt['use_tb_logger'] and 'debug' not in opt['name']:
+    if opt.get('use_tb_logger', False) and 'debug' not in opt['name']:
+        version = float(torch.__version__[0:3])
         logdir = os.path.join(self.opt['path']['root'], 'tb_logger', self.opt['name'])
-        try:
+        # logdir_valid = os.path.join(self.opt['path']['root'], 'tb_logger', self.opt['name'] + 'valid')
+        if version >= 1.1:  # PyTorch 1.1
             # official PyTorch tensorboard
             from torch.utils.tensorboard import SummaryWriter
-            tb_logger = SummaryWriter(log_dir=log_dir)
-            return tb_logger
-        except:
+        else:
+            logger.info('You are using PyTorch {}. Using [tensorboardX].'.format(version))
             from tensorboardX import SummaryWriter
-            try:
-                # for version tensorboardX >= 1.7
-                tb_logger = SummaryWriter(logdir=log_dir)
-            except:
-                # for version tensorboardX < 1.6
-                tb_logger = SummaryWriter(log_dir=log_dir)
-    
+        try:
+            # for versions PyTorch > 1.1 and tensorboardX < 1.6
+            tb_logger = SummaryWriter(log_dir=log_dir)
+            # tb_logger_valid = SummaryWriter(log_dir=logdir_valid)
+        except:
+            # for version tensorboardX >= 1.7
+            tb_logger = SummaryWriter(logdir=log_dir)
+            # tb_logger_valid = SummaryWriter(logdir=logdir_valid)
+    tb_logger = None    
     return {"tb_logger": tb_logger}
 
 
@@ -104,6 +106,9 @@ def get_random_seed(opt):
 
 def get_dataloaders(opt):
     logger = util.get_root_logger()
+
+    gpu_ids = opt.get('gpu_ids', None)
+    gpu_ids = gpu_ids if gpu_ids else []
     
     # Create datasets and dataloaders
     dataloaders = {}
@@ -119,7 +124,7 @@ def get_dataloaders(opt):
         if not dataset:
             raise Exception('Dataset "{}" for phase "{}" is empty.'.format(name, phase))
 
-        dataloaders[phase] = create_dataloader(dataset, dataset_opt)
+        dataloaders[phase] = create_dataloader(dataset, dataset_opt, gpu_ids)
 
         if opt['is_train'] and phase == 'train':
             batch_size = dataset_opt.get('batch_size', 4)
@@ -226,6 +231,7 @@ def fit(model, opt, dataloaders, steps_states, data_params, loggers):
                         # tensorboard logger
                         if opt['use_tb_logger'] and 'debug' not in opt['name']:
                             tb_logger.add_scalar(k, v, current_step)
+                        # tb_logger.flush()
                     logger.info(message)
 
                     # # start time for next iteration
@@ -303,6 +309,8 @@ def fit(model, opt, dataloaders, steps_states, data_params, loggers):
                     if opt['use_tb_logger'] and 'debug' not in opt['name']:
                         for r in avg_metrics:
                             tb_logger.add_scalar(r['name'], r['average'], current_step)
+                            # tb_logger_valid.add_scalar(r['name'], r['average'], current_step)
+                            # tb_logger_valid.flush()
                     
                     # # reset time for next iteration to skip the validation time from calculation
                     # t0 = time.time()
@@ -314,7 +322,6 @@ def fit(model, opt, dataloaders, steps_states, data_params, loggers):
             
             logger.info('End of epoch {} / {} \t Time Taken: {} sec'.format(
                 epoch, total_epochs, time.time() - epoch_start_time))
-
 
         logger.info('Saving the final model.')
         if model.swa:
@@ -359,7 +366,7 @@ def main():
     dataloaders, data_params = get_dataloaders(opt)
 
     # create and setup model: load and print networks; create schedulers/optimizer; init
-    model = create_model(opt)
+    model = create_model(opt, step = 0 if resume_state is None else resume_state['iter'])
 
     # resume training if needed
     steps_states = resume_training(opt, model, resume_state, data_params)
