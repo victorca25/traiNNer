@@ -305,7 +305,7 @@
     // , "p1_losses": ["pix"] // from the paper: l1 pixel_weigh: 1
     // , "p2_losses": ["pix-multiscale", "ms-ssim"] // from the paper: multiscale_weight: 1, ms-ssim_weight: 1
     // , "p3_losses": ["contextual"] // from the paper: VGG feature_weight: 1 gan_weight: 0.005
-    // , "ppon_stages": [1000, 2000] //[50000, 75000] //The first value here is where phase 2 (structure) will start and the second is where phase 3 (features) starts. From the paper: ~[173000, 200000] from scratch
+    // , "ppon_stages": [50000, 75000] //The first value here is where phase 2 (structure) will start and the second is where phase 3 (features) starts. From the paper: ~[173000, 200000] from scratch
 
     // Differentiable Augmentation for Data-Efficient GAN Training
     //, "diffaug": true

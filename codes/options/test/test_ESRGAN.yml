@@ -6,6 +6,7 @@ gpu_ids: [0]
 # test_mode: normal # normal | chop | x8
 # chop_patch_size: 200
 # chop_step: 0.9
+# val_comparison: true
 
 datasets:
   test_1: # the 1st test dataset

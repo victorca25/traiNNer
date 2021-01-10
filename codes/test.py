@@ -14,6 +14,74 @@ from utils.metrics import calculate_psnr, calculate_ssim
 from train import parse_options, dir_check, configure_loggers, get_dataloaders
 
 
+def visuals_check(visuals_keys, val_comparison=None):
+    aligned_metrics = False
+    save_imgs = []
+    compare_imgs = []
+    model_type = None
+    
+    if visuals_keys >= {"LR", "HR", "SR"} or visuals_keys >= {"lq", "gt", "result"}:
+        # SR, 1X
+        aligned_metrics = True
+        if val_comparison:
+            save_imgs = ["LR", "SR"] if "SR" in visuals_keys else ["lq", "results"]  # default, can filter from options file
+        else: 
+            save_imgs = ["SR"] if "SR" in visuals_keys else ["results"]
+        compare_imgs = ["SR", "HR"] if "SR" in visuals_keys else ["results", "gt"]
+        model_type = "SR"
+    elif visuals_keys >= {"LR", "SR"} or visuals_keys >= {"lq", "result"}:
+        # LR
+        if val_comparison:
+            save_imgs = ["LR", "SR"] if "SR" in visuals_keys else ["lq", "results"]
+        else:
+            save_imgs = ["SR"] if "SR" in visuals_keys else ["results"]
+        model_type = "SR"
+    elif visuals_keys >= {"real_A", "fake_B", "rec_A", "real_B", "fake_A", "rec_B"}:
+        # CycleGAN
+        # res_img = "fake_B" # if AtoB else "fake_A"
+        save_imgs = ["real_A", "fake_B", "rec_A", "real_B", "fake_A", "rec_B"]  # default, can filter from options file
+        model_type = "CiC"
+    elif visuals_keys >= {"real_A", "fake_B", "real_B"}:
+        # pix2pix
+        # res_img = "fake_B"
+        save_imgs = ["real_A", "fake_B", "real_B"]  # default, can filter from options file
+        model_type = "P2P"
+    elif visuals_keys >= {"interlaced", "top_fake", "bottom_fake", "top_real", "bot_real"}:
+        # DVD train
+        aligned_metrics = True
+        save_imgs = ["top_fake", "bottom_fake"]
+        compare_imgs = ["top_fake", "top_real"]  # and compare_imgs = ["bot_fake", "bot_real"]
+        model_type = "DVD"
+    elif visuals_keys >= {"interlaced", "top_fake", "bottom_fake"}:
+        # DVD test
+        save_imgs = ["top_fake", "bottom_fake"]
+        model_type = "DVD"
+    
+    return {"aligned_metrics": aligned_metrics,
+            "save_imgs": save_imgs,
+            "compare_imgs": compare_imgs,
+            "model_type": model_type}
+
+def get_img_path(data):
+    img_path = ''
+    data_keys = data.keys()
+    if data_keys >= {"LR", "HR", "LR_path", "HR_path"} or data_keys >= {"lq", "gt", "lq_path", "gt_path"}:
+        # LRHR, PBR, Vid Train
+        img_path = data['LR_path'][0] if 'LR_path' in data else data['lq_path'][0]
+    elif data_keys >= {"LR", "LR_path"} or data_keys >= {"lq", "lq_path"}:
+        # LR
+        img_path = data['LR_path'][0] if 'LR_path' in data else data['lq_path'][0]
+    elif data_keys >= {"A", "B", "A_path", "B_path"}:
+        # pix2pix, CycleGAN
+        img_path = ''  # model.image_paths
+    elif data_keys >= {"in", "top", "bottom", "in_path", "top_path", "bot_path"}:
+        # DVD train
+        img_path = data['in_path'][0]
+    elif data_keys >= {"in", "in_path"}:
+        # DVD test
+        img_path = data['in_path'][0]
+    return img_path
+
 def test_loop(model, opt, dataloaders, data_params):
     logger = util.get_root_logger()
 
@@ -37,7 +105,8 @@ def test_loop(model, opt, dataloaders, data_params):
             need_HR = False if dataloader.dataset.opt['dataroot_HR'] is None else True
 
             model.feed_data(data, need_HR=need_HR)  # unpack data from data loader
-            img_path = data['LR_path'][0]
+            # img_path = data['LR_path'][0]
+            img_path = get_img_path(data)
             img_name = os.path.splitext(os.path.basename(img_path))[0]
 
             # test with eval mode. This only affects layers like batchnorm and dropout.
@@ -52,23 +121,29 @@ def test_loop(model, opt, dataloaders, data_params):
             else:
                 # normal inference
                 model.test()  # run inference
-            visuals = model.get_current_visuals(need_HR=need_HR)  # get image results
+            
+            # get image results
+            visuals = model.get_current_visuals(need_HR=need_HR)
 
-            sr_img = tensor2np(visuals['SR'], denormalize=znorm)  # uint8
+            res_options = visuals_check(visuals.keys(), opt.get('val_comparison', None))
 
             # save images
-            suffix = opt['suffix']
-            if suffix:
-                save_img_path = os.path.join(dataset_dir, img_name + suffix + '.png')
+            save_img_path = os.path.join(dataset_dir, img_name + opt.get('suffix', ''))
+
+            # save single images or lr / sr comparison
+            if opt['val_comparison'] and len(res_options['save_imgs']) > 1:
+                comp_images = [tensor2np(visuals[save_img_name]) for save_img_name in res_options['save_imgs']]
+                util.save_img_comp(comp_images, save_img_path + '.png')
             else:
-                save_img_path = os.path.join(dataset_dir, img_name + '.png')
-            util.save_img(sr_img, save_img_path)
+                imn = '_' + save_img_name if len(res_options['save_imgs']) > 1 else ''
+                for save_img_name in res_options['save_imgs']:
+                    util.save_img(tensor2np(visuals[save_img_name]), save_img_path + imn + '.png')
 
             # calculate metrics if HR dataset is provided and metrics are configured in options
-            if need_HR and calc_metrics:
-                gt_img = tensor2np(visuals['HR'], denormalize=znorm)  # uint8
-
-                test_results = test_metrics.calculate_metrics(sr_img, gt_img, crop_size=opt['scale'])
+            if need_HR and calc_metrics and res_options['aligned_metrics']:
+                metric_imgs = [tensor2np(visuals[x]) for x in res_options['compare_imgs']]
+                test_results = test_metrics.calculate_metrics(metric_imgs[0], metric_imgs[1], 
+                                                              crop_size=opt['scale'])
                 
                 # prepare single image metrics log message
                 logger_m = '{:20s} -'.format(img_name)
@@ -77,7 +152,8 @@ def test_loop(model, opt, dataloaders, data_params):
                     logger_m += formatted_res
 
                 if gt_img.shape[2] == 3:  # RGB image, calculate y_only metrics
-                    test_results_y = test_metrics_y.calculate_metrics(sr_img, gt_img, crop_size=opt['scale'], only_y=True)
+                    test_results_y = test_metrics_y.calculate_metrics(metric_imgs[0], metric_imgs[1], 
+                                                                      crop_size=opt['scale'], only_y=True)
                     
                     # add the y only results to the single image log message
                     for k, v in test_results_y:
