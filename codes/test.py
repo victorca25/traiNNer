@@ -135,8 +135,8 @@ def test_loop(model, opt, dataloaders, data_params):
                 comp_images = [tensor2np(visuals[save_img_name]) for save_img_name in res_options['save_imgs']]
                 util.save_img_comp(comp_images, save_img_path + '.png')
             else:
-                imn = '_' + save_img_name if len(res_options['save_imgs']) > 1 else ''
                 for save_img_name in res_options['save_imgs']:
+                    imn = '_' + save_img_name if len(res_options['save_imgs']) > 1 else ''
                     util.save_img(tensor2np(visuals[save_img_name]), save_img_path + imn + '.png')
 
             # calculate metrics if HR dataset is provided and metrics are configured in options
