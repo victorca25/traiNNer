@@ -35,13 +35,19 @@ class PPONModel(SRRaGANModel):
         if not current_step:
             current_step = 0
         phase = 1
+
+        current_phase = self.phase
         
         for i, s in enumerate(self.stages_m):
             if current_step >= s:
                 phase = i + 2
                 self.log_dict = {}  # Clear the loss logs
         
-        self.phase = 'p{}'.format(phase)
+        phase = 'p{}'.format(phase)
+        if phase != current_phase:
+            self.phase = phase
+            self.set_optim_params()
+            logger.info('Switching to phase: {}, step: {}'.format(phase, current_step))
 
     def set_optim_params(self):
         """ Freeze layers according to the current phase.
@@ -49,11 +55,34 @@ class PPONModel(SRRaGANModel):
             p2: Only training the Structure Layers: SFEM and SRM
             p3: Only training the the Perceptual Layers: PFEM and PRM
         """
+        # phase 1
+        if self.phase == 'p1': # content
+            for param in self.netG.module.CFEM.parameters():
+                param.requires_grad = True
+            for param in self.netG.module.CRM.parameters():
+                param.requires_grad = True
+            for param in self.netG.module.SFEM.parameters():
+                param.requires_grad = False
+            for param in self.netG.module.SRM.parameters():
+                param.requires_grad = False
+            for param in self.netG.module.PFEM.parameters():
+                param.requires_grad = False
+            for param in self.netG.module.PRM.parameters():
+                param.requires_grad = False
+
         # phase 2
         if self.phase == 'p2': # structure
             for param in self.netG.module.CFEM.parameters():
                 param.requires_grad = False
             for param in self.netG.module.CRM.parameters():
+                param.requires_grad = False
+            for param in self.netG.module.SFEM.parameters():
+                param.requires_grad = True
+            for param in self.netG.module.SRM.parameters():
+                param.requires_grad = True
+            for param in self.netG.module.PFEM.parameters():
+                param.requires_grad = False
+            for param in self.netG.module.PRM.parameters():
                 param.requires_grad = False
 
         # phase 3
@@ -66,6 +95,10 @@ class PPONModel(SRRaGANModel):
                 param.requires_grad = False
             for param in self.netG.module.SRM.parameters():
                 param.requires_grad = False
+            for param in self.netG.module.PFEM.parameters():
+                param.requires_grad = True
+            for param in self.netG.module.PRM.parameters():
+                param.requires_grad = True
         
         # optim_params = []
         # for k, v in self.netG.named_parameters():
@@ -108,7 +141,6 @@ class PPONModel(SRRaGANModel):
         # freeze discriminator while generator is trained to prevent BP
         if self.cri_gan:
             self.requires_grad(self.netD, flag=False, net_type='D')
-        self.set_optim_params()
 
         # batch (mixup) augmentations
         aug = None
