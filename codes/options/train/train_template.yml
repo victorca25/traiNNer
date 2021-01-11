@@ -178,6 +178,7 @@ network_D:
     norm_type: batch
     act_type: leakyrelu
     mode: CNA # CNA | NAC
+    convtype: Conv2D # Conv2D | PartialConv2D | DeformConv2D
     nf: 64
     in_nc: 3
     nlayer: 3 # only for patchgan and multiscale

@@ -19,18 +19,18 @@ class Discriminator_VGG(nn.Module):
 
         conv_blocks = []
         conv_blocks.append(B.conv_block(  in_nc, base_nf, kernel_size=3, stride=1, norm_type=None, \
-            act_type=act_type, mode=mode))
+            act_type=act_type, mode=mode, convtype=convtype))
         conv_blocks.append(B.conv_block(base_nf, base_nf, kernel_size=4, stride=2, norm_type=norm_type, \
-            act_type=act_type, mode=mode))
+            act_type=act_type, mode=mode, convtype=convtype))
 
         cur_size = size // 2
         cur_nc = base_nf
         while cur_size > 4:
             out_nc = cur_nc * 2 if cur_nc < 512 else cur_nc
             conv_blocks.append(B.conv_block(cur_nc, out_nc, kernel_size=3, stride=1, norm_type=norm_type, \
-                act_type=act_type, mode=mode))
+                act_type=act_type, mode=mode, convtype=convtype))
             conv_blocks.append(B.conv_block(out_nc, out_nc, kernel_size=4, stride=2, norm_type=norm_type, \
-                act_type=act_type, mode=mode))
+                act_type=act_type, mode=mode, convtype=convtype))
             cur_nc = out_nc
             cur_size //= 2
 
