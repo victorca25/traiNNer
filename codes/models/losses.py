@@ -324,8 +324,8 @@ class Adversarial(nn.Module):
                 l_d_real = 0
                 l_d_fake = 0
                 for preds in zip(pred_d_real, pred_d_fake):
-                    l_d_real = self.cri_gan(preds[0][0] - torch.mean(preds[1][0]), True)
-                    l_d_fake = self.cri_gan(preds[1][0] - torch.mean(preds[0][0]), False)
+                    l_d_real += self.cri_gan(preds[0][0] - torch.mean(preds[1][0]), True)
+                    l_d_fake += self.cri_gan(preds[1][0] - torch.mean(preds[0][0]), False)
                 pred_d_real = pred_d_real[0][0] # leave only the largest D for the logs
                 pred_d_fake = pred_d_fake[0][0] # leave only the largest D for the logs
             else: # regular single scale discriminators

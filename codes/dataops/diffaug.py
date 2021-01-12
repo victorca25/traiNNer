@@ -5,18 +5,28 @@ import torch
 import torch.nn.functional as F
 
 def DiffAugment(x, policy='', channels_first=True):
-    '''
+    """
     Differentiable Augmentation for Data-Efficient GAN Training
     https://arxiv.org/pdf/2006.02595.pdf
     https://github.com/mit-han-lab/data-efficient-gans/blob/master/DiffAugment_pytorch.py
-    '''
+    General recommendation is using more augmentations the smaller the 
+    dataset is and use suitable augmentations according to the data and 
+    as many as possible, then after some time of training, disable the 
+    most destructive augmentations from the POV of the images. Examples:
+        - Use policy = 'color,translation,cutout' if your dataset is small 
+        (e.g., few hundreds of images).
+        - With 'color,transl_zoom,flip,rotate,cutout', more transformations
+        added.
+        - For large datasets, try using a subset of transformations in 
+        ['color', 'translation', 'cutout'].
+    """
     if policy:
         if not channels_first: #BHWC -> BCHW
             #https://github.com/fxia22/stn.pytorch/issues/7
             x = x.permute(0, 3, 1, 2)
         for p in policy.split(','):
-            #can condition here to only use one of the functions in "p"
-            #zoom_in, zoom_out and rand_translation should be mutually exclusive
+            # can condition here to only use one of the functions in "p"
+            # zoom_in, zoom_out and rand_translation should be mutually exclusive
             if (p == 'zoom' or p == 'transl_zoom') and len(AUGMENT_FNS[p]) > 1:
               f = random.choice(AUGMENT_FNS[p])
               x = f(x)
@@ -215,12 +225,43 @@ def zoom_in(img: torch.Tensor, anisotropic=False): #scale=2
     
     return img
 
+def rand_offset(x, ratio=1, ratio_h=1, ratio_v=1):
+    w, h = x.size(2), x.size(3)
+
+    imgs = []
+    for img in x.unbind(dim = 0):
+        max_h = int(w * ratio * ratio_h)
+        max_v = int(h * ratio * ratio_v)
+
+        value_h = random.randint(0, max_h) * 2 - max_h
+        value_v = random.randint(0, max_v) * 2 - max_v
+
+        if abs(value_h) > 0:
+            img = torch.roll(img, value_h, 2)
+
+        if abs(value_v) > 0:
+            img = torch.roll(img, value_v, 1)
+
+        imgs.append(img)
+
+    return torch.stack(imgs)
+
+def rand_offset_h(x, ratio=1):
+    return rand_offset(x, ratio=1, ratio_h=ratio, ratio_v=0)
+
+def rand_offset_v(x, ratio=1):
+    return rand_offset(x, ratio=1, ratio_h=0, ratio_v=ratio)
+
+
 AUGMENT_FNS = {
-    'color': [rand_brightness, rand_saturation, rand_contrast],
-    'translation': [rand_translation], #should not combine with zoom, use one or the other
-    'zoom': [zoom_in, zoom_out], #only one zoom should be used per run
-    'flip': [rand_hflip], #, rand_vflip], #note: vflip can change image statistics, use with care
-    'rotate': [rand_90], #, rand_n90
-    'cutout': [rand_cutout], 
-    'transl_zoom': [rand_translation, zoom_in, zoom_out], #if using the three of them, use this instead of 'translation' and 'zoom'
+    'color': [rand_brightness, rand_saturation, rand_contrast],  # randomly change brightness, saturation and contrast
+    'translation': [rand_translation],  # randomly moves image on the canvas with black background. Should not combine with zoom, use one or the other
+    'zoom': [zoom_in, zoom_out],  # only one zoom should be used per run
+    'flip': [rand_hflip],  #, rand_vflip], #note: vflip can change image statistics, use with care
+    'rotate': [rand_90],  #, rand_n90
+    'cutout': [rand_cutout],  # creates random black boxes on the image
+    'transl_zoom': [rand_translation, zoom_in, zoom_out],  # if using the three of them, use this instead of 'translation' and 'zoom'
+    'offset': [rand_offset],  # randomly moves image by x and y-axis with repeating image
+    'offset_h': [rand_offset_h],  # randomly offset only on x-axis
+    'offset_v': [rand_offset_v],  # randomly offset only on y-axis
 }

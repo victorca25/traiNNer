@@ -6,6 +6,8 @@ from .SRRaGAN_model import SRRaGANModel
 from .base_model import nullcast
 logger = logging.getLogger('base')
 
+from dataops.batchaug import BatchAug
+
 
 class PPONModel(SRRaGANModel):
     def __init__(self, opt):
