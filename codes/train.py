@@ -50,13 +50,17 @@ def configure_loggers(opt=None):
     logger.info(options.dict2str(opt))
     
     # initialize tensorboard logger
+    tb_logger = None
     if opt.get('use_tb_logger', False) and 'debug' not in opt['name']:
         version = float(torch.__version__[0:3])
         log_dir = os.path.join(opt['path']['root'], 'tb_logger', opt['name'])
         # logdir_valid = os.path.join(opt['path']['root'], 'tb_logger', opt['name'] + 'valid')
         if version >= 1.1:  # PyTorch 1.1
             # official PyTorch tensorboard
-            from torch.utils.tensorboard import SummaryWriter
+            try:
+                from torch.utils.tensorboard import SummaryWriter
+            except:
+                from tensorboardX import SummaryWriter    
         else:
             logger.info('You are using PyTorch {}. Using [tensorboardX].'.format(version))
             from tensorboardX import SummaryWriter
@@ -68,7 +72,6 @@ def configure_loggers(opt=None):
             # for version tensorboardX >= 1.7
             tb_logger = SummaryWriter(logdir=log_dir)
             # tb_logger_valid = SummaryWriter(logdir=logdir_valid)
-    tb_logger = None    
     return {"tb_logger": tb_logger}
 
 
