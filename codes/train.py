@@ -258,7 +258,7 @@ def fit(model, opt, dataloaders, steps_states, data_params, loggers):
                     logger.info('Models and training states saved.')
 
                 # validation
-                if dataloaders['val'] and current_step % opt['train']['val_freq'] == 0 and take_step:
+                if dataloaders.get('val', None) and current_step % opt['train']['val_freq'] == 0 and take_step:
                     val_metrics = metrics.MetricsDict(metrics=opt['train'].get('metrics', None))
                     for val_data in dataloaders['val']:
                         
