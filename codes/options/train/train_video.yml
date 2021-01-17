@@ -95,7 +95,7 @@ network_G:
 # Discriminator options:
 network_D:
     # ESRGAN (default)| PPON:
-    which_model_D: patchgan # discriminator_vgg_128 | discriminator_vgg | discriminator_vgg_128_fea (feature extraction) | patchgan | multiscale
+    which_model_D: patchgan # discriminator_vgg_128 | discriminator_vgg | discriminator_vgg_128_fea (feature extraction) | patchgan | multiscale | discriminator_resnet_128
     norm_type: batch
     act_type: leakyrelu
     mode: CNA # CNA | NAC

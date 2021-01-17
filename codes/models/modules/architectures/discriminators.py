@@ -773,3 +773,110 @@ class PixelDiscriminator(nn.Module):
         return self.net(input)
 
 
+# ResNet50 style Discriminator with input size 128*128
+class Discriminator_ResNet_128(nn.Module):
+    """
+    Structure based off of the ResNet50 configuration from this repository:
+    https://github.com/bentrevett/pytorch-image-classification
+    """
+    def __init__(self, in_nc, base_nf, norm_type='batch', act_type='leakyrelu', mode='CNA'):
+        super(Discriminator_ResNet_128, self).__init__()
+        # features
+        # hxw, c
+
+        self.in_channels = base_nf
+        
+        # 128, 3
+        conv0 = B.conv_block(in_nc, self.in_channels, kernel_size=7, norm_type=norm_type, act_type=act_type, \
+            mode=mode, stride=2, bias=False)
+        pool0 = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
+        # 32, 64
+
+        layer1 = self.get_resnet_layer(Bottleneck, 3, base_nf) # 32, 64
+        layer2 = self.get_resnet_layer(Bottleneck, 4, base_nf*2, stride = 2) # 16, 128
+        layer3 = self.get_resnet_layer(Bottleneck, 6, base_nf*4, stride = 2) # 8, 256
+        layer4 = self.get_resnet_layer(Bottleneck, 3, base_nf*8, stride = 2) # 4, 512
+
+        avgpool = nn.AdaptiveAvgPool2d((1,1))
+
+        self.features = B.sequential(conv0, pool0, layer1, layer2, layer3, layer4, avgpool)
+
+        self.classifier = nn.Linear(self.in_channels, 1)
+
+    def get_resnet_layer(self, block, n_blocks, channels, stride = 1):
+    
+        layers = []
+        
+        if self.in_channels != block.expansion * channels:
+            downsample = True
+        else:
+            downsample = False
+        
+        layers.append(block(self.in_channels, channels, stride, downsample))
+        
+        for i in range(1, n_blocks):
+            layers.append(block(block.expansion * channels, channels))
+
+        self.in_channels = block.expansion * channels
+            
+        return nn.Sequential(*layers)
+
+    def forward(self, x):
+        x = self.features(x)
+        x = x.view(x.size(0), -1)
+        x = self.classifier(x)
+        return x
+
+class Bottleneck(nn.Module):
+    
+    expansion = 4
+    
+    def __init__(self, in_channels, out_channels, stride = 1, downsample = False):
+        super().__init__()
+    
+        self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size = 1, 
+                               stride = 1, bias = False)
+        self.bn1 = nn.BatchNorm2d(out_channels)
+        
+        self.conv2 = nn.Conv2d(out_channels, out_channels, kernel_size = 3, 
+                               stride = stride, padding = 1, bias = False)
+        self.bn2 = nn.BatchNorm2d(out_channels)
+        
+        self.conv3 = nn.Conv2d(out_channels, self.expansion * out_channels, kernel_size = 1,
+                               stride = 1, bias = False)
+        self.bn3 = nn.BatchNorm2d(self.expansion * out_channels)
+        
+        self.relu = nn.ReLU(inplace = True)
+        
+        if downsample:
+            conv = nn.Conv2d(in_channels, self.expansion * out_channels, kernel_size = 1, 
+                             stride = stride, bias = False)
+            bn = nn.BatchNorm2d(self.expansion * out_channels)
+            downsample = nn.Sequential(conv, bn)
+        else:
+            downsample = None
+            
+        self.downsample = downsample
+        
+    def forward(self, x):
+        
+        i = x
+        
+        x = self.conv1(x)
+        x = self.bn1(x)
+        x = self.relu(x)
+        
+        x = self.conv2(x)
+        x = self.bn2(x)
+        x = self.relu(x)
+        
+        x = self.conv3(x)
+        x = self.bn3(x)
+                
+        if self.downsample is not None:
+            i = self.downsample(i)
+            
+        x += i
+        x = self.relu(x)
+    
+        return x
