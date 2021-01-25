@@ -5,6 +5,7 @@ from torch.nn import init as init
 from torch.nn.modules.batchnorm import _BatchNorm
 
 from . import block as B
+from . import RRDBNet_arch as R
 from .convolutions.deformconv2d import DCNv2Pack
 
 
@@ -357,6 +358,12 @@ class EDVR(nn.Module):
         with_predeblur (bool): Whether has predeblur module.
             Default: False.
         with_tsa (bool): Whether has TSA module. Default: True.
+
+    Custom Args:
+        residual_type (str): Type of residual block to use. 'RB' = ResidualBlock (no BN), 
+            'RRDB' = Residual-in-Residual Dense Block. Default: 'RB'.
+        upsample_model (str): The type of upsample layer to use. 'pixelshuffle' or 'upconv'.
+            Default: 'pixelshuffle'.
     """
 
     def __init__(self,
@@ -370,7 +377,9 @@ class EDVR(nn.Module):
                  center_frame_idx=2,
                  hr_in=False,
                  with_predeblur=False,
-                 with_tsa=True):
+                 with_tsa=True,
+                 residual_type='RB',
+                 upsample_mode='pixelshuffle'):
         super(EDVR, self).__init__()
         if center_frame_idx is None:
             self.center_frame_idx = num_frame // 2
@@ -389,8 +398,12 @@ class EDVR(nn.Module):
             self.conv_first = nn.Conv2d(num_in_ch, num_feat, 3, 1, 1)
 
         # extrat pyramid features
-        self.feature_extraction = B.make_layer(
-            ResidualBlockNoBN, num_extract_block, num_feat=num_feat)
+        if residual_type == 'RRDB':
+            self.feature_extraction = B.make_layer(
+                R.RRDB, num_extract_block, nf=num_feat)
+        else:
+            self.feature_extraction = B.make_layer(
+                ResidualBlockNoBN, num_extract_block, num_feat=num_feat)
         self.conv_l2_1 = nn.Conv2d(num_feat, num_feat, 3, 2, 1)
         self.conv_l2_2 = nn.Conv2d(num_feat, num_feat, 3, 1, 1)
         self.conv_l3_1 = nn.Conv2d(num_feat, num_feat, 3, 2, 1)
@@ -408,12 +421,22 @@ class EDVR(nn.Module):
             self.fusion = nn.Conv2d(num_frame * num_feat, num_feat, 1, 1)
 
         # reconstruction
-        self.reconstruction = B.make_layer(
-            ResidualBlockNoBN, num_reconstruct_block, num_feat=num_feat)
+        if residual_type == 'RRDB':
+            self.reconstruction = B.make_layer(
+                R.RRDB, num_reconstruct_block, nf=num_feat)
+        else:
+            self.reconstruction = B.make_layer(
+                ResidualBlockNoBN, num_reconstruct_block, num_feat=num_feat)
         # upsample
-        self.upconv1 = nn.Conv2d(num_feat, num_feat * 4, 3, 1, 1)
-        self.upconv2 = nn.Conv2d(num_feat, 64 * 4, 3, 1, 1)
-        self.pixel_shuffle = nn.PixelShuffle(2)
+        # Doing it this way for backwards compatibility
+        if upsample_mode == 'upconv':
+            self.upconv1 = B.upconv_block(num_feat, num_feat, 2, 3, 1, act_type=None)
+            self.upconv2 = B.upconv_block(num_feat, 64, 2, 3, 1, act_type=None)
+            self.pixel_shuffle = nn.Identity()
+        else:
+            self.upconv1 = nn.Conv2d(num_feat, num_feat * 4, 3, 1, 1)
+            self.upconv2 = nn.Conv2d(num_feat, 64 * 4, 3, 1, 1)
+            self.pixel_shuffle = nn.PixelShuffle(2)
         self.conv_hr = nn.Conv2d(64, 64, 3, 1, 1)
         self.conv_last = nn.Conv2d(64, num_out_ch, 3, 1, 1)
 
