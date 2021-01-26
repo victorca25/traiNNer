@@ -550,7 +550,7 @@ class SelfAttentionBlock(nn.Module):
         
         if self.max_pool: #Upscale to original size
             # out = self.upsample_o(out)
-            out = B.Upsample(size=(input.shape[2],input.shape[3]), mode='bicubic', align_corners=False)(out) #bicubic (PyTorch > 1.0) | bilinear others.
+            out = Upsample(size=(input.shape[2],input.shape[3]), mode='bicubic', align_corners=False)(out) #bicubic (PyTorch > 1.0) | bilinear others.
         
         out = self.gamma*out + input #Add original input
         
