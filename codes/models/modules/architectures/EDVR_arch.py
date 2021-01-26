@@ -8,6 +8,8 @@ from . import block as B
 from . import RRDBNet_arch as R
 from .convolutions.deformconv2d import DCNv2Pack
 
+import math
+
 
 # TODO: Stardardize with one in block.py
 @torch.no_grad()
@@ -379,7 +381,8 @@ class EDVR(nn.Module):
                  with_predeblur=False,
                  with_tsa=True,
                  residual_type='RB',
-                 upsample_mode='pixelshuffle'):
+                 upsample_mode='pixelshuffle',
+                 upscale=4):
         super(EDVR, self).__init__()
         if center_frame_idx is None:
             self.center_frame_idx = num_frame // 2
@@ -428,15 +431,18 @@ class EDVR(nn.Module):
             self.reconstruction = B.make_layer(
                 ResidualBlockNoBN, num_reconstruct_block, num_feat=num_feat)
         # upsample
-        # Doing it this way for backwards compatibility
-        if upsample_mode == 'upconv':
-            self.upconv1 = B.upconv_block(num_feat, num_feat, 2, 3, 1, act_type=None)
-            self.upconv2 = B.upconv_block(num_feat, 64, 2, 3, 1, act_type=None)
-            self.pixel_shuffle = nn.Identity()
-        else:
-            self.upconv1 = nn.Conv2d(num_feat, num_feat * 4, 3, 1, 1)
-            self.upconv2 = nn.Conv2d(num_feat, 64 * 4, 3, 1, 1)
-            self.pixel_shuffle = nn.PixelShuffle(2)
+        self.upscale = upscale
+        n_upscale = int(math.log(upscale, 2))
+        self.n_upscale = n_upscale
+        for i in range(n_upscale):
+            if upsample_mode == 'upconv':
+                for i in range(n_upscale):
+                    setattr(self, f'upconv{i+1}', B.upconv_block(num_feat, (num_feat if i < n_upscale-1 else 64), 2, 3, 1, act_type=None))
+                self.pixel_shuffle = nn.Identity()
+            else: # if upsample_mode == 'pixelshuffle':
+                for i in range(n_upscale):
+                    setattr(self, f'upconv{i+1}', B.pixelshuffle_block(num_feat, (num_feat if i < n_upscale-1 else 64), 2, 3, 1, act_type=None))
+                self.pixel_shuffle = nn.PixelShuffle(2)  
         self.conv_hr = nn.Conv2d(64, 64, 3, 1, 1)
         self.conv_last = nn.Conv2d(64, num_out_ch, 3, 1, 1)
 
@@ -446,11 +452,11 @@ class EDVR(nn.Module):
     def forward(self, x):
         b, t, c, h, w = x.size()
         if self.hr_in:
-            assert h % 16 == 0 and w % 16 == 0, (
-                'The height and width must be multiple of 16.')
+            assert h % (self.upscale ** 2) == 0 and w % (self.upscale ** 2) == 0, (
+                'The height and width must be multiple of {}.'.format(self.upscale ** 2))
         else:
-            assert h % 4 == 0 and w % 4 == 0, (
-                'The height and width must be multiple of 4.')
+            assert h % self.upscale == 0 and w % self.upscale == 0, (
+                'The height and width must be multiple of {}.'.format(self.upscale))
 
         x_center = x[:, self.center_frame_idx, :, :, :].contiguous()
 
@@ -459,7 +465,7 @@ class EDVR(nn.Module):
         if self.with_predeblur:
             feat_l1 = self.conv_1x1(self.predeblur(x.view(-1, c, h, w)))
             if self.hr_in:
-                h, w = h // 4, w // 4
+                h, w = h // self.upscale, w // self.upscale
         else:
             feat_l1 = self.lrelu(self.conv_first(x.view(-1, c, h, w)))
 
@@ -495,14 +501,16 @@ class EDVR(nn.Module):
         feat = self.fusion(aligned_feat)
 
         out = self.reconstruction(feat)
-        out = self.lrelu(self.pixel_shuffle(self.upconv1(out)))
-        out = self.lrelu(self.pixel_shuffle(self.upconv2(out)))
+        # Backwards compatibility
+        for i in range(self.n_upscale):
+            upconv = getattr(self, f'upconv{i+1}')
+            out = self.lrelu(self.pixel_shuffle(upconv(out)))
         out = self.lrelu(self.conv_hr(out))
         out = self.conv_last(out)
         if self.hr_in:
             base = x_center
         else:
             base = F.interpolate(
-                x_center, scale_factor=4, mode='bilinear', align_corners=False)
+                x_center, scale_factor=self.upscale, mode='bilinear', align_corners=False)
         out += base
         return out

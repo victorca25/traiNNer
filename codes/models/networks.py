@@ -225,7 +225,7 @@ def define_G(opt, step=0):
         netG = EDVR_arch.EDVR(num_in_ch=opt_net['in_nc'], num_out_ch=opt_net['out_nc'], num_feat=opt_net['nf'], num_frame=opt_net['n_frames'],
                             deformable_groups=opt_net['deformable_groups'], num_extract_block=opt_net['n_extract_block'], 
                             num_reconstruct_block=opt_net['n_reconstruct_block'], center_frame_idx=None, with_predeblur=opt_net['predeblur'], 
-                            with_tsa=opt_net['tsa'], residual_type=opt_net['residual_type'], upsample_mode=opt_net['upsample_mode'])
+                            with_tsa=opt_net['tsa'], residual_type=opt_net['residual_type'], upsample_mode=opt_net['upsample_mode'], upscale=opt_net['scale'])
     else:
         raise NotImplementedError('Generator model [{:s}] not recognized'.format(which_model))
 
