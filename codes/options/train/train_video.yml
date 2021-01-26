@@ -103,8 +103,9 @@ network_G:
     # n_reconstruct_block: 10 # Number of reconstruction blocks (M=10, L=40)
     # predeblur: false # Use pre-deblur 
     # tsa: true # Use Temporal Spatial Attention
-    # residual_type: RB # RB | RRDB
     # upsample_mode: pixelshuffle # pixelshuffle | upconv
+    # add_rrdb: false # Adds RRDB blocks before upsample step to improve SR
+    # nb: 23 # Only applies to add_rrdb's RRDB blocks
     
 # Discriminator options:
 network_D:

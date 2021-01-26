@@ -380,9 +380,10 @@ class EDVR(nn.Module):
                  hr_in=False,
                  with_predeblur=False,
                  with_tsa=True,
-                 residual_type='RB',
                  upsample_mode='pixelshuffle',
-                 upscale=4):
+                 upscale=4,
+                 add_rrdb=False,
+                 nb=23):
         super(EDVR, self).__init__()
         if center_frame_idx is None:
             self.center_frame_idx = num_frame // 2
@@ -400,13 +401,9 @@ class EDVR(nn.Module):
         else:
             self.conv_first = nn.Conv2d(num_in_ch, num_feat, 3, 1, 1)
 
-        # extrat pyramid features
-        if residual_type == 'RRDB':
-            self.feature_extraction = B.make_layer(
-                R.RRDB, num_extract_block, nf=num_feat)
-        else:
-            self.feature_extraction = B.make_layer(
-                ResidualBlockNoBN, num_extract_block, num_feat=num_feat)
+        # extract pyramid features
+        self.feature_extraction = B.make_layer(
+            ResidualBlockNoBN, num_extract_block, num_feat=num_feat)
         self.conv_l2_1 = nn.Conv2d(num_feat, num_feat, 3, 2, 1)
         self.conv_l2_2 = nn.Conv2d(num_feat, num_feat, 3, 1, 1)
         self.conv_l3_1 = nn.Conv2d(num_feat, num_feat, 3, 2, 1)
@@ -424,12 +421,18 @@ class EDVR(nn.Module):
             self.fusion = nn.Conv2d(num_frame * num_feat, num_feat, 1, 1)
 
         # reconstruction
-        if residual_type == 'RRDB':
-            self.reconstruction = B.make_layer(
-                R.RRDB, num_reconstruct_block, nf=num_feat)
-        else:
-            self.reconstruction = B.make_layer(
-                ResidualBlockNoBN, num_reconstruct_block, num_feat=num_feat)
+        self.reconstruction = B.make_layer(
+            ResidualBlockNoBN, num_reconstruct_block, num_feat=num_feat)
+
+        # Optional RRDB blocks
+        self.add_rrdb = add_rrdb
+        if add_rrdb:
+            rb_blocks = [R.RRDB(num_feat, nr=3, kernel_size=3, gc=32, stride=1, bias=1, pad_type='zero',
+                norm_type=None, act_type='leakyrelu', mode='CNA', convtype='Conv2D',
+                gaussian_noise=False, plus=False) for _ in range(nb)]
+            LR_conv = B.conv_block(num_feat, num_feat, kernel_size=3, norm_type=None, act_type=None, mode='CNA', convtype='Conv2D')
+            self.RRDB = B.ShortcutBlock(B.sequential(*rb_blocks, LR_conv))
+
         # upsample
         self.upscale = upscale
         n_upscale = int(math.log(upscale, 2))
@@ -501,7 +504,10 @@ class EDVR(nn.Module):
         feat = self.fusion(aligned_feat)
 
         out = self.reconstruction(feat)
-        # Backwards compatibility
+
+        if self.add_rrdb:
+            out = self.RRDB(out)
+
         for i in range(self.n_upscale):
             upconv = getattr(self, f'upconv{i+1}')
             out = self.lrelu(self.pixel_shuffle(upconv(out)))
