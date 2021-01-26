@@ -68,3 +68,18 @@ network_G:
   # gaussian: true # true | false
   # plus: false # true | false
   # ##finalact: tanh # Test. Activation function to make outputs fit in [-1, 1] range. Default = None. Coordinate with znorm.
+
+  # EDVR:
+  # which_model_G: EDVR_net
+  # in_nc: 3 # Number of input image channels: 3 for RGB and 1 for grayscale
+  # out_nc: 3 # Number of output image channels: 3 for RGB and 1 for grayscale
+  # nf: 64 # Number of features (M=64, L=128)
+  # n_frames: 3 # number of frames the network will use to estimate the central frame (n-1)/2. Must coincide with "num_frames" in the dataset.
+  # deformable_groups: 8 # Number of deformable offset groups in the deformable layers
+  # n_extract_block: 5 # Number of extract blocks
+  # n_reconstruct_block: 10 # Number of reconstruction blocks (M=10, L=40)
+  # predeblur: false # Use pre-deblur 
+  # tsa: true # Use Temporal Spatial Attention
+  # upsample_mode: pixelshuffle # pixelshuffle | upconv
+  # add_rrdb: false # Adds RRDB blocks before upsample step to improve SR
+  # nb: 23 # Only applies to add_rrdb's RRDB blocks
