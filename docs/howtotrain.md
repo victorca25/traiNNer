@@ -11,10 +11,13 @@ We use a PSNR-oriented pretrained SR model to initialize the parameters for bett
 Note that while you can train PPON using the regular train.py file and the same steps as other SR models, these options have to be set in the training options file (using example values):
 
 Select ppon model type:
+```
     model: ppon
+```
 
 
 Set the ppon Generator network:
+```
     which_model_G: ppon
     mode: CNA
     nf: 64
@@ -22,9 +25,10 @@ Set the ppon Generator network:
     in_nc: 3
     out_nc: 3
     group: 1
-
+```
 
 You need to configure the losses (type, weights, etc) as you would normally first:
+```    
     pixel_criterion: l1
     pixel_weight: 1
     feature_criterion: l1
@@ -35,12 +39,15 @@ You need to configure the losses (type, weights, etc) as you would normally firs
     ms_weight: 1e-2
     gan_type: vanilla
     gan_weight: 8e-3
+```
 
 And then pick which of the configured losses will be used for each stage (the names used are matched out of the names as they are logged during training, so `pixel_criterion` corresponds to `pix`, `feature_criterion` to `fea` and `cx_type: contextual` to `contextual`, for example):
+```
     p1_losses: [pix] # from the paper: l1 pixel_weigh: 1
     p2_losses: [pix-multiscale, ms-ssim] # from the paper: multiscale_weight: 1, ms-ssim_weight: 1
     p3_losses: [fea] # from the paper: VGG feature_weight: 1 gan_weight: 0.005
     ppon_stages: [1000, 2000] # The first value here is where phase 2 (structure) will start and the second is where phase 3 (features) starts
+```
 
 The same losses can be used in multiple stages (it can be repeated) and take into consideration that the first stage is the one with the most capacity of the network and the other two stages depend on it.
 
