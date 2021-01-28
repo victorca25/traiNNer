@@ -294,7 +294,13 @@ class KernelDownscale(object):
         self.scale = 1.0/scale
 
         # self.kernel_paths = glob.glob(os.path.join(opt['dataroot_kernels'], '*/*_kernel_x{}.npy'.format(scale)))
-        self.kernel_paths = glob.glob(os.path.join(kernel_paths, '*/*_kernel_x{}.npy'.format(scale)))
+        # using the modified kernelGAN file structure.
+        self.kernel_paths = glob.glob(os.path.join(kernel_paths, '*/kernel_x{}.npy'.format(scale)))
+        if not self.kernel_paths:
+            # try using the original kernelGAN file structure.
+            self.kernel_paths = glob.glob(os.path.join(kernel_paths, '*/*_kernel_x{}.npy'.format(scale)))
+        assert self.kernel_paths, "No kernels found for scale {} in path {}.".format(scale, kernel_paths)
+        
         self.num_kernel = len(self.kernel_paths)
         # print('num_kernel: ', self.num_kernel)
 
@@ -314,6 +320,7 @@ class KernelDownscale(object):
             kernel = np.load(f)
 
         kernel = self.pre_process(kernel)
+        kernel = kernel / np.sum(kernel)  # normalize to make cropped kernel sum 1 again
         # print(kernel.shape)
 
         input_shape = img.shape
