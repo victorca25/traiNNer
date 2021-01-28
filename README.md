@@ -77,7 +77,7 @@ We also provide:
 1.  Some useful scripts. More details in [`./codes/scripts`](https://github.com/victorca25/BasicSR/tree/master/codes/scripts). 
 2.  [Evaluation codes](https://github.com/victorca25/BasicSR/tree/master/metrics), e.g., PSNR/SSIM metric.
 
-To extract the realistic kernels and noise patches, use the modified KernelGAN and patches extraction code in: [DLIP](https://github.com/victorca25/DLIP)
+To extract the estimated kernels and noise patches from images, use the modified KernelGAN and patches extraction code in: [DLIP](https://github.com/victorca25/DLIP). Detailed instructions to use the estimated kernels are available [here](https://github.com/victorca25/BasicSR/blob/master/docs/kernels.md)
 
 ## Usage
 
