@@ -30,7 +30,7 @@ class LRHRDataset(Dataset):
         self.LR_env, self.HR_env = None, None  # environment for lmdb
         self.output_sample_imgs = None
 
-        if opt.get('dataroot_kernels', None):
+        if opt.get('dataroot_kernels', None) and 999 in self.opt["lr_downscale_types"]:
             #TODO: note: use the model scale to get the right kernel 
             scale = opt.get('scale', 4)
             self.ds_kernels = KernelDownscale(scale=scale, kernel_paths=opt['dataroot_kernels'])
