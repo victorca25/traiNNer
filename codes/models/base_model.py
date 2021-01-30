@@ -101,7 +101,7 @@ class BaseModel:
             if isinstance(name, str):
                 net = getattr(self, 'net' + name)
                 s, n = self.get_network_description(net)
-                if isinstance(net, nn.DataParallel):
+                if isinstance(net, nn.DataParallel) or isinstance(self.netG, nn.parallel.DistributedDataParallel):
                     net_struc_str = '{} - {}'.format(net.__class__.__name__,
                                                      net.module.__class__.__name__)
                 else:
@@ -188,10 +188,11 @@ class BaseModel:
                 net = getattr(self, 'net' + name)
                 load_path_opt = 'pretrain_model_{}'.format(name)
                 load_path = self.opt['path'][load_path_opt]
+                load_submodule = self.opt['path'].get('load_submodule', None)  # 'RRDB' -> pretrained RRDB for SRFlow
                 if load_path is not None:
                     logger.info('Loading pretrained model for {} [{:s}] ...'.format(name, load_path))
                     strict = self.opt['network_{}'.format(name)].get('strict', None)
-                    self.load_network(load_path, net, strict, model_type=name)
+                    self.load_network(load_path, net, strict, model_type=name, submodule=load_submodule)
 
         # load_path_G = self.opt['path']['pretrain_model_G']
         # if load_path_G is not None:

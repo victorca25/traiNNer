@@ -219,10 +219,10 @@ class SRRaGANModel(BaseModel):
 
     def feed_data(self, data, need_HR=True):
         # LR images
-        self.var_L = data['LR'].to(self.device)
+        self.var_L = data['LR'].to(self.device)  # LQ
         if need_HR:  # train or val
             # HR images
-            self.var_H = data['HR'].to(self.device)
+            self.real_H = data['HR'].to(self.device)  # GT
             # discriminator references
             input_ref = data.get('ref', data['HR'])
             self.var_ref = input_ref.to(self.device)
@@ -262,8 +262,8 @@ class SRRaGANModel(BaseModel):
         # batch (mixup) augmentations
         aug = None
         if self.mixup:
-            self.var_H, self.var_L, mask, aug = BatchAug(
-                self.var_H, self.var_L,
+            self.real_H, self.var_L, mask, aug = BatchAug(
+                self.real_H, self.var_L,
                 self.mixopts, self.mixprob, self.mixalpha,
                 self.aux_mixprob, self.aux_mixalpha, self.mix_p
                 )
@@ -276,12 +276,12 @@ class SRRaGANModel(BaseModel):
         # batch (mixup) augmentations
         # cutout-ed pixels are discarded when calculating loss by masking removed pixels
         if aug == "cutout":
-            self.fake_H, self.var_H = self.fake_H*mask, self.var_H*mask
+            self.fake_H, self.real_H = self.fake_H*mask, self.real_H*mask
         
         # unpad images if using CEM
         if self.CEM:
             self.fake_H = self.CEM_net.HR_unpadder(self.fake_H)
-            self.var_H = self.CEM_net.HR_unpadder(self.var_H)
+            self.real_H = self.CEM_net.HR_unpadder(self.real_H)
             self.var_ref = self.CEM_net.HR_unpadder(self.var_ref)
 
         l_g_total = 0
@@ -294,7 +294,7 @@ class SRRaGANModel(BaseModel):
         if (self.cri_gan is not True) or (step % self.D_update_ratio == 0 and step > self.D_init_iters):
             with self.cast(): # Casts operations to mixed precision if enabled, else nullcontext
                 # regular losses
-                loss_results, self.log_dict = self.generatorlosses(self.fake_H, self.var_H, self.log_dict, self.f_low)
+                loss_results, self.log_dict = self.generatorlosses(self.fake_H, self.real_H, self.log_dict, self.f_low)
                 l_g_total += sum(loss_results) / self.accumulations
 
                 if self.cri_gan:
@@ -309,7 +309,7 @@ class SRRaGANModel(BaseModel):
             # high precision generator losses (can be affected by AMP half precision)
             if self.precisegeneratorlosses.loss_list:
                 precise_loss_results, self.log_dict = self.precisegeneratorlosses(
-                        self.fake_H, self.var_H, self.log_dict, self.f_low)
+                        self.fake_H, self.real_H, self.log_dict, self.f_low)
                 l_g_total += sum(precise_loss_results) / self.accumulations
             
             if self.amp:
@@ -471,7 +471,7 @@ class SRRaGANModel(BaseModel):
         out_dict['LR'] = self.var_L.detach()[0].float().cpu()
         out_dict['SR'] = self.fake_H.detach()[0].float().cpu()
         if need_HR:
-            out_dict['HR'] = self.var_H.detach()[0].float().cpu()
+            out_dict['HR'] = self.real_H.detach()[0].float().cpu()
         return out_dict
 
     def get_current_visuals_batch(self, need_HR=True):
@@ -479,5 +479,5 @@ class SRRaGANModel(BaseModel):
         out_dict['LR'] = self.var_L.detach().float().cpu()
         out_dict['SR'] = self.fake_H.detach().float().cpu()
         if need_HR:
-            out_dict['HR'] = self.var_H.detach().float().cpu()
+            out_dict['HR'] = self.real_H.detach().float().cpu()
         return out_dict

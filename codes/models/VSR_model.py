@@ -208,9 +208,9 @@ class VSRModel(BaseModel):
 
         # bicubic upscaled LR and RGB center HR
         if isinstance(data['HR_center'], torch.Tensor):
-            self.var_H_center = data['HR_center'].to(self.device)
+            self.real_H_center = data['HR_center'].to(self.device)
         else:
-            self.var_H_center = None
+            self.real_H_center = None
         if isinstance(data['LR_bicubic'], torch.Tensor): 
             self.var_LR_bic = data['LR_bicubic'].to(self.device)
         else:
@@ -222,7 +222,7 @@ class VSRModel(BaseModel):
                 HR = data['HR'].view(b, -1, 1, h_lr * self.scale, w_lr * self.scale) # b, t, c, h, w
             elif len(data['HR'].size()) == 5: #for networks that work with 3 channel images
                 HR = data['HR'] # b, t, c, h, w 
-            self.var_H = HR.to(self.device)
+            self.real_H = HR.to(self.device)
 
             # discriminator references
             input_ref = data.get('ref', data['HR'])
@@ -248,8 +248,8 @@ class VSRModel(BaseModel):
         aug = None
         '''
         if self.mixup:
-            self.var_H, self.var_L, mask, aug = BatchAug(
-                self.var_H, self.var_L,
+            self.real_H, self.var_L, mask, aug = BatchAug(
+                self.real_H, self.var_L,
                 self.mixopts, self.mixprob, self.mixalpha,
                 self.aux_mixprob, self.aux_mixalpha, self.mix_p
                 )
@@ -267,11 +267,11 @@ class VSRModel(BaseModel):
         # cutout-ed pixels are discarded when calculating loss by masking removed pixels
         '''
         if aug == "cutout":
-            self.fake_H, self.var_H = self.fake_H*mask, self.var_H*mask
+            self.fake_H, self.real_H = self.fake_H*mask, self.real_H*mask
         '''
 
         #TODO: TMP test to view samples of the optical flows
-        # tmp_vis(self.var_H[:, self.idx_center, :, :, :], True)
+        # tmp_vis(self.real_H[:, self.idx_center, :, :, :], True)
         # print(flow_L1[0].shape)
         # tmp_vis(flow_L1[0][:, 0:1, :, :], to_np=True, rgb2bgr=False)
         # tmp_vis(flow_L2[0][:, 0:1, :, :], to_np=True, rgb2bgr=False)
@@ -290,7 +290,7 @@ class VSRModel(BaseModel):
         if (self.cri_gan is not True) or (step % self.D_update_ratio == 0 and step > self.D_init_iters):
             with self.cast(): # Casts operations to mixed precision if enabled, else nullcontext
                 # get the central frame for SR losses
-                if isinstance(self.var_LR_bic, torch.Tensor) and isinstance(self.var_H_center, torch.Tensor):
+                if isinstance(self.var_LR_bic, torch.Tensor) and isinstance(self.real_H_center, torch.Tensor):
                     # tmp_vis(ycbcr_to_rgb(self.var_LR_bic), True)
                     # print("fake_H:", self.fake_H.shape)
                     fake_H_cb = self.var_LR_bic[:, 1, :, :].to(self.device)
@@ -300,18 +300,18 @@ class VSRModel(BaseModel):
                     centralSR = ycbcr_to_rgb(torch.stack((self.fake_H.squeeze(1), fake_H_cb, fake_H_cr), -3))
                     # print("central rgb", centralSR.shape)
                     # tmp_vis(centralSR, True)
-                    # centralHR = ycbcr_to_rgb(self.var_H_center) #Not needed, can send the rgb HR from dataloader
-                    centralHR = self.var_H_center
+                    # centralHR = ycbcr_to_rgb(self.real_H_center) #Not needed, can send the rgb HR from dataloader
+                    centralHR = self.real_H_center
                     # print(centralHR.shape)
                     # tmp_vis(centralHR)
                 else: #if self.var_L.shape[2] == 1:
                     centralSR = self.fake_H
-                    centralHR = self.var_H[:, :, self.idx_center, :, :] if self.tensor_shape == 'CTHW' else self.var_H[:, self.idx_center, :, :, :]
+                    centralHR = self.real_H[:, :, self.idx_center, :, :] if self.tensor_shape == 'CTHW' else self.real_H[:, self.idx_center, :, :, :]
                 
                 # tmp_vis(torch.cat((centralSR, centralHR), -1))
 
                 # regular losses
-                # loss_SR = criterion(self.fake_H, self.var_H[:, idx_center, :, :, :]) #torch.nn.MSELoss()
+                # loss_SR = criterion(self.fake_H, self.real_H[:, idx_center, :, :, :]) #torch.nn.MSELoss()
                 loss_results, self.log_dict = self.generatorlosses(centralSR, 
                                     centralHR, self.log_dict, self.f_low)
                 l_g_total += sum(loss_results)/self.accumulations
@@ -327,7 +327,7 @@ class VSRModel(BaseModel):
                                             F.avg_pool2d(self.var_L[:, self.idx_center, :, :, :], kernel_size=2),
                                             flow_L1[i])
                             loss_L2 = self.cri_ofr(self.var_L[:, i, :, :, :], self.var_L[:, self.idx_center, :, :, :], flow_L2[i])
-                            loss_L3 = self.cri_ofr(self.var_H[:, i, :, :, :], self.var_H[:, self.idx_center, :, :, :], flow_L3[i])
+                            loss_L3 = self.cri_ofr(self.real_H[:, i, :, :, :], self.real_H[:, self.idx_center, :, :, :], flow_L3[i])
                             # ofr weights option. lambda2 = 0.2, lambda1 = 0.1 in the paper
                             l_g_ofr += loss_L3 + self.ofr_wl2 * loss_L2 + self.ofr_wl1 * loss_L1
 
@@ -434,7 +434,7 @@ class VSRModel(BaseModel):
         out_dict['LR'] = self.var_L.detach()[0].float().cpu()
         out_dict['SR'] = self.fake_H.detach()[0].float().cpu()
         if need_HR:
-            out_dict['HR'] = self.var_H.detach()[0].float().cpu()
+            out_dict['HR'] = self.real_H.detach()[0].float().cpu()
         return out_dict
 
     def get_current_visuals_batch(self, need_HR=True):
@@ -443,5 +443,5 @@ class VSRModel(BaseModel):
         out_dict['LR'] = self.var_L.detach().float().cpu()
         out_dict['SR'] = self.fake_H.detach().float().cpu()
         if need_HR:
-            out_dict['HR'] = self.var_H.detach().float().cpu()
+            out_dict['HR'] = self.real_H.detach().float().cpu()
         return out_dict

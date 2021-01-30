@@ -118,7 +118,7 @@ class SFTGAN_ACD_Model(BaseModel):
         self.var_cat = data['category'].long().to(self.device)
 
         if need_HR:  # train or val
-            self.var_H = data['HR'].to(self.device)
+            self.real_H = data['HR'].to(self.device)
 
     def optimize_parameters(self, step):
         # G
@@ -129,10 +129,10 @@ class SFTGAN_ACD_Model(BaseModel):
         l_g_total = 0
         if step % self.D_update_ratio == 0 and step > self.D_init_iters:
             if self.cri_pix:  # pixel loss
-                l_g_pix = self.l_pix_w * self.cri_pix(self.fake_H, self.var_H)
+                l_g_pix = self.l_pix_w * self.cri_pix(self.fake_H, self.real_H)
                 l_g_total += l_g_pix
             if self.cri_fea:  # feature loss
-                real_fea = self.netF(self.var_H).detach()
+                real_fea = self.netF(self.real_H).detach()
                 fake_fea = self.netF(self.fake_H)
                 l_g_fea = self.l_fea_w * self.cri_fea(fake_fea, real_fea)
                 l_g_total += l_g_fea
@@ -152,7 +152,7 @@ class SFTGAN_ACD_Model(BaseModel):
         self.optimizer_D.zero_grad()
         l_d_total = 0
         # real data
-        pred_d_real, cls_d_real = self.netD(self.var_H)
+        pred_d_real, cls_d_real = self.netD(self.real_H)
         l_d_real = self.cri_gan(pred_d_real, True)
         l_d_cls_real = self.cri_ce(cls_d_real, self.var_cat)
         # fake data
@@ -163,11 +163,11 @@ class SFTGAN_ACD_Model(BaseModel):
         l_d_total = l_d_real + l_d_cls_real + l_d_fake + l_d_cls_fake
 
         if self.opt['train']['gan_type'] == 'wgan-gp':
-            batch_size = self.var_H.size(0)
+            batch_size = self.real_H.size(0)
             if self.random_pt.size(0) != batch_size:
                 self.random_pt.resize_(batch_size, 1, 1, 1)
             self.random_pt.uniform_()  # Draw random interpolation points
-            interp = self.random_pt * self.fake_H.detach() + (1 - self.random_pt) * self.var_H
+            interp = self.random_pt * self.fake_H.detach() + (1 - self.random_pt) * self.real_H
             interp.requires_grad = True
             interp_crit, _ = self.netD(interp)
             l_d_gp = self.l_gp_w * self.cri_gp(interp, interp_crit)  # maybe wrong in cls?
@@ -209,7 +209,7 @@ class SFTGAN_ACD_Model(BaseModel):
         out_dict['LR'] = self.var_L.detach()[0].float().cpu()
         out_dict['SR'] = self.fake_H.detach()[0].float().cpu()
         if need_HR:
-            out_dict['HR'] = self.var_H.detach()[0].float().cpu()
+            out_dict['HR'] = self.real_H.detach()[0].float().cpu()
         return out_dict
 
     def print_network(self):

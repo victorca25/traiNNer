@@ -175,45 +175,45 @@ class PBRModel(BaseModel):
         self.var_L = data['LR'].to(self.device)
         if need_HR:  # train or val
             # HR images
-            self.var_H = data['HR'].to(self.device)
+            self.real_H = data['HR'].to(self.device)
             # discriminator references
             input_ref = data.get('ref', data['HR'])
             self.var_ref = input_ref.to(self.device)
         
         if isinstance(data.get('NO', None), torch.Tensor):
-            self.var_NO = data['NO'].to(self.device)
+            self.real_NO = data['NO'].to(self.device)
         else:
-            self.var_NO = None
+            self.real_NO = None
         
         if isinstance(data.get('AL', None), torch.Tensor):
-            self.var_AL = data['AL'].to(self.device)
+            self.real_AL = data['AL'].to(self.device)
         else:
-            self.var_AL = None
+            self.real_AL = None
 
         if isinstance(data.get('AO', None), torch.Tensor):
-            self.var_AO = data['AO'].to(self.device)
+            self.real_AO = data['AO'].to(self.device)
         else:
-            self.var_AO = None
+            self.real_AO = None
         
         if isinstance(data.get('HE', None), torch.Tensor):
-            self.var_HE = data['HE'].to(self.device)
+            self.real_HE = data['HE'].to(self.device)
         else:
-            self.var_HE = None
+            self.real_HE = None
         
         if isinstance(data.get('ME', None), torch.Tensor):
-            self.var_ME = data['ME'].to(self.device)
+            self.real_ME = data['ME'].to(self.device)
         else:
-            self.var_ME = None
+            self.real_ME = None
         
         if isinstance(data.get('RE', None), torch.Tensor):
-            self.var_RE = data['RE'].to(self.device)
+            self.real_RE = data['RE'].to(self.device)
         else:
-            self.var_RE = None
+            self.real_RE = None
         
         if isinstance(data.get('RO', None), torch.Tensor):
-            self.var_RO = data['RO'].to(self.device)
+            self.real_RO = data['RO'].to(self.device)
         else:
-            self.var_RO = None
+            self.real_RO = None
         
 
     def feed_data_batch(self, data, need_HR=True):
@@ -230,8 +230,8 @@ class PBRModel(BaseModel):
         # batch (mixup) augmentations
         # aug = None
         # if self.mixup:
-        #     self.var_H, self.var_L, mask, aug = BatchAug(
-        #         self.var_H, self.var_L,
+        #     self.real_H, self.var_L, mask, aug = BatchAug(
+        #         self.real_H, self.var_L,
         #         self.mixopts, self.mixprob, self.mixalpha,
         #         self.aux_mixprob, self.aux_mixalpha, self.mix_p
         #         )
@@ -256,7 +256,7 @@ class PBRModel(BaseModel):
         # batch (mixup) augmentations
         # cutout-ed pixels are discarded when calculating loss by masking removed pixels
         # if aug == "cutout":
-        #     self.fake_H, self.var_H = self.fake_H*mask, self.var_H*mask
+        #     self.fake_H, self.real_H = self.fake_H*mask, self.real_H*mask
         
         l_g_total = 0
         """
@@ -269,52 +269,52 @@ class PBRModel(BaseModel):
             with self.cast(): # Casts operations to mixed precision if enabled, else nullcontext
                 # regular losses
                 log_dict_diffuse = {}
-                loss_results, log_dict_diffuse = self.generatorlosses(fake_SR, self.var_H, log_dict_diffuse, self.f_low)
+                loss_results, log_dict_diffuse = self.generatorlosses(fake_SR, self.real_H, log_dict_diffuse, self.f_low)
                 l_g_total += sum(loss_results)/self.accumulations
 
                 #TODO: for now only showing the logs for the diffuse losses, need to append the other logs
                 self.log_dict = log_dict_diffuse
                 
-                if isinstance(self.var_NO, torch.Tensor):
+                if isinstance(self.real_NO, torch.Tensor):
                     NO_loss_results = []
                     log_dict_normal = {}
-                    NO_loss_results, log_dict_normal = self.generatorlosses(fake_NO, self.var_NO, log_dict_normal, self.f_low)
+                    NO_loss_results, log_dict_normal = self.generatorlosses(fake_NO, self.real_NO, log_dict_normal, self.f_low)
                     l_g_total += sum(NO_loss_results)/self.accumulations
 
-                if isinstance(self.var_AL, torch.Tensor):
+                if isinstance(self.real_AL, torch.Tensor):
                     AL_loss_results = []
                     log_dict_albedo = {}
-                    AL_loss_results, log_dict_albedo = self.generatorlosses(fake_AL, self.var_AL, log_dict_albedo, self.f_low)
+                    AL_loss_results, log_dict_albedo = self.generatorlosses(fake_AL, self.real_AL, log_dict_albedo, self.f_low)
                     l_g_total += sum(AL_loss_results)/self.accumulations
                 
-                if isinstance(self.var_AO, torch.Tensor):
+                if isinstance(self.real_AO, torch.Tensor):
                     AO_loss_results = []
                     log_dict_ao = {}
-                    AO_loss_results, log_dict_ao = self.generatorlosses1ch(fake_AO, self.var_AO, log_dict_ao, self.f_low)
+                    AO_loss_results, log_dict_ao = self.generatorlosses1ch(fake_AO, self.real_AO, log_dict_ao, self.f_low)
                     l_g_total += sum(AO_loss_results)/self.accumulations
                 
-                if isinstance(self.var_HE, torch.Tensor):
+                if isinstance(self.real_HE, torch.Tensor):
                     HE_loss_results = []
                     log_dict_height = {}
-                    HE_loss_results, log_dict_height = self.generatorlosses1ch(fake_HE, self.var_HE, log_dict_height, self.f_low)
+                    HE_loss_results, log_dict_height = self.generatorlosses1ch(fake_HE, self.real_HE, log_dict_height, self.f_low)
                     l_g_total += sum(HE_loss_results)/self.accumulations
                 
-                if isinstance(self.var_ME, torch.Tensor):
+                if isinstance(self.real_ME, torch.Tensor):
                     ME_loss_results = []
                     log_dict_metalness = {}
-                    ME_loss_results, log_dict_metalness = self.generatorlosses1ch(fake_ME, self.var_ME, log_dict_metalness, self.f_low)
+                    ME_loss_results, log_dict_metalness = self.generatorlosses1ch(fake_ME, self.real_ME, log_dict_metalness, self.f_low)
                     l_g_total += sum(ME_loss_results)/self.accumulations
                 
-                if isinstance(self.var_RE, torch.Tensor):
+                if isinstance(self.real_RE, torch.Tensor):
                     RE_loss_results = []
                     log_dict_reflection = {}
-                    RE_loss_results, log_dict_reflection = self.generatorlosses1ch(fake_RE, self.var_RE, log_dict_reflection, self.f_low)
+                    RE_loss_results, log_dict_reflection = self.generatorlosses1ch(fake_RE, self.real_RE, log_dict_reflection, self.f_low)
                     l_g_total += sum(RE_loss_results)/self.accumulations
                 
-                if isinstance(self.var_RO, torch.Tensor):
+                if isinstance(self.real_RO, torch.Tensor):
                     RO_loss_results = []
                     log_dict_roughness = {}
-                    RO_loss_results, log_dict_roughness = self.generatorlosses1ch(fake_RO, self.var_RO, log_dict_roughness, self.f_low)
+                    RO_loss_results, log_dict_roughness = self.generatorlosses1ch(fake_RO, self.real_RO, log_dict_roughness, self.f_low)
                     l_g_total += sum(RO_loss_results)/self.accumulations
 
                 #TODO: for now only one GAN for the diffuse image, can have one for each map
@@ -332,49 +332,49 @@ class PBRModel(BaseModel):
             #TODO: for now only showing the logs for the diffuse losses, need to append the other logs
             if self.precisegeneratorlosses.loss_list and self.precisegeneratorlosses1ch.loss_list:
                 precise_loss_results, self.log_dict = self.precisegeneratorlosses(
-                                    fake_SR, self.var_H, self.log_dict, self.f_low)
+                                    fake_SR, self.real_H, self.log_dict, self.f_low)
                 l_g_total += sum(precise_loss_results)/self.accumulations
                 
-                if isinstance(self.var_NO, torch.Tensor):
+                if isinstance(self.real_NO, torch.Tensor):
                     NO_loss_results = []
                     NO_loss_results, log_dict_normal = self.precisegeneratorlosses(
-                                    fake_NO, self.var_NO, log_dict_normal, self.f_low)
+                                    fake_NO, self.real_NO, log_dict_normal, self.f_low)
                     l_g_total += sum(NO_loss_results)/self.accumulations
 
-                if isinstance(self.var_AL, torch.Tensor):
+                if isinstance(self.real_AL, torch.Tensor):
                     AL_loss_results = []
                     AL_loss_results, log_dict_albedo = self.precisegeneratorlosses(
-                                    fake_AL, self.var_AL, log_dict_albedo, self.f_low)
+                                    fake_AL, self.real_AL, log_dict_albedo, self.f_low)
                     l_g_total += sum(AL_loss_results)/self.accumulations
                 
-                if isinstance(self.var_AO, torch.Tensor):
+                if isinstance(self.real_AO, torch.Tensor):
                     AO_loss_results = []
                     AO_loss_results, log_dict_ao = self.precisegeneratorlosses1ch(
-                                    fake_AO, self.var_AO, log_dict_ao, self.f_low)
+                                    fake_AO, self.real_AO, log_dict_ao, self.f_low)
                     l_g_total += sum(AO_loss_results)/self.accumulations
                 
-                if isinstance(self.var_HE, torch.Tensor):
+                if isinstance(self.real_HE, torch.Tensor):
                     HE_loss_results = []
                     HE_loss_results, log_dict_height = self.precisegeneratorlosses1ch(
-                                    fake_HE, self.var_HE, log_dict_height, self.f_low)
+                                    fake_HE, self.real_HE, log_dict_height, self.f_low)
                     l_g_total += sum(HE_loss_results)/self.accumulations
                 
-                if isinstance(self.var_ME, torch.Tensor):
+                if isinstance(self.real_ME, torch.Tensor):
                     ME_loss_results = []
                     ME_loss_results, log_dict_metalness = self.precisegeneratorlosses1ch(
-                                    fake_ME, self.var_ME, log_dict_metalness, self.f_low)
+                                    fake_ME, self.real_ME, log_dict_metalness, self.f_low)
                     l_g_total += sum(ME_loss_results)/self.accumulations
                 
-                if isinstance(self.var_RE, torch.Tensor):
+                if isinstance(self.real_RE, torch.Tensor):
                     RE_loss_results = []
                     RE_loss_results, log_dict_reflection = self.precisegeneratorlosses1ch(
-                                    fake_RE, self.var_RE, log_dict_reflection, self.f_low)
+                                    fake_RE, self.real_RE, log_dict_reflection, self.f_low)
                     l_g_total += sum(RE_loss_results)/self.accumulations
                 
-                if isinstance(self.var_RO, torch.Tensor):
+                if isinstance(self.real_RO, torch.Tensor):
                     RO_loss_results = []
                     RO_loss_results, log_dict_roughness = self.precisegeneratorlosses1ch(
-                                    fake_RO, self.var_RO, log_dict_roughness, self.f_low)
+                                    fake_RO, self.real_RO, log_dict_roughness, self.f_low)
                     l_g_total += sum(RO_loss_results)/self.accumulations
             
             if self.amp:
@@ -454,7 +454,7 @@ class PBRModel(BaseModel):
         out_dict['LR'] = self.var_L.detach()[0].float().cpu()
         out_dict['SR'] = self.fake_H.detach()[0].float().cpu()
         if need_HR:
-            out_dict['HR'] = self.var_H.detach()[0].float().cpu()
+            out_dict['HR'] = self.real_H.detach()[0].float().cpu()
         return out_dict
 
     def get_current_visuals_batch(self, need_HR=True):
@@ -462,5 +462,5 @@ class PBRModel(BaseModel):
         out_dict['LR'] = self.var_L.detach().float().cpu()
         out_dict['SR'] = self.fake_H.detach().float().cpu()
         if need_HR:
-            out_dict['HR'] = self.var_H.detach().float().cpu()
+            out_dict['HR'] = self.real_H.detach().float().cpu()
         return out_dict
