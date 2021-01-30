@@ -13,6 +13,10 @@ from models import create_model
 from utils.metrics import calculate_psnr, calculate_ssim
 from train import parse_options, dir_check, configure_loggers, get_dataloaders
 
+from models.modules.architectures.CEM import CEMnet
+from dataops.filters import GuidedFilter
+from dataops.colors import rgb_to_ycbcr, ycbcr_to_rgb
+
 
 def visuals_check(visuals_keys, val_comparison=None):
     aligned_metrics = False
@@ -82,6 +86,19 @@ def get_img_path(data):
         img_path = data['in_path'][0]
     return img_path
 
+def get_CEM(opt, data):
+    CEM_net = None
+    if opt.get('use_cem', None):
+        CEM_conf = CEMnet.Get_CEM_Conf(opt['scale'])
+        CEM_conf.lower_magnitude_bound = opt['cem_config'].get('cem_lmb', 0.35)
+        CEM_conf.default_kernel_alg = opt['cem_config'].get('cem_alg', 'torch')
+        kernel = opt['cem_config'].get('cem_kernel', 'cubic')
+        if kernel == 'estimated':
+            kernel = data.get('kernel', None)
+        CEM_net = CEMnet.CEMnet(CEM_conf, upscale_kernel=kernel)
+        CEM_net.WrapArchitecture(only_padders=True)
+    return CEM_net
+
 def test_loop(model, opt, dataloaders, data_params):
     logger = util.get_root_logger()
 
@@ -104,6 +121,9 @@ def test_loop(model, opt, dataloaders, data_params):
             znorm = znorms[name]
             need_HR = False if dataloader.dataset.opt['dataroot_HR'] is None else True
 
+            # set up per image CEM wrapper if configured
+            CEM_net = get_CEM(opt, data)
+
             model.feed_data(data, need_HR=need_HR)  # unpack data from data loader
             # img_path = data['LR_path'][0]
             img_path = get_img_path(data)
@@ -113,17 +133,40 @@ def test_loop(model, opt, dataloaders, data_params):
             test_mode = opt.get('test_mode', None)
             if test_mode == 'x8':
                 # geometric self-ensemble
-                model.test_x8()
+                model.test_x8(CEM_net=CEM_net)
             elif test_mode == 'chop':
                 # chop images in patches/crops, to reduce VRAM usage
                 model.test_chop(patch_size=opt.get('chop_patch_size', 100), 
-                                step=opt.get('chop_step', 0.9))
+                                step=opt.get('chop_step', 0.9),
+                                CEM_net=CEM_net)
             else:
                 # normal inference
-                model.test()  # run inference
+                model.test(CEM_net=CEM_net)  # run inference
             
             # get image results
             visuals = model.get_current_visuals(need_HR=need_HR)
+
+            # post-process options if using CEM
+            if opt.get('use_cem', None) and opt['cem_config'].get('out_orig', False):
+                # run regular inference
+                if test_mode == 'x8':
+                    model.test_x8()
+                elif test_mode == 'chop':
+                    model.test_chop(patch_size=opt.get('chop_patch_size', 100), 
+                                    step=opt.get('chop_step', 0.9))
+                else:
+                    model.test()
+                orig_visuals = model.get_current_visuals(need_HR=need_HR)
+
+                if opt['cem_config'].get('out_filter', False):
+                    GF = GuidedFilter(ks=opt['cem_config'].get('out_filter_ks', 7))
+                    filt = GF(visuals['SR'].unsqueeze(0), (visuals['SR']-orig_visuals['SR']).unsqueeze(0)).squeeze(0)
+                    visuals['SR'] = orig_visuals['SR']+filt
+
+                if opt['cem_config'].get('out_keepY', False):
+                    out_regY = rgb_to_ycbcr(orig_visuals['SR']).unsqueeze(0)
+                    out_cemY = rgb_to_ycbcr(visuals['SR']).unsqueeze(0)
+                    visuals['SR'] = ycbcr_to_rgb(torch.cat([out_regY[:, 0:1, :, :], out_cemY[:, 1:2, :, :], out_cemY[:, 2:3, :, :]], 1)).squeeze(0)
 
             res_options = visuals_check(visuals.keys(), opt.get('val_comparison', None))
 

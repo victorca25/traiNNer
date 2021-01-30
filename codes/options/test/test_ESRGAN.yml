@@ -8,6 +8,13 @@ gpu_ids: [0]
 # chop_step: 0.9
 # val_comparison: true
 
+# use_cem: false
+#   cem_config:
+#     cem_kernel: cubic # cubic | linear | estimated
+#     out_orig: false
+#     out_filter: true
+#     out_keepY: false
+
 datasets:
   test_1: # the 1st test dataset
     name: seta

@@ -495,3 +495,25 @@ def model_val(opt_net=None, state_dict=None, model_type=None):
         # if model_type not provided, return unchanged 
         # (can do other validations here)
         return state_dict
+
+def cem2normal(state_dict):
+    if str(list(state_dict.keys())[0]).startswith('generated_image_model'):
+        try:
+            logger.info('Unwrapping the Generator model from CEM')
+        except:
+            print('Unwrapping the Generator model from CEM')
+        crt_net = {}
+        items = []
+
+        for k, v in state_dict.items():
+            items.append(k)
+
+        for k in items.copy():
+            if 'generated_image_model.module.' in k:
+                ori_k = k.replace('generated_image_model.module.', '')
+                crt_net[ori_k] = state_dict[k]
+                items.remove(k)
+
+        state_dict = crt_net
+
+    return state_dict

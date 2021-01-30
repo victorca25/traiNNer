@@ -278,10 +278,18 @@ class GradientLoss(nn.Module):
             targetdy, targetdx, targetdp, targetdn = get_4dim_image_gradients(target) 
             return (self.criterion(inputdx, targetdx) + self.criterion(inputdy, targetdy) + \
                     self.criterion(inputdp, targetdp) + self.criterion(inputdn, targetdn))/4
+            # input_grad = torch.pow(torch.pow((inputdy) * 0.25, 2) + torch.pow((inputdx) * 0.25, 2) \
+            #            + torch.pow((inputdp) * 0.25, 2) + torch.pow((inputdn) * 0.25, 2), 0.5)
+            # target_grad = torch.pow(torch.pow((targetdy) * 0.5, 2) + torch.pow((targetdx) * 0.5, 2) \
+            #            + torch.pow((targetdp) * 0.25, 2) + torch.pow((targetdn) * 0.25, 2), 0.5)
+            # return self.criterion(input_grad, target_grad)
         else: #'2d'
             inputdy, inputdx = get_image_gradients(input)
-            targetdy, targetdx = get_image_gradients(target) 
+            targetdy, targetdx = get_image_gradients(target)
             return (self.criterion(inputdx, targetdx) + self.criterion(inputdy, targetdy))/2
+            # input_grad = torch.pow(torch.pow((inputdy) * 0.5, 2) + torch.pow((inputdx) * 0.5, 2), 0.5)
+            # target_grad = torch.pow(torch.pow((targetdy) * 0.5, 2) + torch.pow((targetdx) * 0.5, 2), 0.5)
+            # return self.criterion(input_grad, target_grad)
 
 
 class ElasticLoss(nn.Module):
@@ -412,7 +420,6 @@ class MultiscalePixelLoss(nn.Module):
 
 
 # Frequency loss 
-# https://github.com/lj1995-computer-vision/Trident-Dehazing-Network/blob/master/loss/fft.py
 class FFTloss(torch.nn.Module):
     def __init__(self, loss_f = torch.nn.L1Loss, reduction='mean'):
         super(FFTloss, self).__init__()
@@ -425,18 +432,42 @@ class FFTloss(torch.nn.Module):
 
 class OFLoss(torch.nn.Module):
     '''
-    Overflow loss
-    Only use if the image range is in [0,1]. (This solves the SPL brightness problem
-    and can be useful in other cases as well)
-    https://github.com/lj1995-computer-vision/Trident-Dehazing-Network/blob/master/loss/brelu.py
+    Overflow loss (similar to Range limiting loss, needs tests)
+    Penalizes for pixel values that exceed the valid range (default [0,1]). 
+    Note: This solves part of the SPL brightness problem and can be useful 
+    in other cases as well)
     '''
-    def __init__(self):
+    def __init__(self, legit_range=[0,1]):
         super(OFLoss, self).__init__()
+        self.legit_range = legit_range
 
     def forward(self, img1):
-        img_clamp = img1.clamp(0,1)
+        img_clamp = img1.clamp(self.legit_range[0], self.legit_range[1])
         b,c,h,w = img1.shape
         return torch.log((img1 - img_clamp).abs() + 1).sum()/b/c/h/w
+
+
+class RangeLoss(torch.nn.Module):
+    """
+    Range limiting loss (similar to Overflow loss, needs tests)
+    Penalizes for pixel values that exceed the valid range (default [0,1]), 
+    and helps prevent model divergence.
+    """
+    def __init__(self, legit_range=[0,1], chroma_mode=False):
+        super(RangeLoss, self).__init__()
+        self.legit_range = legit_range
+        self.chroma_mode = chroma_mode
+    
+    def forward(self, x):
+        dtype = torch.cuda.FloatTensor
+        legit_range = torch.FloatTensor(self.legit_range).type(dtype)
+        # Returning the mean deviation from the legitimate range, across all channels and pixels:
+        if self.chroma_mode:
+            x = ycbcr_to_rgb(x)
+        return torch.max(torch.max(x-legit_range[1], 
+                            other=torch.zeros(size=[1]).type(dtype)), 
+                            other=torch.max(legit_range[0]-x, 
+                            other=torch.zeros(size=[1]).type(dtype))).mean()
 
 
 class OFR_loss(torch.nn.Module):

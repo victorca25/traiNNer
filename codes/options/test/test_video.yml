@@ -52,6 +52,8 @@ network_G:
   # nf: 64 # of discrim filters
   # in_nc: 3 # of input image channels: 3 for RGB and 1 for grayscale
   # out_nc: 3 # of output image channels: 3 for RGB and 1 for grayscale
+  # nb: 3 # number of Conv3D blocks
+  # n_frames: 5 # number of frames
 
   # EVSRGAN:
   # which_model_G: RRDB_net # RRDB_net (original ESRGAN arch)

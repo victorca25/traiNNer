@@ -321,6 +321,7 @@ def fit(model, opt, dataloaders, steps_states, data_params, loggers):
                 if current_step % opt['logger']['print_freq'] == 0 and take_step or \
                         (dataloaders.get('val', None) and current_step % opt['train']['val_freq'] == 0 and take_step):
                     # reset time for next iteration to skip the validation time from calculation
+                    # TODO: will not reset if not using validations
                     t0 = time.time()
             
             logger.info('End of epoch {} / {} \t Time Taken: {} sec'.format(

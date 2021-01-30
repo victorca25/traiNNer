@@ -275,6 +275,7 @@
     //, "spl_weight": 1e-1 //1e-2 //SPL loss function. note: needs to add a cap in the generator (finalcap; For [0,1] range -> "finalcap": "clamp") or the overflow loss or it can become unstable.
     //, "of_type": "overflow" //overflow loss function to force the images back into the [0, 1] range
     //, "of_weight": 2e-1
+    //, "range_weight": 1
     //, "fft_type": "fft"
     //, "fft_weight": 1e-1
     //, "color_criterion": "color-l1cosinesim" // l1cosinesim naturally helps color consistency, so it is the best to use here, but others can be used as well
@@ -283,6 +284,8 @@
     //, "avg_weight": 5 // Averaging downscale loss
     // , "ms_criterion": "multiscale-l1"
     // , "ms_weight": 1e-2
+    // , "fdpl_type": "fdpl"
+    // , "fdpl_weight": 1e-3
 
     // Adversarial loss:
     , "gan_type": "vanilla" //"vanilla" | "wgan-gp" | "lsgan" 

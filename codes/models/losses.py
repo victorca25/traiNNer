@@ -126,6 +126,7 @@ def get_loss_fn(loss_type=None,
             #TMP #loss_type.split('-')[1] # = vgg16, vgg19, resnet, ...
             #network = define_F(use_bn=False, feat_network = loss_type.split('-')[1])
             loss_function = PerceptualLoss(criterion=fea_loss_f, network=network, rotations=False, flips=False)
+    # Contextual Loss
     elif loss_type == 'contextual':
         layers = opt.get('cx_vgg_layers', {"conv_3_2": 1.0, "conv_4_2": 1.0})
         loss_function = Contextual_Loss(layers, max_1d_size=64, distance_type = 'cosine', calc_type = 'regular')
@@ -133,7 +134,11 @@ def get_loss_fn(loss_type=None,
     elif loss_type == 'fft':
         loss_function = FFTloss()
     elif loss_type == 'overflow':
-        loss_function = OFLoss()  
+        loss_function = OFLoss()
+    # Range limiting loss
+    elif loss_type == 'range':
+        legit_range = [-1,1] if opt['datasets']['train'].get('znorm', False) else [0,1]
+        loss_function = RangeLoss(legit_range=legit_range)
     elif loss_type.find('color') >= 0:
         color_loss_f = get_loss_fn(loss_type.split('-')[1], recurrent=True)
         ds_f = torch.nn.AvgPool2d(kernel_size=opt['scale'])
@@ -142,6 +147,9 @@ def get_loss_fn(loss_type=None,
         avg_loss_f = get_loss_fn(loss_type.split('-')[1], recurrent=True)
         ds_f = torch.nn.AvgPool2d(kernel_size=opt['scale'])
         loss_function = AverageLoss(loss_f=avg_loss_f, ds_f=ds_f)
+    elif loss_type == 'fdpl':
+        diff_means = opt.get('diff_means', "./models/modules/FDPL/diff_means.pt")
+        loss_function = FDPLLoss(dataset_diff_means_file=diff_means, device=device)
     else:
         loss_function = None
         #raise NotImplementedError('Loss type [{:s}] not recognized.'.format(loss_type))
@@ -536,7 +544,8 @@ class GeneratorLoss(nn.Module):
         for i, l in enumerate(loss_list):
             if l['function']:
                 if fsfilter: # branch selecting the ones that should use LPF
-                    if l['name'].find('tv') >= 0 or l['name'].find('overflow') >= 0:
+                    if l['name'].find('tv') >= 0 or l['name'].find('overflow') >= 0 \
+                            or l['name'].find('range') >= 0:
                         #Note: Using sr_f here means it will only preserve total variation / denoise on 
                         # the LF, which may or may not be a valid proposition, test!
                         effective_loss = l['weight']*l['function'](sr_f) # fake_H
@@ -549,7 +558,8 @@ class GeneratorLoss(nn.Module):
                     else:
                         effective_loss = l['weight']*l['function'](sr, hr) # (fake_H, var_H)
                 else:
-                    if l['name'].find('tv') >= 0 or l['name'].find('overflow') >= 0:
+                    if l['name'].find('tv') >= 0 or l['name'].find('overflow') >= 0 \
+                            or l['name'].find('range') >= 0:
                         effective_loss = l['weight']*l['function'](sr) # fake_H
                     elif l['name'].find('ssim') >= 0:
                         effective_loss = l['weight']*(1 - l['function'](sr, hr)) # (fake_H, var_H)
@@ -614,6 +624,12 @@ class PreciseGeneratorLoss(nn.Module):
         fft_weight  = train_opt.get('fft_weight', 0)
         fft_type  = train_opt.get('fft_type', None)
 
+        fdpl_weight  = train_opt.get('fdpl_weight', 0)
+        fdpl_type  = train_opt.get('fdpl_type', None)
+
+        range_weight = train_opt.get('range_weight', 0) 
+        range_type = 'range'
+
 
         # building the loss
         self.loss_list = []
@@ -659,6 +675,14 @@ class PreciseGeneratorLoss(nn.Module):
             cri_fft = get_loss_fn(fft_type, fft_weight, device = device)
             self.loss_list.append(cri_fft)
 
+        if fdpl_weight > 0 and fdpl_type:
+            cri_fdpl = get_loss_fn(fdpl_type, fdpl_weight, device = device, opt = train_opt)
+            self.loss_list.append(cri_fdpl)
+
+        if range_weight > 0 and range_type:
+            cri_range = get_loss_fn(range_type, range_weight, device = device, opt = opt)
+            self.loss_list.append(cri_range)
+
     def forward(self, sr, hr, log_dict, fsfilter=None, selector=[]):
         # make sure both sr and hr are not in float16 or int, change to float32 (torch.float32/torch.float)
         # in some cases could even need torch.float64/torch.double, may have to add the case here
@@ -698,7 +722,8 @@ class PreciseGeneratorLoss(nn.Module):
         for i, l in enumerate(loss_list):
             if l['function']:
                 if fsfilter: # branch selecting the ones that should use LPF
-                    if l['name'].find('tv') >= 0 or l['name'].find('overflow') >= 0:
+                    if l['name'].find('tv') >= 0 or l['name'].find('overflow') >= 0 \
+                            or l['name'].find('range') >= 0:
                         #Note: Using sr_f here means it will only preserve total variation / denoise on 
                         # the LF, which may or may not be a valid proposition, test!
                         effective_loss = l['weight']*l['function'](sr_f) # fake_H
@@ -711,7 +736,8 @@ class PreciseGeneratorLoss(nn.Module):
                     else:
                         effective_loss = l['weight']*l['function'](sr, hr) # (fake_H, var_H)
                 else:
-                    if l['name'].find('tv') >= 0 or l['name'].find('overflow') >= 0:
+                    if l['name'].find('tv') >= 0 or l['name'].find('overflow') >= 0 \
+                            or l['name'].find('range') >= 0:
                         effective_loss = l['weight']*l['function'](sr) # fake_H
                     elif l['name'].find('ssim') >= 0:
                         effective_loss = l['weight']*(1 - l['function'](sr, hr)) # (fake_H, var_H)

@@ -6,7 +6,7 @@ from shutil import copyfile
 import torch
 import torch.nn as nn
 
-from models.networks import model_val
+from models.networks import model_val, cem2normal
 
 import logging
 logger = logging.getLogger('base')
@@ -25,7 +25,7 @@ class nullcast():
 
 class BaseModel:
     """
-    This class is an base class for models.
+    This class is a base class for models.
     To create a subclass, you need to implement the following five functions:
         -- <__init__>:                      initialize the class; first call super(NewModel, self).__init__(opt)
         -- <feed_data>:                     unpack data from dataset and apply any preprocessing.
@@ -335,6 +335,11 @@ class BaseModel:
         state_dict = network.state_dict()
         for key, param in state_dict.items():
             state_dict[key] = param.cpu()
+        
+        # unwrap a CEM model if necessary, keep only original parameters
+        if str(list(state_dict.keys())[0]).startswith('generated_image_model'):
+            state_dict = cem2normal(state_dict)
+
         try:  # save model in the pre-1.4.0 non-zipped format
             torch.save(state_dict, save_path, _use_new_zipfile_serialization=False)
         except:  # pre 1.4.0, normal torch.save

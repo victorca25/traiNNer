@@ -75,6 +75,8 @@ network_G:
     # nf: 64 # Number of discrim filters
     # in_nc: 3 # Number of input image channels: 3 for RGB and 1 for grayscale
     # out_nc: 3 # Number of output image channels: 3 for RGB and 1 for grayscale
+    # nb: 3 # number of Conv3D blocks
+    # n_frames: 5 # number of frames
 
     # EVSRGAN:
     # which_model_G: RRDB_net # RRDB_net (original ESRGAN arch)
@@ -200,6 +202,8 @@ train:
     # avg_weight: 5 # Averaging downscale loss
     # ms_criterion: multiscale-l1
     # ms_weight: 1e-2
+    # fdpl_type: fdpl
+    # fdpl_weight: 1e-3
 
     # video losses
     ofr_type: ofr #optical flow reconstruction

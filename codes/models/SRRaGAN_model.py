@@ -20,6 +20,7 @@ from . import swa
 from dataops.batchaug import BatchAug
 from dataops.filters import FilterHigh, FilterLow #, FilterX
 from dataops.common import extract_patches_2d, recompose_tensor
+from models.modules.architectures.CEM import CEMnet
 
 load_amp = (hasattr(torch.cuda, "amp") and hasattr(torch.cuda.amp, "autocast"))
 if load_amp:
@@ -51,6 +52,8 @@ class SRRaGANModel(BaseModel):
                 self.netD = networks.define_D(opt).to(self.device)  # D
                 self.netD.train()
         self.load()  # load G and D if needed
+
+        self.outm = None
 
         # define losses, optimizer and scheduler
         if self.is_train:
@@ -191,6 +194,21 @@ class SRRaGANModel(BaseModel):
                         self.feature_loc = loc
                         logger.info('FreezeD enabled')
 
+            """
+            Initialize CEM and wrap training generator 
+            """
+            self.CEM = opt.get('use_cem', None)
+            if self.CEM:
+                CEM_conf = CEMnet.Get_CEM_Conf(opt['scale'])
+                CEM_conf.sigmoid_range_limit = bool(opt['network_G'].get('sigmoid_range_limit', 0))
+                if CEM_conf.sigmoid_range_limit:
+                    CEM_conf.input_range = [-1,1] if z_norm else [0,1]
+                kernel = None  # note: could pass a kernel here, but None will use default cubic kernel
+                self.CEM_net = CEMnet.CEMnet(CEM_conf, upscale_kernel=kernel)
+                self.CEM_net.WrapArchitecture(only_padders=True)
+                self.netG = self.CEM_net.WrapArchitecture(self.netG, training_patch_size=opt['datasets']['train']['HR_size'])
+                logger.info('CEM enabled')
+
         # print network
         """ 
         TODO:
@@ -213,15 +231,27 @@ class SRRaGANModel(BaseModel):
         # LR
         self.var_L = data
 
-    def forward(self, data=None):
-        """Run forward pass; called by <optimize_parameters> and <test> functions."""
+    def forward(self, data=None, CEM_net=None):
+        """
+        Run forward pass; called by <optimize_parameters> and <test> functions.
+        Can be used either with 'data' passed directly or loaded 'self.var_L'. 
+        CEM_net can be used during inference to pass different CEM wrappers.
+        """
         if isinstance(data, torch.Tensor):
-            return self.netG(data)
+            if CEM_net is not None:
+                wrapped_netG = CEM_net.WrapArchitecture(self.netG)
+                return wrapped_netG(data)
+            else:
+                return self.netG(data)
         
-        if self.outm: #if the model has the final activation option
-            self.fake_H = self.netG(self.var_L, outm=self.outm)
-        else: #regular models without the final activation option
-            self.fake_H = self.netG(self.var_L)  # G(LR)
+        if CEM_net is not None:
+            wrapped_netG = CEM_net.WrapArchitecture(self.netG)
+            self.fake_H = wrapped_netG(self.var_L)  # G(LR)
+        else:
+            if self.outm: #if the model has the final activation option
+                self.fake_H = self.netG(self.var_L, outm=self.outm)
+            else: #regular models without the final activation option
+                self.fake_H = self.netG(self.var_L)  # G(LR)
 
     def optimize_parameters(self, step):       
         # G
@@ -248,6 +278,12 @@ class SRRaGANModel(BaseModel):
         if aug == "cutout":
             self.fake_H, self.var_H = self.fake_H*mask, self.var_H*mask
         
+        # unpad images if using CEM
+        if self.CEM:
+            self.fake_H = self.CEM_net.HR_unpadder(self.fake_H)
+            self.var_H = self.CEM_net.HR_unpadder(self.var_H)
+            self.var_ref = self.CEM_net.HR_unpadder(self.var_ref)
+
         l_g_total = 0
         """
         Calculate and log losses
@@ -341,17 +377,17 @@ class SRRaGANModel(BaseModel):
                 self.optimizer_D.zero_grad()
                 self.optDstep = True
 
-    def test(self):
+    def test(self, CEM_net=None):
         """Forward function used in test time.
         This function wraps <forward> function in no_grad() so intermediate steps 
         for backprop are not saved.
         """
         self.netG.eval()
         with torch.no_grad():
-            self.forward()
+            self.forward(CEM_net=CEM_net)
         self.netG.train()
 
-    def test_x8(self):
+    def test_x8(self, CEM_net=None):
         """Geometric self-ensemble forward function used in test time.
         Will upscale each image 8 times in different rotations/flips 
         and average the results into a single image.
@@ -378,7 +414,7 @@ class SRRaGANModel(BaseModel):
         for tf in 'v', 'h', 't':
             lr_list.extend([_transform(t, tf) for t in lr_list])
         with torch.no_grad():
-            sr_list = [self.forward(aug) for aug in lr_list]
+            sr_list = [self.forward(data=aug, CEM_net=CEM_net) for aug in lr_list]
         for i in range(len(sr_list)):
             if i > 3:
                 sr_list[i] = _transform(sr_list[i], 't')
@@ -391,7 +427,7 @@ class SRRaGANModel(BaseModel):
         self.fake_H = output_cat.mean(dim=0, keepdim=True)
         self.netG.train()
 
-    def test_chop(self, patch_size=200, step=1.0):
+    def test_chop(self, patch_size=200, step=1.0, CEM_net=None):
         """Chop forward function used in test time.
         Converts large images into patches of size (patch_size, patch_size).
         Make sure the patch size is small enough that your GPU memory is sufficient.
@@ -415,7 +451,7 @@ class SRRaGANModel(BaseModel):
         with torch.no_grad():
             for p in range(n_patches):
                 lowres_input = img_patches[p:p + 1]
-                prediction = self.forward(lowres_input)
+                prediction = self.forward(data=lowres_input, CEM_net=CEM_net)
                 highres_patches.append(prediction)
 
         highres_patches = torch.cat(highres_patches, 0)
