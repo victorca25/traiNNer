@@ -3,7 +3,7 @@ We use a PSNR-oriented pretrained SR model to initialize the parameters for bett
 
 1. Prepare datasets, usually the DIV2K dataset. More details are in [`codes/data`](https://github.com/victorca25/BasicSR/tree/master/codes/data).
 2. Optional: If the intention is to replicate the original paper here you would prerapre the PSNR-oriented pretrained model. You can also use the original `RRDB_PSNR_x4.pth` as the pretrained model for that purpose, otherwise *any* existing model will work as pretrained.
-3. Modify one of the configuration template file, for example `options/train/train_template.json` or  `options/train/train_template.yml`
+3. Modify one of the configuration template file, for example `options/train/train_template.json` or `options/train/train_template.yml`
 4. Run command: `python train.py -opt options/train/train_template.json` or `python train.py -opt options/train/train_template.yml`
 
 
@@ -70,11 +70,30 @@ Lastly, you can control what phase you want to train with the ppon_stages option
 1. Modify the configuration file in `options/train/train_sftgan.json`
 1. Run command: `python train.py -opt options/train/train_sftgan.json`
 
+
+### Train SRFlow models
+SRFlow allows for the use of any differentiable architecture for the LR encoding network, since ir itself does not need to be invertible. SRFlow uses by default an RRDB network (ESRGAN) network for this purpose. In the original work, a pretrained ESRGAN model is loaded and according to the paper, the remaining flow network is trained for half the training time and the RRDB module is only unfrozen after that period. The option "train_RRDB_delay: 0.5" does that automatically, but you can lower it to start earlier if required. Besides these main differences, the training process is similar to other SR networks.
+
+1. Prepare datasets, usually the DIV2K dataset. More details are in [`codes/data`](https://github.com/victorca25/BasicSR/tree/master/codes/data).
+2. Optional: If the intention is to replicate the original paper here you would use an ESRGAN pretrained model. The original paper used the ESRGAN modified architecture model for this purpose. You can also use the original `RRDB_PSNR_x4.pth` as the pretrained model for that purpose, otherwise *any* existing model will work as pretrained. In `options/train/train_srflow.yml` set path.pretrain_model_G: `RRDB_ESRGAN_x4_mod_arch.pth` (or any ESRGAN model) and path.load_submodule: `true` for this purpose. If using an SRFlow model as pretrained, only setting pretrain_model_G is required.
+3. Modify the configuration file, `options/train/train_srflow.yml` as needed.
+4. Run command: `python train_srflow.py -opt options/train/train_srflow.yml`
+
+Notes:
+- While SRFlow only needs the nll to train, it is possible to add any of the losses (except GAN) from the regular training template for training and they will work. They will operate on the deterministic version of the super resolved image with temperature τ= 0. 
+- SRFlow is more memory intensive than ESRGAN, specially if using the regular losses that need to calculate reconstructed SR from the latent space `z` (with `reverse=True`)
+- To remain stable, SRFlow needs a large batch size. batch=1 produces NaN results. If real batch sizes>1 are not possible on the hardware, using virtual batch can solve this stability issue.
+- During validation and inference it's known that reconstructed images will output NaN values, which are reduced with more training. More details are discussed [here](https://github.com/andreas128/SRFlow/issues/2)
+- During validation, as many images as set in the `heats: [ 0.0, 0.5, 0.75, 1.0 ]` times `n_sample: 3` will be generated. This example means 3 random samples from each of the heat values configured there, 12 images in total for each validation image.
+
+
 ### Train Video Super-Resolution (VSR) models
 TBD
 
+
 ### Train Video Frame Interpolation (RIFE) models
 TBD
+
 
 ### Resuming Training 
 When resuming training, just set the `resume_state` option in the configuration file under `path`, like: <small>`resume_state: "../experiments/debug_001_RRDB_PSNR_x4_DIV2K/training_state/200.state"`. </small>

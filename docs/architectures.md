@@ -31,6 +31,9 @@
 7. The CEM module from [**Explorable-Super-Resolution**](https://github.com/YuvalBahat/Explorable-Super-Resolution/). [Paper](http://openaccess.thecvf.com/content_CVPR_2020/papers/Bahat_Explorable_Super_Resolution_CVPR_2020_paper.pdf). More information on CEM [here](https://github.com/victorca25/BasicSR/tree/master/codes/models/modules/architectures/CEM). Note that the rest of the explorable SR framework is TBD.
 
 8. [**SRFlow**](https://github.com/andreas128/SRFlow). [Paper](https://arxiv.org/pdf/2006.14200.pdf). Details TBD.
+<p align="center">
+   <img height="220" src="https://user-images.githubusercontent.com/41912303/107157089-77b5cc00-6982-11eb-83f3-05773ff46610.png">
+</p>
 
 9. [**RIFE**](https://github.com/hzwer/arXiv2020-RIFE). [Paper](https://arxiv.org/abs/2011.06294). Details TBD.
 
