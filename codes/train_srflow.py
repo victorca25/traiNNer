@@ -14,174 +14,7 @@ from dataops.common import tensor2np
 from models import create_model
 from utils import util, metrics
 
-
-def parse_options(is_train=True):
-    # options
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        '-opt', type=str, required=True, help='Path to options file.')
-
-    args = parser.parse_args()
-    opt = options.parse(args.opt, is_train=is_train)
-
-    return opt
-
-
-def dir_check(opt):
-    if opt['is_train']:
-        # starting from scratch, needs to create training directory
-        if not opt['path']['resume_state']:
-            util.mkdir_and_rename(opt['path']['experiments_root'])  # rename old folder if exists
-            util.mkdirs((path for key, path in opt['path'].items() if not key == 'experiments_root'
-                        and 'pretrain_model' not in key and 'resume' not in key))
-    else:
-        # create testing directory
-        util.mkdirs((path for key, path in opt['path'].items() if not key == 'pretrain_model_G'))
-
-
-def configure_loggers(opt=None):
-    tofile = opt.get('logger', {}).get('save_logfile', True)
-    if opt['is_train']:
-        # config loggers. Before it, the log will not work
-        util.get_root_logger(None, opt['path']['log'], 'train', level=logging.INFO, screen=True, tofile=tofile)
-        util.get_root_logger('val', opt['path']['log'], 'val', level=logging.INFO, tofile=tofile)
-    else:
-        util.get_root_logger(None, opt['path']['log'], 'test', level=logging.INFO, screen=True, tofile=tofile)
-    logger = util.get_root_logger()  # 'base'
-    logger.info(options.dict2str(opt))
-    
-    # initialize tensorboard logger
-    tb_logger = None
-    if opt.get('use_tb_logger', False) and 'debug' not in opt['name']:
-        version = float(torch.__version__[0:3])
-        log_dir = os.path.join(opt['path']['root'], 'tb_logger', opt['name'])
-        # log_dir = os.path.join(opt['path']['experiments_root'], opt['name'], 'tb')
-        # logdir_valid = os.path.join(opt['path']['root'], 'tb_logger', opt['name'] + 'valid')
-        # logdir_valid = os.path.join(opt['path']['experiments_root'], opt['name'], 'tb_valid')
-        if version >= 1.1:  # PyTorch 1.1
-            # official PyTorch tensorboard
-            try:
-                from torch.utils.tensorboard import SummaryWriter
-            except:
-                from tensorboardX import SummaryWriter    
-        else:
-            logger.info('You are using PyTorch {}. Using [tensorboardX].'.format(version))
-            from tensorboardX import SummaryWriter
-        try:
-            # for versions PyTorch > 1.1 and tensorboardX < 1.6
-            tb_logger = SummaryWriter(log_dir=log_dir)
-            # tb_logger_valid = SummaryWriter(log_dir=logdir_valid)
-        except:
-            # for version tensorboardX >= 1.7
-            tb_logger = SummaryWriter(logdir=log_dir)
-            # tb_logger_valid = SummaryWriter(logdir=logdir_valid)
-    return {"tb_logger": tb_logger}
-
-
-def get_resume_state(opt):
-    logger = util.get_root_logger()
-
-    # train from scratch OR resume training
-    if opt['path']['resume_state']:
-        if os.path.isdir(opt['path']['resume_state']):
-            resume_state_path = glob.glob(opt['path']['resume_state'] + '/*.state')
-            resume_state_path = util.sorted_nicely(resume_state_path)[-1]
-        else:
-            resume_state_path = opt['path']['resume_state']
-        resume_state = torch.load(resume_state_path)
-        logger.info('Set [resume_state] to {}'.format(resume_state_path))
-        logger.info('Resuming training from epoch: {}, iter: {}.'.format(
-            resume_state['epoch'], resume_state['iter']))
-        options.check_resume(opt)  # check resume options
-    else:  # training from scratch
-        resume_state = None
-    return resume_state
-
-
-def get_random_seed(opt):
-    logger = util.get_root_logger()
-    # set random seed
-    seed = opt['train']['manual_seed']
-    if seed is None:
-        seed = random.randint(1, 10000)
-        opt['train']['manual_seed'] = seed
-    logger.info('Random seed: {}'.format(seed))
-    util.set_random_seed(seed)
-    return opt
-
-
-def get_dataloaders(opt):
-    logger = util.get_root_logger()
-
-    gpu_ids = opt.get('gpu_ids', None)
-    gpu_ids = gpu_ids if gpu_ids else []
-    
-    # Create datasets and dataloaders
-    dataloaders = {}
-    data_params = {}
-    znorm = {}
-    for phase, dataset_opt in opt['datasets'].items():
-        if opt['is_train'] and phase not in ['train', 'val']:
-            raise NotImplementedError('Phase [{:s}] is not recognized.'.format(phase))
-        
-        name = dataset_opt['name']
-        dataset = create_dataset(dataset_opt)
-
-        if not dataset:
-            raise Exception('Dataset "{}" for phase "{}" is empty.'.format(name, phase))
-
-        dataloaders[phase] = create_dataloader(dataset, dataset_opt, gpu_ids)
-
-        if opt['is_train'] and phase == 'train':
-            batch_size = dataset_opt.get('batch_size', 4)
-            virtual_batch_size = dataset_opt.get('virtual_batch_size', batch_size)
-            virtual_batch_size = virtual_batch_size if virtual_batch_size > batch_size else batch_size
-            train_size = int(math.ceil(len(dataset) / batch_size))
-            logger.info('Number of train images: {:,d}, iters: {:,d}'.format(
-                len(dataset), train_size))
-            total_iters = int(opt['train']['niter'])
-            total_epochs = int(math.ceil(total_iters / train_size))
-            logger.info('Total epochs needed: {:d} for iters {:,d}'.format(
-                total_epochs, total_iters))
-            data_params = {
-                "batch_size": batch_size, 
-                "virtual_batch_size": virtual_batch_size, 
-                "total_iters": total_iters, 
-                "total_epochs": total_epochs
-            }
-            assert dataset is not None
-        else:
-            logger.info('Number of {:s} images in [{:s}]: {:,d}'.format(phase, name, len(dataset)))
-            if phase != 'val':
-                znorm[name] = dataset_opt.get('znorm', False)                    
-    
-    if not opt['is_train']:
-        data_params['znorm'] = znorm
-
-    if not dataloaders:
-        raise Exception("No Dataloader has been created.")
-
-    return dataloaders, data_params
-
-
-def resume_training(opt, model, resume_state, data_params):
-    batch_size = data_params['batch_size'] 
-    virtual_batch_size = data_params['virtual_batch_size']
-
-    # resume training
-    if resume_state:
-        start_epoch = resume_state['epoch']
-        current_step = resume_state['iter']
-        virtual_step = current_step * virtual_batch_size / batch_size \
-            if virtual_batch_size and virtual_batch_size > batch_size else current_step
-        model.resume_training(resume_state)  # handle optimizers and schedulers
-        model.update_schedulers(opt['train'])  # updated schedulers in case configuration has changed
-        del resume_state
-    else:
-        start_epoch = 0
-        current_step = 0
-        virtual_step = 0
-    return {"start_epoch": start_epoch, "current_step": current_step, "virtual_step": virtual_step}
+from train import parse_options, dir_check, configure_loggers, get_dataloaders, get_resume_state, get_random_seed, resume_training
 
 
 def fit(model, opt, dataloaders, steps_states, data_params, loggers):
@@ -245,10 +78,10 @@ def fit(model, opt, dataloaders, steps_states, data_params, loggers):
                     # tensorboard training logger
                     if opt['use_tb_logger'] and 'debug' not in opt['name']:
                         if current_step % opt['logger'].get('tb_sample_rate', 1) == 0: # Reduce rate of tb logs
+                            # tb_logger.add_scalar('loss/nll', nll, current_step)
                             tb_logger.add_scalar('lr/base', model.get_current_learning_rate(), current_step)
                             tb_logger.add_scalar('time/iteration', timer.get_last_iteration(), current_step)
                             tb_logger.add_scalar('time/data', timerData.get_last_iteration(), current_step)
-                            # tb_logger.add_scalar('time/eta', eta(timer.get_last_iteration()), current_step)
 
                     logs = model.get_current_log()
                     for k, v in logs.items():
@@ -283,28 +116,51 @@ def fit(model, opt, dataloaders, steps_states, data_params, loggers):
                 # validation
                 if dataloaders.get('val', None) and current_step % opt['train']['val_freq'] == 0 and take_step:
                     val_metrics = metrics.MetricsDict(metrics=opt['train'].get('metrics', None))
+                    nlls = []
                     for val_data in dataloaders['val']:
                         
                         model.feed_data(val_data)  # unpack data from data loader
                         model.test()  # run inference
+                        if hasattr(model, 'nll'):
+                            nll = model.nll if model.nll else 0
+                            nlls.append(nll)
 
                         """
                         Get Visuals
                         """
                         visuals = model.get_current_visuals()  # get image results
-                        sr_img = tensor2np(visuals['SR'], denormalize=opt['datasets']['train']['znorm'])
-                        gt_img = tensor2np(visuals['HR'], denormalize=opt['datasets']['train']['znorm'])
-
-                        # Save SR images for reference
                         img_name = os.path.splitext(os.path.basename(val_data['LR_path'][0]))[0]
                         img_dir = os.path.join(opt['path']['val_images'], img_name)
                         util.mkdir(img_dir)
-                        if opt['train']['overwrite_val_imgs']:
-                            save_img_path = os.path.join(img_dir, '{:s}.png'.format(img_name))
-                        else:
-                            save_img_path = os.path.join(img_dir, '{:s}_{:d}.png'.format(img_name, current_step))
+                        
+                        # Save SR images for reference
+                        sr_img = None
+                        if hasattr(model, 'heats'):  # SRFlow
+                            opt['train']['val_comparison'] = False
+                            for heat in model.heats:
+                                for i in range(model.n_sample):
+                                    sr_img = tensor2np(visuals['SR', heat, i], denormalize=opt['datasets']['train']['znorm'])
+                                    if opt['train']['overwrite_val_imgs']:
+                                        save_img_path = os.path.join(img_dir,
+                                                                '{:s}_h{:03d}_s{:d}.png'.format(img_name, int(heat * 100), i))
+                                    else:
+                                        save_img_path = os.path.join(img_dir,
+                                                                '{:s}_{:09d}_h{:03d}_s{:d}.png'.format(img_name,
+                                                                                                        current_step,
+                                                                                                        int(heat * 100), i))
+                                    util.save_img(sr_img, save_img_path)
+                        else:  # regular SR
+                            sr_img = tensor2np(visuals['SR'], denormalize=opt['datasets']['train']['znorm'])
+                            if opt['train']['overwrite_val_imgs']:
+                                save_img_path = os.path.join(img_dir, '{:s}.png'.format(img_name))
+                            else:
+                                save_img_path = os.path.join(img_dir, '{:s}_{:d}.png'.format(img_name, current_step))
+                            if not opt['train']['val_comparison']:
+                                util.save_img(sr_img, save_img_path)
+                        assert sr_img is not None
 
                         # Save GT images for reference
+                        gt_img = tensor2np(visuals['HR'], denormalize=opt['datasets']['train']['znorm'])
                         if opt['train']['save_gt']:
                             save_img_path_gt = os.path.join(img_dir,
                                                             '{:s}_GT.png'.format(img_name))
@@ -323,8 +179,8 @@ def fit(model, opt, dataloaders, steps_states, data_params, loggers):
                         if opt['train']['val_comparison']:
                             lr_img = tensor2np(visuals['LR'], denormalize=opt['datasets']['train']['znorm'])
                             util.save_img_comp([lr_img, sr_img], save_img_path)
-                        else:
-                            util.save_img(sr_img, save_img_path)
+                        # else:
+                            # util.save_img(sr_img, save_img_path)
 
                         """
                         Get Metrics
@@ -333,6 +189,8 @@ def fit(model, opt, dataloaders, steps_states, data_params, loggers):
                         val_metrics.calculate_metrics(sr_img, gt_img, crop_size=opt['scale'])  # , only_y=True)
 
                     avg_metrics = val_metrics.get_averages()
+                    if nlls:
+                        avg_nll = sum(nlls) / len(nlls)
                     del val_metrics
 
                     # log
@@ -340,6 +198,8 @@ def fit(model, opt, dataloaders, steps_states, data_params, loggers):
                     for r in avg_metrics:
                         formatted_res = r['name'].upper() + ': {:.5g}, '.format(r['average'])
                         logger_m += formatted_res
+                    if nlls:
+                        logger_m += 'avg_nll: {:.4e}  '.format(avg_nll)
 
                     logger.info('# Validation # ' + logger_m[:-2])
                     logger_val = logging.getLogger('val')  # validation logger
@@ -350,6 +210,8 @@ def fit(model, opt, dataloaders, steps_states, data_params, loggers):
                     if opt['use_tb_logger'] and 'debug' not in opt['name']:
                         for r in avg_metrics:
                             tb_logger.add_scalar(r['name'], r['average'], current_step)
+                            if nlls:
+                                tb_logger.add_scalar('average nll', avg_nll, current_step)
                             # tb_logger.flush()
                             # tb_logger_valid.add_scalar(r['name'], r['average'], current_step)
                             # tb_logger_valid.flush()
@@ -375,7 +237,7 @@ def fit(model, opt, dataloaders, steps_states, data_params, loggers):
             model.save(current_step, True)
         model.save_training_state(epoch + (n >= len(dataloaders['train'])), current_step, True)
         logger.info('Training interrupted. Latest models and training states saved.')
-    
+
 
 def main():
     # parse training options
