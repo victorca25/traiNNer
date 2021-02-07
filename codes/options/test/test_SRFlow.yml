@@ -9,8 +9,8 @@ gpu_ids: [0]
 datasets:
   test:
     name: seta
-    mode: LR
-    #dataroot_HR: '../test1/HR'
+    mode: LRHRC
+    dataroot_HR: '../test1/HR'
     dataroot_LR: '../test1/LR'
     
 path:
