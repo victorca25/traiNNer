@@ -35,7 +35,7 @@ class LRHRDataset(Dataset):
             scale = opt.get('scale', 4)
             self.ds_kernels = KernelDownscale(scale=scale, kernel_paths=opt['dataroot_kernels'])
 
-        if opt['phase'] == 'train' and opt.get('lr_noise_types', 3) and "patches" in opt['lr_noise_types']:
+        if opt['phase'] == 'train' and opt.get('lr_noise_types', 3) and "patches" in opt.get('lr_noise_types', {}):
             assert opt['noise_data']
             self.noise_patches = NoisePatches(opt['noise_data'], opt.get('HR_size', 128)/opt.get('scale', 4))
         else:

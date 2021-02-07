@@ -37,7 +37,8 @@ def get_schedulers(optimizers=None, schedulers=None, train_opt=None):
                                     restarts=train_opt['restarts'],
                                     weights=train_opt['restart_weights'],
                                     gamma=train_opt['lr_gamma'],
-                                    clear_state=train_opt['clear_state'])
+                                    clear_state=train_opt['clear_state'],
+                                    lr_steps_invese=train_opt.get('lr_steps_inverse', []))
     
         elif train_opt['lr_scheme'] == 'StepLR':
             sched = lr_scheduler.StepLR(optimizer, step_size=train_opt['lr_step_size'], 

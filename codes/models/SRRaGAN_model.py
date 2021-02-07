@@ -31,7 +31,7 @@ else:
 
 
 class SRRaGANModel(BaseModel):
-    def __init__(self, opt):
+    def __init__(self, opt, step=0):
         super(SRRaGANModel, self).__init__(opt)
         train_opt = opt['train']
 
@@ -44,7 +44,7 @@ class SRRaGANModel(BaseModel):
         self.model_names = ['G']
 
         # define networks and load pretrained models
-        self.netG = networks.define_G(opt).to(self.device)  # G
+        self.netG = networks.define_G(opt, step=step).to(self.device)  # G
         if self.is_train:
             self.netG.train()
             if train_opt['gan_weight']:

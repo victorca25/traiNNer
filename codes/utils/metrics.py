@@ -9,6 +9,7 @@ import math
 from dataops.common import np2tensor, tensor2np, read_img, bgra2rgb, bgr2ycbcr
 from models.modules.LPIPS import perceptual_loss as models
 from collections import deque
+import time
 
 
 class MetricsDict():
@@ -350,6 +351,51 @@ class StatsMeter:
 
 
 
+class Timer:
+    def __init__(self):
+        self.times = []
+
+    def tick(self):
+        self.times.append(time.time())
+
+    def get_average_and_reset(self):
+        if len(self.times) < 2:
+            return -1
+        avg = (self.times[-1] - self.times[0]) / (len(self.times) - 1)
+        self.times = [self.times[-1]]
+        return avg
+
+    def get_last_iteration(self):
+        if len(self.times) < 2:
+            return 0
+        return self.times[-1] - self.times[-2]
+
+
+class TickTock:
+    def __init__(self):
+        self.time_pairs = []
+        self.current_time = None
+
+    def tick(self):
+        self.current_time = time.time()
+
+    def tock(self):
+        assert self.current_time is not None, self.current_time
+        self.time_pairs.append([self.current_time, time.time()])
+        self.current_time = None
+
+    def get_average_and_reset(self):
+        if len(self.time_pairs) == 0:
+            return -1
+        deltas = [t2 - t1 for t1, t2 in self.time_pairs]
+        avg = sum(deltas) / len(deltas)
+        self.time_pairs = []
+        return avg
+
+    def get_last_iteration(self):
+        if len(self.time_pairs) == 0:
+            return -1
+        return self.time_pairs[-1][1] - self.time_pairs[-1][0]
 
 
 

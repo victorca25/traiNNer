@@ -45,7 +45,7 @@ def set_random_seed(seed):
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
 
-def get_root_logger(logger_name=None, root=None, phase=None, level=logging.INFO, screen=False):
+def get_root_logger(logger_name=None, root=None, phase=None, level=logging.INFO, screen=False, tofile=True):
     """Set up logger. logger_name=None defaults to name 'base' """
     logger = logging.getLogger(logger_name)
     # if the logger has been initialized, just return the base logger
@@ -54,11 +54,13 @@ def get_root_logger(logger_name=None, root=None, phase=None, level=logging.INFO,
     
     formatter = logging.Formatter(
         '%(asctime)s.%(msecs)03d - %(levelname)s: %(message)s', datefmt='%y-%m-%d %H:%M:%S')
-    log_file = os.path.join(root, phase + '_{}.log'.format(get_timestamp()))
-    fh = logging.FileHandler(log_file, mode='w')
-    fh.setFormatter(formatter)
     logger.setLevel(level)
-    logger.addHandler(fh)
+    
+    if tofile:
+        log_file = os.path.join(root, phase + '_{}.log'.format(get_timestamp()))
+        fh = logging.FileHandler(log_file, mode='w')
+        fh.setFormatter(formatter)
+        logger.addHandler(fh)
     if screen:
         sh = logging.StreamHandler()
         sh.setFormatter(formatter)
@@ -110,10 +112,12 @@ def scandir(dir_path, suffix=None, recursive=False, full_path=False):
 
     return _scandir(dir_path, suffix=suffix, recursive=recursive)
 
-def save_img(img, img_path, mode='RGB'):
+def save_img(img, img_path, mode='RGB', scale=None):
     '''
     Save a single image to the defined path
     '''
+    if scale:
+        img = cv2.resize(img, dsize=None, fx=scale, fy=scale, interpolation=cv2.INTER_NEAREST)
     cv2.imwrite(img_path, img)
 
 def merge_imgs(img_list):

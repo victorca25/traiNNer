@@ -175,16 +175,16 @@ def test_loop(model, opt, dataloaders, data_params):
 
             # save single images or lr / sr comparison
             if opt['val_comparison'] and len(res_options['save_imgs']) > 1:
-                comp_images = [tensor2np(visuals[save_img_name]) for save_img_name in res_options['save_imgs']]
+                comp_images = [tensor2np(visuals[save_img_name], denormalize=znorm) for save_img_name in res_options['save_imgs']]
                 util.save_img_comp(comp_images, save_img_path + '.png')
             else:
                 for save_img_name in res_options['save_imgs']:
                     imn = '_' + save_img_name if len(res_options['save_imgs']) > 1 else ''
-                    util.save_img(tensor2np(visuals[save_img_name]), save_img_path + imn + '.png')
+                    util.save_img(tensor2np(visuals[save_img_name], denormalize=znorm), save_img_path + imn + '.png')
 
             # calculate metrics if HR dataset is provided and metrics are configured in options
             if need_HR and calc_metrics and res_options['aligned_metrics']:
-                metric_imgs = [tensor2np(visuals[x]) for x in res_options['compare_imgs']]
+                metric_imgs = [tensor2np(visuals[x], denormalize=znorm) for x in res_options['compare_imgs']]
                 test_results = test_metrics.calculate_metrics(metric_imgs[0], metric_imgs[1], 
                                                               crop_size=opt['scale'])
                 

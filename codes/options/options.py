@@ -248,7 +248,7 @@ def opt_get(opt=None, keys=[], default=None):
     return ret
 
 
-def check_resume(opt: dict):
+def check_resume(opt: dict, resume_iter = None):
     '''Check resume states and pretrain_model paths'''
     logger = logging.getLogger('base')
     if opt['path']['resume_state']:
@@ -256,14 +256,20 @@ def check_resume(opt: dict):
         if opt['path']['pretrain_model_G'] or opt['path']['pretrain_model_D']:
             logger.warning('pretrain_model paths will be ignored when resuming training from a .state file.')
 
-        state_idx = os.path.basename(opt['path']['resume_state']).split('.')[0]
+        if resume_iter:
+            state_idx = resume_iter
+        else:
+            state_idx = os.path.basename(opt['path']['resume_state']).split('.')[0]
+        
         opt['path']['pretrain_model_G'] = os.path.normpath(os.path.join(opt['path']['models'],
                                                    '{}_G.pth'.format(state_idx)))
         logger.info('Set [pretrain_model_G] to {}'.format(opt['path']['pretrain_model_G']))
+        
         if 'gan' in opt['model']:
             opt['path']['pretrain_model_D'] = os.path.normpath(os.path.join(opt['path']['models'],
                                                        '{}_D.pth'.format(state_idx)))
             logger.info('Set [pretrain_model_D] to {}'.format(opt['path']['pretrain_model_D']))
+        
         if 'swa' in opt['model'] or opt['swa']:
             opt['path']['pretrain_model_swaG'] = os.path.normpath(os.path.join(opt['path']['models'],
                                                    '{}_swaG.pth'.format(state_idx)))

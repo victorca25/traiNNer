@@ -201,7 +201,7 @@ def define_G(opt, step=0):
     elif which_model == 'rife_net':
         from models.modules.architectures import RIFE_arch
         netG = RIFE_arch.RIFE()
-    elif which_model == 'SRFlowNet':
+    elif which_model == 'SRFlow_net':
         from models.modules.architectures import SRFlowNet_arch
         netG = SRFlowNet_arch.SRFlowNet(in_nc=opt_net['in_nc'], out_nc=opt_net['out_nc'],
                 nf=opt_net['nf'], nb=opt_net['nb'], scale=opt['scale'], K=opt_net['flow']['K'], opt=opt, step=step)
@@ -483,7 +483,7 @@ def model_val(opt_net=None, state_dict=None, model_type=None):
         model = opt_get(opt_net, ['network_G', 'which_model_G'])
         if model == 'RRDB_net': # tonormal
             return mod2normal(state_dict)
-        elif model == 'MRRDB_net': # tomod
+        elif model == 'MRRDB_net' or model == 'SRFlow_net': # tomod
             return normal2mod(state_dict)
         else:
             return state_dict

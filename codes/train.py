@@ -4,7 +4,7 @@ import logging
 import math
 import os.path
 import random
-import time
+# import time
 
 import torch
 
@@ -40,13 +40,14 @@ def dir_check(opt):
 
 
 def configure_loggers(opt=None):
+    tofile = opt.get('logger', {}).get('save_logfile', True)
     if opt['is_train']:
         # config loggers. Before it, the log will not work
-        util.get_root_logger(None, opt['path']['log'], 'train', level=logging.INFO, screen=True)
-        util.get_root_logger('val', opt['path']['log'], 'val', level=logging.INFO)
+        util.get_root_logger(None, opt['path']['log'], 'train', level=logging.INFO, screen=True, tofile=tofile)
+        util.get_root_logger('val', opt['path']['log'], 'val', level=logging.INFO, tofile=tofile)
     else:
-        util.get_root_logger(None, opt['path']['log'], 'test', level=logging.INFO, screen=True)
-    logger = util.get_root_logger()
+        util.get_root_logger(None, opt['path']['log'], 'test', level=logging.INFO, screen=True, tofile=tofile)
+    logger = util.get_root_logger()  # 'base'
     logger.info(options.dict2str(opt))
     
     # initialize tensorboard logger
@@ -54,7 +55,9 @@ def configure_loggers(opt=None):
     if opt.get('use_tb_logger', False) and 'debug' not in opt['name']:
         version = float(torch.__version__[0:3])
         log_dir = os.path.join(opt['path']['root'], 'tb_logger', opt['name'])
+        # log_dir = os.path.join(opt['path']['experiments_root'], opt['name'], 'tb')
         # logdir_valid = os.path.join(opt['path']['root'], 'tb_logger', opt['name'] + 'valid')
+        # logdir_valid = os.path.join(opt['path']['experiments_root'], opt['name'], 'tb_valid')
         if version >= 1.1:  # PyTorch 1.1
             # official PyTorch tensorboard
             try:
@@ -200,13 +203,18 @@ def fit(model, opt, dataloaders, steps_states, data_params, loggers):
     # training
     logger.info('Start training from epoch: {:d}, iter: {:d}'.format(start_epoch, current_step))
     try:
+        timer = metrics.Timer()  # iteration timer
+        timerData = metrics.TickTock()  # data timer
+        timerEpoch = metrics.TickTock()  # epoch timer
         # outer loop for different epochs
-        for epoch in range(start_epoch, total_epochs * (virtual_batch_size // batch_size)):
-            t0 = time.time()  # start the iteration time
-            epoch_start_time = time.time()  # start the epoch time
+        for epoch in range(start_epoch, (total_epochs * (virtual_batch_size // batch_size))+1):
+            # epoch_start_time = time.time()  # start the epoch time #TODO
+            timerData.tick()
+            timerEpoch.tick()
 
             # inner iteration loop within one epoch
             for n, train_data in enumerate(dataloaders['train'], start=1):
+                timerData.tock()
 
                 virtual_step += 1
                 take_step = False
@@ -221,24 +229,40 @@ def fit(model, opt, dataloaders, steps_states, data_params, loggers):
                 model.optimize_parameters(virtual_step)  # calculate loss functions, get gradients, update network weights
 
                 # log
+                def eta(t_iter):
+                    # calculate training ETA in hours
+                    return (t_iter * (opt['train']['niter'] - current_step)) / 3600 if t_iter > 0 else 0
+
                 if current_step % opt['logger']['print_freq'] == 0 and take_step:
-                    # iteration end time 
-                    t1 = time.time()
+                    # iteration end time
+                    avg_time = timer.get_average_and_reset()
+                    avg_data_time = timerData.get_average_and_reset()
 
                     # print training losses and save logging information to disk
+                    message = '<epoch:{:3d}, iter:{:8,d}, lr:{:.3e}, t:{:.4f}s, td:{:.4f}s, eta:{:.4f}h> '.format(
+                        epoch, current_step, model.get_current_learning_rate(current_step), avg_time, 
+                        avg_data_time, eta(avg_time))
+                    
+                    # tensorboard training logger
+                    if opt['use_tb_logger'] and 'debug' not in opt['name']:
+                        if current_step % opt['logger'].get('tb_sample_rate', 1) == 0: # Reduce rate of tb logs
+                            tb_logger.add_scalar('lr/base', model.get_current_learning_rate(), current_step)
+                            tb_logger.add_scalar('time/iteration', timer.get_last_iteration(), current_step)
+                            tb_logger.add_scalar('time/data', timerData.get_last_iteration(), current_step)
+                            # tb_logger.add_scalar('time/eta', eta(timer.get_last_iteration()), current_step)
+
                     logs = model.get_current_log()
-                    message = '<epoch:{:3d}, iter:{:8,d}, lr:{:.3e}, i_time: {:.4f} sec.> '.format(
-                        epoch, current_step, model.get_current_learning_rate(current_step), (t1 - t0))
                     for k, v in logs.items():
                         message += '{:s}: {:.4e} '.format(k, v)
-                        # tensorboard logger
+                        # tensorboard loss logger
                         if opt['use_tb_logger'] and 'debug' not in opt['name']:
-                            tb_logger.add_scalar(k, v, current_step)
-                        # tb_logger.flush()
+                            if current_step % opt['logger'].get('tb_sample_rate', 1) == 0: # Reduce rate of tb logs
+                                tb_logger.add_scalar(k, v, current_step)
+                            # tb_logger.flush()
                     logger.info(message)
 
-                    # # start time for next iteration
-                    # t0 = time.time()
+                    # start time for next iteration #TODO:skip the validation time from calculation
+                    timer.tick()
 
                 # update learning rate
                 if model.optGstep and model.optDstep and take_step:
@@ -281,7 +305,22 @@ def fit(model, opt, dataloaders, steps_states, data_params, loggers):
                         else:
                             save_img_path = os.path.join(img_dir, '{:s}_{:d}.png'.format(img_name, current_step))
 
-                        # save single images or lr / sr comparison
+                        # Save GT images for reference
+                        if opt['train']['save_gt']:
+                            save_img_path_gt = os.path.join(img_dir,
+                                                            '{:s}_GT.png'.format(img_name))
+                            if not os.path.isfile(save_img_path_gt):
+                                util.save_img(gt_img, save_img_path_gt)
+
+                        # Save LQ images for reference
+                        if opt['train']['save_lr']:
+                            save_img_path_lq = os.path.join(img_dir,
+                                                            '{:s}_LQ.png'.format(img_name))
+                            if not os.path.isfile(save_img_path_lq):
+                                lq_img = tensor2np(visuals['LR'], denormalize=opt['datasets']['train']['znorm'])
+                                util.save_img(lq_img, save_img_path_lq, scale=opt['scale'])
+
+                        # save single images or LQ / SR comparison
                         if opt['train']['val_comparison']:
                             lr_img = tensor2np(visuals['LR'], denormalize=opt['datasets']['train']['znorm'])
                             util.save_img_comp([lr_img, sr_img], save_img_path)
@@ -312,20 +351,15 @@ def fit(model, opt, dataloaders, steps_states, data_params, loggers):
                     if opt['use_tb_logger'] and 'debug' not in opt['name']:
                         for r in avg_metrics:
                             tb_logger.add_scalar(r['name'], r['average'], current_step)
+                            # tb_logger.flush()
                             # tb_logger_valid.add_scalar(r['name'], r['average'], current_step)
                             # tb_logger_valid.flush()
                     
-                    # # reset time for next iteration to skip the validation time from calculation
-                    # t0 = time.time()
-                
-                if current_step % opt['logger']['print_freq'] == 0 and take_step or \
-                        (dataloaders.get('val', None) and current_step % opt['train']['val_freq'] == 0 and take_step):
-                    # reset time for next iteration to skip the validation time from calculation
-                    # TODO: will not reset if not using validations
-                    t0 = time.time()
+                timerData.tick()
             
-            logger.info('End of epoch {} / {} \t Time Taken: {} sec'.format(
-                epoch, total_epochs, time.time() - epoch_start_time))
+            timerEpoch.tock()
+            logger.info('End of epoch {} / {} \t Time Taken: {:.4f} sec'.format(
+                epoch, total_epochs, timerEpoch.get_last_iteration()))
 
         logger.info('Saving the final model.')
         if model.swa:

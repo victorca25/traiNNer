@@ -418,6 +418,9 @@ class BaseModel:
             state['swa_scheduler'] = []
             if self.swa and isinstance(self.swa_start_iter, int) and iter_step > self.swa_start_iter:
                 state['swa_scheduler'].append(self.swa_scheduler.state_dict())
+        if self.opt['is_train'] and self.opt['use_amp']:
+            state['amp_scaler'] = self.amp_scaler.state_dict()
+
         if latest:
             save_filename = 'latest.state'
         else:
@@ -432,8 +435,8 @@ class BaseModel:
         """Resume the optimizers and schedulers for training"""
         resume_optimizers = resume_state['optimizers']
         resume_schedulers = resume_state['schedulers']
-        assert len(resume_optimizers) == len(self.optimizers), 'Wrong lengths of optimizers'
-        assert len(resume_schedulers) == len(self.schedulers), 'Wrong lengths of schedulers'
+        assert len(resume_optimizers) == len(self.optimizers), 'Wrong length of optimizers'
+        assert len(resume_schedulers) == len(self.schedulers), 'Wrong length of schedulers'
         for i, o in enumerate(resume_optimizers):
             self.optimizers[i].load_state_dict(o)
         for i, s in enumerate(resume_schedulers):
@@ -447,6 +450,9 @@ class BaseModel:
                 resume_swa_scheduler = resume_state['swa_scheduler']
                 for i, s in enumerate(resume_swa_scheduler):
                     self.swa_scheduler.load_state_dict(s)
+        if self.opt['is_train'] and self.opt['use_amp']:
+            if resume_state.get('amp_scaler', None):
+                self.amp_scaler.load_state_dict(resume_state['amp_scaler'])
 
     # TODO: check all these updates
     def update_schedulers(self, train_opt: dict):
