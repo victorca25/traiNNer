@@ -16,32 +16,34 @@ Details of the supported architectures can be found [here](https://github.com/vi
 (README currently WIP)
 
 Some of the new things in the latest version of this code:
--   The filters and image manipulations used by the different functions (HFEN, SSIM/MS-SSIM, SPL, TV/DTV, etc) are now consolidated in filters.py and colors.py
+-   The filters and image manipulations used by the different functions (HFEN, SSIM/MS-SSIM, SPL, TV/DTV, etc) are now consolidated in filters.py and colors.py.
 -   Reusable loss builder to reduce the changes needed when using a new model and adding new losses only once for all models
--   Metrics builder to include only the selected ones during validation
--   Automatic Mixed Precision (AMP: <https://pytorch.org/docs/master/amp.html>) is now properly integrated. (Code updated to work with Pytorch 1.6.0 and 1.3.0). Option "use_amp".
--   Contextual Loss (<https://arxiv.org/abs/1803.02077>, <https://arxiv.org/abs/1803.04626>). Option: 'cx_type'.
--   Differential Augmentations for efficient gan training (<https://arxiv.org/pdf/2006.10738>). Option: 'diffaug'.
--   batch augmentations (based on <https://arxiv.org/abs/2004.00448>). Option: 'mixup'.
--   ESRGAN+ improvements to the ESRGAN network (<https://arxiv.org/pdf/2001.08073>). Options: 'gaussian' and 'plus'.
--   adapted frequency filtering per loss function (<https://arxiv.org/pdf/1911.07850>). Option: 'fs'.
--   enabled option to use the feature maps from the VGG-like discriminator in training for feature similarity (<https://arxiv.org/abs/1712.05927>). Option: 'discriminator_vgg_128_fea'.
--   PatchGAN option for the discriminator (<https://arxiv.org/pdf/1611.07004v3.pdf>). Option: 'patchgan'.
--   Multiscale PatchGAN option for the discriminator (<https://arxiv.org/pdf/1711.11585.pdf>). Option: 'multiscale'.
--   Added a modified Pixel Attention Network for Efficient Image Super-Resolution (<https://arxiv.org/pdf/2010.01073.pdf>), which includes a self-attention layer in the residual path, among other changes. A basic pretrained model for 4x scale can be found [here](https://mega.nz/file/mpRgVThY#tRi1q_PrY5OX4MVOTtjWlXzBXcLZs2tP1duo-mEkWSs)
--   Stochastic Weight Averaging (SWA: <https://pytorch.org/blog/pytorch-1.6-now-includes-stochastic-weight-averaging/>, <https://arxiv.org/pdf/1803.05407.pdf>) added as an option. Currently the change only applies to the generator network, changing the original learning rate scheduler to the SWA scheduler after a defined number of iterations have passed (the original paper refers to the later 25% part of training). The resulting SWA model can be converted to a regular model after training using the scripts/swa2normal.py script. Option "use_swa" and configure the swa scheduler.
--   Added the basic idea behind "Freeze Discriminator: A Simple Baseline for Fine-tuning GANs" (<https://arxiv.org/pdf/2002.10964.pdf>) to accelerate training with transfer learning. It is possible to use a pretrained discriminator model and freeze the initial (bottom) X number of layers. Option: "freeze_loc", enabled for any of the VGG-like discriminators or patchgan (muliscale patchgan not yet added).
+-   Metrics builder to include only the selected ones during validation.
+-   Integrated Automatic Mixed Precision ([AMP](https://pytorch.org/docs/master/amp.html)). (Code updated to work with Pytorch 1.6.0 and 1.3.0). Option "use_amp".
+-   Contextual Loss ([CX](https://arxiv.org/abs/1803.02077), [CX](https://arxiv.org/abs/1803.04626)). Option: 'cx_type'.
+-   Differential Augmentations for efficient gan training ([Paper](https://arxiv.org/pdf/2006.10738)). Option: 'diffaug'.
+-   Batch augmentations (based on [Cutblur](https://arxiv.org/abs/2004.00448)). Option: 'mixup'.
+-   ESRGAN+ improvements to the ESRGAN network ([ESRGAN+](https://arxiv.org/pdf/2001.08073)). Options: 'gaussian' and 'plus'.
+-   Adapted frequency filtering per loss function ([Reference](https://arxiv.org/pdf/1911.07850)). Option: 'fs'.
+-   Enabled option to use the feature maps from the VGG-like discriminator in training for feature similarity ([Reference](https://arxiv.org/abs/1712.05927)). Option: 'discriminator_vgg_128_fea'.
+-   PatchGAN option for the discriminator ([Reference](https://arxiv.org/pdf/1611.07004v3.pdf)). Option: 'patchgan'.
+-   Multiscale PatchGAN option for the discriminator ([Reference](https://arxiv.org/pdf/1711.11585.pdf)). Option: 'multiscale'.
+-   Added a modified Pixel Attention Network for Efficient Image Super-Resolution ([PAN](https://arxiv.org/pdf/2010.01073.pdf)), which includes a self-attention layer in the residual path, among other changes. A basic pretrained model for 4x scale can be found [here](https://mega.nz/file/mpRgVThY#tRi1q_PrY5OX4MVOTtjWlXzBXcLZs2tP1duo-mEkWSs).
+-   Stochastic Weight Averaging ([SWA](https://arxiv.org/pdf/1803.05407.pdf), [Pytorch](https://pytorch.org/blog/pytorch-1.6-now-includes-stochastic-weight-averaging/)) added as an option. Currently the change only applies to the generator network, changing the original learning rate scheduler to the SWA scheduler after a defined number of iterations have passed (the original paper refers to the later 25% part of training). The resulting SWA model can be converted to a regular model after training using the scripts/swa2normal.py script. Option "use_swa" and configure the swa scheduler.
+-   Added the basic idea behind "Freeze Discriminator: A Simple Baseline for Fine-tuning GANs" ([FreezeD](https://arxiv.org/pdf/2002.10964.pdf)) to accelerate training with transfer learning. It is possible to use a pretrained discriminator model and freeze the initial (bottom) X number of layers. Option: "freeze_loc", enabled for any of the VGG-like discriminators or patchgan (multiscale patchgan not yet added).
+-   Integrated the Consistency Enforcing Module (CEM) from Explorable Super Resolution ([Paper](http://openaccess.thecvf.com/content_CVPR_2020/papers/Bahat_Explorable_Super_Resolution_CVPR_2020_paper.pdf), [Web](https://yuvalbahat.github.io/Explorable-Super-Resolution/)). Available both for use during inference, as well as during training (only using a default downsampling kernel ATM). Can be easily extended to use estimaged Kernels from the images for downscaling using KernelGAN from [DLIP](https://github.com/victorca25/DLIP). More information on CEM [here](https://github.com/victorca25/BasicSR/tree/master/codes/models/modules/architectures/CEM).
+-   Added the training and testing codes for Super-Resolution using Normalizing Flow in PyTorch ([SRFlow](https://arxiv.org/pdf/2006.14200.pdf) models (including the GLOW reference [code](https://github.com/chaiyujin/glow-pytorch/)).
 -   Other changes: added graceful interruption of training to continue from where it was interrupted, virtual batch option, "strict" model loading flag, support for using YAML or JSON options files, color transfer script (color_transfer.py) with multiple algorithms to transfer image statistics (colors) from a reference image to another, integrated the "forward_chop" function into the SR model to crop images into patches before upscaling for inference in VRAM constrained systems (use option test_mode: chop), general fixes and code refactoring.
 
 WIP:
--   Added on the fly use of realistic image kernels extracted with KernelGAN (<https://openaccess.thecvf.com/content_ICCV_2019/papers/Zhou_Kernel_Modeling_Super-Resolution_on_Real_Low-Resolution_Images_ICCV_2019_paper.pdf>) and injection of noise extracted from real images patches (<https://openaccess.thecvf.com/content_cvpr_2018/papers/Chen_Image_Blind_Denoising_CVPR_2018_paper.pdf>)
--   Change to use openCV-based composable transformation for augmentations (<https://github.com/victorca25/opencv_transforms>) with a new dataloader 
--   Use of configuration presets for reuse instead of editing full configuration files 
--   Video network for optical flow and video super-resolution (<http://arxiv.org/abs/2001.02129>. Pretrained model using 3 frames, trained on a subset of REDS dataset [here](https://mega.nz/file/28JmyLrK#xhRP-EZKR7Vg7UjIRZQqotiFLix21JaGGLSvZq7cjt4)) 
--   Added option to use different image upscaling networks with the HR optical flow estimation for video (Pretrained using 3 frames and default ESRGAN as SR network [here](https://mega.nz/file/TwwEWD7Q#wCfUvVudI17weYc1JLeM3nTeK2xiMlVdc_JN1Nov3ac))
--   Initial integration of RIFE (<https://arxiv.org/abs/2011.06294>) architecture for Video Frame Interpolation (Converted trained model from three pickle files into a single pth model [here](https://mega.nz/file/DhBWgRYQ#hLkR4Eiks6s3ZvwLCl4eA57J3baR0eDXjyaV9yzmTeM))
--   Video ESRGAN (EVSRGAN) and SR3D networks using 3D convolution for video super-resolution, inspired on "3DSRnet: Video Super-resolution using 3D Convolutional Neural Networks" (<https://arxiv.org/pdf/1812.09079.pdf>). (EVSRGAN Pretrained using 3 frames and default arch options [here](https://u.pcloud.link/publink/show?code=XZ2Wg8XZebryABNV8Q0GsSE2ifkLdh9NzzaX))
--   Real-time Deep Video Deinterlacing (https://arxiv.org/pdf/1708.00187.pdf) training and testing codes implemented. (Pretraineds DVD models can be found [here](https://u.pcloud.link/publink/show?code=kZIIfQXZYLGBJF4sQVJ2aONxgwiPr8iQPxo7))
+-   Added on the fly use of realistic image kernels extracted with KernelGAN ([Paper](https://openaccess.thecvf.com/content_ICCV_2019/papers/Zhou_Kernel_Modeling_Super-Resolution_on_Real_Low-Resolution_Images_ICCV_2019_paper.pdf) and injection of noise extracted from real images patches ([Reference](https://openaccess.thecvf.com/content_cvpr_2018/papers/Chen_Image_Blind_Denoising_CVPR_2018_paper.pdf)).
+-   Change to use openCV-based composable transformation for augmentations ([From](https://github.com/victorca25/opencv_transforms)) with a new dataloader.
+-   Use of configuration presets for reuse instead of editing full configuration files.
+-   Video network for optical flow and video super-resolution ([SOFVSR](http://arxiv.org/abs/2001.02129)). Pretrained model using 3 frames, trained on a subset of REDS dataset [here](https://mega.nz/file/28JmyLrK#xhRP-EZKR7Vg7UjIRZQqotiFLix21JaGGLSvZq7cjt4). 
+-   Added option to use different image upscaling networks with the HR optical flow estimation for video (Pretrained using 3 frames and default ESRGAN as SR network [here](https://mega.nz/file/TwwEWD7Q#wCfUvVudI17weYc1JLeM3nTeK2xiMlVdc_JN1Nov3ac)).
+-   Initial integration of RIFE ([Paper](https://arxiv.org/abs/2011.06294)) architecture for Video Frame Interpolation (Converted trained model from three pickle files into a single pth model [here](https://mega.nz/file/DhBWgRYQ#hLkR4Eiks6s3ZvwLCl4eA57J3baR0eDXjyaV9yzmTeM)).
+-   Video ESRGAN (EVSRGAN) and SR3D networks using 3D convolution for video super-resolution, inspired on "3DSRnet: Video Super-resolution using 3D Convolutional Neural Networks" ([Paper](https://arxiv.org/pdf/1812.09079.pdf)). EVSRGAN Pretrained using 3 frames and default arch options [here](https://u.pcloud.link/publink/show?code=XZ2Wg8XZebryABNV8Q0GsSE2ifkLdh9NzzaX).
+-   Real-time Deep Video Deinterlacing ([Paper](https://arxiv.org/pdf/1708.00187.pdf)) training and testing codes implemented. Pretraineds DVD models can be found [here](https://u.pcloud.link/publink/show?code=kZIIfQXZYLGBJF4sQVJ2aONxgwiPr8iQPxo7).
 
 (Previous changes can be found [here](https://github.com/victorca25/BasicSR/blob/master/docs/changes.md))
     
@@ -66,7 +68,7 @@ WIP:
 
 ## Codes
 
-[`./codes`](https://github.com/victorca25/BasicSR/tree/master/codes). We provide a detailed explaination of the **code framework** in [`./codes`](https://github.com/victorca25/BasicSR/tree/master/codes).
+[`./codes`](https://github.com/victorca25/BasicSR/tree/master/codes). Detailed explaination of the **code framework** in [`./codes`](https://github.com/victorca25/BasicSR/tree/master/codes).
 
 <p align="center">
    <img src="https://github.com/xinntao/public_figures/blob/master/BasicSR/code_framework.png" height="300">
@@ -92,7 +94,7 @@ We provide **pretrained models** in [Pretrained models](#pretrained-models).
 #### For simple testing
 The recommended way to get started with some of the models produced by the training codes available in this repository is by getting the pretrained models to be tested and either a GUI (for [ESRGAN models](https://github.com/n00mkrad/cupscale), for [video](https://github.com/n00mkrad/flowframes)) or a smaller repo for inference (for [ESRGAN](https://github.com/JoeyBallentine/ESRGAN), for [video](https://github.com/JoeyBallentine/Video-Inference)). 
 
-Otherwise, it is also possible to do inference of batches of images with the code in this repository as follow.
+Otherwise, it is also possible to do inference of batches of images and some additional options (such as CEM, geometric self-ensemble or automatic cropping of images before upscale for VRAM limited environment) with the code in this repository as follow.
 
 #### Test Super Resolution models (ESRGAN, PPON, PAN, others)
 
@@ -212,7 +214,7 @@ You can put the downloaded models in the default `experiments/pretrained_models`
 
 Models that were trained using the same pretrained model or are derivates of the same pretrained model are able to be interpolated to combine the properties of both. The original author demostrated this by interpolating the PSNR pretrained model (which is not perceptually good, but results in smooth images) with the ESRGAN resulting models that have more details but sometimes is excessive to control a balance in the resulting images, instead of interpolating the resulting images from both models, giving much better results.
 
-The authors continued exploring the capabilities of linearly interpolating models in their new work "DNI" (CVPR19): [Deep Network Interpolation for Continuous Imagery Effect Transition](https://xinntao.github.io/projects/DNI) with very interesting results and examples. The script for interpolation can be found in the [net_interp.py](https://github.com/victorca25/BasicSR/blob/master/codes/scripts/net_interp.py) file, but a new version with more options will be commited at a later time. This is an alternative to create new models without additional training and also to create pretrained models for easier fine tuning. 
+The authors continued exploring the capabilities of linearly interpolating models in "DNI": [Deep Network Interpolation for Continuous Imagery Effect Transition](https://xinntao.github.io/projects/DNI) (CVPR19) with very interesting results and examples. The script for interpolation can be found in the [net_interp.py](https://github.com/victorca25/BasicSR/blob/master/codes/scripts/net_interp.py) file. This is an alternative to create new models without additional training and also to create pretrained models for easier fine tuning. 
 
 <p align="center">
    <img src="https://camo.githubusercontent.com/913baa366ba395595a9638ab6282a9cbb088ab98/68747470733a2f2f78696e6e74616f2e6769746875622e696f2f70726f6a656374732f444e495f7372632f7465617365722e6a7067" height="300">
@@ -227,7 +229,7 @@ Following are the original pretrained models that the authors made available for
     <th>Name</th>
     <th>Models</th>
     <th>Short Description</th>
-    <th>Google Drive</th>
+    <th>Source</th>
     <th>Other</th>
   </tr>
   <tr>

@@ -22,10 +22,17 @@
 </p>
 
 5. [**PAN**](https://github.com/zhaohengyuan1/PAN) Pixel Attention Network for Efficient Image Super-Resolution. [Paper](https://arxiv.org/pdf/2010.01073.pdf). Details TBD.
+<p align="center">
+   <img height="220" src="https://user-images.githubusercontent.com/41912303/107143307-af962280-6934-11eb-90e6-0489158d7168.png">
+</p>
 
 6. [**SOFVSR**](https://github.com/LongguangWang/SOF-VSR/tree/master/TIP) Deep Video Super-Resolution using HR Optical Flow Estimation. [Paper](http://arxiv.org/abs/2001.02129). Details TBD.
 
-7. [**RIFE**](https://github.com/hzwer/arXiv2020-RIFE). [Paper](https://arxiv.org/abs/2011.06294). Details TBD.
+7. The CEM module from [**Explorable-Super-Resolution**](https://github.com/YuvalBahat/Explorable-Super-Resolution/). [Paper](http://openaccess.thecvf.com/content_CVPR_2020/papers/Bahat_Explorable_Super_Resolution_CVPR_2020_paper.pdf). More information on CEM [here](https://github.com/victorca25/BasicSR/tree/master/codes/models/modules/architectures/CEM). Note that the rest of the explorable SR framework is TBD.
+
+8. [**SRFlow**](https://github.com/andreas128/SRFlow). [Paper](https://arxiv.org/pdf/2006.14200.pdf). Details TBD.
+
+9. [**RIFE**](https://github.com/hzwer/arXiv2020-RIFE). [Paper](https://arxiv.org/abs/2011.06294). Details TBD.
 
 ### BibTex
 
@@ -55,4 +62,23 @@
         booktitle = {IEEE International Conference on Computer Vision Workshop(ICCVW)},
         month = {October},
         year = {2019}
+    }
+    @Article{Wang2020tip,
+        author    = {Longguang Wang and Yulan Guo and Li Liu and Zaiping Lin and Xinpu Deng and Wei An},
+        title     = {Deep Video Super-Resolution using {HR} Optical Flow Estimation},
+        journal   = {{IEEE} Transactions on Image Processing},
+        year      = {2020},
+    }
+    @inproceedings{bahat2020explorable,
+        title={Explorable Super Resolution},
+        author={Bahat, Yuval and Michaeli, Tomer},
+        booktitle={Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition},
+        pages={2716--2725},
+        year={2020}
+    }
+    @inproceedings{lugmayr2020srflow,
+        title={SRFlow: Learning the Super-Resolution Space with Normalizing Flow},
+        author={Lugmayr, Andreas and Danelljan, Martin and Van Gool, Luc and Timofte, Radu},
+        booktitle={ECCV},
+        year={2020}
     }

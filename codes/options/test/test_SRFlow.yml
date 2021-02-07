@@ -1,0 +1,47 @@
+#### general settings
+name: SRFLOW_x4
+suffix: _SRFLOW
+model: srflow
+scale: 4
+gpu_ids: [0]
+
+#### Test Settings
+datasets:
+  test:
+    name: seta
+    mode: LR
+    #dataroot_HR: '../test1/HR'
+    dataroot_LR: '../test1/LR'
+    
+path:
+  root: 'D:/Code/GitHub/BasicSR'
+  pretrain_model_G: ../experiments/pretrained_models/SRFlow_DF2K_4X.pth
+
+#### network structures
+network_G:
+  which_model_G: SRFlow_net
+  in_nc: 3
+  out_nc: 3
+  nf: 64
+  nb: 23
+  upscale: 4
+  train_RRDB: false
+  train_RRDB_delay: 0.5
+  flow:
+    K: 16
+    L: 3
+    noInitialInj: true
+    coupling: CondAffineSeparatedAndCond
+    additionalFlowNoAffine: 2
+    split:
+      enable: true
+    fea_up0: true
+    stackRRDB:
+      blocks: [ 1, 8, 15, 22 ]
+      concat: true
+
+#### validation settings
+# heat: 0.9 # This is the standard deviation of the latent vectors
+val:
+  heats: [ 0.0, 0.5, 0.75, 1.0 ] # This are the standard deviation of the latent vectors
+  n_sample: 3

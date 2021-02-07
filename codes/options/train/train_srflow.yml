@@ -1,0 +1,141 @@
+# General settings
+# name: srflowtest #train
+name: debug_001_template # use "debug" or "debug_nochkp" in the name to run a test session and check everything is working. Does validation and state saving every 8 iterations.
+use_tb_logger: true
+model: srflow
+scale: 4
+gpu_ids: [0]
+# use_amp: true
+# use_swa: false
+
+# Dataset options:
+datasets:
+  train:
+    name: DIV2K
+    mode: LRHRC
+    # dataroot_HR: '../datasets/train/hr' # Original, with a single directory
+    # dataroot_LR: '../datasets/train/lr' # Original, with a single directory
+    dataroot_HR: [
+      '../datasets/train/hr1', 
+      '../datasets/train/hr2', 
+      '../datasets/train/hr3'
+      ] # high resolution / ground truth images
+    dataroot_LR: [
+      '../datasets/train/lr1', 
+      '../datasets/train/lr2' #,
+      # '../datasets/train/lr3'
+      ] # low resolution images. If there are missing LR images, they will be generated on the fly from HR
+    subset_file: null
+    use_shuffle: true
+    znorm: false # true | false # To normalize images in [-1, 1] range. Default = None (range [0,1]). Can use with activation function like tanh.
+    n_workers: 4 # 0 to disable CPU multithreading, or an integrer representing CPU threads to use for dataloading
+    batch_size: 8
+    virtual_batch_size: 8
+    HR_size: 128 # patch size. Default: 128. Needs to be coordinated with the patch size of the features network
+    image_channels: 3 # number of channels to load images in
+    quant: 255 #32
+
+    # If manually configuring on the fly generation of LR: (else, it will automatically default to Matlab-like downscale algorithm (777) when/if required
+    # dataroot_kernels: '../training/kernels/results/' # location of the image kernels extracted with KernelGAN, for use with the "realistic" downscale type
+    # lr_downscale: true # false
+    # lr_downscale_types: ["linear", "cubic", "matlab_bicubic"] # select from ["nearest", "linear", "cubic", "area", "lanczos4", "linear_exact", "matlab_bicubic", "realistic"] #scale_algos #scaling interpolation options
+
+    # Rotations augmentations:
+    use_flip: true # flip images
+    use_rot: true # rotate images in 90 degree angles
+    hr_rrot: false # rotate images in random degress between -45 and 45
+    
+    # Noise and blur augmentations:
+    # lr_blur: false # true | false
+    # lr_blur_types: {gaussian: 1, clean: 3} # select from: "average","box","gaussian","bilateral","clean" ##blur options #median and motion aren't working yet
+    # noise_data: ../noise_patches/normal/ # location of the noise patches extracted from real images to use for noise injection with noise option "patches"
+    # lr_noise: false # true | false
+    # lr_noise_types: {gaussian: 1, JPEG: 1, clean: 4} # select from: "gaussian", "JPEG", "quantize", "poisson", "dither", "s&p", "speckle", "patches", "clean"
+    # lr_noise2: false # true | false
+    # lr_noise_types2: {dither: 2, clean: 2} # select from: "gaussian", "JPEG", "quantize", "poisson", "dither", "s&p", "speckle", "patches", "clean"
+    # hr_noise: false # true | false
+    # hr_noise_types: {gaussian: 1, clean: 4} # select from: "gaussian", "JPEG", "quantize", "poisson", "dither", "s&p", "speckle", "clean"
+    
+  val: 
+    name: val_set14_part
+    mode: LRHROTF
+    dataroot_HR: '../datasets/val/hr'
+    dataroot_LR: '../datasets/val/lr'
+    
+    znorm: false # true | false # To normalize images in [-1, 1] range. Default = None (range [0,1]). Can use with activation function like tanh.
+    quant: 255 #32
+    
+    # hr_crop: false #disabled
+    # lr_downscale: false
+    # lr_downscale_types: ["linear", "cubic"] # select from ["nearest", "linear", "cubic", "area", "lanczos4", "linear_exact", "matlab_bicubic"] #scale_algos #scaling interpolation options
+    
+path:
+  strict: false # true | false
+  root: 'D:/Code/GitHub/BasicSR'
+  # if using full pretrained SRFlow model (set train_RRDB_delay to 0.0):
+  pretrain_model_G: ../experiments/pretrained_models/SRFlow_DF2K_4X.pth
+  # if using RRDB model as pretrained:
+  # load_submodule: RRDB
+  # pretrain_model_G: ../experiments/pretrained_models/RRDB_ESRGAN_x4_mod_arch.pth
+  # if resuming training:
+  # resume_state: '../experiments/debug_002_srflow_x4_DIV2K/training_state/16.state'
+
+heat: 0.9 # This is the standard deviation of the latent vectors
+
+# Generator options:
+network_G:
+  which_model_G: SRFlow_net
+  in_nc: 3
+  out_nc: 3
+  nf: 64
+  nb: 23
+  upscale: 4
+  train_RRDB: false
+  train_RRDB_delay: 0.5
+
+  flow:
+    K: 16
+    L: 3
+    noInitialInj: true
+    coupling: CondAffineSeparatedAndCond
+    additionalFlowNoAffine: 2
+    split:
+      enable: true
+    fea_up0: true
+    stackRRDB:
+      blocks: [ 1, 8, 15, 22 ]
+      concat: true
+    augmentation:
+      noiseQuant: true
+
+# Training settings:
+train:
+  lr_G: 2.5e-4
+  weight_decay_G: 0
+  beta1_G: 0.9
+  beta2_G: 0.99
+  lr_scheme: MultiStepLR
+  warmup_iter: -1  # no warm up
+  lr_steps_rel: [ 0.5, 0.75, 0.9, 0.95 ]
+  lr_gamma: 0.5
+
+  # fl_weight: 1
+  # l1_weight: 0
+
+  manual_seed: 10
+  niter: 200000
+  val_freq: 40000
+  overwrite_val_imgs: true
+  # val_comparison: true
+  metrics: 'psnr,ssim,lpips' # select from: "psnr,ssim,lpips" or a combination separated by comma ","
+
+# Validation settings
+val:
+  # validation will produce "n_sample" samples for each heat value in "heats"
+  heats: [ 0.0, 0.5, 0.75, 1.0 ] # [ 0.0, 0.7, 0.8, 0.9 ]
+  n_sample: 3
+
+# Logger
+logger:
+  print_freq: 100
+  save_checkpoint_freq: 1e3
