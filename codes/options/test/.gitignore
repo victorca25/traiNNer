@@ -1,0 +1,11 @@
+*.yml
+*.json
+!test_abpn.json
+!test_deinterlace.yml
+!test_ESRGAN.json
+!test_ESRGAN.yml
+!test_sr.json
+!test_SRFlow.yml
+!test_SRGAN.json
+!test_SRResNet.json
+!test_video.yml
