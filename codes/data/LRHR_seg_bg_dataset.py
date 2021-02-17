@@ -3,11 +3,11 @@ import random
 import numpy as np
 import cv2
 import torch
-import torch.utils.data as data
 import dataops.common as util
+from data.base_dataset import BaseDataset, get_dataroots_paths
 
 
-class LRHRSeg_BG_Dataset(data.Dataset):
+class LRHRSeg_BG_Dataset(BaseDataset):
     '''
     Read HR image, segmentation probability map; generate LR image, category for SFTGAN
     also sample general scenes for background
@@ -15,32 +15,35 @@ class LRHRSeg_BG_Dataset(data.Dataset):
     '''
 
     def __init__(self, opt):
-        super(LRHRSeg_BG_Dataset, self).__init__()
-        self.opt = opt
-        self.paths_LR = None
-        self.paths_HR = None
+        super(LRHRSeg_BG_Dataset, self).__init__(opt, keys_ds=['LR','HR'])
+        self.znorm = opt.get('znorm', False) # Alternative: images are z-normalized to the [-1,1] range
+        # self.opt = opt
+        # self.paths_LR = None
+        # self.paths_HR = None
         self.paths_HR_bg = None  # HR images for background scenes
-        self.LR_env = None  # environment for lmdb
+        self.LR_env = None
         self.HR_env = None
-        self.HR_env_bg = None
+        self.HR_env_bg = None  # environment for lmdb
 
-        # read image list from lmdb or image files
-        self.HR_env, self.paths_HR = util.get_image_paths(opt['data_type'], opt['dataroot_HR'])
-        self.LR_env, self.paths_LR = util.get_image_paths(opt['data_type'], opt['dataroot_LR'])
-        self.HR_env_bg, self.paths_HR_bg = util.get_image_paths(opt['data_type'], \
-            opt['dataroot_HR_bg'])
+        # get images paths (and optional environments for lmdb) from dataroots
+        self.paths_LR, self.paths_HR = get_dataroots_paths(opt, strict=False, keys_ds=self.keys_ds)
 
-        assert self.paths_HR, 'Error: HR path is empty.'
-        if self.paths_LR and self.paths_HR:
-            assert len(self.paths_LR) == len(self.paths_HR), \
-                'HR and LR datasets have different number of images - {}, {}.'.format(\
-                len(self.paths_LR), len(self.paths_HR))
+        # read backgrounds image list from lmdb or image files
+        self.paths_HR_bg = util.get_image_paths(opt['data_type'], opt['dataroot_HR_bg'])
+        
+        if self.opt.get('data_type') == 'lmdb':
+            self.LR_env = util._init_lmdb(opt.get('dataroot_'+self.keys_ds[0]))
+            self.HR_env = util._init_lmdb(opt.get('dataroot_'+self.keys_ds[1]))
+            self.HR_env_bg = util._init_lmdb(opt.get('dataroot_HR_bg'))
+
+        assert len(self.paths_HR) == len(self.paths_HR_bg)
 
         self.random_scale_list = [1, 0.9, 0.8, 0.7, 0.6, 0.5]
         self.ratio = 10  # 10 OST data samples and 1 DIV2K general data samples(background)
 
     def __getitem__(self, index):
         HR_path, LR_path = None, None
+        data_type = self.opt.get('data_type', 'img')
         scale = self.opt['scale']
         HR_size = self.opt['HR_size']
 
@@ -49,14 +52,14 @@ class LRHRSeg_BG_Dataset(data.Dataset):
                 random.choice(list(range(self.ratio))) == 0:  # read background images
             bg_index = random.randint(0, len(self.paths_HR_bg) - 1)
             HR_path = self.paths_HR_bg[bg_index]
-            img_HR = util.read_img(self.HR_env_bg, HR_path)
+            img_HR = util.read_img(env=data_type, path=HR_path, lmdb_env=self.HR_env_bg)
             seg = torch.FloatTensor(8, img_HR.shape[0], img_HR.shape[1]).fill_(0)
             seg[0, :, :] = 1  # background
         else:
             HR_path = self.paths_HR[index]
-            img_HR = util.read_img(self.HR_env, HR_path)
+            img_HR = util.read_img(env=data_type, path=HR_path, lmdb_env=self.HR_env)
             seg = torch.load(HR_path.replace('/img/', '/bicseg/').replace('.png', '.pth'))
-            # read segmentatin files, you should change it to your settings.
+            # read segmentation files, you should change it to your settings.
 
         # modcrop in the validation / test phase
         if self.opt['phase'] != 'train':
@@ -67,7 +70,7 @@ class LRHRSeg_BG_Dataset(data.Dataset):
         # get LR image
         if self.paths_LR:
             LR_path = self.paths_LR[index]
-            img_LR = util.read_img(self.LR_env, LR_path)
+            img_LR = util.read_img(env=data_type, path=LR_path, lmdb_env=self.LR_env)
         else:  # down-sampling on-the-fly
             # randomly scale during training
             if self.opt['phase'] == 'train':
@@ -127,15 +130,9 @@ class LRHRSeg_BG_Dataset(data.Dataset):
             category = -1  # during val, useless
 
         # BGR to RGB, HWC to CHW, numpy to tensor
-        if img_HR.shape[2] == 3:
-            img_HR = img_HR[:, :, [2, 1, 0]]
-            img_LR = img_LR[:, :, [2, 1, 0]]
-        elif img_LR.shape[2] == 4:
-            img_HR = img_HR[:, :, [2, 1, 0, 3]]
-            img_LR = img_LR[:, :, [2, 1, 0, 3]]
-        img_HR = torch.from_numpy(np.ascontiguousarray(np.transpose(img_HR, (2, 0, 1)))).float()
-        img_LR = torch.from_numpy(np.ascontiguousarray(np.transpose(img_LR, (2, 0, 1)))).float()
-        seg = torch.from_numpy(np.ascontiguousarray(np.transpose(seg, (2, 0, 1)))).float()
+        img_HR = util.np2tensor(img_HR, normalize=self.znorm, add_batch=False)
+        img_LR = util.np2tensor(img_LR, normalize=self.znorm, add_batch=False)
+        seg = util.np2tensor(seg, normalize=self.znorm, add_batch=False)
 
         if LR_path is None:
             LR_path = HR_path

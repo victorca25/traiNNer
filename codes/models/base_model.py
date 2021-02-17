@@ -418,8 +418,8 @@ class BaseModel:
             state['swa_scheduler'] = []
             if self.swa and isinstance(self.swa_start_iter, int) and iter_step > self.swa_start_iter:
                 state['swa_scheduler'].append(self.swa_scheduler.state_dict())
-        if self.opt['is_train'] and self.opt['use_amp']:
-            state['amp_scaler'] = self.amp_scaler.state_dict()
+        if self.opt['is_train'] and self.opt['use_amp'] and state.get('amp_scaler', None):
+                state['amp_scaler'] = self.amp_scaler.state_dict()
 
         if latest:
             save_filename = 'latest.state'

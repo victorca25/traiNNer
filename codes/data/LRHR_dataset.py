@@ -3,11 +3,11 @@ import random
 import numpy as np
 import cv2
 import torch
-import torch.utils.data as data
 import dataops.common as util
+from data.base_dataset import BaseDataset, get_dataroots_paths
 
 
-class LRHRDataset(data.Dataset):
+class LRHRDataset(BaseDataset):
     '''
     Read LR and HR image pairs.
     If only HR image is provided, generate LR image on-the-fly.
@@ -15,40 +15,32 @@ class LRHRDataset(data.Dataset):
     '''
 
     def __init__(self, opt):
-        super(LRHRDataset, self).__init__()
-        self.opt = opt
-        self.paths_LR = None
-        self.paths_HR = None
+        super(LRHRDataset, self).__init__(opt, keys_ds=['LR','HR'])
+        # self.opt = opt
+        # self.paths_LR = None
+        # self.paths_HR = None
         self.LR_env = None  # environment for lmdb
         self.HR_env = None
+        self.znorm = opt.get('znorm', False)
 
-        # read image list from subset list txt
-        if opt['subset_file'] is not None and opt['phase'] == 'train':
-            with open(opt['subset_file']) as f:
-                self.paths_HR = sorted([os.path.join(opt['dataroot_HR'], line.rstrip('\n')) \
-                        for line in f])
-            if opt['dataroot_LR'] is not None:
-                raise NotImplementedError('Now subset only supports generating LR on-the-fly.')
-        else:  # read image list from lmdb or image files
-            self.HR_env, self.paths_HR = util.get_image_paths(opt['data_type'], opt['dataroot_HR'])
-            self.LR_env, self.paths_LR = util.get_image_paths(opt['data_type'], opt['dataroot_LR'])
+        # get images paths (and optional environments for lmdb) from dataroots
+        self.paths_LR, self.paths_HR = get_dataroots_paths(opt, strict=False, keys_ds=self.keys_ds)
 
-        assert self.paths_HR, 'Error: HR path is empty.'
-        if self.paths_LR and self.paths_HR:
-            assert len(self.paths_LR) == len(self.paths_HR), \
-                'HR and LR datasets have different number of images - {}, {}.'.format(\
-                len(self.paths_LR), len(self.paths_HR))
+        if self.opt.get('data_type') == 'lmdb':
+            self.LR_env = util._init_lmdb(opt.get('dataroot_'+self.keys_ds[0]))
+            self.HR_env = util._init_lmdb(opt.get('dataroot_'+self.keys_ds[1]))
 
         self.random_scale_list = [1]
 
     def __getitem__(self, index):
         HR_path, LR_path = None, None
+        data_type = self.opt.get('data_type', 'img')
         scale = self.opt['scale']
         HR_size = self.opt['HR_size']
 
         # get HR image
         HR_path = self.paths_HR[index]
-        img_HR = util.read_img(self.HR_env, HR_path)
+        img_HR = util.read_img(env=data_type, path=HR_path, lmdb_env=self.HR_env)
         # modcrop in the validation / test phase
         if self.opt['phase'] != 'train':
             img_HR = util.modcrop(img_HR, scale)
@@ -59,7 +51,7 @@ class LRHRDataset(data.Dataset):
         # get LR image
         if self.paths_LR:
             LR_path = self.paths_LR[index]
-            img_LR = util.read_img(self.LR_env, LR_path)
+            img_LR = util.read_img(env=data_type, path=LR_path, lmdb_env=self.LR_env)
         else:  # down-sampling on-the-fly
             # randomly scale during training
             if self.opt['phase'] == 'train':
@@ -114,14 +106,8 @@ class LRHRDataset(data.Dataset):
             img_LR = util.channel_convert(C, self.opt['color'], [img_LR])[0] # TODO during val no definetion
 
         # BGR to RGB, HWC to CHW, numpy to tensor
-        if img_HR.shape[2] == 3:
-            img_HR = img_HR[:, :, [2, 1, 0]]
-            img_LR = img_LR[:, :, [2, 1, 0]]
-        elif img_LR.shape[2] == 4:
-            img_HR = img_HR[:, :, [2, 1, 0, 3]]
-            img_LR = img_LR[:, :, [2, 1, 0, 3]]
-        img_HR = torch.from_numpy(np.ascontiguousarray(np.transpose(img_HR, (2, 0, 1)))).float()
-        img_LR = torch.from_numpy(np.ascontiguousarray(np.transpose(img_LR, (2, 0, 1)))).float()
+        img_HR = util.np2tensor(img_HR, normalize=self.znorm, add_batch=False)
+        img_LR = util.np2tensor(img_LR, normalize=self.znorm, add_batch=False)
 
         if LR_path is None:
             LR_path = HR_path

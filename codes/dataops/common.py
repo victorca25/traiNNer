@@ -13,18 +13,25 @@ from torchvision.utils import make_grid
 from dataops.colors import *
 from dataops.debug import tmp_vis, describe_numpy, describe_tensor
 
+try:
+    from PIL import Image
+except:
+    pass
+
 ####################
 # Files & IO
 ####################
 
 ###################### get image path list ######################
-IMG_EXTENSIONS = ['.jpg', '.JPG', '.jpeg', '.JPEG', '.png', '.PNG', '.ppm', '.PPM', '.bmp', '.BMP', '.dng', '.DNG', '.webp','.npy', '.NPY']
+IMG_EXTENSIONS = ['.jpg', '.JPG', '.jpeg', '.JPEG', '.png', '.PNG', '.ppm', 
+                  '.PPM', '.bmp', '.BMP', '.dng', '.DNG', '.webp',
+                  '.tif', '.TIF', '.tiff', '.TIFF', '.npy', '.NPY']
 
 def is_image_file(filename):
     return any(filename.endswith(extension) for extension in IMG_EXTENSIONS)
 
 
-def _get_paths_from_images(path):
+def _get_paths_from_images(path, max_dataset_size=float("inf")):
     '''get image path list from image folder'''
     assert os.path.isdir(path), '{:s} is not a valid directory'.format(path)
     images = []
@@ -34,58 +41,93 @@ def _get_paths_from_images(path):
                 img_path = os.path.join(dirpath, fname)
                 images.append(img_path)
     assert images, '{:s} has no valid image file'.format(path)
-    return images
+    return images[:min(max_dataset_size, len(images))]
 
 
 def _get_paths_from_lmdb(dataroot):
-    '''get image path list from lmdb'''
-    import lmdb
-    env = lmdb.open(dataroot, readonly=True, lock=False, readahead=False, meminit=False)
-    keys_cache_file = os.path.join(dataroot, '_keys_cache.p')
-    logger = logging.getLogger('base')
-    if os.path.isfile(keys_cache_file):
-        logger.info('Read lmdb keys from cache: {}'.format(keys_cache_file))
-        keys = pickle.load(open(keys_cache_file, "rb"))
-    else:
-        with env.begin(write=False) as txn:
-            logger.info('Creating lmdb keys cache: {}'.format(keys_cache_file))
-            keys = [key.decode('ascii') for key, _ in txn.cursor()]
-        pickle.dump(keys, open(keys_cache_file, 'wb'))
-    paths = sorted([key for key in keys if not key.endswith('.meta')])
-    return env, paths
+    """Get image path list from lmdb meta info.
+    Args:
+        dataroot (str): dataroot path.
+    Returns:
+        list[str]: Returned path list.
+    """
+    if not dataroot.endswith('.lmdb'):
+        raise ValueError(f'Folder {dataroot} should in lmdb format.')
+    with open(os.path.join(dataroot, 'meta_info.txt')) as fin:
+        paths = [line.split('.')[0] for line in fin]
+    return paths
 
 
-def get_image_paths(data_type, dataroot):
+def _init_lmdb(dataroot, readonly=True, lock=False, readahead=False, meminit=False):
+    """ initializes lmbd env from dataroot """
+    try:
+        import lmdb
+    except ImportError:
+        raise ImportError('Please install lmdb to enable use.')
+    
+    assert isinstance(dataroot, str), 'lmdb is only supported using a single lmdb database per dataroot.'
+
+    #lmdb_env
+    return lmdb.open(dataroot, readonly=readonly, lock=lock, readahead=readahead, meminit=meminit)
+
+
+def get_image_paths(data_type, dataroot, max_dataset_size=float("inf")):
     '''get image path list
     support lmdb or image files'''
-    env, paths = None, None
+    paths = None
     if dataroot is not None:
         if data_type == 'lmdb':
-            env, paths = _get_paths_from_lmdb(dataroot)
+            paths = _get_paths_from_lmdb(dataroot)
         elif data_type == 'img':
-            paths = sorted(_get_paths_from_images(dataroot))
+            paths = sorted(_get_paths_from_images(dataroot, max_dataset_size=max_dataset_size))
         else:
             raise NotImplementedError('data_type [{:s}] is not recognized.'.format(data_type))
-    return env, paths
+    return paths
 
 
 ###################### read images ######################
-def _read_lmdb_img(env, key, size=None):
-    '''read image from lmdb with key (w/ and w/o fixed size)
-    size: (C, H, W) tuple'''
-    with env.begin(write=False) as txn:
+
+def _read_lmdb_img(key, lmdb_env):
+    """ Read image from lmdb with key.
+    Args:
+        key (str | obj:`Path`): the lmdb key / image path in lmdb.
+        lmdb_env: lmdb environment initialized with _init_lmdb()
+    Returns:
+        Decoded image from buffer in bytes
+    """
+    
+    with lmdb_env.begin(write=False) as txn:
         buf = txn.get(key.encode('ascii'))
-        buf_meta = txn.get((key + '.meta').encode('ascii')).decode('ascii')
-    img_flat = np.frombuffer(buf, dtype=np.uint8)
-    if size:
-        C, H, W = size
-    else:
-        H, W, C = [int(s) for s in buf_meta.split(',')]
-    img = img_flat.reshape(H, W, C)
+
+    # return buf
+    img = imfrombytes(buf)  # float32=True
     return img
 
 
-def read_img(env, path, out_nc=3, fix_channels=True, size=None):
+def imfrombytes(content, flag='color', float32=False):
+    """Read an image from bytes.
+    Args:
+        content (bytes): Image bytes got from files or other streams.
+        flag (str): Flags specifying the color type of a loaded image,
+            candidates are `color`, `grayscale` and `unchanged`.
+        float32 (bool): Whether to change to float32., If True, will also norm
+            to [0, 1]. Default: False.
+    Returns:
+        ndarray: Loaded image array.
+    """
+    img_np = np.frombuffer(content, np.uint8)
+    imread_flags = {
+        'color': cv2.IMREAD_COLOR,
+        'grayscale': cv2.IMREAD_GRAYSCALE,
+        'unchanged': cv2.IMREAD_UNCHANGED
+    }
+    img = cv2.imdecode(img_np, imread_flags[flag])
+    if float32:
+        img = img.astype(np.float32) / 255.
+    return img
+
+
+def read_img(env=None, path=None, out_nc=3, fix_channels=True, lmdb_env=None, image_type='cv2'):
     '''
         Reads image using cv2 (rawpy if dng), from lmdb bor from a buffer 
         (path=buffer). Could also use using PIL instead of cv2.
@@ -93,39 +135,40 @@ def read_img(env, path, out_nc=3, fix_channels=True, size=None):
         path: image path or buffer to read
         out_nc: Desired number of channels
         fix_channels: changes the images to the desired number of channels
-        size: fixed size to use for lmbg (optional)
+        lmdb_env: lmdb environment to use (for lmdb)
+        image_type: select a library to open the images with: 'cv2', 'pil',
+         'plt' (optional)
     Output:
         Numpy HWC, BGR, [0,255] by default 
     '''
 
     img = None
-    if env is None or env is 'img':  # img
+    if env is None or env == 'img':  # img
         if(path[-3:].lower() == 'dng'): # if image is a DNG
             import rawpy
             with rawpy.imread(path) as raw:
                 img = raw.postprocess()
-        if(path[-3:].lower() == 'npy'): # if image is a NPY numpy array
+        elif(path[-3:].lower() == 'npy'): # if image is a NPY numpy array
             with open(path, 'rb') as f:
                 img = np.load(f)
-        else: # else, if image can be read by cv2 
+        elif image_type == 'pil': # using PIL instead of OpenCV
+            img = Image.open(path).convert('RGB')
+        elif image_type == 'plt' : # For other images unrecognized by cv2
+            import matplotlib.pyplot as plt
+            img = (255*plt.imread(path)[:,:,:3]).astype('uint8')
+        else: # else, if image can be read by cv2
             img = cv2.imread(path, cv2.IMREAD_UNCHANGED)
-        #TODO: add variable detecting if cv2 is not available and try PIL instead
-        # elif: # using PIL instead of OpenCV
-            # img = Image.open(path).convert('RGB')
-        # else: # For other images unrecognized by cv2
-            # import matplotlib.pyplot as plt
-            # img = (255*plt.imread(path)[:,:,:3]).astype('uint8')
     elif env is 'lmdb':
-        img = _read_lmdb_img(env, path, size)
+        img = _read_lmdb_img(path, lmdb_env)
     elif env is 'buffer':
         img = cv2.imdecode(path, cv2.IMREAD_UNCHANGED)
     else:
-        raise NotImplementedError("Unsupported env: %s" % (env,))
+        raise NotImplementedError("Unsupported env: {}".format(env))
 
-    # if not img:
+    # if (not isinstance(img, np.ndarray)) or (not isinstance(img, Image.Image)):
     #     raise ValueError(f"Failed to read image: {path}")
 
-    if fix_channels:
+    if fix_channels and image_type == 'cv2':
         img = fix_img_channels(img, out_nc)
 
     return img

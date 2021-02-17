@@ -114,7 +114,7 @@ def parse(opt_path: str, is_train: bool = True) -> NoneDict:
             opt = yaml.load(f, Loader=Loader)
 
     opt['is_train'] = is_train
-    scale = opt.get('scale', 4)
+    scale = opt.get('scale', 1)
     bm = opt.get('batch_multiplier', None)
 
     # datasets
@@ -123,7 +123,7 @@ def parse(opt_path: str, is_train: bool = True) -> NoneDict:
         dataset['phase'] = phase
         dataset['scale'] = scale
         is_lmdb = False
-        image_paths = ["HR", "HR_bg", "LR"]
+        image_paths = ["HR", "HR_bg", "LR", "A", "B", "lq", "gt", "ref"]
         for key in image_paths:
             image_paths = dataset.get('dataroot_' + key, None)
             if image_paths is not None:
@@ -177,6 +177,8 @@ def parse(opt_path: str, is_train: bool = True) -> NoneDict:
         opt['path']['training_state'] = os.path.join(experiments_root, 'training_state')
         opt['path']['log'] = experiments_root
         opt['path']['val_images'] = os.path.join(experiments_root, 'val_images')
+        if opt['train'].get('display_freq', None):
+            opt['path']['disp_images'] = os.path.join(experiments_root, 'disp_images')
         opt['train']['overwrite_val_imgs'] = opt['train'].get('overwrite_val_imgs', None)
         opt['train']['val_comparison'] = opt['train'].get('val_comparison', None)
         opt['logger']['overwrite_chkp'] = opt['logger'].get('overwrite_chkp', None)
@@ -188,7 +190,7 @@ def parse(opt_path: str, is_train: bool = True) -> NoneDict:
         if 'debug_nochkp' in opt['name']:
             opt['train']['val_freq'] = 8
             opt['logger']['print_freq'] = 2
-            opt['logger']['save_checkpoint_freq'] = 1000 #10000000
+            opt['logger']['save_checkpoint_freq'] = 10000000
             opt['train']['lr_decay_iter'] = 10
         elif 'debug' in opt['name']:
             opt['train']['val_freq'] = 8

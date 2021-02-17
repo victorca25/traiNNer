@@ -1,11 +1,8 @@
 import os.path
-# import glob
 import random
 import numpy as np
 import cv2
 import torch
-# import torch.utils.data as data
-from torch.utils.data.dataset import Dataset
 import dataops.common as util
 
 import dataops.augmentations as augmentations #TMP
@@ -13,10 +10,10 @@ from dataops.augmentations import Scale, MLResize, RandomQuantize, KernelDownsca
 from dataops.debug import tmp_vis, describe_numpy, describe_tensor
 
 import dataops.opencv_transforms.opencv_transforms as transforms
+from data.base_dataset import BaseDataset, get_dataroots_paths
 
 
-
-class LRHRDataset(Dataset):
+class LRHRDataset(BaseDataset):
     '''
     Read LR and HR image pairs.
     If only HR image is provided, generate LR image on-the-fly.
@@ -24,11 +21,12 @@ class LRHRDataset(Dataset):
     '''
 
     def __init__(self, opt):
-        super(LRHRDataset, self).__init__()
-        self.opt = opt
-        self.paths_LR, self.paths_HR = None, None
+        super(LRHRDataset, self).__init__(opt, keys_ds=['LR','HR'])
+        # self.opt = opt
+        # self.paths_LR, self.paths_HR = None, None
         self.LR_env, self.HR_env = None, None  # environment for lmdb
         self.output_sample_imgs = None
+        self.vars = opt.get('outputs', 'LRHR')  #'AB'
 
         if opt.get('dataroot_kernels', None) and 999 in self.opt["lr_downscale_types"]:
             #TODO: note: use the model scale to get the right kernel 
@@ -41,127 +39,18 @@ class LRHRDataset(Dataset):
         else:
             self.noise_patches = None
 
-        # read image list from subset list txt
-        if opt['subset_file'] is not None and opt['phase'] == 'train':
-            with open(opt['subset_file']) as f:
-                self.paths_HR = sorted([os.path.join(opt['dataroot_HR'], line.rstrip('\n')) \
-                        for line in f])
-            if opt['dataroot_LR'] is not None:
-                raise NotImplementedError('Subset only supports generating LR on-the-fly.')
-        else:  # read image list from lmdb or image files
-            # Check if dataroot_HR is a list of directories or a single directory. Note: lmdb will not currently work with a list
-            HR_images_paths = opt['dataroot_HR']
-            # if receiving a single path in str format, convert to list
-            if type(HR_images_paths) is str:
-                HR_images_paths = [HR_images_paths]
-
-            # Check if dataroot_LR is a list of directories or a single directory. Note: lmdb will not currently work with a list
-            LR_images_paths = opt['dataroot_LR']
-            if not LR_images_paths:
-                LR_images_paths = []
-            # if receiving a single path in str format, convert to list
-            if type(LR_images_paths) is str:
-                LR_images_paths = [LR_images_paths]
-            
-            self.paths_HR = []
-            self.paths_LR = []
-
-            # special case when dealing with duplicate HR_images_paths or LR_images_paths
-            # LMDB will not be supported with this option
-            if len(HR_images_paths) != len(set(HR_images_paths)) or \
-                len(LR_images_paths) != len(set(LR_images_paths)):
-
-                # only resolve when the two path lists coincide in the number of elements, 
-                # they have to be ordered specifically as they will be used in the options file
-                assert len(HR_images_paths) == len(LR_images_paths), \
-                    'Error: When using duplicate paths, dataroot_HR and dataroot_LR must contain the same number of elements.'
-
-                for paths in zip(HR_images_paths, LR_images_paths):
-                    _, paths_HR = util.get_image_paths(opt['data_type'], paths[0])
-                    _, paths_LR = util.get_image_paths(opt['data_type'], paths[1])
-                    for imgs in zip(paths_HR, paths_LR):
-                        _, HR_filename = os.path.split(imgs[0])
-                        _, LR_filename = os.path.split(imgs[1])
-                        assert HR_filename == LR_filename, 'Wrong pair of images {} and {}'.format(HR_filename, LR_filename)
-                        self.paths_HR.append(imgs[0])
-                        self.paths_LR.append(imgs[1])
-            else: # for cases with extra HR directories for OTF images or original single directories
-                self.HR_env = []
-                self.LR_env = []
-                # process HR_images_paths
-                # if type(HR_images_paths) is list:
-                for path in HR_images_paths:
-                    HR_env, paths_HR = util.get_image_paths(opt['data_type'], path)
-                    if type(HR_env) is list:
-                        for imgs in HR_env:
-                            self.HR_env.append(imgs)
-                    for imgs in paths_HR:
-                        self.paths_HR.append(imgs)
-                if self.HR_env.count(None) == len(self.HR_env):
-                    self.HR_env = None
-                else:
-                    self.HR_env = sorted(self.HR_env)
-                self.paths_HR = sorted(self.paths_HR)
-                # elif type(HR_images_paths) is str:
-                #     self.HR_env, self.paths_HR = util.get_image_paths(opt['data_type'], HR_images_paths)
-                
-                # process LR_images_paths
-                # if type(LR_images_paths) is list:
-                for path in LR_images_paths:
-                    LR_env, paths_LR = util.get_image_paths(opt['data_type'], path)
-                    if type(LR_env) is list:
-                        for imgs in LR_env:
-                            self.LR_env.append(imgs)
-                    for imgs in paths_LR:
-                        self.paths_LR.append(imgs)
-                if self.LR_env.count(None) == len(self.LR_env):
-                    self.LR_env = None
-                else:
-                    self.LR_env = sorted(self.LR_env)
-                self.paths_LR = sorted(self.paths_LR)
-                # elif type(LR_images_paths) is str:
-                #     self.LR_env, self.paths_LR = util.get_image_paths(opt['data_type'], LR_images_paths)
-
-        assert self.paths_HR, 'Error: HR path is empty.'
-        if self.paths_LR and self.paths_HR:
-            # Modified to allow using HR and LR folders with different amount of images
-            # - If an LR image pair is not found, downscale HR on the fly, else, use the LR
-            # - If all LR are provided and 'lr_downscale' is enabled, randomize use of provided LR and OTF LR for augmentation
-            """
-            assert len(self.paths_LR) == len(self.paths_HR), \
-                'HR and LR datasets have different number of images - {}, {}.'.format(\
-                len(self.paths_LR), len(self.paths_HR))
-            """
-            #"""
-            assert len(self.paths_HR) >= len(self.paths_LR), \
-                'HR dataset contains less images than LR dataset  - {}, {}.'.format(\
-                len(self.paths_HR), len(self.paths_LR))
-            #"""
-            if len(self.paths_LR) < len(self.paths_HR):
-                print('LR contains less images than HR dataset  - {}, {}. Will generate missing images on the fly.'.format(len(self.paths_LR), len(self.paths_HR)))
-                i=0
-                tmp = []
-                for idx in range(0, len(self.paths_HR)):
-                    _, HRtail = os.path.split(self.paths_HR[idx])
-                    if i < len(self.paths_LR):
-                        LRhead, LRtail = os.path.split(self.paths_LR[i])
-                        
-                        if LRtail == HRtail:
-                            LRimg_path = os.path.join(LRhead, LRtail)
-                            tmp.append(LRimg_path)
-                            i+=1
-                        else:
-                            LRimg_path = None
-                            tmp.append(LRimg_path)
-                    else: #if the last image is missing
-                        LRimg_path = None
-                        tmp.append(LRimg_path)
-                self.paths_LR = tmp
+        # get images paths (and optional environments for lmdb) from dataroots
+        self.paths_LR, self.paths_HR = get_dataroots_paths(opt, strict=False, keys_ds=self.keys_ds)
         
+        if self.opt.get('data_type') == 'lmdb':
+            self.LR_env = util._init_lmdb(opt.get('dataroot_'+self.keys_ds[0]))
+            self.HR_env = util._init_lmdb(opt.get('dataroot_'+self.keys_ds[1]))
+
         #self.random_scale_list = [1]
 
     def __getitem__(self, index):
         HR_path, LR_path = None, None
+        data_type = self.opt.get('data_type', 'img')
         scale = self.opt.get('scale', 4)
         HR_size = self.opt.get('HR_size', 128)
         if HR_size:
@@ -208,20 +97,19 @@ class LRHRDataset(Dataset):
                 #print("HR flipped")
 
             # Read the LR and HR images from the provided paths
-            img_LR = util.read_img(self.LR_env, LR_path, out_nc=image_channels)
-            img_HR = util.read_img(self.HR_env, HR_path, out_nc=image_channels)
+            img_LR = util.read_img(env=data_type, path=LR_path, lmdb_env=self.LR_env, out_nc=image_channels)
+            img_HR = util.read_img(env=data_type, path=HR_path, lmdb_env=self.HR_env, out_nc=image_channels)
             
             # Even if LR dataset is provided, force to generate aug_downscale % of downscales OTF from HR
             # The code will later make sure img_LR has the correct size
             if self.opt.get('aug_downscale', None):
-                #aug_downscale = self.opt['aug_downscale']
                 if np.random.rand() < self.opt['aug_downscale']:
                     img_LR = img_HR
             
         # If LR is not provided, use HR and modify on the fly
         else:
             HR_path = self.paths_HR[index]
-            img_HR = util.read_img(self.HR_env, HR_path, out_nc=image_channels)
+            img_HR = util.read_img(env=data_type, path=HR_path, lmdb_env=self.HR_env, out_nc=image_channels)
             img_LR = img_HR
             LR_path = HR_path
         
@@ -577,7 +465,10 @@ class LRHRDataset(Dataset):
         
         if LR_path is None:
             LR_path = HR_path
-        return {'LR': img_LR, 'HR': img_HR, 'LR_path': LR_path, 'HR_path': HR_path} 
+        if self.vars == 'AB':
+            return {'A': img_LR, 'B': img_HR, 'A_paths': LR_path, 'B_paths': HR_path}
+        else:
+            return {'LR': img_LR, 'HR': img_HR, 'LR_path': LR_path, 'HR_path': HR_path}
 
     def __len__(self):
         return len(self.paths_HR)
