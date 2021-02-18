@@ -82,7 +82,7 @@ class VidTrainsetLoader(Dataset):
         
         # list the frames in the directory 
         # hr_dir = self.trainset_dir + '/' + video_dir + '/hr'
-        _, paths_HR = util.get_image_paths(self.opt['data_type'], os.path.join(self.paths_HR, video_dir))
+        paths_HR = util.get_image_paths(self.opt['data_type'], os.path.join(self.paths_HR, video_dir))
         # print(paths_HR)
 
         if self.opt['phase'] == 'train':
@@ -113,7 +113,7 @@ class VidTrainsetLoader(Dataset):
         List based frames loading
         '''
         if self.paths_LR:
-            _, paths_LR = util.get_image_paths(self.opt['data_type'], os.path.join(self.paths_LR, video_dir))
+            paths_LR = util.get_image_paths(self.opt['data_type'], os.path.join(self.paths_LR, video_dir))
         else:
             paths_LR = paths_HR
             ds_algo = 777 # default to matlab-like bicubic downscale
@@ -347,7 +347,7 @@ class VidTestsetLoader(Dataset):
         '''
         List based frames loading
         '''
-        _, paths_LR = util.get_image_paths(self.opt['data_type'], os.path.join(self.paths_LR, video_dir))
+        paths_LR = util.get_image_paths(self.opt['data_type'], os.path.join(self.paths_LR, video_dir))
 
         assert self.num_frames <= len(paths_LR), (
             f'num_frame must be smaller than the number of frames per video, check {video_dir}')

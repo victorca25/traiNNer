@@ -21,10 +21,10 @@ class DVDDataset(data.Dataset):
         self.opt = opt
         self.debug = None  # path to a directory to save debug files, None = Disable
 
-        _, self.paths_in = get_image_paths('img', opt['dataroot_in'])
-        _, self.paths_top = get_image_paths('img', opt['dataroot_top'])
-        _, self.paths_bot = get_image_paths('img', opt['dataroot_bottom'])
-        _, self.paths_progressive = get_image_paths('img', opt['dataroot_progressive'])
+        self.paths_in = get_image_paths('img', opt['dataroot_in'])
+        self.paths_top = get_image_paths('img', opt['dataroot_top'])
+        self.paths_bot = get_image_paths('img', opt['dataroot_bottom'])
+        self.paths_progressive = get_image_paths('img', opt['dataroot_progressive'])
 
         if self.paths_in and self.paths_top and self.paths_bot:
             assert len(self.paths_top) >= len(self.paths_in), \	
@@ -115,7 +115,7 @@ class DVDIDataset(data.Dataset):
         self.paths_in = None
 
         # read image list from lmdb or image files
-        _, self.paths_in = get_image_paths('img', opt['dataroot_in'])
+        self.paths_in = get_image_paths('img', opt['dataroot_in'])
         assert self.paths_in, 'Error: Interlaced paths are empty.'
 
     def __getitem__(self, index):
