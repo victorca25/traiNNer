@@ -1,6 +1,7 @@
 #different optimizers can be used here, can be changed in the options 
 
 import torch
+from models.modules.optimizers.adamp import AdamP, SGDP
 
 
 def get_optimizers(cri_gan=None, netD=None, netG=None, train_opt=None, logger=None, optimizers=None):
@@ -15,6 +16,11 @@ def get_optimizers(cri_gan=None, netD=None, netG=None, train_opt=None, logger=No
     
     wd_G = train_opt.get('weight_decay_G', 0)
     optim_G = train_opt.get('optim_G', 'adam')
+    eps_G = train_opt.get('eps_G', 1e-8)
+    nesterov_G = train_opt.get('nesterov_G', False)
+    delta_G = train_opt.get('delta_G', 0.1)
+    wd_ratio_G = train_opt.get('wd_ratio_G', 0.1)
+    dampening_G = train_opt.get('dampening_G', 0)
     
     if optim_G == 'sgd':
         optimizer_G = torch.optim.SGD(optim_params, lr=train_opt['lr_G'], \
@@ -22,6 +28,16 @@ def get_optimizers(cri_gan=None, netD=None, netG=None, train_opt=None, logger=No
     elif optim_G == 'rmsprop':
         optimizer_G = torch.optim.RMSprop(optim_params, lr=train_opt['lr_G'], \
             weight_decay=wd_G, eps=(train_opt['eps_G']))
+    elif optim_G == 'sgdp':
+        optimizer_G = SGDP(optim_params, lr=train_opt['lr_G'], \
+            weight_decay=wd_G, momentum=(train_opt['momentum_G']), 
+            dampening=dampening_G, nesterov=nesterov_G,
+            eps=eps_G, delta=delta_G, wd_ratio=wd_ratio_G)
+    elif optim_G == 'adamp':
+        optimizer_G = AdamP(optim_params, lr=train_opt['lr_G'], \
+            weight_decay=wd_G, betas=(train_opt['beta1_G'], 0.999), 
+            nesterov=nesterov_G, eps=eps_G, 
+            delta=delta_G, wd_ratio=wd_ratio_G)
     else: # default to 'adam'
         optimizer_G = torch.optim.Adam(optim_params, lr=train_opt['lr_G'], \
             weight_decay=wd_G, betas=(train_opt['beta1_G'], 0.999))
@@ -31,6 +47,11 @@ def get_optimizers(cri_gan=None, netD=None, netG=None, train_opt=None, logger=No
     if cri_gan:
         wd_D = train_opt.get('weight_decay_D', 0)
         optim_D = train_opt.get('optim_D', 'adam')
+        eps_D = train_opt.get('eps_D', 1e-8)
+        nesterov_D = train_opt.get('nesterov_D', False)
+        delta_D = train_opt.get('delta_D', 0.1)
+        wd_ratio_D = train_opt.get('wd_ratio_D', 0.1)
+        dampening_D = train_opt.get('dampening_D', 0)
         
         if optim_D == 'sgd':
             optimizer_D = torch.optim.SGD(netD.parameters(), lr=train_opt['lr_D'], \
@@ -38,6 +59,15 @@ def get_optimizers(cri_gan=None, netD=None, netG=None, train_opt=None, logger=No
         elif optim_D == 'rmsprop':
             optimizer_D = torch.optim.RMSprop(netD.parameters(), lr=train_opt['lr_D'], \
                 weight_decay=wd_D, eps=(train_opt['eps_D']))
+        elif optim_D == 'sgdp':
+            optimizer_D = SGDP(optim_params, lr=train_opt['lr_D'], \
+                weight_decay=wd_D, momentum=(train_opt['momentum_D']), 
+                dampening=dampening_D, nesterov=nesterov_D,
+                eps=eps_D, delta=delta_D, wd_ratio=wd_ratio_D)
+        elif optim_D == 'adamp':
+            optimizer_D = AdamP(optim_params, lr=train_opt['lr_D'], \
+                weight_decay=wd_D, betas=(train_opt['beta1_D'], 0.999), 
+                nesterov=nesterov_D, eps=eps_D, delta=delta_D, wd_ratio=wd_ratio_D)
         else: # default to 'adam'
             optimizer_D = torch.optim.Adam(netD.parameters(), lr=train_opt['lr_D'], \
                 weight_decay=wd_D, betas=(train_opt['beta1_D'], 0.999))
@@ -69,13 +99,18 @@ def get_optimizers_filter(cri_gan=None, netD=None, netG=None, train_opt=None, lo
 
     wd_G = train_opt.get('weight_decay_G', 0)
     optim_G = train_opt.get('optim_G', 'adam')
+    eps_G = train_opt.get('eps_G', 1e-8)
+    nesterov_G = train_opt.get('nesterov_G', False)
+    delta_G = train_opt.get('delta_G', 0.1)
+    wd_ratio_G = train_opt.get('wd_ratio_G', 0.1)
+    dampening_G = train_opt.get('dampening_G', 0)
     
     if optim_G == 'sgd':
         optimizer_G = torch.optim.SGD(
             [
                 {"params": optim_params_other,
                 "lr": train_opt['lr_G'],
-                "momentum": train_opt['eps_G'],
+                "momentum": train_opt['momentum_G'],
                 "weight_decay": wd_G},
                 {"params": optim_params_filter,
                 "lr": train_opt.get('lr_filter', train_opt['lr_G']),
@@ -94,6 +129,54 @@ def get_optimizers_filter(cri_gan=None, netD=None, netG=None, train_opt=None, lo
                 "lr": train_opt.get('lr_filter', train_opt['lr_G']),
                 "eps": train_opt['eps_G'],
                 "weight_decay": wd_G}
+            ]
+        )
+    elif optim_G == 'sgdp':
+        optimizer_G = SGDP(
+            [
+                {"params": optim_params_other,
+                "lr": train_opt['lr_G'],
+                "momentum": train_opt['momentum_G'],
+                "weight_decay": wd_G,
+                "dampening": dampening_G,
+                "nesterov": nesterov_G,
+                "eps": eps_G, 
+                "delta": delta_G,
+                "wd_ratio": wd_ratio_G
+                },
+                {"params": optim_params_filter,
+                "lr": train_opt.get('lr_filter', train_opt['lr_G']),
+                "momentum": train_opt['momentum_G'],
+                "weight_decay": wd_G,
+                "dampening": dampening_G,
+                "nesterov": nesterov_G,
+                "eps": eps_G, 
+                "delta": delta_G,
+                "wd_ratio": wd_ratio_G}
+            ]
+        )
+    elif optim_G == 'adamp':
+        optimizer_G = AdamP(
+            [
+                {"params": optim_params_other,
+                "lr": train_opt['lr_G'],
+                "beta1": train_opt['beta1_G'],
+                "beta2": train_opt.get('beta2_G', 0.999),
+                "weight_decay": wd_G,
+                "nesterov": nesterov_G,
+                "eps": eps_G,
+                "delta": delta_G,
+                "wd_ratio": wd_ratio_G
+                },
+                {"params": optim_params_filter,
+                "lr": train_opt.get('lr_filter', train_opt['lr_G']),
+                "beta1": train_opt['beta1_G'],
+                "beta2": train_opt.get('beta2_G', 0.999),
+                "weight_decay": wd_G,
+                "nesterov": nesterov_G,
+                "eps": eps_G,
+                "delta": delta_G,
+                "wd_ratio": wd_ratio_G}
             ]
         )
     else: # default to 'adam'
