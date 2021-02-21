@@ -9,7 +9,7 @@ try:
 except:
     pass
 
-from dataops.common import get_image_paths
+from dataops.common import get_image_paths, read_img
 
 
 class BaseDataset(data.Dataset):
@@ -95,8 +95,8 @@ def paired_dataset_validation(A_images_paths, B_images_paths, data_type='img', m
     paths_A = []
     paths_B = []
     for paths in zip(A_images_paths, B_images_paths):
-        _, A_paths = get_image_paths(data_type, paths[0], max_dataset_size)  # get image paths
-        _, B_paths = get_image_paths(data_type, paths[1], max_dataset_size)  # get image paths
+        A_paths = get_image_paths(data_type, paths[0], max_dataset_size)  # get image paths
+        B_paths = get_image_paths(data_type, paths[1], max_dataset_size)  # get image paths
         for imgs in zip(A_paths, B_paths):
             _, A_filename = os.path.split(imgs[0])
             _, B_filename = os.path.split(imgs[1])
@@ -123,6 +123,7 @@ def check_data_keys(opt, keys_ds=['LR', 'HR']):
             opt.pop(A_el)
     
     return opt
+
 
 
 def read_dataroots(opt, keys_ds=['LR','HR']):
