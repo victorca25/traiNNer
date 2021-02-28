@@ -19,18 +19,18 @@ class Discriminator_VGG(nn.Module):
 
         conv_blocks = []
         conv_blocks.append(B.conv_block(  in_nc, base_nf, kernel_size=3, stride=1, norm_type=None, \
-            act_type=act_type, mode=mode))
+            act_type=act_type, mode=mode, convtype=convtype))
         conv_blocks.append(B.conv_block(base_nf, base_nf, kernel_size=4, stride=2, norm_type=norm_type, \
-            act_type=act_type, mode=mode))
+            act_type=act_type, mode=mode, convtype=convtype))
 
         cur_size = size // 2
         cur_nc = base_nf
         while cur_size > 4:
             out_nc = cur_nc * 2 if cur_nc < 512 else cur_nc
             conv_blocks.append(B.conv_block(cur_nc, out_nc, kernel_size=3, stride=1, norm_type=norm_type, \
-                act_type=act_type, mode=mode))
+                act_type=act_type, mode=mode, convtype=convtype))
             conv_blocks.append(B.conv_block(out_nc, out_nc, kernel_size=4, stride=2, norm_type=norm_type, \
-                act_type=act_type, mode=mode))
+                act_type=act_type, mode=mode, convtype=convtype))
             cur_nc = out_nc
             cur_size //= 2
 
@@ -153,29 +153,29 @@ class Discriminator_VGG_128(nn.Module):
         # hxw, c
         # 128, 64
         conv0 = B.conv_block(in_nc, base_nf, kernel_size=3, norm_type=None, act_type=act_type, \
-            mode=mode)
+            mode=mode, convtype=convtype)
         conv1 = B.conv_block(base_nf, base_nf, kernel_size=4, stride=2, norm_type=norm_type, \
-            act_type=act_type, mode=mode)
+            act_type=act_type, mode=mode, convtype=convtype)
         # 64, 64
         conv2 = B.conv_block(base_nf, base_nf*2, kernel_size=3, stride=1, norm_type=norm_type, \
-            act_type=act_type, mode=mode)
+            act_type=act_type, mode=mode, convtype=convtype)
         conv3 = B.conv_block(base_nf*2, base_nf*2, kernel_size=4, stride=2, norm_type=norm_type, \
-            act_type=act_type, mode=mode)
+            act_type=act_type, mode=mode, convtype=convtype)
         # 32, 128
         conv4 = B.conv_block(base_nf*2, base_nf*4, kernel_size=3, stride=1, norm_type=norm_type, \
-            act_type=act_type, mode=mode)
+            act_type=act_type, mode=mode, convtype=convtype)
         conv5 = B.conv_block(base_nf*4, base_nf*4, kernel_size=4, stride=2, norm_type=norm_type, \
-            act_type=act_type, mode=mode)
+            act_type=act_type, mode=mode, convtype=convtype)
         # 16, 256
         conv6 = B.conv_block(base_nf*4, base_nf*8, kernel_size=3, stride=1, norm_type=norm_type, \
-            act_type=act_type, mode=mode)
+            act_type=act_type, mode=mode, convtype=convtype)
         conv7 = B.conv_block(base_nf*8, base_nf*8, kernel_size=4, stride=2, norm_type=norm_type, \
-            act_type=act_type, mode=mode)
+            act_type=act_type, mode=mode, convtype=convtype)
         # 8, 512
         conv8 = B.conv_block(base_nf*8, base_nf*8, kernel_size=3, stride=1, norm_type=norm_type, \
-            act_type=act_type, mode=mode)
+            act_type=act_type, mode=mode, convtype=convtype)
         conv9 = B.conv_block(base_nf*8, base_nf*8, kernel_size=4, stride=2, norm_type=norm_type, \
-            act_type=act_type, mode=mode)
+            act_type=act_type, mode=mode, convtype=convtype)
         # 4, 512
         self.features = B.sequential(conv0, conv1, conv2, conv3, conv4, conv5, conv6, conv7, conv8,\
             conv9)
