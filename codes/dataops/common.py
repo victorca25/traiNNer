@@ -127,16 +127,16 @@ def imfrombytes(content, flag='color', float32=False):
     return img
 
 
-def read_img(env=None, path=None, out_nc=3, fix_channels=True, lmdb_env=None, image_type='cv2'):
+def read_img(env=None, path=None, out_nc=3, fix_channels=True, lmdb_env=None, loader='cv2'):
     '''
-        Reads image using cv2 (rawpy if dng), from lmdb bor from a buffer 
-        (path=buffer). Could also use using PIL instead of cv2.
+        Reads image using cv2 or PIL (rawpy if dng), from lmdb or from a 
+        buffer (path=buffer).
     Arguments:
         path: image path or buffer to read
         out_nc: Desired number of channels
         fix_channels: changes the images to the desired number of channels
         lmdb_env: lmdb environment to use (for lmdb)
-        image_type: select a library to open the images with: 'cv2', 'pil',
+        loader: select a library to open the images with: 'cv2', 'pil',
          'plt' (optional)
     Output:
         Numpy HWC, BGR, [0,255] by default 
@@ -151,9 +151,9 @@ def read_img(env=None, path=None, out_nc=3, fix_channels=True, lmdb_env=None, im
         elif(path[-3:].lower() == 'npy'): # if image is a NPY numpy array
             with open(path, 'rb') as f:
                 img = np.load(f)
-        elif image_type == 'pil': # using PIL instead of OpenCV
+        elif loader == 'pil': # using PIL instead of OpenCV
             img = Image.open(path).convert('RGB')
-        elif image_type == 'plt' : # For other images unrecognized by cv2
+        elif loader == 'plt' : # For other images unrecognized by cv2
             import matplotlib.pyplot as plt
             img = (255*plt.imread(path)[:,:,:3]).astype('uint8')
         else: # else, if image can be read by cv2
@@ -165,10 +165,10 @@ def read_img(env=None, path=None, out_nc=3, fix_channels=True, lmdb_env=None, im
     else:
         raise NotImplementedError("Unsupported env: {}".format(env))
 
-    # if (not isinstance(img, np.ndarray)) or (not isinstance(img, Image.Image)):
+    # if (not isinstance(img, np.ndarray)): # or (not isinstance(img, Image.Image)):
     #     raise ValueError(f"Failed to read image: {path}")
 
-    if fix_channels and image_type == 'cv2':
+    if fix_channels and loader == 'cv2':
         img = fix_img_channels(img, out_nc)
 
     return img
@@ -389,6 +389,7 @@ def ycbcr2rgb(img_ycbcr):
     return img_rgb
 '''
 
+#TODO: will be unused, but move to augmentations.py
 def modcrop(img_in, scale):
     # img_in: Numpy, HWC or HW
     img = np.copy(img_in)
@@ -403,6 +404,7 @@ def modcrop(img_in, scale):
     else:
         raise ValueError('Wrong img ndim: [{:d}].'.format(img.ndim))
     return img
+
 
 #TODO: this should probably be elsewhere (augmentations.py)
 def augment(img_list, hflip=True, rot=True):
@@ -787,35 +789,71 @@ def recompose_tensor(patches, height, width, step=[1.0,1.0], scale=1):
 # Matlab imresize
 ####################
 
+def get_img_types(x):
+    if isinstance(x, np.ndarray):
+        to_dtype = lambda a: a
+        fw = np
+    else:
+        to_dtype = lambda a: a.to(x.dtype)
+        fw = torch
+    eps = fw.finfo(fw.float32).eps
+    return fw, to_dtype, eps
 
-# These next functions are all interpolation methods. x is the distance from the left pixel center
+
+def kernel_width(kw):
+    """ Wrapper to add the kernel support to the interpolation 
+    functions, i.e length of non-zero segment over its 1d input 
+    domain. 
+    This is a characteristic of the function. eg. for bicubic 4, 
+    linear 2, laczos2 4, lanczos3 6, box 1.
+    """
+    def wrapper(f):
+        f.kernel_width = kw
+        return f
+    return wrapper
+
+
+# these next functions are all interpolation methods. 
+# x is the distance from the left pixel center
+@kernel_width(4)
 def cubic(x):
-    absx = torch.abs(x)
-    absx2 = absx**2
-    absx3 = absx**3
-    return (1.5*absx3 - 2.5*absx2 + 1) * ((absx <= 1).type_as(absx)) + \
-        (-0.5*absx3 + 2.5*absx2 - 4*absx + 2) * (((absx > 1)*(absx <= 2)).type_as(absx))
+    fw, to_dtype, eps = get_img_types(x)
+    absx = fw.abs(x)
+    absx2 = absx ** 2
+    absx3 = absx ** 3    
+    return ((1.5 * absx3 - 2.5 * absx2 + 1.) * to_dtype(absx <= 1.) +
+            (-0.5 * absx3 + 2.5 * absx2 - 4. * absx + 2.) *
+            to_dtype((absx > 1.) & (absx <= 2.)))
 
+@kernel_width(1)
 def box(x):
-    return ((-0.5 <= x) & (x < 0.5)) * 1.0
+    fw, to_dtype, eps = get_img_types(x)
+    return to_dtype((-1 <= x) & (x < 0)) + to_dtype((0 <= x) & (x <= 1))
+    # return to_dtype((-0.5 <= x) & (x < 0.5)) * 1.0
 
+@kernel_width(2)
 def linear(x):
-    return (x + 1) * ((-1 <= x) & (x < 0)) + (1 - x) * ((0 <= x) & (x <= 1))
+    fw, to_dtype, eps = get_img_types(x)
+    return ((x + 1) * to_dtype((-1 <= x) & (x < 0)) + (1 - x) *
+            to_dtype((0 <= x) & (x <= 1)))
 
+@kernel_width(4)
 def lanczos2(x):
-    return (((torch.sin(math.pi*x) * torch.sin(math.pi*x/2) + torch.finfo(torch.float32).eps) /
-             ((math.pi**2 * x**2 / 2) + torch.finfo(torch.float32).eps))
-            * (torch.abs(x) < 2))
+    fw, to_dtype, eps = get_img_types(x)
+    return (((fw.sin(math.pi * x) * fw.sin(math.pi * x / 2) + eps) /
+            ((math.pi**2 * x**2 / 2) + eps)) * to_dtype(fw.abs(x) < 2))
 
+@kernel_width(6)
 def lanczos3(x):
-    return (((torch.sin(math.pi*x) * torch.sin(math.pi*x/3) + torch.finfo(torch.float32).eps) /
-            ((math.pi**2 * x**2 / 3) + torch.finfo(torch.float32).eps))
-            * (torch.abs(x) < 3))
+    fw, to_dtype, eps = get_img_types(x)
+    return (((fw.sin(math.pi * x) * fw.sin(math.pi * x / 3) + eps) /
+            ((math.pi**2 * x**2 / 3) + eps)) * to_dtype(fw.abs(x) < 3))
 
 
 def calculate_weights_indices(in_length, out_length, scale, kernel, kernel_width, antialiasing):
-    if (scale < 1) and (antialiasing):
-        # Use a modified kernel to simultaneously interpolate and antialias- larger kernel width
+    if (scale < 1) and antialiasing:
+        # Use a modified kernel with larger kernel width to simultaneously 
+        # interpolate and antialias
         kernel_width = kernel_width / scale
 
     # Output-space coordinates
@@ -833,33 +871,36 @@ def calculate_weights_indices(in_length, out_length, scale, kernel, kernel_width
     # computation?  Note: it's OK to use an extra pixel here; if the
     # corresponding weights are all zero, it will be eliminated at the end
     # of this function.
-    P = math.ceil(kernel_width) + 2
+    p = math.ceil(kernel_width) + 2
 
     # The indices of the input pixels involved in computing the k-th output
     # pixel are in row k of the indices matrix.
-    indices = left.view(out_length, 1).expand(out_length, P) + torch.linspace(0, P - 1, P).view(
-        1, P).expand(out_length, P)
+    indices = left.view(out_length, 1).expand(out_length, p) + torch.linspace(
+        0, p - 1, p).view(1, p).expand(out_length, p)
 
     # The weights used to compute the k-th output pixel are in row k of the
     # weights matrix.
-    distance_to_center = u.view(out_length, 1).expand(out_length, P) - indices
+    distance_to_center = u.view(out_length, 1).expand(out_length, p) - indices
+    
     # apply kernel
-    if (scale < 1) and (antialiasing):
+    if (scale < 1) and antialiasing:
         weights = scale * kernel(distance_to_center * scale)
     else:
         weights = kernel(distance_to_center)
+    
     # Normalize the weights matrix so that each row sums to 1.
     weights_sum = torch.sum(weights, 1).view(out_length, 1)
-    weights = weights / weights_sum.expand(out_length, P)
+    weights = weights / weights_sum.expand(out_length, p)
 
-    # If a column in weights is all zero, get rid of it. only consider the first and last column.
+    # If a column in weights is all zero, get rid of it. 
+    # only consider the first and last column.
     weights_zero_tmp = torch.sum((weights == 0), 0)
     if not math.isclose(weights_zero_tmp[0], 0, rel_tol=1e-6):
-        indices = indices.narrow(1, 1, P - 2)
-        weights = weights.narrow(1, 1, P - 2)
+        indices = indices.narrow(1, 1, p - 2)
+        weights = weights.narrow(1, 1, p - 2)
     if not math.isclose(weights_zero_tmp[-1], 0, rel_tol=1e-6):
-        indices = indices.narrow(1, 0, P - 2)
-        weights = weights.narrow(1, 0, P - 2)
+        indices = indices.narrow(1, 0, p - 2)
+        weights = weights.narrow(1, 0, p - 2)
     weights = weights.contiguous()
     indices = indices.contiguous()
     sym_len_s = -indices.min() + 1
@@ -868,23 +909,56 @@ def calculate_weights_indices(in_length, out_length, scale, kernel, kernel_width
     return weights, indices, int(sym_len_s), int(sym_len_e)
 
 
-def imresize(img, scale, antialiasing=True, interpolation=None):
+def get_imresize_kernel(interpolation):
+    if isinstance(interpolation, str):
+        return {
+            "cubic": cubic,
+            "lanczos2": lanczos2,
+            "lanczos3": lanczos3,
+            "box": box,
+            "linear": linear,
+            None: cubic,  # set default interpolation method as cubic
+        }.get(interpolation)
+    elif 'function' in str(type(interpolation)):
+        return interpolation
+    elif not interpolation:
+        return cubic
+
+
+# @torch.no_grad()
+def imresize(img, scale, antialiasing=True, interpolation=None, 
+             kernel_width=None, out_shape=None):
     # The scale should be the same for H and W
-    # input: img: CHW RGB [0,1]
-    # output: CHW RGB [0,1] w/o round
+    # input: img: tensor CHW RGB [0,1] or numpy HWC BGR
+    # output: tensor CHW RGB [0,1] w/o round or numpy HWC BGR
 
-    in_C, in_H, in_W = img.size()
-    out_C, out_H, out_W = in_C, math.ceil(in_H * scale), math.ceil(in_W * scale)
+    # if isinstance(img, np.ndarray):
+    if type(img).__module__ == np.__name__:  # numpy type
+        numpy_type = True
+        change_range = False
+        if img.max() > 1:
+            #TODO Note: this adds a bit of latency
+            img_type = img.dtype
+            if np.issubdtype(img_type, np.integer):
+                info = np.iinfo
+            elif np.issubdtype(img_type, np.floating):
+                info = np.finfo
+            img = img/info(img_type).max
+            change_range = True
+        img = torch.from_numpy(img.transpose(2, 0, 1)).float()
+    else:
+        numpy_type = False
 
-    # Choose interpolation method, each method has the matching kernel size
-    kernel, kernel_width = {
-        "cubic": (cubic, 4.0),
-        "lanczos2": (lanczos2, 4.0),
-        "lanczos3": (lanczos3, 6.0),
-        "box": (box, 1.0),
-        "linear": (linear, 2.0),
-        None: (cubic, 4.0)  # set default interpolation method as cubic
-    }.get(interpolation)
+    in_c, in_h, in_w = img.size()
+    out_h, out_w = math.ceil(in_h * scale), math.ceil(in_w * scale)
+
+    # get interpolation method, each method has the matching kernel size
+    kernel = get_imresize_kernel(interpolation)
+    
+    # unless the kernel support size is specified by the user, use the 
+    # attribute of the interpolation method
+    if not kernel_width:
+        kernel_width = kernel.kernel_width
 
     # Return the desired dimension order for performing the resize.  The
     # strategy is to perform the resize first along the dimension with the
@@ -892,152 +966,65 @@ def imresize(img, scale, antialiasing=True, interpolation=None):
     # Now we do not support this.
 
     # get weights and indices
-    weights_H, indices_H, sym_len_Hs, sym_len_He = calculate_weights_indices(
-        in_H, out_H, scale, kernel, kernel_width, antialiasing)
-    weights_W, indices_W, sym_len_Ws, sym_len_We = calculate_weights_indices(
-        in_W, out_W, scale, kernel, kernel_width, antialiasing)
+    weights_h, indices_h, sym_len_hs, sym_len_he = calculate_weights_indices(
+        in_h, out_h, scale, kernel, kernel_width, antialiasing)
+    weights_w, indices_w, sym_len_ws, sym_len_we = calculate_weights_indices(
+        in_w, out_w, scale, kernel, kernel_width, antialiasing)
     # process H dimension
     # symmetric copying
-    img_aug = torch.FloatTensor(in_C, in_H + sym_len_Hs + sym_len_He, in_W)
-    img_aug.narrow(1, sym_len_Hs, in_H).copy_(img)
+    img_aug = torch.FloatTensor(in_c, in_h + sym_len_hs + sym_len_he, in_w)
+    img_aug.narrow(1, sym_len_hs, in_h).copy_(img)
 
-    sym_patch = img[:, :sym_len_Hs, :]
+    sym_patch = img[:, :sym_len_hs, :]
     inv_idx = torch.arange(sym_patch.size(1) - 1, -1, -1).long()
     sym_patch_inv = sym_patch.index_select(1, inv_idx)
-    img_aug.narrow(1, 0, sym_len_Hs).copy_(sym_patch_inv)
+    img_aug.narrow(1, 0, sym_len_hs).copy_(sym_patch_inv)
 
-    sym_patch = img[:, -sym_len_He:, :]
+    sym_patch = img[:, -sym_len_he:, :]
     inv_idx = torch.arange(sym_patch.size(1) - 1, -1, -1).long()
     sym_patch_inv = sym_patch.index_select(1, inv_idx)
-    img_aug.narrow(1, sym_len_Hs + in_H, sym_len_He).copy_(sym_patch_inv)
+    img_aug.narrow(1, sym_len_hs + in_h, sym_len_he).copy_(sym_patch_inv)
 
-    out_1 = torch.FloatTensor(in_C, out_H, in_W)
-    kernel_width = weights_H.size(1)
-    for i in range(out_H):
-        idx = int(indices_H[i][0])
-        out_1[0, i, :] = img_aug[0, idx:idx + kernel_width, :].transpose(0, 1).mv(weights_H[i])
-        out_1[1, i, :] = img_aug[1, idx:idx + kernel_width, :].transpose(0, 1).mv(weights_H[i])
-        out_1[2, i, :] = img_aug[2, idx:idx + kernel_width, :].transpose(0, 1).mv(weights_H[i])
-
+    out_1 = torch.FloatTensor(in_c, out_h, in_w)
+    kernel_width = weights_h.size(1)
+    for i in range(out_h):
+        idx = int(indices_h[i][0])
+        for j in range(in_c):
+            out_1[j, i, :] = img_aug[j, idx:idx + kernel_width, :].transpose(
+                0, 1).mv(weights_h[i])
+    
     # process W dimension
     # symmetric copying
-    out_1_aug = torch.FloatTensor(in_C, out_H, in_W + sym_len_Ws + sym_len_We)
-    out_1_aug.narrow(2, sym_len_Ws, in_W).copy_(out_1)
+    out_1_aug = torch.FloatTensor(in_c, out_h, in_w + sym_len_ws + sym_len_we)
+    out_1_aug.narrow(2, sym_len_ws, in_w).copy_(out_1)
 
-    sym_patch = out_1[:, :, :sym_len_Ws]
+    sym_patch = out_1[:, :, :sym_len_ws]
     inv_idx = torch.arange(sym_patch.size(2) - 1, -1, -1).long()
     sym_patch_inv = sym_patch.index_select(2, inv_idx)
-    out_1_aug.narrow(2, 0, sym_len_Ws).copy_(sym_patch_inv)
+    out_1_aug.narrow(2, 0, sym_len_ws).copy_(sym_patch_inv)
 
-    sym_patch = out_1[:, :, -sym_len_We:]
+    sym_patch = out_1[:, :, -sym_len_we:]
     inv_idx = torch.arange(sym_patch.size(2) - 1, -1, -1).long()
     sym_patch_inv = sym_patch.index_select(2, inv_idx)
-    out_1_aug.narrow(2, sym_len_Ws + in_W, sym_len_We).copy_(sym_patch_inv)
+    out_1_aug.narrow(2, sym_len_ws + in_w, sym_len_we).copy_(sym_patch_inv)
 
-    out_2 = torch.FloatTensor(in_C, out_H, out_W)
-    kernel_width = weights_W.size(1)
-    for i in range(out_W):
-        idx = int(indices_W[i][0])
-        out_2[0, :, i] = out_1_aug[0, :, idx:idx + kernel_width].mv(weights_W[i])
-        out_2[1, :, i] = out_1_aug[1, :, idx:idx + kernel_width].mv(weights_W[i])
-        out_2[2, :, i] = out_1_aug[2, :, idx:idx + kernel_width].mv(weights_W[i])
+    out_2 = torch.FloatTensor(in_c, out_h, out_w)
+    kernel_width = weights_w.size(1)
+    for i in range(out_w):
+        idx = int(indices_w[i][0])
+        for j in range(in_c):
+            out_2[j, :, i] = out_1_aug[j, :,
+                                       idx:idx + kernel_width].mv(weights_w[i])
 
+    if numpy_type:
+        out_2 = out_2.numpy().transpose(1, 2, 0) #.clip(0,1)
+        if change_range:
+            out_2 = out_2*info(img_type).max #uint8 = 255
+            out_2 = out_2.astype(img_type)
     return out_2
 
 
-def imresize_np(img, scale, antialiasing=True, interpolation=None):
-    # Now the scale should be the same for H and W
-    # input: img: Numpy, HWC BGR [0,1]
-    # output: HWC BGR [0,1] w/o round
-    
-    change_range = False
-    if img.max() > 1:
-        img_type = img.dtype
-        if np.issubdtype(img_type, np.integer):
-            info = np.iinfo
-        elif np.issubdtype(img_type, np.floating):
-            info = np.finfo
-        img = img/info(img_type).max
-        change_range = True
-
-    img = torch.from_numpy(img)
-
-    in_H, in_W, in_C = img.size()
-    out_C, out_H, out_W = in_C, math.ceil(in_H * scale), math.ceil(in_W * scale)
-
-    # Choose interpolation method, each method has the matching kernel size
-    kernel, kernel_width = {
-        "cubic": (cubic, 4.0),
-        "lanczos2": (lanczos2, 4.0),
-        "lanczos3": (lanczos3, 6.0),
-        "box": (box, 1.0),
-        "linear": (linear, 2.0),
-        None: (cubic, 4.0)  # set default interpolation method as cubic
-    }.get(interpolation)
-
-    # Return the desired dimension order for performing the resize.  The
-    # strategy is to perform the resize first along the dimension with the
-    # smallest scale factor.
-    # Now we do not support this.
-
-    # get weights and indices
-    weights_H, indices_H, sym_len_Hs, sym_len_He = calculate_weights_indices(
-        in_H, out_H, scale, kernel, kernel_width, antialiasing)
-    weights_W, indices_W, sym_len_Ws, sym_len_We = calculate_weights_indices(
-        in_W, out_W, scale, kernel, kernel_width, antialiasing)
-    # process H dimension
-    # symmetric copying
-    img_aug = torch.FloatTensor(in_H + sym_len_Hs + sym_len_He, in_W, in_C)
-    img_aug.narrow(0, sym_len_Hs, in_H).copy_(img)
-
-    sym_patch = img[:sym_len_Hs, :, :]
-    inv_idx = torch.arange(sym_patch.size(0) - 1, -1, -1).long()
-    sym_patch_inv = sym_patch.index_select(0, inv_idx)
-    img_aug.narrow(0, 0, sym_len_Hs).copy_(sym_patch_inv)
-
-    sym_patch = img[-sym_len_He:, :, :]
-    inv_idx = torch.arange(sym_patch.size(0) - 1, -1, -1).long()
-    sym_patch_inv = sym_patch.index_select(0, inv_idx)
-    img_aug.narrow(0, sym_len_Hs + in_H, sym_len_He).copy_(sym_patch_inv)
-
-    out_1 = torch.FloatTensor(out_H, in_W, in_C)
-    kernel_width = weights_H.size(1)
-    for i in range(out_H):
-        idx = int(indices_H[i][0])
-        out_1[i, :, 0] = img_aug[idx:idx + kernel_width, :, 0].transpose(0, 1).mv(weights_H[i])
-        out_1[i, :, 1] = img_aug[idx:idx + kernel_width, :, 1].transpose(0, 1).mv(weights_H[i])
-        out_1[i, :, 2] = img_aug[idx:idx + kernel_width, :, 2].transpose(0, 1).mv(weights_H[i])
-
-    # process W dimension
-    # symmetric copying
-    out_1_aug = torch.FloatTensor(out_H, in_W + sym_len_Ws + sym_len_We, in_C)
-    out_1_aug.narrow(1, sym_len_Ws, in_W).copy_(out_1)
-
-    sym_patch = out_1[:, :sym_len_Ws, :]
-    inv_idx = torch.arange(sym_patch.size(1) - 1, -1, -1).long()
-    sym_patch_inv = sym_patch.index_select(1, inv_idx)
-    out_1_aug.narrow(1, 0, sym_len_Ws).copy_(sym_patch_inv)
-
-    sym_patch = out_1[:, -sym_len_We:, :]
-    inv_idx = torch.arange(sym_patch.size(1) - 1, -1, -1).long()
-    sym_patch_inv = sym_patch.index_select(1, inv_idx)
-    out_1_aug.narrow(1, sym_len_Ws + in_W, sym_len_We).copy_(sym_patch_inv)
-
-    out_2 = torch.FloatTensor(out_H, out_W, in_C)
-    kernel_width = weights_W.size(1)
-    for i in range(out_W):
-        idx = int(indices_W[i][0])
-        out_2[:, i, 0] = out_1_aug[:, idx:idx + kernel_width, 0].mv(weights_W[i])
-        out_2[:, i, 1] = out_1_aug[:, idx:idx + kernel_width, 1].mv(weights_W[i])
-        out_2[:, i, 2] = out_1_aug[:, idx:idx + kernel_width, 2].mv(weights_W[i])
-
-    out_2 = out_2.numpy().clip(0,1)
-    
-    if change_range:
-        out_2 = out_2*info(img_type).max #uint8 = 255
-        out_2 = out_2.astype(img_type)
-
-    return out_2
+imresize_np = imresize
 
 
 if __name__ == '__main__':
