@@ -213,7 +213,7 @@ def fit(model, opt, dataloaders, steps_states, data_params, loggers):
 
             # inner iteration loop within one epoch
             for n, train_data in enumerate(dataloaders['train'], start=1):
-                timerData.tock()
+                timerData.tock()  # timer for data loading per iteration
 
                 virtual_step += 1
                 take_step = False
@@ -373,6 +373,7 @@ def fit(model, opt, dataloaders, steps_states, data_params, loggers):
             model.save(current_step, True, loader=dataloaders['train'])
         else:
             model.save(current_step, True)
+        n = n if 'n' in locals() else 0
         model.save_training_state(epoch + (n >= len(dataloaders['train'])), current_step, True)
         logger.info('Training interrupted. Latest models and training states saved.')
     
