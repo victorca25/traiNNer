@@ -341,6 +341,10 @@ def define_D(opt):
         from models.modules.architectures import discriminators
         netD = discriminators.MultiscaleDiscriminator(input_nc=opt_net['in_nc'], ndf=opt_net['nf'], \
             n_layers=opt_net['nlayer'], num_D=opt_net['num_D'])
+    elif which_model == 'discriminator_resnet_128':
+        from models.modules.architectures import discriminators
+        netD = discriminators.Discriminator_ResNet_128(in_nc=opt_net['in_nc'], base_nf=opt_net['nf'], \
+            norm_type=opt_net['norm_type'], mode=opt_net['mode'], act_type=opt_net['act_type'])
     else:
         raise NotImplementedError('Discriminator model [{:s}] not recognized'.format(which_model))
     """

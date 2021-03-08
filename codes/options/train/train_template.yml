@@ -174,7 +174,7 @@ network_G:
 network_D:
     strict: true # true | false # whether to load the model in strict mode or not
     # ESRGAN (default)| PPON:
-    which_model_D: discriminator_vgg # discriminator_vgg_128 | discriminator_vgg | discriminator_vgg_128_fea (feature extraction) | discriminator_vgg_fea (feature extraction) | patchgan | multiscale
+    which_model_D: discriminator_vgg # discriminator_vgg_128 | discriminator_vgg | discriminator_vgg_128_fea (feature extraction) | discriminator_vgg_fea (feature extraction) | patchgan | multiscale | discriminator_resnet_128
     norm_type: batch
     act_type: leakyrelu
     mode: CNA # CNA | NAC
