@@ -15,27 +15,9 @@ import types
 import collections
 import warnings
 
+from .common import preserve_channel_dim
+from .common import _cv2_str2pad, _cv2_str2interpolation
 
-#For alt 1:
-#PAD_MOD
-_cv2_pad_to_str = {'constant':cv2.BORDER_CONSTANT,
-                   'edge':cv2.BORDER_REPLICATE,
-                   'reflect':cv2.BORDER_REFLECT_101,
-                   'reflect1':cv2.BORDER_DEFAULT,
-                   'symmetric':cv2.BORDER_REFLECT
-                  }
-#INTER_MODE
-_cv2_interpolation_to_str = {'nearest':cv2.INTER_NEAREST,
-                         'NEAREST':cv2.INTER_NEAREST, 
-                         'bilinear':cv2.INTER_LINEAR,
-                         'BILINEAR':cv2.INTER_LINEAR, 
-                         'area':cv2.INTER_AREA,
-                         'AREA':cv2.INTER_AREA,
-                         'bicubic':cv2.INTER_CUBIC,
-                         'BICUBIC':cv2.INTER_CUBIC, 
-                         'lanczos':cv2.INTER_LANCZOS4,
-                         'LANCZOS':cv2.INTER_LANCZOS4,}
-_cv2_interpolation_from_str= {v:k for k,v in _cv2_interpolation_to_str.items()}
 
 
 def _is_pil_image(img):
@@ -43,7 +25,6 @@ def _is_pil_image(img):
         return isinstance(img, (Image.Image, accimage.Image))
     else:
         return isinstance(img, Image.Image)
-
 
 def _is_tensor_image(img):
     return torch.is_tensor(img) and img.ndimension() == 3
@@ -70,18 +51,20 @@ def to_tensor(pic):
     if _is_numpy_image(pic):
         if len(pic.shape) == 2:
             pic = cv2.cvtColor(pic, cv2.COLOR_GRAY2RGB)
-        img = torch.from_numpy(pic.transpose((2, 0, 1)))
+        pic = to_rgb_bgr(pic.copy())
+        img = torch.from_numpy(pic.transpose((2, 0, 1))).contiguous()
         # backward compatibility
-        if isinstance(img, torch.ByteTensor) or img.max() > 1 or img.dtype==torch.uint8:
+        if isinstance(img, torch.ByteTensor) or img.max() > 127 or img.dtype==torch.uint8:
             return img.float().div(255)
         else:
-            try:
-                return to_tensor(np.array(pic))
-                #return img
-            except Exception:
-                raise TypeError('pic should be ndarray. Got {}'.format(type(pic)))
+            return img
     elif _is_tensor_image(pic):
         return pic
+    else:
+        try:
+            return to_tensor(np.array(pic))
+        except Exception:
+            raise TypeError('pic should be ndarray. Got {}'.format(type(pic)))
 
 
 def to_cv_image(pic, mode=None):
@@ -114,33 +97,59 @@ def to_cv_image(pic, mode=None):
         return cv2.cvtColor(npimg, mode)
 
 
-def normalize(tensor, mean, std):
-    r"""Normalize a tensor image with mean and standard deviation.
+def normalize(img, mean, std, max_pixel_value=255.0):
+    r"""Normalize an image with mean and standard deviation.
     .. note::
         This transform acts in-place, i.e., it mutates the input tensor.
     See :class:`~torchvision.transforms.Normalize` for more details.
 
     Args:
-        tensor (Tensor): Tensor image of size (C, H, W) to be normalized.
+        img (Tensor): Image of size (C, H, W) to be normalized.
         mean (sequence): Sequence of means for each channel.
         std (sequence): Sequence of standard deviations for each channely.
+        max_pixel_value (float): in the case of numpy images, use
+            the image's max value for proper normalization.
     Returns:
-        Tensor: Normalized Tensor image.
+        Normalized image.
     """
-    # if not _is_tensor_image(tensor):
+    # if not _is_tensor_image(img):
         # raise TypeError('tensor is not a torch image.')
 
-    if _is_tensor_image(tensor):
+    if _is_tensor_image(img):
+        dtype = img.dtype
+        mean = torch.as_tensor(mean, dtype=dtype, device=img.device)
+        std = torch.as_tensor(std, dtype=dtype, device=img.device)
+
+        if (std == 0).any():
+            raise ValueError('std evaluated to zero after conversion to {}, leading to division by zero.'.format(dtype))
+
+        if mean.ndim == 1:
+            mean = mean.view(-1, 1, 1)
+        if std.ndim == 1:
+            std = std.view(-1, 1, 1)
+
         # This is faster than using broadcasting, don't change without benchmarking
-        for t, m, s in zip(tensor, mean, std):
+        for t, m, s in zip(img, mean, std):
             t.sub_(m).div_(s)
-        return tensor
-    elif _is_numpy_image(tensor):
-        return (tensor.astype(np.float32) - 255.0 * np.array(mean))/np.array(std)
+        return img
+    elif _is_numpy_image(img):
+        mean = np.array(mean, dtype=np.float32)
+        mean *= max_pixel_value
+
+        std = np.array(std, dtype=np.float32)
+        std *= max_pixel_value
+
+        denominator = np.reciprocal(std, dtype=np.float32)
+
+        img = img.astype(np.float32)
+        img -= mean
+        img *= denominator
+        return img
     else:
         raise RuntimeError('Undefined type. Must be a numpy or a torch image.')
 
 
+@preserve_channel_dim
 def resize(img, size, interpolation='BILINEAR'):
     r"""Resize the input numpy ndarray to the given size.
     Args:
@@ -170,17 +179,15 @@ def resize(img, size, interpolation='BILINEAR'):
         if w < h:
             ow = size
             oh = int(size * h / w)
-            output = cv2.resize(img, dsize=(ow, oh), interpolation=_cv2_interpolation_to_str[interpolation])
+            output = cv2.resize(img, dsize=(ow, oh), interpolation=_cv2_str2interpolation[interpolation])
         else:
             oh = size
             ow = int(size * w / h)
-            output = cv2.resize(img, dsize=(ow, oh), interpolation=_cv2_interpolation_to_str[interpolation])
+            output = cv2.resize(img, dsize=(ow, oh), interpolation=_cv2_str2interpolation[interpolation])
     else:
-        output = cv2.resize(img, dsize=(size[1], size[0]), interpolation=_cv2_interpolation_to_str[interpolation])
-    if img.shape[2]==1:
-        return output[:, :, np.newaxis]
-    else:
-        return output
+        output = cv2.resize(img, dsize=(size[1], size[0]), interpolation=_cv2_str2interpolation[interpolation])
+    
+    return output
 
 
 def scale(*args, **kwargs):
@@ -277,10 +284,10 @@ def pad(img, padding, fill=0, padding_mode='constant'):
 
     if img.shape[2]==1:
         return(cv2.copyMakeBorder(src=img, top=pad_top, bottom=pad_bottom, left=pad_left, right=pad_right,
-                                 borderType=_cv2_pad_to_str[padding_mode], value=fill)[:,:,np.newaxis])
+                                 borderType=_cv2_str2pad[padding_mode], value=fill)[:,:,np.newaxis])
     else:
         return(cv2.copyMakeBorder(src=img, top=pad_top, bottom=pad_bottom, left=pad_left, right=pad_right,
-                                     borderType=_cv2_pad_to_str[padding_mode], value=fill))
+                                     borderType=_cv2_str2pad[padding_mode], value=fill))
 
 
 #def crop(img, i, j, h, w):
@@ -318,8 +325,6 @@ def crop(img, x, y, h, w):
         x2 += -min(0, x1)
         x1 += -min(0, x1)
 
-    # finally:
-        # return img[x1:x2, y1:y2, ...].copy()
     return img[x1:x2, y1:y2, ...].copy()
     
 
@@ -366,10 +371,12 @@ def hflip(img):
         raise TypeError('img should be numpy image. Got {}'.format(type(img)))
     # img[:,::-1] is much faster, but doesn't work with torch.from_numpy()!
     if img.shape[2]==1:
-        return cv2.flip(img,1)[:,:,np.newaxis]
+        # return cv2.flip(img, 1)[:,:,np.newaxis]
+        return np.copy(img[:, ::-1, ...])[:,:,np.newaxis]
     else:
-        #return img[:, ::-1, :] # test, appears to be faster 
-        return cv2.flip(img, 1)
+        #return img[:, ::-1, :] # test, appears to be faster  # test with np.copy(img[:, ::-1, ...])
+        # return cv2.flip(img, 1)
+        return np.copy(img[:, ::-1, ...])
 
 
 def vflip(img):
@@ -382,11 +389,13 @@ def vflip(img):
     if not _is_numpy_image(img):
         raise TypeError('img should be numpy Image. Got {}'.format(type(img)))
     if img.shape[2]==1:
-        return cv2.flip(img, 0)[:,:,np.newaxis]
+        # return cv2.flip(img, 0)[:,:,np.newaxis]
+        return np.copy(img[::-1, ...])[:,:,np.newaxis]
     else:
-        #return img[::-1, :, :] 
-        ##img[::-1] is much faster, but doesn't work with torch.from_numpy()!
-        return cv2.flip(img, 0)
+        # return img[::-1, ...]
+        ##img[::-1] is much faster, but doesn't work with torch.from_numpy()! # test with np.copy(img[::-1]) or np.ascontiguousarray()
+        # return cv2.flip(img, 0)
+        return np.copy(img[::-1, ...])
 
 
 def five_crop(img, size):
@@ -721,9 +730,9 @@ def rotate(img, angle, resample=cv2.INTER_LINEAR, expand=False, center=None, bor
             # adjust the rotation matrix to take into account translation
             M[0, 2] += (nw - w)/2
             M[1, 2] += (nh - h)/2
-            dst = cv2.warpAffine(img, M, (nw, nh), flags=_cv2_interpolation_to_str[resample], borderValue=border_value)
+            dst = cv2.warpAffine(img, M, (nw, nh), flags=_cv2_str2interpolation[resample], borderValue=border_value)
     else:
-        dst = cv2.warpAffine(img, M, (w, h), flags=_cv2_interpolation_to_str[resample], borderValue=border_value)
+        dst = cv2.warpAffine(img, M, (w, h), flags=_cv2_str2interpolation[resample], borderValue=border_value)
     return dst.astype(imgtype)
 
 
@@ -805,7 +814,7 @@ def affine6(img, anglez=0, shear=0, translate=(0, 0), scale=(1, 1), resample='BI
     M12 = centery - M10 * centerx - M11 * centery + ty
     affine_matrix = np.array([[M00, M01, M02], [M10, M11, M12]], dtype=np.float32)
 
-    dst_img = cv2.warpAffine(img, affine_matrix, (cols, rows), flags=_cv2_interpolation_to_str[resample],
+    dst_img = cv2.warpAffine(img, affine_matrix, (cols, rows), flags=_cv2_str2interpolation[resample],
                              borderMode=cv2.BORDER_CONSTANT, borderValue=fillcolor)
     if gray_scale:
         dst_img = cv2.cvtColor(dst_img, cv2.COLOR_RGB2GRAY)
