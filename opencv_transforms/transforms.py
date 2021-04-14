@@ -18,7 +18,7 @@ import warnings
 # import opencv_functional as F
 from . import functional as F
 from . import extra_functional as EF
-from .common import fetch_kernels, to_tuple
+from .common import fetch_kernels, to_tuple, _cv2_interpolation2str
 
 
 __all__ = ["Compose", "ToTensor", "ToCVImage",
