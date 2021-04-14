@@ -10,7 +10,7 @@ import cv2
 #import collections
 #import warnings
 
-from .common import preserve_shape, preserve_type, preserve_channel_dim, _maybe_process_in_chunks, convolve, polar2z, norm_kernel
+from .common import preserve_shape, preserve_type, preserve_channel_dim, _maybe_process_in_chunks, polar2z, norm_kernel
 from .common import _cv2_str2interpolation, _cv2_interpolation2str, MAX_VALUES_BY_DTYPE
 
 ## Below are new augmentations not available in the original ~torchvision.transforms
@@ -389,6 +389,38 @@ def bilateral_blur(img: np.ndarray, kernel_size: int = 3, sigmaColor: int = 5, s
         sigmaSpace=sigmaSpace)
     return blur_fn(img)
 
+
+@preserve_type
+def km_quantize(img, K=8, single_rnd_color=False):
+    r""" Color quantization with CV2 K-Means clustering.
+    Color quantization is the process of reducing number of colors
+        in an image. Here we use k-means clustering for color
+        quantization. There are 3 features (R,G,B) in the images,
+        so they are reshaped to an array of Px3 size (P is number
+        of pixels in an image, M*N, where M=img.shape[1] and
+        N=img.shape[0]). And after the clustering, we apply centroid
+        values (it is also R,G,B) to all pixels, such that resulting
+        image will have specified number of colors. Finally, it's
+        reshaped back to the shape of the original image.
+    Args:
+        img (numpy ndarray): Image to be quantized.
+    Returns:
+        numpy ndarray: the quantized image.
+    """
+
+    # reshape to (M*N, 3)
+    Z = img.reshape((-1,3)) 
+    # convert image to np.float32
+    Z = np.float32(Z)
+
+    # define criteria, number of clusters(K) and apply kmeans()
+    criteria = (
+        cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 10, 1.0)
+    ret, labels, centroids = cv2.kmeans(
+        Z, K, None, criteria, 10, cv2.KMEANS_RANDOM_CENTERS)
+
+    res = centroids[labels.flatten()]
+    return res.reshape((img.shape))
 
 
 def simple_quantize(image, rgb_range):
@@ -776,3 +808,205 @@ def filter_canny(img: np.ndarray, sigma:float=0.33,
 
     # return the edged image
     return edged
+
+
+
+
+
+
+
+def simple_motion_kernel(kernel_size):
+    kernel = np.zeros((kernel_size, kernel_size), dtype=np.uint8)
+
+    # get random points to draw
+    xs, xe = random.randint(0, kernel_size - 1), random.randint(0, kernel_size - 1)
+    if xs == xe:
+        ys, ye = random.sample(range(kernel_size), 2)
+    else:
+        ys, ye = random.randint(0, kernel_size - 1), random.randint(0, kernel_size - 1)
+
+    # draw motion path
+    cv2.line(kernel, (xs, ys), (xe, ye), 1, thickness=1)
+
+    # normalize kernel
+    return norm_kernel(kernel)
+
+def complex_motion_kernel(SIZE, SIZEx2, DIAGONAL, 
+            COMPLEXITY: float=0, eps: float=0.1):
+    """
+    Get a kernel (psf) of given complexity.
+    Adapted from: https://github.com/LeviBorodenko/motionblur
+    """
+    
+    # generate the path
+    motion_path = create_motion_path(
+        DIAGONAL, SIZEx2, COMPLEXITY, eps)
+
+    # initialize an array with super-sized dimensions
+    kernel = np.zeros(SIZEx2, dtype=np.uint8)
+
+    # convert path values to int32 NumPy array (needed for cv2.polylines)
+    pts = np.array(motion_path).astype(np.int32)
+    pts = pts.reshape((-1,1,2))
+
+    # draw the path using polygon lines
+    kernel = cv2.polylines(kernel,
+                        [pts], #motion_path, #
+                        isClosed=False,
+                        color=(64, 64, 64),
+                        thickness=int(DIAGONAL / 150), #=3,
+                        lineType=cv2.LINE_AA)
+
+    # applying gaussian blur for realism
+    # kernel_size = (2*radius)-1
+    # for now added 2* that and sigmas = 30, lines are coming up aliased
+    kernel_size = 2*(int(DIAGONAL * 0.01)*2)-1
+    kernel = cv2.GaussianBlur(
+                kernel,
+                (kernel_size, kernel_size),
+                sigmaX=30.0,
+                sigmaY=30.0, 
+                borderType=0)
+
+    # resize to actual size
+    # Note: CV2 resize is faster, but has no antialias
+    # kernel = resize(kernel, 
+    #                 out_shape=SIZE, 
+    #                 interpolation="gaussian", #"lanczos2", #lanczos3
+    #                 antialiasing=True)
+    kernel = cv2.resize(kernel,
+                        dsize=SIZE,
+                        #fx=scale,
+                        #fy=scale,
+                        interpolation=cv2.INTER_CUBIC)
+
+    # normalize kernel, so it suns up to 1
+    return norm_kernel(kernel)
+
+def create_motion_path(DIAGONAL, SIZEx2, COMPLEXITY, eps):
+    """
+    creates a motion blur path with the given complexity.
+    Proceed in 5 steps:
+        1. get a random number of random step sizes
+        2. for each step get a random angle
+        3. combine steps and angles into a sequence of increments
+        4. create path out of increments
+        5. translate path to fit the kernel dimensions
+    NOTE: "random" means random but might depend on the given
+        complexity
+    """
+
+    # first find the lengths of the motion blur steps
+    def getSteps():
+        """
+        Calculate the length of the steps taken by the motion blur
+        A higher complexity lead to a longer total motion
+        blur path and more varied steps along the way.
+        Hence we sample:
+            MAX_PATH_LEN =[U(0,1) + U(0, complexity^2)] * diagonal * 0.75
+        and each step is: 
+            beta(1, 30) * (1 - COMPLEXITY + eps) * diagonal)
+        """
+        # getting max length of blur motion
+        MAX_PATH_LEN = 0.75 * DIAGONAL * \
+            (np.random.uniform() + np.random.uniform(0, COMPLEXITY**2))
+
+        # getting step
+        steps = []
+
+        while sum(steps) < MAX_PATH_LEN:
+            # sample next step
+            step = np.random.beta(1, 30) * (1 - COMPLEXITY + eps) * DIAGONAL
+            if step < MAX_PATH_LEN:
+                steps.append(step)
+
+        # return the total number of steps and the steps
+        return len(steps), np.asarray(steps)
+
+    def getAngles(NUM_STEPS):
+        """
+        Gets an angle for each step.
+        The maximal angle should be larger the more intense
+            the motion is, so it's sampled from a
+            U(0, complexity * pi).
+            Sample "jitter" from a beta(2,20) which is the 
+            probability that the next angle has a different
+            sign than the previous one.
+        """
+
+        # first get the max angle in radians
+        MAX_ANGLE = np.random.uniform(0, COMPLEXITY * math.pi)
+
+        # now sample "jitter" which is the probability that the
+        # next angle has a different sign than the previous one
+        JITTER = np.random.beta(2, 20)
+
+        # initialising angles (and sign of angle)
+        angles = [np.random.uniform(low=-MAX_ANGLE, high=MAX_ANGLE)]
+
+        while len(angles) < NUM_STEPS:
+            # sample next angle (absolute value)
+            angle = np.random.triangular(0, COMPLEXITY *
+                                MAX_ANGLE, MAX_ANGLE + eps)
+
+            # with jitter probability change sign wrt previous angle
+            if np.random.uniform() < JITTER:
+                angle *= -np.sign(angles[-1])
+            else:
+                angle *= np.sign(angles[-1])
+
+            angles.append(angle)
+
+        # save angles
+        return np.asarray(angles)
+
+    # Get steps and angles
+    NUM_STEPS, STEPS = getSteps()
+    ANGLES = getAngles(NUM_STEPS)
+
+    # Turn them into a path
+    ####
+
+    # turn angles and steps into complex numbers
+    complex_increments = polar2z(STEPS, ANGLES)
+
+    # generate path as the cumsum of these increments
+    path_complex = np.cumsum(complex_increments)
+
+    # find center of mass of path
+    com_complex = sum(path_complex) / NUM_STEPS
+
+    # shift path s.t. center of mass lies in the middle of
+    # the kernel and a apply a random rotation
+    ###
+
+    # center it on center of mass
+    # center_of_kernel = (x + 1j * y) / 2
+    center_of_kernel = (SIZEx2[0] + 1j * SIZEx2[1]) / 2
+    path_complex -= com_complex
+
+    # randomly rotate path by an angle a in (0, pi)
+    path_complex *= np.exp(1j * np.random.uniform(0, math.pi))
+
+    # center COM on center of kernel
+    path_complex += center_of_kernel
+
+    # convert complex path to final list of coordinate tuples
+    return [(i.real, i.imag) for i in path_complex]
+
+
+@preserve_channel_dim
+def clahe(img, clip_limit=2.0, tile_grid_size=(8, 8)):
+    if img.dtype != np.uint8:
+        raise TypeError("clahe supports only uint8 inputs")
+
+    clahe_mat = cv2.createCLAHE(clipLimit=clip_limit, tileGridSize=tile_grid_size)
+
+    if len(img.shape) == 2 or img.shape[2] == 1:
+        img = clahe_mat.apply(img)
+    else:
+        img = cv2.cvtColor(img, cv2.COLOR_RGB2LAB)
+        img[:, :, 0] = clahe_mat.apply(img[:, :, 0])
+        img = cv2.cvtColor(img, cv2.COLOR_LAB2RGB)
+
+    return img

@@ -2,15 +2,13 @@
 
 This is intended as a faster drop-in replacement of Pytorch's Torchvision augmentations "transforms" [package](https://github.com/pytorch/vision/tree/master/torchvision/transforms), based on NumPy and OpenCV (PIL-free) for computer vision pipelines. 
 
-This repository is the result of merging [jbohnslav](https://github.com/jbohnslav/opencv_transforms) and [YU-Zhiyang](https://github.com/YU-Zhiyang/opencv_transforms_torchvision) repositories which had the same purpose, and my own OpenCV-based augmentations from [BasicSR](https://github.com/victorca25/BasicSR), in order to allow to refactor the project's data flow and streamline to use the Torchvision's API as a standard. This enables changing or combining different base frameworks (OpenCV, Pillow/Pillow-SIMD, etc) only by modifying the imported library and also to easily switch to other replacements like [Kornia](https://github.com/kornia/kornia), [Albumentations](https://github.com/albumentations-team/albumentations), or [Rising](https://github.com/PhoenixDL/rising), based on the user's needs.
-
 Most functions in Pytorch transforms are reimplemented, but there are some considerations:
 
 1.  ToPILImage is not implemented, we use OpenCV instead (ToCVImage). However, the original ToPILImage in ~transforms can be used to save the tensor as a PIL image if required. Once transformed into tensor format, images have RGB channel order in both cases. 
 2.  OpenCV images are Numpy arrays. OpencV supports uint8, int8, uint16, int16, int32, float32, float64. Certain operations (like `cv.CvtColor()`) do require to convert the arrays to OpenCV type (with `cv.fromarray()`).
 3.  The affine transform in the original one only has 5 degrees of freedom, YU-Zhiyang implemented an Affine transform with 6 degress of freedom called `RandomAffine6` (can be found in [transforms.py](opencv_transforms/transforms.py)). The original method `RandomAffine` is also available and reimplemented with OpenCV.
 4.  The rotate function is clockwise, however the original one is anticlockwise.
-5.  Some new augmentations have been added, in comparison to Torchvision's and are indicated in **Support** with and asterisk.
+5.  Some new augmentations have been added, in comparison to Torchvision's.
 6.  **The outputs of the OpenCV versions are almost the same as the original one's (it's possible to test by running [test.py](/test.py)) directly with test images**.
 
 ## Support
@@ -23,18 +21,20 @@ From the original Torchvision transforms:
 -   `RandomApply`, `RandomOrder`, `RandomChoice`, `RandomCrop`,
 -   `RandomHorizontalFlip`, `RandomVerticalFlip`, `RandomResizedCrop`,
 -   `FiveCrop`, `TenCrop`, `LinearTransformation`, `ColorJitter`,
--   `RandomRotation`, `RandomAffine`, `*RandomAffine6`,
+-   `RandomRotation`, `RandomAffine`,
 -   `Grayscale`, `RandomGrayscale`, `RandomErasing`
 
 New transforms:
 
--   `*Cutout`, `*RandomPerspective`,
--   `*RandomGaussianNoise`, `*RandomPoissonNoise`, `*RandomSPNoise`,
--   `*RandomSpeckleNoise`, `*RandomJPEGNoise`, 
--   `*RandomAverageBlur`, `*RandomBilateralBlur`, `*RandomBoxBlur`, `*RandomGaussianBlur`,
--   `*BayerDitherNoise`, `*FSDitherNoise`, `*AverageBWDitherNoise`,`*BayerBWDitherNoise`,
--   `*BinBWDitherNoise`,`*FSBWDitherNoise`,`*RandomBWDitherNoise`,
--   `*FilterMaxRGB`,`*FilterColorBalance`,`*FilterUnsharp`,`*FilterCanny`
+-   `RandomAffine6`, `Cutout`, `RandomPerspective`,
+-   `RandomGaussianNoise`, `RandomPoissonNoise`, `RandomSPNoise`,
+-   `RandomSpeckleNoise`, `RandomCompression`, 
+-   `RandomAverageBlur`, `RandomBilateralBlur`, `RandomBoxBlur`, `RandomGaussianBlur`,
+-   `RandomMedianBlur`, `RandomMotionBlur`, `RandomComplexMotionBlur`
+-   `BayerDitherNoise`, `FSDitherNoise`, `AverageBWDitherNoise`,`BayerBWDitherNoise`,
+-   `BinBWDitherNoise`,`FSBWDitherNoise`,`RandomBWDitherNoise`,
+-   `FilterMaxRGB`,`FilterColorBalance`,`FilterUnsharp`,`FilterCanny`,
+-   `SimpleQuantize`, `RandomQuantize`, `CLAHE`, `ApplyKernel`
 
 ## Requirements
 
@@ -117,6 +117,6 @@ There are multiple image augmentation and manipulation frameworks available, eac
 -   [TorchIO](https://github.com/fepegar/torchio): For 3D medical imaging
 
 ## Postscript
-
+-   This repository is the result of merging [jbohnslav](https://github.com/jbohnslav/opencv_transforms) and [YU-Zhiyang](https://github.com/YU-Zhiyang/opencv_transforms_torchvision) repositories which had the same purpose, and my own OpenCV-based augmentations from [BasicSR](https://github.com/victorca25/BasicSR), in order to allow to refactor the project's data flow and streamline to use the Torchvision's API as a standard. This enables changing or combining different base frameworks (OpenCV, Pillow/Pillow-SIMD, etc) only by modifying the imported library and also to easily switch to other replacements like [Kornia](https://github.com/kornia/kornia), [Albumentations](https://github.com/albumentations-team/albumentations), or [Rising](https://github.com/PhoenixDL/rising), based on the user's needs.
 -   Part of the intention of this merge between jbohnslav's and YU-Zhiyang's projects was to bugfix and allow the authors to more easily incorporate the changes back themselves if they are useful and also to allow to decouple the augmentations code from BasicSR, so it's easier to add more augmentations or even change the backend like in DinJerr's [fork](https://github.com/DinJerr/BasicSR), based on [wand](https://github.com/emcconville/wand)+[ImageMagick](https://imagemagick.org/).
 -   Each backend has it's pros and cons, but important points to consider when choosing are: available augmentation types, performance, external dependencies, features (for example, Kornia's differentiable augmentations) and user preference (all previous points being equal).
