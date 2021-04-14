@@ -10,30 +10,19 @@ import cv2
 #import collections
 #import warnings
 
+from .common import preserve_shape, preserve_type, preserve_channel_dim, _maybe_process_in_chunks, convolve, polar2z, norm_kernel
+from .common import _cv2_str2interpolation, _cv2_interpolation2str, MAX_VALUES_BY_DTYPE
 
 ## Below are new augmentations not available in the original ~torchvision.transforms
 
-_cv2_interpolation_to_str= {'nearest':cv2.INTER_NEAREST,
-                         'NEAREST':cv2.INTER_NEAREST,
-                         'bilinear':cv2.INTER_LINEAR,
-                         'BILINEAR':cv2.INTER_LINEAR,
-                         'area':cv2.INTER_AREA,
-                         'AREA':cv2.INTER_AREA,
-                         'bicubic':cv2.INTER_CUBIC,
-                         'BICUBIC':cv2.INTER_CUBIC,
-                         'lanczos':cv2.INTER_LANCZOS4,
-                         'LANCZOS':cv2.INTER_LANCZOS4}
-_cv2_interpolation_from_str= {v:k for k,v in _cv2_interpolation_to_str.items()}
 
+@preserve_type
 def perspective(img, fov=45, anglex=0, angley=0, anglez=0, shear=0,
                 translate=(0, 0), scale=(1, 1), resample='BILINEAR', fillcolor=(0, 0, 0)):
     r"""
-
-    This function is partly referred to https://blog.csdn.net/dcrmg/article/details/80273818
-
+    This function is partly referred to in 
+    https://blog.csdn.net/dcrmg/article/details/80273818
     """
-
-    imgtype = img.dtype
     gray_scale = False
 
     if len(img.shape) == 2:
@@ -110,13 +99,14 @@ def perspective(img, fov=45, anglex=0, angley=0, anglez=0, shear=0,
     perspective_matrix = cv2.getPerspectiveTransform(org, dst)
     total_matrix = perspective_matrix @ affine_matrix
 
-    result_img = cv2.warpPerspective(img, total_matrix, (w, h), flags=_cv2_interpolation_to_str[resample],
+    result_img = cv2.warpPerspective(img, total_matrix, (w, h), flags=_cv2_str2interpolation[resample],
                                      borderMode=cv2.BORDER_CONSTANT, borderValue=fillcolor)
     if gray_scale:
         result_img = cv2.cvtColor(result_img, cv2.COLOR_RGB2GRAY)
-    return result_img.astype(imgtype)
+    return result_img
 
 
+@preserve_type
 def noise_gaussian(img: np.ndarray, mean=0.0, std=1.0, gtype='color'):
     r"""Add OpenCV Gaussian noise (Additive) to the image.
     Args:
@@ -128,7 +118,6 @@ def noise_gaussian(img: np.ndarray, mean=0.0, std=1.0, gtype='color'):
     Returns:
         numpy ndarray: version of the image with Gaussian noise added.
     """
-    imgtype = img.dtype
     h,w,c = img.shape
     
     if gtype == 'bw':
@@ -137,9 +126,10 @@ def noise_gaussian(img: np.ndarray, mean=0.0, std=1.0, gtype='color'):
     gauss = np.random.normal(loc=mean, scale=std, size=(h,w,c)).astype(np.float32)
     noisy = np.clip((1 + gauss) * img.astype(np.float32), 0, 255) 
     
-    return noisy.astype(imgtype)
+    return noisy
 
 
+@preserve_type
 def noise_poisson(img):
     r"""Add OpenCV Poisson noise to the image.
         Important: Poisson noise is not additive like Gaussian, it's dependant on 
@@ -149,15 +139,15 @@ def noise_poisson(img):
     Returns:
         numpy ndarray: version of the image with Poisson noise added.
     """
-    imgtype = img.dtype
     img = img.astype(np.float32)/255.0
 
     vals = len(np.unique(img))
     vals = 2 ** np.ceil(np.log2(vals))
     noisy = 255 * np.clip(np.random.poisson(img.astype(np.float32) * vals) / float(vals), 0, 1)
-    return noisy.astype(imgtype)
+    return noisy
 
 
+@preserve_type
 def noise_salt_and_pepper(img, prob=0.01):
     r"""Adds "Salt & Pepper" noise to an image.
     Args:
@@ -166,8 +156,6 @@ def noise_salt_and_pepper(img, prob=0.01):
     Returns:
         numpy ndarray: version of the image with Poisson noise added.
     """
-
-    imgtype = img.dtype
     #alt 1: black and white s&p
     rnd = np.random.rand(img.shape[0], img.shape[1])
     noisy = img.copy()
@@ -186,9 +174,10 @@ def noise_salt_and_pepper(img, prob=0.01):
     # peppered = ~salted
     # noisy[flipped & salted] = 1
 
-    return noisy.astype(imgtype)
+    return noisy
 
 
+@preserve_type
 def noise_speckle(img: np.ndarray, mean=0.0, std=1.0, gtype='color'):
     r"""Add Speckle noise to the image.
     Args:
@@ -200,7 +189,6 @@ def noise_speckle(img: np.ndarray, mean=0.0, std=1.0, gtype='color'):
     Returns:
         numpy ndarray: version of the image with Speckle noise added.
     """
-    imgtype = img.dtype
     h,w,c = img.shape
     
     if gtype == 'bw':
@@ -211,40 +199,57 @@ def noise_speckle(img: np.ndarray, mean=0.0, std=1.0, gtype='color'):
     noisy = img + img * speckle
     noisy = np.clip(noisy, 0, 255) 
     
-    return noisy.astype(imgtype)
+    return noisy
 
-def compression_jpeg(img: np.ndarray, quality=20):
-    r"""Compress the image as JPEG using OpenCV.
+
+@preserve_shape
+@preserve_type
+def compression(img: np.ndarray, quality=20, image_type='.jpeg'):
+    r"""Compress the image using OpenCV.
     Args:
         img (numpy ndarray): Image to be compressed.
-        quality (int: [0,100]): Compression quality for the image. Lower values represent 
-            higher compression and lower quality. Default=20
+        quality (int: [0,100]): Compression quality for the image. 
+            Lower values represent higher compression and lower 
+            quality. Default=20
+        image_type (str): select between '.jpeg' or '.webp'
+            compression. Default='.jpeg'.
     Returns:
-        numpy ndarray: version of the image with JPEG compression.
+        numpy ndarray: version of the image with compression.
     """
-    
-    imgtype = img.dtype
-    if img.ndim >= 3:
-        img_channels = img.shape[2]
-    elif img.ndim == 2:
-        img_channels = 1
+    if image_type in [".jpeg", ".jpg"]:
+        quality_flag = cv2.IMWRITE_JPEG_QUALITY
+    elif image_type == ".webp":
+        quality_flag = cv2.IMWRITE_WEBP_QUALITY
+    else:
+        NotImplementedError("Only '.jpg' and '.webp' compression transforms are implemented. ")
+
+    input_dtype = img.dtype
+    needs_float = False
+
+    if input_dtype == np.float32:
+        warn(
+            "Image compression augmentation "
+            "is most effective with uint8 inputs, "
+            "{} is used as input.".format(input_dtype),
+            UserWarning,
+        )
+        img = from_float(img, dtype=np.dtype("uint8"))
+        needs_float = True
+    elif input_dtype not in (np.uint8, np.float32):
+        raise TypeError("Unexpected dtype {} for compression augmentation".format(input_dtype))
 
     #encoding parameters
-    encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), quality]
+    encode_param = [int(quality_flag), quality]
     # encode
-    is_success, encimg = cv2.imencode('.jpg', img, encode_param) 
+    is_success, encimg = cv2.imencode(image_type, img, encode_param) 
     
     # decode
-    jpeg_img = cv2.imdecode(encimg, 1)
-    
-    # fix for grayscale images
-    if jpeg_img.ndim == 3 and jpeg_img.shape[2] != img_channels:
-        jpeg_img = jpeg_img[:,:,1]
+    compressed_img = cv2.imdecode(encimg, cv2.IMREAD_UNCHANGED)
 
-    if jpeg_img.ndim != 3:
-        jpeg_img = jpeg_img[..., np.newaxis]
-    
-    return jpeg_img.astype(imgtype)
+    if needs_float:
+        compressed_img = to_float(compressed_img, max_value=255)
+
+    return compressed_img
 
 
 #Get a valid kernel for the blur operations
@@ -260,7 +265,8 @@ def valid_kernel(h: int, w: int, kernel_size: int):
     
     return kernel_size
 
-
+@preserve_shape
+@preserve_type
 def average_blur(img: np.ndarray, kernel_size: int = 3):
     r"""Blurs an image using OpenCV Gaussian Blur.
     Args:
@@ -269,18 +275,80 @@ def average_blur(img: np.ndarray, kernel_size: int = 3):
     Returns:
         numpy ndarray: version of the image with blur applied.
     """
-    imgtype = img.dtype
-    h,w,c = img.shape
+    h, w = img.shape[0:2]
 
     #Get a valid kernel size
     kernel_size = valid_kernel(h,w,kernel_size)
     
     #Averaging Filter Blur (Homogeneous filter)
-    blurred = cv2.blur(img,(kernel_size,kernel_size))
+    # blurred = cv2.blur(img, (kernel_size,kernel_size))
+    blur_fn = _maybe_process_in_chunks(cv2.blur, ksize=(kernel_size,kernel_size))
+    return blur_fn(img)
 
-    return blurred.astype(imgtype)
+#Box blur and average blur should be the same
+@preserve_shape
+@preserve_type
+def box_blur(img: np.ndarray, kernel_size: int = 3):
+    r"""Blurs an image using OpenCV Gaussian Blur.
+    Args:
+        img (numpy ndarray): Image to be augmented.
+        kernel_size (int): size of the blur filter to use. Default: 3.
+    Returns:
+        numpy ndarray: version of the image with blur applied.
+    """
+    h, w = img.shape[0:2]
+
+    #Get a valid kernel size
+    kernel_size = valid_kernel(h,w,kernel_size)
+    
+    #Box Filter Blur 
+    # blurred = cv2.boxFilter(img,ddepth=-1,ksize=(kernel_size,kernel_size))
+    blur_fn = _maybe_process_in_chunks(cv2.boxFilter, ddepth=-1, ksize=(kernel_size,kernel_size))
+    return blur_fn(img)
+
+@preserve_shape
+@preserve_type
+def gaussian_blur(img: np.ndarray, kernel_size: int = 3, sigma=0.0):
+    r"""Blurs an image using OpenCV Gaussian Blur.
+    Args:
+        img (numpy ndarray): Image to be augmented.
+        kernel_size (int): size of the blur filter to use. Default: 3.
+    Returns:
+        numpy ndarray: version of the image with blur applied.
+    Note: When sigma=0, it is computed as `sigma = 0.3*((kernel_size-1)*0.5 - 1) + 0.8`
+    """
+    h, w = img.shape[0:2]
+
+    #Get a valid kernel size
+    kernel_size = valid_kernel(h,w,kernel_size)
+    
+    #Gaussian Filter Blur
+    # blurred = cv2.GaussianBlur(img,(kernel_size,kernel_size),0)
+    blur_fn = _maybe_process_in_chunks(cv2.GaussianBlur, ksize=(kernel_size,kernel_size), sigmaX=sigma)
+    return blur_fn(img)
+
+@preserve_shape
+@preserve_type
+def median_blur(img: np.ndarray, kernel_size: int = 3):
+    r"""Blurs an image using OpenCV Median Blur.
+    Args:
+        img (numpy ndarray): Image to be augmented.
+        kernel_size (int): size of the blur filter to use. Default: 3.
+    Returns:
+        numpy ndarray: version of the image with blur applied.
+    """
+    h, w = img.shape[0:2]
+
+    #Get a valid kernel size
+    kernel_size = valid_kernel(h,w,kernel_size)
+    
+    #Median Filter Blur
+    blur_fn = _maybe_process_in_chunks(cv2.medianBlur, ksize=kernel_size)
+    return blur_fn(img)
 
 #Needs testing
+@preserve_shape
+@preserve_type
 def bilateral_blur(img: np.ndarray, kernel_size: int = 3, sigmaColor: int = 5, sigmaSpace: int = 5):
     r"""Blurs an image using OpenCV Gaussian Blur.
     Args:
@@ -304,79 +372,41 @@ def bilateral_blur(img: np.ndarray, kernel_size: int = 3, sigmaColor: int = 5, s
     Returns:
         numpy ndarray: version of the image with blur applied.
     """
-    imgtype = img.dtype
-    h,w,c = img.shape
+    h, w = img.shape[0:2]
 
     #Get a valid kernel size
     kernel_size = valid_kernel(h,w,kernel_size)
     #Bilateral filter doesn't appear to work with kernel_size > 9, check
-    if kernel_size > 9:
-        kernel_size = 9
+    # if kernel_size > 9:
+    #     kernel_size = 9
     
     #Bilateral Filter
-    blurred = cv2.bilateralFilter(img,kernel_size,sigmaColor,sigmaSpace)
+    # blurred = cv2.bilateralFilter(img,kernel_size,sigmaColor,sigmaSpace)
+    blur_fn = _maybe_process_in_chunks(
+        cv2.bilateralFilter,
+        d=kernel_size,
+        sigmaColor=sigmaColor,
+        sigmaSpace=sigmaSpace)
+    return blur_fn(img)
 
-    return blurred.astype(imgtype)
-
-#Box blur and average blur should be the same
-def box_blur(img: np.ndarray, kernel_size: int = 3):
-    r"""Blurs an image using OpenCV Gaussian Blur.
-    Args:
-        img (numpy ndarray): Image to be augmented.
-        kernel_size (int): size of the blur filter to use. Default: 3.
-    Returns:
-        numpy ndarray: version of the image with blur applied.
-    """
-    imgtype = img.dtype
-    h,w,c = img.shape
-
-    #Get a valid kernel size
-    kernel_size = valid_kernel(h,w,kernel_size)
-    
-    #Box Filter Blur 
-    blurred = cv2.boxFilter(img,-1,(kernel_size,kernel_size))
-
-    return blurred.astype(imgtype)
-
-def gaussian_blur(img: np.ndarray, kernel_size: int = 3):
-    r"""Blurs an image using OpenCV Gaussian Blur.
-    Args:
-        img (numpy ndarray): Image to be augmented.
-        kernel_size (int): size of the blur filter to use. Default: 3.
-    Returns:
-        numpy ndarray: version of the image with blur applied.
-    """
-    imgtype = img.dtype
-    h,w,c = img.shape
-
-    #Get a valid kernel size
-    kernel_size = valid_kernel(h,w,kernel_size)
-    
-    #Gaussian Filter Blur
-    blurred = cv2.GaussianBlur(img,(kernel_size,kernel_size),0)
-
-    return blurred.astype(imgtype)
-
-
-#with Minisom
-#def quantize():
-#TBD
 
 
 def simple_quantize(image, rgb_range):
-    pixel_range = 255 / rgb_range
-    return 255*(image*pixel_range/255).clip(0, 255).round()/(pixel_range)
+    r""" Simple image quantization nased on color ranges.
+    """
+    pixel_range = 255. / rgb_range
+    image = image.astype(np.float32)
+    return (255.*(image*pixel_range/255.).clip(0, 255).round()/(pixel_range)).astype(np.uint8)
 
 
-
+@preserve_type
 def noise_dither_bayer(img: np.ndarray):
     r"""Adds colored bayer dithering noise to the image.
     Args:
         img (numpy ndarray): Image to be dithered.
     Returns:
         numpy ndarray: version of the image with dithering applied.
-    """
-    
+    """    
     imgtype = img.dtype
     size = img.shape
 
@@ -403,9 +433,9 @@ def noise_dither_bayer(img: np.ndarray):
                     img_split[i,j,channel] = 255 #1
     dithered = img_split #*255.
     
-    return dithered.astype(imgtype)
+    return dithered
 
-
+@preserve_type
 def noise_dither_fs(img: np.ndarray, samplingF = 1):
     r"""Adds colored Floyd-Steinberg dithering noise to the image.
 
@@ -446,7 +476,6 @@ def noise_dither_fs(img: np.ndarray, samplingF = 1):
             v = 0
         return v
     
-    imgtype = img.dtype
     size = img.shape
 
     #Note: these are very slow for large images, must crop first before applying.    
@@ -489,20 +518,20 @@ def noise_dither_fs(img: np.ndarray, samplingF = 1):
             re_fs[i+1, j+1, 2] = minmax(re_fs[i+1, j+1, 2]+(1/16.0)*quant_error_r)
     dithered = re_fs
 
-    return dithered.astype(imgtype)
+    return dithered
 
 def noise_dither_avg_bw(img):
     """
         https://github.com/QunixZ/Image_Dithering_Implements/blob/master/HW1.py
     """
     if len(img.shape) > 2 and img.shape[2] != 1:
-        img = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)/255.
+        img = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
     
     threshold = np.average(img)
-    re_aver = np.where(img < threshold, 0, 1).astype(np.float32)
+    re_aver = np.where(img < threshold, 0, 255).astype(np.uint8)
     #re_aver = cv2.cvtColor(re_aver,cv2.COLOR_GRAY2RGB)
 
-    return re_aver*255.
+    return re_aver
 
 def noise_dither_bayer_bw(img):
     """
@@ -532,11 +561,11 @@ def noise_dither_bin_bw(img):
         https://github.com/QunixZ/Image_Dithering_Implements/blob/master/HW1.py
     """
     if len(img.shape) > 2 and img.shape[2] != 1:
-        img = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)/255.
+        img = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
 
-    img_bw = np.where(img < 0.5, 0, 1).astype(np.float32)
+    img_bw = np.where(img < 127, 0, 255).astype(np.uint8)
     #img_bw = cv2.cvtColor(img_bw,cv2.COLOR_GRAY2RGB)
-    return img_bw*255.
+    return img_bw
 
 
 def noise_dither_fs_bw(img, samplingF = 1):
@@ -595,7 +624,8 @@ def noise_dither_random_bw(img):
 
 
 def filter_max_rgb(img: np.ndarray):
-    r"""The Max RGB filter is used to visualize which channel contributes most to a given area of an image. 
+    r"""The Max RGB filter is used to visualize which channel 
+        contributes most to a given area of an image. 
         Can be used for simple color-based segmentation.
         More infotmation on: https://www.pyimagesearch.com/2015/09/28/implementing-the-max-rgb-filter-in-opencv/
     Args:
@@ -617,7 +647,7 @@ def filter_max_rgb(img: np.ndarray):
     # merge the channels back together and return the image
     return cv2.merge([B, G, R])
 
-
+@preserve_type
 def filter_colorbalance(img: np.ndarray, percent=1):
     r"""Simple color balance algorithm (similar to Photoshop "auto levels")
         More infotmation on: 
@@ -650,6 +680,8 @@ def filter_colorbalance(img: np.ndarray, percent=1):
     return cv2.merge(out_channels)
 
 
+@preserve_shape
+@preserve_type
 def filter_unsharp(img: np.ndarray, blur_algo='median', kernel_size=None, strength=0.3, unsharp_algo='laplacian'):
     r"""Unsharp mask filter, used to sharpen images to make edges and interfaces look crisper.
         More infotmation on: 
@@ -662,22 +694,21 @@ def filter_unsharp(img: np.ndarray, blur_algo='median', kernel_size=None, streng
     Returns:
         numpy ndarray: version of the image after Unsharp Mask.
     """
-    #h,w,c = img.shape
-    imgtype = img.dtype
-    
     #can randomize strength from 0.5 to 0.8
     # if strength is None:
     #     strength = np.random.uniform(0.3, 0.9)
-    
+
     if unsharp_algo == 'DoG':
-        #If using Difference of Gauss (DoG)
-        #run a 5x5 gaussian blur then a 3x3 gaussian blr
-        blur5 = cv2.GaussianBlur(img,(5,5),0)
-        blur3 = cv2.GaussianBlur(img,(3,3),0)
+        # If using Difference of Gauss (DoG)
+        # run a 5x5 gaussian blur then a 3x3 gaussian blur
+        blur5 = gaussian_blur(img.astype(np.float32), 5)
+        blur3 = gaussian_blur(img.astype(np.float32), 3)
         DoGim = blur5 - blur3
         img_out = img - strength*DoGim
+        img_out = img_out.astype(np.uint8)
     
-    else: # 'laplacian': using LoG (actually, median blur instead of gaussian)
+    else: 
+        # 'laplacian': using LoG (actually, median blur instead of gaussian)
         #randomize kernel_size between 1, 3 and 5
         if kernel_size is None:
             kernel_sizes = [1, 3, 5] #TODO: ks 5 is causing errors
@@ -685,29 +716,49 @@ def filter_unsharp(img: np.ndarray, blur_algo='median', kernel_size=None, streng
         # Median filtering (could be Gaussian for proper LoG)
         #gray_image_mf = median_filter(gray_image, 1)
         if blur_algo == 'median':
-            smooth = cv2.medianBlur(img.astype(np.uint8), kernel_size)
-        # Calculate the Laplacian (LoG, or in this case, Laplacian of Median)
-        lap = cv2.Laplacian(smooth,cv2.CV_64F)
+            smooth = median_blur(img.astype(np.uint8), kernel_size)
+
+        # Calculate the Laplacian
+        # (LoG, or in this case, Laplacian of Median)
+        lap = cv2.Laplacian(smooth, cv2.CV_64F)
+        if len(lap.shape) == 2:
+            lap = lap.reshape(lap.shape[0], lap.shape[1], 1)
+
         # Calculate the sharpened image
         img_out = img - strength*lap
-    
-     # Saturate the pixels in either direction
+
+    # Saturate the pixels in either direction
     img_out[img_out>255] = 255
     img_out[img_out<0] = 0
     
-    return img_out.astype(imgtype)
+    return img_out
 
 
-def filter_canny(img: np.ndarray, sigma=0.33):
+def binarize(img, threshold):
+    r"""Binarize operation (ie. for edge detectors)
+    Args:
+        threshold: threshold value for binarize option
+    """
+    #img = img > threshold
+    img[img < threshold] = 0.
+    return img
+
+@preserve_shape
+@preserve_type
+def filter_canny(img: np.ndarray, sigma:float=0.33, 
+            bin_thresh:bool=False, threshold:int=127, to_rgb:bool=False):
     r"""Automatic Canny filter for edge detection
     Args:
-        img (numpy ndarray): Image to be filtered.
-        sigma (float): standard deviation from the median to automatically calculate minimun 
+        img: Image to be filtered.
+        sigma: standard deviation from the median to automatically calculate minimun 
             values and maximum values thresholds. Default: 0.33.
+        bin_thresh: flag to apply binarize (threshold) operation
+
     Returns:
         numpy ndarray: version of the image after Canny filter.
     """
-    imgtype = img.dtype
+    if len(img.shape) > 2 and img.shape[2] != 1:
+        to_rgb = True
 
     # compute the median of the single channel pixel intensities
     median = np.median(img)
@@ -717,5 +768,11 @@ def filter_canny(img: np.ndarray, sigma=0.33):
     maxVal = int(min(255, (1.0 + sigma) * median))
     edged = cv2.Canny(img, minVal, maxVal)
 
+    if bin_thresh:
+        edged = binarize(edged, threshold)
+
+    if to_rgb:
+        edged = cv2.cvtColor(edged, cv2.COLOR_GRAY2RGB)
+
     # return the edged image
-    return edged.astype(imgtype)
+    return edged
