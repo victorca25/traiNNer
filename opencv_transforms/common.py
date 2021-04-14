@@ -52,6 +52,30 @@ MAX_VALUES_BY_DTYPE = {
 # }
 
 
+def preserve_shape(func):
+    """
+    Wrapper to preserve shape of the image
+    """
+    @wraps(func)
+    def wrapped_function(img, *args, **kwargs):
+        shape = img.shape
+        result = func(img, *args, **kwargs)
+        # numpy reshape:
+        result = result.reshape(shape)
+        return result
+    return wrapped_function
+
+def preserve_type(func):
+    """
+    Wrapper to preserve type of the image
+    """
+    @wraps(func)
+    def wrapped_function(img, *args, **kwargs):
+        dtype = img.dtype
+        result = func(img, *args, **kwargs)
+        return result.astype(dtype)
+    return wrapped_function
+
 def preserve_channel_dim(func):
     """
     Preserve dummy channel dimension for grayscale images
