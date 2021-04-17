@@ -8,7 +8,8 @@ import torchvision.utils
 
 import models.modules.architectures.seg_arch as seg_arch
 import utils.util as util
-from dataops.common import modcrop, imresize
+from dataops.common import modcrop
+from dataops.imresize import resize as imresize
 
 # options
 test_img_folder_name = 'samples'  # image folder name

@@ -5,6 +5,7 @@ import cv2
 import torch
 import dataops.common as util
 from data.base_dataset import BaseDataset, get_dataroots_paths
+from dataops.imresize import resize as imresize
 
 
 class LRHRDataset(BaseDataset):
@@ -72,7 +73,7 @@ class LRHRDataset(BaseDataset):
 
             H, W, _ = img_HR.shape
             # using matlab imresize
-            img_LR = util.imresize_np(img_HR, 1 / scale, True)
+            img_LR = imresize(img_HR, 1 / scale, antialiasing=True)
             if img_LR.ndim == 2:
                 img_LR = np.expand_dims(img_LR, axis=2)
 
@@ -83,7 +84,7 @@ class LRHRDataset(BaseDataset):
                 img_HR = cv2.resize(
                     np.copy(img_HR), (HR_size, HR_size), interpolation=cv2.INTER_LINEAR)
                 # using matlab imresize
-                img_LR = util.imresize_np(img_HR, 1 / scale, True)
+                img_LR = imresize(img_HR, 1 / scale, antialiasing=True)
                 if img_LR.ndim == 2:
                     img_LR = np.expand_dims(img_LR, axis=2)
 

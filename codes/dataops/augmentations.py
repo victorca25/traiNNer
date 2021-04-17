@@ -11,16 +11,32 @@ import cv2
 import dataops.common as util
 from dataops.minisom import MiniSom
 from dataops.debug import *
+from dataops.imresize import resize as imresize
 
 import dataops.opencv_transforms.opencv_transforms as transforms
 from torch.utils.data.dataset import Dataset #TODO TMP, move NoisePatches to a separate dataloader
 
+custom_ktypes = [794, 793, 792, 791, 790, 789, 788, 787, 786, 785, 784,
+                783, 782, 781, 780, 779, 778, 777, 776, 775, 774, 773,]
+
+_n_interpolation_to_str = {
+    794:'blackman5', 793:'blackman4', 792:'blackman3',
+    791:'blackman2', 790:'sinc5', 789:'sinc4', 788:'sinc3',
+    787:'sinc2', 786:'gaussian', 785:'hamming', 784:'hanning',
+    783:'catrom', 782:'bell', 781:'lanczos5', 780:'lanczos4',
+    779:'hermite', 778:'mitchell', 777:'cubic', 776:'lanczos3',
+    775:'lanczos2', 774:'box', 773:'linear',}
 
 def Scale(img=None, scale: int = None, algo=None, ds_kernel=None, resize_type=None):
 
     ow, oh = img.shape[0], img.shape[1]
-    w = int(oh/scale)
-    h = int(ow/scale)
+    ## original rounds down:
+    # w = int(oh/scale)
+    # h = int(ow/scale)
+    ## rounded_up = -(-numerator // denominator)     # math.ceil(scale_factor * in_sz)
+    w = int(-(-oh//scale))
+    h = int(-(-ow//scale))
+
     if (h == oh) and (w == ow):
         return img, None
     
@@ -53,7 +69,8 @@ class MLResize(object):
             numpy ndarray: Rescaled image.
             
         """
-        return util.imresize_np(img=img, scale=self.scale, antialiasing=self.antialiasing, interpolation=self.interpolation)
+        # return util.imresize_np(img=img, scale=self.scale, antialiasing=self.antialiasing, interpolation=self.interpolation)
+        return imresize(img=img, scale_factors=self.scale, antialiasing=self.antialiasing, interpolation=self.interpolation)
 
 
 def get_resize(size, scale=None, ds_algo=None, ds_kernel=None, resize_type=None):
@@ -71,17 +88,11 @@ def get_resize(size, scale=None, ds_algo=None, ds_kernel=None, resize_type=None)
         pass
     elif not resize_type:
         resize_type = random.choice(ds_algo)
-        
+    
     # print(resize_type)
-    if resize_type == 777 or resize_type == 776 or resize_type == 775 or resize_type == 774 \
-        or resize_type == 773: #matlab-like resize, ie: 'matlab_bicubic'
-        _ml_interpolation_to_str = {777:'cubic',
-                                776:'lanczos3',
-                                775:'lanczos2',
-                                774:'box',
-                                773:'linear'}
+    if resize_type in custom_ktypes:
         # print('matlab')
-        resize = MLResize(scale=scale, interpolation=_ml_interpolation_to_str[resize_type]) #(np.copy(img_LR))
+        resize = MLResize(scale=scale, interpolation=_n_interpolation_to_str[resize_type]) #(np.copy(img_LR))
     elif resize_type == 999: # use realistic downscale kernels
         # print('kernelgan')
         if ds_kernel:
@@ -110,56 +121,76 @@ def get_blur(blur_types: list = []):
         blur_type = random.choice(blur_types)
         if blur_type == 'average':
             # print('average')
-            blur = transforms.RandomAverageBlur(random_params=True, p=1)
+            blur = transforms.RandomAverageBlur(
+                    max_kernel_size=11, random_params=True, p=1)
         elif blur_type == 'box':
             # print('box')
-            blur = transforms.RandomBoxBlur(random_params=True, p=1)
+            blur = transforms.RandomBoxBlur(
+                    max_kernel_size=11, random_params=True, p=1)
         elif blur_type == 'gaussian':
             # print('gaussian')
-            blur = transforms.RandomGaussianBlur(random_params=True, p=1)
+            blur = transforms.RandomGaussianBlur(
+                    max_kernel_size=11, random_params=True, p=1)
+        elif blur_type == 'median':
+            # print('median')
+            blur = transforms.RandomMedianBlur(
+                    max_kernel_size=11, random_params=True, p=1)
         elif blur_type == 'bilateral':
             # print('bilateral')
-            blur = transforms.RandomBilateralBlur(sigmaSpace=200, sigmaColor=200, random_params=True, p=1)
+            blur = transforms.RandomBilateralBlur(
+                    sigmaSpace=200, sigmaColor=200,
+                    max_kernel_size=11, random_params=True, p=1)
+        elif blur_type == 'motion':
+            # print('motion')
+            blur = transforms.RandomMotionBlur(
+                     max_kernel_size=7, random_params=True, p=1)
+        elif blur_type == 'complexmotion':
+            # print('complexmotion')
+            blur = transforms.RandomComplexMotionBlur(
+                     max_kernel_size=7, random_params=True, p=1,
+                     size=100, complexity=1.0)        
         #elif blur_type == 'clean':
     return blur
 
 
 #TODO: use options to set the noise types parameters if configured, else random_params=True
-def get_noise(noise_types: list = [], noise_patches=None):
+def get_noise(noise_types: list = [], noise_patches=None, noise_amp: int=1):
 
     noise = None
     if(isinstance(noise_types, list)):
         noise_type = random.choice(noise_types)
         
         # if noise_type == 'dither':
-        if noise_type.find('dither') >= 0:
+        if 'dither' in noise_type:
+            # print(noise_type)
             #TODO: need a dither type selector, there are multiple options including b&w dithers
             # dither = 'fs'
             # if dither == 'fs':
-            if noise_type.find('fs') >= 0:
+            if 'fs' in noise_type and 'bw' not in noise_type:
                 noise = transforms.FSDitherNoise(p=1)
             # elif dither == 'bayer':
-            elif noise_type.find('bayer') >= 0:
+            elif 'bayer' in noise_type and 'bw' not in noise_type:
                 noise = transforms.BayerDitherNoise(p=1)
             # elif dither == 'fs_bw':
-            elif noise_type.find('fs_bw') >= 0:
+            elif 'fs_bw' in noise_type:
                 noise = transforms.FSBWDitherNoise(p=1)
             # elif dither == 'avg_bw':
-            elif noise_type.find('avg_bw') >= 0:
+            elif 'avg_bw' in noise_type:
                 noise = transforms.AverageBWDitherNoise(p=1)
             # elif dither == 'bayer_bw':
-            elif noise_type.find('bayer_bw') >= 0:
+            elif 'bayer_bw' in noise_type:
                 noise = transforms.BayerBWDitherNoise(p=1)
             # elif dither == 'bin_bw':
-            elif noise_type.find('bin_bw') >= 0:
+            elif 'bin_bw' in noise_type:
                 noise = transforms.BinBWDitherNoise(p=1)
             # elif dither == 'rnd_bw':
-            elif noise_type.find('rnd_bw') >= 0:
+            elif 'rnd_bw' in noise_type:
                 noise = transforms.RandomBWDitherNoise(p=1)
             # print("dither")
         elif noise_type == 'simplequantize':
-            #TODO: find a useful rgb_range for SimpleQuantize 
-            noise = transforms.SimpleQuantize(p=1, rgb_range = 150) #30
+            #TODO: find a useful rgb_range for SimpleQuantize in [0,255]
+            # the smaller the value, the closer to original colors
+            noise = transforms.SimpleQuantize(p=1, rgb_range = 50) #30
             # print("simplequantize")
         elif noise_type == 'quantize':
             noise = RandomQuantize(p=1, num_colors=32)
@@ -167,9 +198,11 @@ def get_noise(noise_types: list = [], noise_patches=None):
         elif noise_type == 'gaussian':
             noise = transforms.RandomGaussianNoise(p=1, random_params=True, gtype='bw')
             # print("gaussian")
-        elif noise_type == 'JPEG':
-            noise = transforms.RandomJPEGNoise(p=1, random_params=True)
+        elif noise_type.lower() == 'jpeg':
+            noise = transforms.RandomCompression(p=1, random_params=True, image_type='.jpeg')
             # print("JPEG")
+        elif noise_type.lower() == 'webp':
+            noise = transforms.RandomCompression(p=1, random_params=True, image_type='.webp')
         elif noise_type == 'poisson':
             noise = transforms.RandomPoissonNoise(p=1)
             # print("poisson")
@@ -182,14 +215,17 @@ def get_noise(noise_types: list = [], noise_patches=None):
         elif noise_type == 'maxrgb':
             noise = transforms.FilterMaxRGB(p=1)
             # print("maxrgb")
+        # elif noise_type == 'canny':
+        #     noise = transforms.FilterCanny(p=1)
         elif noise_type == 'patches' and noise_patches:
-            noise = RandomNoisePatches(noise_patches)
+            noise = RandomNoisePatches(noise_patches, noise_amp)
             # print("patches")
         #elif noise_type == 'clean':
 
     return noise
 
 def get_pad(img, size: int, fill = 0, padding_mode: str ='constant'):
+    #TODO: update to work with PIL as well with image_size(img)
     h, w = img.shape[0], img.shape[1]
 
     if fill == 'random':
@@ -320,7 +356,9 @@ class KernelDownscale(object):
             kernel = np.load(f)
 
         kernel = self.pre_process(kernel)
-        kernel = kernel / np.sum(kernel)  # normalize to make cropped kernel sum 1 again
+        # normalize to make cropped kernel sum 1 again
+        # kernel = kernel / np.sum(kernel)
+        kernel = kernel.astype(np.float32) / np.sum(kernel)
         # print(kernel.shape)
 
         input_shape = img.shape
@@ -392,15 +430,30 @@ class NoisePatches(Dataset):
 
 
 class RandomNoisePatches():
-    def __init__(self, noise_patches):
+    def __init__(self, noise_patches, noise_amp=1):
         self.noise_patches = noise_patches
+        self.noise_amp = noise_amp
 
     def __call__(self, img):
         # add noise from patches 
         noise = self.noise_patches[np.random.randint(0, len(self.noise_patches))]
         # tmp_vis(noise, False)
         # img = torch.clamp(img + noise, 0, 1)
-        img = np.clip((img + noise), 0, 255).astype('uint8')
+        # describe_numpy(img, all=True)
+        h, w = img.shape[0:2]
+        n_h, n_w = noise.shape[0:2]
+        if n_h < h or n_w < w:
+            # pad noise patch to image size if smaller
+            i = random.randint(0, h - n_h)
+            j = random.randint(0, w - n_w)
+            #top, bottom, left, right borders
+            noise = transforms.Pad(padding=(i, h-(i+n_h), j, w-(j+n_w)))(noise)
+        elif n_h > h or n_w > w:
+            # crop noise patch to image size if larger
+            noise = transforms.RandomCrop(size=(w,h))(noise)
+
+        img = np.clip((img.astype('float32') + self.noise_amp*noise), 0, 255).astype('uint8')
+        # describe_numpy(img, all=True)
         ## tmp_vis(img, False)
         return img
 
@@ -587,7 +640,7 @@ def scale_img(image, scale, algo=None):
             interpol = algo
         
         if interpol == 777: #'matlab_bicubic'
-            resized = util.imresize_np(image, 1 / scale, True)
+            resized = imresize(image, 1 / scale, antialiasing=True)
             # force to 3 channels
             # if resized.ndim == 2:
                 # resized = np.expand_dims(resized, axis=2)
@@ -610,7 +663,7 @@ def resize_img(image, newdim=(128, 128), algo=None):
             interpol = algo
             
     if interpol == 777: #'matlab_bicubic'
-        resized = util.imresize_np(image, 1 / scale, True)
+        resized = imresize(image, 1 / scale, antialiasing=True)
         # force to 3 channels
         # if resized.ndim == 2:
             # resized = np.expand_dims(resized, axis=2)

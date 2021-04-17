@@ -7,7 +7,8 @@ import numpy as np
 import torch
 
 import utils.util as util
-from dataops.common import modcrop, imresize
+from dataops.common import modcrop
+from dataops.imresize import resize as imresize
 
 # model_path = '../experiments/pretrained_models/sft_net_torch.pth' # torch version
 model_path = '../experiments/pretrained_models/SFTGAN_bicx4_noBN_OST_bg.pth'  # pytorch training
