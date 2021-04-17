@@ -7,7 +7,7 @@ import dataops.common as util
 
 import dataops.augmentations as augmentations
 from dataops.debug import tmp_vis, describe_numpy, describe_tensor
-from data.base_dataset import BaseDataset, get_dataroots_paths
+from data.base_dataset import BaseDataset, get_dataroots_paths, read_imgs_from_path
 
 
 class LRHRDataset(BaseDataset):
@@ -35,7 +35,6 @@ class LRHRDataset(BaseDataset):
 
     def __getitem__(self, index):
         HR_path, LR_path = None, None
-        data_type = self.opt.get('data_type', 'img')
         scale = self.opt['scale']
         HR_size = self.opt['HR_size']
         if HR_size:
@@ -46,58 +45,9 @@ class LRHRDataset(BaseDataset):
         znorm  = self.opt.get('znorm', False)
         
         ######## Read the images ########
-        #TODO: check cases where default of 3 channels will be troublesome
-        image_channels  = self.opt.get('image_channels', 3)
-        
-        # Check if LR Path is provided
-        if self.paths_LR:
-            #If LR is provided, check if 'rand_flip_LR_HR' is enabled
-            if self.opt.get('rand_flip_LR_HR', None) and self.opt['phase'] == 'train':
-                LRHRchance = random.uniform(0, 1)
-                flip_chance  = self.opt.get('flip_chance', 0.05)
-                #print("Random Flip Enabled")
-            # Normal case, no flipping:
-            else:
-                LRHRchance = 0.
-                flip_chance = 0.
-                #print("No Random Flip")
+        img_LR, img_HR, LR_path, HR_path = read_imgs_from_path(
+            self.opt, index, self.paths_LR, self.paths_HR, self.LR_env, self.HR_env)
 
-            # get HR and LR images
-            # If enabled, random chance that LR and HR images are flipped
-            # Normal case, no flipping
-            # If img_LR (LR_path) doesn't exist, use img_HR (HR_path)
-            if LRHRchance < (1- flip_chance):
-                HR_path = self.paths_HR[index]
-                LR_path = self.paths_LR[index]
-                if LR_path is None:
-                    LR_path = HR_path
-                #print("HR kept")
-            # Flipped case:
-            # If img_HR (LR_path) doesn't exist, use img_HR (LR_path)
-            else:
-                HR_path = self.paths_LR[index]
-                LR_path = self.paths_HR[index]
-                if HR_path is None:
-                    HR_path = LR_path
-                #print("HR flipped")
-
-            # Read the LR and HR images from the provided paths
-            img_LR = util.read_img(env=data_type, path=LR_path, lmdb_env=self.LR_env, out_nc=image_channels)
-            img_HR = util.read_img(env=data_type, path=HR_path, lmdb_env=self.HR_env, out_nc=image_channels)
-            
-            # Even if LR dataset is provided, force to generate aug_downscale % of downscales OTF from HR
-            # The code will later make sure img_LR has the correct size
-            if self.opt.get('aug_downscale', None):
-                if np.random.rand() < self.opt['aug_downscale']:
-                    img_LR = img_HR
-            
-        # If LR is not provided, use HR and modify on the fly
-        else:
-            HR_path = self.paths_HR[index]
-            img_HR = util.read_img(env=data_type, path=HR_path, lmdb_env=self.HR_env, out_nc=image_channels)
-            img_LR = img_HR
-            LR_path = HR_path
-        
         ######## Modify the images ########
         
         # HR modcrop in the validation / test phase
@@ -338,22 +288,7 @@ class LRHRDataset(BaseDataset):
                 # cv2.imwrite(debugpath+"\\"+im_name+hex+'_HR1.png',img_HRn1) #random name to save
             
         ######## Convert images to PyTorch Tensors ########
-        
-        """ # for debugging
-        if (img_HR.min() < -1):
-            describe_numpy(img_HR, all=True)
-            print(HR_path)
-        if (img_HR.max() > 1):
-            describe_numpy(img_HR, all=True)
-            print(HR_path)
-        if (img_LR.min() < -1):
-            describe_numpy(img_LR, all=True)
-            print(LR_path)
-        if (img_LR.max() > 1):
-            describe_numpy(img_LR, all=True)
-            print(LR_path)
-        #"""
-        
+
         # check for grayscale images #TODO: should not be needed anymore
         if len(img_HR.shape) < 3:
             img_HR = img_HR[..., np.newaxis]

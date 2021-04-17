@@ -1,15 +1,40 @@
+"""This module implements a 'BaseDataset' for datasets.
+It also includes common dataroot validation functions and PIL transformation functions 
+(e.g., get_transform, __scale_width), which can be later used in subclasses.
+"""
 import os
 import random
 import numpy as np
 import torch.utils.data as data
-import torchvision.transforms as transforms
+
+from dataops.common import get_image_paths, read_img, np2tensor
 
 try:
     from PIL import Image
-except:
-    pass
+    pil_available = True
+except ImportError:
+    pil_available = False
+    # pass
 
-from dataops.common import get_image_paths, read_img
+try:
+    import cv2
+    cv2_available =  True
+except ImportError:
+    cv2_available = False
+
+def set_transforms(loader_type=None):
+    if not hasattr(set_transforms, 'loader_type') or set_transforms.loader_type != loader_type:
+        global transforms
+        if loader_type == 'pil' and pil_available:
+            import torchvision.transforms as transforms
+        elif cv2_available:
+            import dataops.opencv_transforms.opencv_transforms as transforms
+        else:
+            Exception("No suitable image loader available. Need either PIL or OpenCV.")
+
+        set_transforms.loader_type = loader_type
+
+set_transforms()
 
 
 class BaseDataset(data.Dataset):
@@ -53,8 +78,6 @@ class BaseDataset(data.Dataset):
 
 
 
-
-
 def process_img_paths(images_paths, data_type='img'):
     # process images_paths
     paths_list = []
@@ -72,17 +95,18 @@ def read_subset(dataroot, subset_file):
     return paths
 
 
-def format_paths(dataroot):
+def format_paths(dataroot=None):
     """
     Check if dataroot_HR is a list of directories or a single directory. 
     Note: lmdb will not currently work with a list
     """
     # if receiving a single path in str format, convert to list
-    if type(dataroot) is str:
-        dataroot = os.path.join(dataroot)
-        dataroot = [dataroot]
-    
-    assert isinstance(dataroot, list)
+    if dataroot:
+        if type(dataroot) is str:
+            dataroot = os.path.join(dataroot)
+            dataroot = [dataroot]
+        else:
+            assert isinstance(dataroot, list)
     return dataroot
 
 
@@ -233,3 +257,66 @@ def get_dataroots_paths(opt, strict=False, keys_ds=['LR', 'HR']):
     if paths_A and paths_B:
         paths_A, paths_B = validate_paths(paths_A, paths_B, strict=strict, keys_ds=keys_ds)
     return paths_A, paths_B
+
+
+
+
+
+def read_imgs_from_path(opt, index, paths_A, paths_B, A_env, B_env):
+    #TODO: check cases where default of 3 channels will be troublesome
+    image_channels  = opt.get('image_channels', 3)
+    data_type = opt.get('data_type', 'img')
+    loader = opt.get('data_type', 'cv2')
+
+    # Check if A/LR Path is provided
+    if paths_A:
+        # If A/LR is provided, check if 'rand_flip_LR_HR' or 'rand_flip_A_B' is enabled
+        if (opt.get('rand_flip_LR_HR', None) or opt.get('rand_flip_A_B', None)) and opt['phase'] == 'train':
+            randomchance = random.uniform(0, 1)
+            flip_chance  = opt.get('flip_chance', 0.05)
+            # print("Random Flip Enabled")
+        # Normal case, no flipping:
+        else:
+            randomchance = 0.
+            flip_chance = 0.
+            # print("No Random Flip")
+
+        # get B/HR and A/LR images pairs
+        # If enabled, random chance that A/LR and B/HR images domains are flipped
+        # Normal case, no flipping
+        # If img_A (A_path) doesn't exist, use img_B (B_path)
+        if randomchance < (1- flip_chance):
+            B_path = paths_B[index]
+            A_path = paths_A[index]
+            if A_path is None:
+                A_path = B_path
+            # print("HR kept")
+        # Flipped case:
+        # If img_B (A_path) doesn't exist, use img_B (A_path)
+        else:
+            B_path = paths_A[index]
+            A_path = paths_B[index]
+            if B_path is None:
+                B_path = A_path
+            # print("HR flipped")
+
+        # Read the A/LR and B/HR images from the provided paths
+        img_A = read_img(env=data_type, path=A_path, lmdb_env=A_env, out_nc=image_channels, loader=loader)
+        img_B = read_img(env=data_type, path=B_path, lmdb_env=B_env, out_nc=image_channels, loader=loader)
+        
+        # Even if A/LR dataset is provided, force to generate aug_downscale % of downscales OTF from B/HR
+        # The code will later make sure img_A has the correct size
+        if opt.get('aug_downscale', None):
+            # if np.random.rand() < opt['aug_downscale']:
+            if random.random() < opt['aug_downscale']:
+                img_A = img_B
+        
+    # If A/LR is not provided, use B/HR and modify on the fly
+    else:
+        B_path = paths_B[index]
+        img_B = read_img(env=data_type, path=B_path, lmdb_env=B_env, out_nc=image_channels, loader=loader)
+        img_A = img_B
+        A_path = B_path
+
+    return img_A, img_B, A_path, B_path
+
