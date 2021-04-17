@@ -4,27 +4,27 @@ from collections import OrderedDict
 import cv2
 
 #PAD_MOD
-_str_to_cv2_pad_to = {'constant':cv2.BORDER_CONSTANT,
-                   'edge':cv2.BORDER_REPLICATE,
-                   'reflect':cv2.BORDER_REFLECT_101,
-                   'symmetric':cv2.BORDER_REFLECT
-                  }
+_cv2_str2pad = {'constant':cv2.BORDER_CONSTANT,
+                'edge':cv2.BORDER_REPLICATE,
+                'reflect':cv2.BORDER_REFLECT_101,
+                'symmetric':cv2.BORDER_REFLECT
+               }
 #INTER_MODE
-_str_to_cv2_interpolation = {'nearest':cv2.INTER_NEAREST, 
-                         'linear':cv2.INTER_LINEAR,
-                         'bilinear':cv2.INTER_LINEAR,
-                         'area':cv2.INTER_AREA,
-                         'cubic':cv2.INTER_CUBIC,
-                         'bicubic':cv2.INTER_CUBIC,
-                         'lanczos':cv2.INTER_LANCZOS4,
-                         'lanczos4':cv2.INTER_LANCZOS4,
-                         'linear_exact':cv2.INTER_LINEAR_EXACT,
-                         'matlab_linear':773,
-                         'matlab_box':774,
-                         'matlab_lanczos2':775,
-                         'matlab_lanczos3':776,
-                         'matlab_bicubic':777,
-                         'realistic':999}
+_cv2_str2interpolation = {'cv2_nearest':cv2.INTER_NEAREST,
+                         'nearest':cv2.INTER_NEAREST,
+                         'cv2_linear':cv2.INTER_LINEAR,
+                         'cv2_area':cv2.INTER_AREA,
+                         'cv2_cubic':cv2.INTER_CUBIC,
+                         'cv2_lanczos4':cv2.INTER_LANCZOS4,
+                         'cv2_linear_exact':cv2.INTER_LINEAR_EXACT,
+                         'linear':773, 'box':774,'lanczos2':775,
+                         'lanczos3':776, 'bicubic':777, 'mitchell':778,
+                         'hermite':779, 'lanczos4':780, 'lanczos5':781,
+                         'bell':782, 'catrom':783, 'hanning':784,
+                         'hamming':785, 'gaussian':786, 'sinc2':787,
+                         'sinc3':788, 'sinc4':789, 'sinc5':790,
+                         'blackman2':791, 'blackman3':792, 'blackman4':793,
+                         'blackman5':794, 'realistic':999,}
 
 def parse2lists(types: (dict, str, any)) -> (list, any):
     """Converts dictionaries or single string options to lists that 
@@ -154,7 +154,7 @@ def parse(opt_path: str, is_train: bool = True) -> NoneDict:
             if isinstance(dataset['lr_downscale_types'], str):
                 dataset['lr_downscale_types'] = [dataset['lr_downscale_types']]
             dataset['lr_downscale_types'] = [(
-                _str_to_cv2_interpolation[algo.lower()] if isinstance(algo, str) else algo
+                _cv2_str2interpolation[algo.lower()] if isinstance(algo, str) else algo
             ) for algo in dataset['lr_downscale_types']]
 
         for k in ['lr_blur_types', 'lr_noise_types', 'lr_noise_types2', 'hr_noise_types']:
