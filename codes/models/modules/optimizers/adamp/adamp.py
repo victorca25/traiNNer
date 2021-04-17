@@ -8,7 +8,7 @@ class AdamP(Optimizer):
     r"""Implements AdamP algorithm proposed in `AdamP: Slowing Down the Slowdown for 
         Momentum Optimizers`_, a projection-based solution that regularizes the 
         momentum-induced norm growth and improves model performances. Modified from 
-        Adam in torch.optim library.
+        AdamW in torch.optim library.
     Arguments:
         params (iterable): iterable of parameters to optimize or dicts defining
             parameter groups

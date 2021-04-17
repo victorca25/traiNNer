@@ -21,28 +21,29 @@ def get_optimizers(cri_gan=None, netD=None, netG=None, train_opt=None, logger=No
     delta_G = train_opt.get('delta_G', 0.1)
     wd_ratio_G = train_opt.get('wd_ratio_G', 0.1)
     dampening_G = train_opt.get('dampening_G', 0)
-    
+    beta2_G = train_opt.get('beta2_G', 0.999)
+
     if optim_G == 'sgd':
-        optimizer_G = torch.optim.SGD(optim_params, lr=train_opt['lr_G'], \
+        optimizer_G = torch.optim.SGD(optim_params, lr=train_opt['lr_G'],
             weight_decay=wd_G, momentum=(train_opt['momentum_G']))
     elif optim_G == 'rmsprop':
-        optimizer_G = torch.optim.RMSprop(optim_params, lr=train_opt['lr_G'], \
+        optimizer_G = torch.optim.RMSprop(optim_params, lr=train_opt['lr_G'],
             weight_decay=wd_G, eps=(train_opt['eps_G']))
     elif optim_G == 'sgdp':
-        optimizer_G = SGDP(optim_params, lr=train_opt['lr_G'], \
+        optimizer_G = SGDP(optim_params, lr=train_opt['lr_G'],
             weight_decay=wd_G, momentum=(train_opt['momentum_G']), 
             dampening=dampening_G, nesterov=nesterov_G,
             eps=eps_G, delta=delta_G, wd_ratio=wd_ratio_G)
     elif optim_G == 'adamp':
-        optimizer_G = AdamP(optim_params, lr=train_opt['lr_G'], \
-            weight_decay=wd_G, betas=(train_opt['beta1_G'], 0.999), 
+        optimizer_G = AdamP(optim_params, lr=train_opt['lr_G'],
+            weight_decay=wd_G, betas=(train_opt['beta1_G'], beta2_G), 
             nesterov=nesterov_G, eps=eps_G, 
             delta=delta_G, wd_ratio=wd_ratio_G)
     else: # default to 'adam'
-        optimizer_G = torch.optim.Adam(optim_params, lr=train_opt['lr_G'], \
-            weight_decay=wd_G, betas=(train_opt['beta1_G'], 0.999))
+        optimizer_G = torch.optim.Adam(optim_params, lr=train_opt['lr_G'],
+            weight_decay=wd_G, betas=(train_opt['beta1_G'], beta2_G))
     optimizers.append(optimizer_G)
-    
+
     # D
     if cri_gan:
         wd_D = train_opt.get('weight_decay_D', 0)
@@ -52,25 +53,26 @@ def get_optimizers(cri_gan=None, netD=None, netG=None, train_opt=None, logger=No
         delta_D = train_opt.get('delta_D', 0.1)
         wd_ratio_D = train_opt.get('wd_ratio_D', 0.1)
         dampening_D = train_opt.get('dampening_D', 0)
-        
+        beta2_D = train_opt.get('beta2_D', 0.999)
+
         if optim_D == 'sgd':
-            optimizer_D = torch.optim.SGD(netD.parameters(), lr=train_opt['lr_D'], \
+            optimizer_D = torch.optim.SGD(netD.parameters(), lr=train_opt['lr_D'],
                 weight_decay=wd_D, momentum=(train_opt['momentum_D']))
         elif optim_D == 'rmsprop':
-            optimizer_D = torch.optim.RMSprop(netD.parameters(), lr=train_opt['lr_D'], \
+            optimizer_D = torch.optim.RMSprop(netD.parameters(), lr=train_opt['lr_D'],
                 weight_decay=wd_D, eps=(train_opt['eps_D']))
         elif optim_D == 'sgdp':
-            optimizer_D = SGDP(optim_params, lr=train_opt['lr_D'], \
+            optimizer_D = SGDP(optim_params, lr=train_opt['lr_D'],
                 weight_decay=wd_D, momentum=(train_opt['momentum_D']), 
                 dampening=dampening_D, nesterov=nesterov_D,
                 eps=eps_D, delta=delta_D, wd_ratio=wd_ratio_D)
         elif optim_D == 'adamp':
-            optimizer_D = AdamP(optim_params, lr=train_opt['lr_D'], \
-                weight_decay=wd_D, betas=(train_opt['beta1_D'], 0.999), 
+            optimizer_D = AdamP(optim_params, lr=train_opt['lr_D'],
+                weight_decay=wd_D, betas=(train_opt['beta1_D'], beta2_D), 
                 nesterov=nesterov_D, eps=eps_D, delta=delta_D, wd_ratio=wd_ratio_D)
         else: # default to 'adam'
-            optimizer_D = torch.optim.Adam(netD.parameters(), lr=train_opt['lr_D'], \
-                weight_decay=wd_D, betas=(train_opt['beta1_D'], 0.999))
+            optimizer_D = torch.optim.Adam(netD.parameters(), lr=train_opt['lr_D'],
+                weight_decay=wd_D, betas=(train_opt['beta1_D'], beta2_D))
         optimizers.append(optimizer_D)
         return optimizers, optimizer_G, optimizer_D
     
