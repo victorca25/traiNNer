@@ -18,7 +18,7 @@ import warnings
 # import opencv_functional as F
 from . import functional as F
 from . import extra_functional as EF
-from .common import fetch_kernels, to_tuple, _cv2_interpolation2str
+from .common import fetch_kernels, to_tuple, _cv2_interpolation2str, convolve
 
 
 __all__ = ["Compose", "ToTensor", "ToCVImage",
@@ -1981,7 +1981,7 @@ class RandomMotionBlur(BlurBase):
         self.per_channel = per_channel
 
     def apply(self, img, kernel=None, **params):
-        return EF.convolve(img, kernel=kernel, per_channel=self.per_channel, **params)
+        return convolve(img, kernel=kernel, per_channel=self.per_channel, **params)
 
     def get_params(self, imgdim=None):
         kernel_size = random.choice(np.arange(3, self.max_kernel_size + 1, 2))
@@ -2402,7 +2402,7 @@ class ApplyKernel:
 
         # First run a correlation (convolution with flipped kernel)
         # out_im = cv2.filter2D(img, -1, kernel)
-        out_im = EF.convolve(img, kernel)
+        out_im = convolve(img, kernel)
 
         if self.scale < 1:
             input_shape = img.shape
