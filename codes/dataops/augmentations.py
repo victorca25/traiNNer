@@ -166,7 +166,7 @@ def get_noise(noise_types: list = [], noise_patches=None, noise_amp: int=1):
             #TODO: need a dither type selector, there are multiple options including b&w dithers
             # dither = 'fs'
             # if dither == 'fs':
-            if 'fs' in noise_type and 'bw' not in noise_type:
+            if ('fs' in noise_type and 'bw' not in noise_type) or noise_type == 'dither':
                 noise = transforms.FSDitherNoise(p=1)
             # elif dither == 'bayer':
             elif 'bayer' in noise_type and 'bw' not in noise_type:
