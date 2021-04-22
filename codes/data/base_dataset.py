@@ -7,34 +7,9 @@ import random
 import numpy as np
 import torch.utils.data as data
 
-from dataops.common import get_image_paths, read_img, np2tensor
+from dataops.common import get_image_paths, read_img
 
-try:
-    from PIL import Image
-    pil_available = True
-except ImportError:
-    pil_available = False
-    # pass
 
-try:
-    import cv2
-    cv2_available =  True
-except ImportError:
-    cv2_available = False
-
-def set_transforms(loader_type=None):
-    if not hasattr(set_transforms, 'loader_type') or set_transforms.loader_type != loader_type:
-        global transforms
-        if loader_type == 'pil' and pil_available:
-            import torchvision.transforms as transforms
-        elif cv2_available:
-            import dataops.opencv_transforms.opencv_transforms as transforms
-        else:
-            Exception("No suitable image loader available. Need either PIL or OpenCV.")
-
-        set_transforms.loader_type = loader_type
-
-set_transforms()
 
 
 class BaseDataset(data.Dataset):
@@ -78,7 +53,12 @@ class BaseDataset(data.Dataset):
 
 
 
-def process_img_paths(images_paths, data_type='img'):
+############# Testing below
+
+def process_img_paths(images_paths=None, data_type='img'):
+    if not images_paths:
+        return images_paths
+
     # process images_paths
     paths_list = []
     for path in images_paths:
@@ -176,7 +156,7 @@ def read_dataroots(opt, keys_ds=['LR','HR']):
         # special case when dealing with duplicate B_images_paths or A_images_paths
         # lmdb not be supported with this option
         if len(B_images_paths) != len(set(B_images_paths)) or \
-            len(A_images_paths) != len(set(A_images_paths)):
+            A_images_paths and (len(A_images_paths) != len(set(A_images_paths))):
 
             # only resolve when the two path lists coincide in the number of elements, 
             # they have to be ordered specifically as they will be used in the options file
