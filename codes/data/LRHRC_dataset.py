@@ -12,6 +12,11 @@ from dataops.debug import tmp_vis, describe_numpy, describe_tensor
 import dataops.opencv_transforms.opencv_transforms as transforms
 from data.base_dataset import BaseDataset, get_dataroots_paths, read_imgs_from_path
 
+from dataops.augmentations import generate_A_fn, image_type, get_default_imethod, dim_change_fn, shape_change_fn, random_downscale_B
+from dataops.augmentations import get_unpaired_params, get_augmentations, get_totensor_params, get_totensor
+from dataops.augmentations import get_ds_kernels, get_noise_patches
+from dataops.augmentations import get_params, image_size, scale_params, scale_opt, get_transform
+
 
 class LRHRDataset(BaseDataset):
     '''
@@ -28,20 +33,27 @@ class LRHRDataset(BaseDataset):
         self.output_sample_imgs = None
         self.vars = opt.get('outputs', 'LRHR')  #'AB'
 
+        """
+        self.ds_kernels = None
         if opt.get('dataroot_kernels', None) and 999 in self.opt["lr_downscale_types"]:
             #TODO: note: use the model scale to get the right kernel 
             scale = opt.get('scale', 4)
             self.ds_kernels = KernelDownscale(scale=scale, kernel_paths=opt['dataroot_kernels'])
+        """
+        self.ds_kernels = get_ds_kernels(opt)
 
+        """
         if opt['phase'] == 'train' and opt.get('lr_noise_types', 3) and "patches" in opt.get('lr_noise_types', {}):
             assert opt['noise_data']
             self.noise_patches = NoisePatches(opt['noise_data'], opt.get('HR_size', 128)/opt.get('scale', 4))
         else:
             self.noise_patches = None
+        """
+        self.noise_patches = get_noise_patches(opt)
 
         # get images paths (and optional environments for lmdb) from dataroots
         self.paths_LR, self.paths_HR = get_dataroots_paths(opt, strict=False, keys_ds=self.keys_ds)
-        
+
         if self.opt.get('data_type') == 'lmdb':
             self.LR_env = util._init_lmdb(opt.get('dataroot_'+self.keys_ds[0]))
             self.HR_env = util._init_lmdb(opt.get('dataroot_'+self.keys_ds[1]))
@@ -54,24 +66,24 @@ class LRHRDataset(BaseDataset):
         HR_size = self.opt.get('HR_size', 128)
         if HR_size:
             LR_size = HR_size // scale
-        
+
         # Default case: tensor will result in the [0,1] range
         # Alternative: tensor will be z-normalized to the [-1,1] range
         znorm  = self.opt.get('znorm', False)
-        
+
         ######## Read the images ########
         img_LR, img_HR, LR_path, HR_path = read_imgs_from_path(
             self.opt, index, self.paths_LR, self.paths_HR, self.LR_env, self.HR_env)
-        
+
         # tmp_vis(img_HR, False)
         # tmp_vis(img_LR, False)
 
         ######## Modify the images ########
-        
+
         # HR modcrop in the validation / test phase
         if self.opt['phase'] != 'train':
             img_HR = util.modcrop(img_HR, scale)
-        
+
         # change color space if necessary
         # Note: Changing the LR colorspace here could make it so some colors are introduced when 
         #  doing the augmentations later (ie: with Gaussian or Speckle noise), may be good if the
@@ -88,10 +100,11 @@ class LRHRDataset(BaseDataset):
             img_LR = util.channel_convert(img_LR.shape[2], self.opt['color_LR'], [img_LR])[0]
 
         ######## Augmentations ########
-        
+
         #Augmentations during training
         if self.opt['phase'] == 'train':
 
+            """
             # HR downscale
             if self.opt.get('hr_downscale', None): 
                 ds_algo  = self.opt.get('hr_downscale_types', 777)
@@ -106,12 +119,20 @@ class LRHRDataset(BaseDataset):
                     if img_LR is not None and (img_HR.shape[0] // scale != img_LR.shape[0] or img_HR.shape[1] // scale != img_LR.shape[1]):
                         #img_LR, lr_scale_interpol_algo = augmentations.scale_img(img_LR, hr_downscale_amt, algo=ds_algo)
                         img_LR, _ = Scale(img=img_LR, scale=hr_downscale_amt, algo=ds_algo)
+            """
+            default_int_method = get_default_imethod(image_type(img_LR))
+
+            self.opt['crop_size'] = HR_size  # TODO: TMP
+            self.opt['preprocess'] = 'crop'  # TODO: TMP
+            img_LR, img_HR = random_downscale_B(img_A=img_LR, img_B=img_HR, 
+                                opt=self.opt)
 
             # Validate there's an img_LR, if not, use img_HR
             if img_LR is None:
                 img_LR = img_HR
                 print("Image LR: ", LR_path, ("was not loaded correctly, using HR pair to downscale on the fly."))
 
+            """
             # Check that HR and LR have the same dimensions ratio, else use an option to process
             #TODO: add options variable
             shape_change = self.opt.get('shape_change', 'reshape_hr') #"reshape_lr"
@@ -136,16 +157,27 @@ class LRHRDataset(BaseDataset):
                     #TODO: disabled to test cx loss 
                     #print("Warning: img_LR dimensions ratio does not match img_HR dimensions ratio for: ", HR_path)
                     img_LR = img_HR
-            
+            """
+            img_LR, img_HR = shape_change_fn(
+                img_A=img_LR, img_B=img_HR, opt=self.opt, scale=scale,
+                default_int_method=default_int_method)
+
+            """
             # Random Crop (reduce computing cost and adjust images to correct size first)
             if img_HR.shape[0] > HR_size or img_HR.shape[1] > HR_size:
                 #Here the scale should be in respect to the images, not to the training scale (in case they are being scaled on the fly)
                 scaleor = img_HR.shape[0]//img_LR.shape[0]
                 img_HR, img_LR = augmentations.random_crop_pairs(img_HR, img_LR, HR_size, scaleor)
-            
+            """
+            #TODO: Note: crops handled later with get_transform(), but order changes. 
+            # Crops now happen after dim_change_fn() and generate_A_fn() 
+
+            #"""
             #TODO: test to be removed
             # img_HR = transforms.Resize((HR_size-100,img_HR.shape[1]), interpolation="BILINEAR")(np.copy(img_HR))
             # img_LR = transforms.Resize((LR_size-(100//scale),img_LR.shape[1]), interpolation="BILINEAR")(np.copy(img_LR))
+            #"""
+            """
             # Or if the HR images are too small, Resize to the HR_size size and fit LR pair to LR_size too
             #TODO: add options variable
             dim_change = self.opt.get('dim_change', 'pad')
@@ -170,13 +202,20 @@ class LRHRDataset(BaseDataset):
                         else:
                             ds_kernel = None
                         img_LR, _ = Scale(img=img_LR, scale=scale, algo=ds_algo, ds_kernel=ds_kernel)
-                    
+
                     HR_pad, fill = get_pad(img_HR, HR_size, fill='random', padding_mode=self.opt.get('pad_mode', 'constant'))
                     img_HR = HR_pad(np.copy(img_HR))
-                    
+
                     LR_pad, _ = get_pad(img_LR, HR_size//scale, fill=fill, padding_mode=self.opt.get('pad_mode', 'constant'))
                     img_LR = LR_pad(np.copy(img_LR))
-            
+            """
+            img_LR, img_HR = dim_change_fn(
+                img_A=img_LR, img_B=img_HR, opt=self.opt, scale=scale,
+                default_int_method=default_int_method, 
+                crop_size=HR_size, A_crop_size=LR_size,
+                ds_kernels=self.ds_kernels)
+
+            """
             # (Randomly) scale LR (from HR) during training if :
             # - LR dataset is not provided
             # - LR dataset is not in the correct scale
@@ -196,8 +235,13 @@ class LRHRDataset(BaseDataset):
                 img_LR, _ = Scale(img=img_LR, scale=scale, algo=ds_algo, ds_kernel=ds_kernel)
                 # resize = get_resize(size=LR_size, scale=scale, ds_algo=ds_algo)
                 # img_LR = resize(np.copy(img_LR))
-            #"""
-            
+            """
+            img_LR = generate_A_fn(img_A=img_LR, img_B=img_HR,
+                            opt=self.opt, scale=scale,
+                            default_int_method=default_int_method,
+                            ds_kernels=self.ds_kernels)
+
+            """
             # Rotations. 'use_flip' = 180 or 270 degrees (mirror), 'use_rot' = 90 degrees, 'HR_rrot' = random rotations +-45 degrees
             if (self.opt['use_flip'] or self.opt['use_rot']) and self.opt.get('hr_rrot', None):
                 if np.random.rand() > 0.5:
@@ -213,7 +257,30 @@ class LRHRDataset(BaseDataset):
             elif self.opt.get('hr_rrot', None):
                 if np.random.rand() > 0.5: # randomize the random rotations, so half the images are the original
                     img_HR, img_LR = augmentations.random_rotate_pairs(img_HR, img_LR, HR_size, scale)
-            
+            """
+
+            # get and apply the paired transformations below
+            transform_params = get_params(
+                scale_opt(self.opt, scale), image_size(img_LR))
+            A_transform = get_transform(
+                scale_opt(self.opt, scale),
+                transform_params,
+                # grayscale=(input_nc == 1),
+                method=default_int_method)
+            B_transform = get_transform(
+                self.opt,
+                scale_params(transform_params, scale),
+                # grayscale=(output_nc == 1),
+                method=default_int_method)
+            img_LR = A_transform(img_LR)
+            img_HR = B_transform(img_HR)
+
+            #TODO: Remove TMP
+            if self.opt.get('hr_rrot', None):
+                if random.random() > 0.5: # randomize the random rotations, so half the images are the original
+                    img_HR, img_LR = augmentations.random_rotate_pairs(img_HR, img_LR, HR_size, scale)
+
+
             # Final sizes checks
             # if the resulting HR image size so far is too large or too small, resize HR to the correct size and downscale to generate a new LR on the fly
             # if the resulting LR so far does not have the correct dimensions, also generate a new HR-LR image pair on the fly
@@ -233,10 +300,10 @@ class LRHRDataset(BaseDataset):
                 ds_algo  = self.opt.get('lr_downscale_types', 777) 
                 #img_LR, _ = augmentations.scale_img(img_HR, scale, algo=ds_algo)
                 img_LR, _ = Scale(img_HR, scale, algo=ds_algo)
-            
-            
+
             # Below are the On The Fly augmentations
-            
+
+            """
             # Apply "auto levels" to images
             #rand_levels = (1 - self.opt.get('rand_auto_levels', 0)) # Randomize for augmentation
             rand_levels = self.opt.get('rand_auto_levels', 0)
@@ -272,7 +339,7 @@ class LRHRDataset(BaseDataset):
             if self.opt.get('hr_unsharp_mask', None):
                 hr_rand_unsharp = self.opt.get('hr_rand_unsharp', 0)
                 img_HR =  transforms.FilterUnsharp(p=hr_rand_unsharp)(img_HR)
-            
+
             # Add noise to HR if enabled AND noise types are provided (for noise2noise and similar)
             if self.opt.get('hr_noise', None):
                 noise_option = get_noise(self.opt.get('hr_noise_types', None))
@@ -282,7 +349,7 @@ class LRHRDataset(BaseDataset):
                 #TODO: check if necessary
                 # else:
                 #     print("Noise types 'hr_noise_types' not defined. Skipping OTF noise for HR.")
-            
+
             # Create color fringes
             # Caution: Can easily destabilize a model
             # Only applied to a small % of the images. Around 20% and 50% appears to be stable.
@@ -290,8 +357,7 @@ class LRHRDataset(BaseDataset):
                 lr_fringes_chance = self.opt['lr_fringes_chance'] if self.opt['lr_fringes_chance'] else 0.4
                 if np.random.rand() > (1.- lr_fringes_chance):
                     img_LR = augmentations.translate_chan(img_LR)
-            
-            #"""
+
             #v LR blur AND blur types are provided, else will skip
             if self.opt.get('lr_blur', None):
                 blur_option = get_blur(self.opt.get('lr_blur_types', None))
@@ -301,9 +367,7 @@ class LRHRDataset(BaseDataset):
                 #TODO: check if necessary
                 # else:
                 #     print("Blur types 'lr_blur_types' not defined. Skipping OTF blur.")
-            #"""
-                
-            #"""
+
             #v LR primary noise: Add noise to LR if enabled AND noise types are provided, else will skip
             if self.opt.get('lr_noise', None):
                 noise_option = get_noise(self.opt.get('lr_noise_types', None), self.noise_patches)
@@ -323,9 +387,7 @@ class LRHRDataset(BaseDataset):
                 #TODO: check if necessary
                 # else:
                 #     print("Noise types 'lr_noise_types2' not defined. Skipping OTF secondary noise.")
-            #"""
-                
-            #"""
+            
             #v LR cutout / LR random erasing (for inpainting/classification tests)
             if self.opt.get('lr_cutout', None) and (self.opt.get('lr_erasing', None)  != True):
                 # img_LR = augmentations.cutout(img_LR, img_LR.shape[0] // 2)
@@ -340,7 +402,26 @@ class LRHRDataset(BaseDataset):
                 else:
                     #img_LR = augmentations.random_erasing(img_LR, p=0.5, modes=[3])
                     img_LR = transforms.RandomErasing(p=1)(img_LR, mode=[3])
-            #"""
+            """
+
+            lr_aug_params, hr_aug_params = get_unpaired_params(self.opt)
+            # print(lr_aug_params)
+            # print(hr_aug_params)
+
+            # get and apply the unpaired augmentations below
+            lr_augmentations = get_augmentations(
+                self.opt, 
+                params=lr_aug_params,
+                noise_patches=self.noise_patches,
+                )
+            hr_augmentations = get_augmentations(
+                self.opt, 
+                params=hr_aug_params,
+                noise_patches=self.noise_patches,
+                )
+
+            img_LR = lr_augmentations(img_LR)
+            img_HR = hr_augmentations(img_HR)
 
 
         # For testing and validation
@@ -352,11 +433,12 @@ class LRHRDataset(BaseDataset):
                 # else: # Default to matlab-like bicubic downscale
                 #     img_LR, scale_interpol_algo = augmentations.scale_img(img_LR, scale, algo=777)
                 img_LR, _ = Scale(img_LR, scale, algo=self.opt.get('lr_downscale_types', 777))
-        
+
         # Alternative position for changing the colorspace of LR. 
         # if self.opt['color_LR']: # Only change LR
             # img_LR = util.channel_convert(img_LR.shape[2], self.opt['color'], [img_LR])[0]
-            
+
+        """
         # Debug #TODO: use the debugging functions to visualize or save images instead
         # Save img_LR and img_HR images to a directory to visualize what is the result of the on the fly augmentations
         # DO NOT LEAVE ON DURING REAL TRAINING
@@ -380,21 +462,31 @@ class LRHRDataset(BaseDataset):
                 cv2.imwrite(debugpath+"\\"+im_name+hex+'_LR.png',img_LR) #random name to save
                 cv2.imwrite(debugpath+"\\"+im_name+hex+'_HR.png',img_HR) #random name to save
                 # cv2.imwrite(debugpath+"\\"+im_name+hex+'_HR1.png',img_HRn1) #random name to save
-            
+        """
+
         ######## Convert images to PyTorch Tensors ########
 
+        """
         # check for grayscale images #TODO: should not be needed anymore
         if len(img_HR.shape) < 3:
             img_HR = img_HR[..., np.newaxis]
         if len(img_LR.shape) < 3:
             img_LR = img_LR[..., np.newaxis]
-        
+        """
+
         # tmp_vis(img_HR, False)
         # tmp_vis(img_LR, False)
 
+        """
         img_HR = util.np2tensor(img_HR, normalize=znorm, add_batch=False) #.astype('uint8').clip(0,255)
         img_LR = util.np2tensor(img_LR, normalize=znorm, add_batch=False)
-        
+        """
+
+        totensor_params = get_totensor_params(self.opt)
+        tensor_transform = get_totensor(self.opt, params=totensor_params, toTensor=True, grayscale=False)
+        img_LR = tensor_transform(img_LR)
+        img_HR = tensor_transform(img_HR)
+
         if LR_path is None:
             LR_path = HR_path
         if self.vars == 'AB':
@@ -404,4 +496,4 @@ class LRHRDataset(BaseDataset):
 
     def __len__(self):
         return len(self.paths_HR)
-        
+

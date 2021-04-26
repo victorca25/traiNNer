@@ -15,6 +15,7 @@ from dataops.debug import *
 from dataops.imresize import resize as imresize
 
 import dataops.opencv_transforms.opencv_transforms as transforms
+from dataops.opencv_transforms.opencv_transforms.common import wrap_cv2_function, wrap_pil_function
 from torch.utils.data.dataset import Dataset #TODO TMP, move NoisePatches to a separate dataloader
 
 # from dataops.augmentations import Scale, get_blur, get_noise, get_pad, translate_chan, NoisePatches, KernelDownscale, RandomQuantize, RandomNoisePatches #, MLResize, RandomQuantize, KernelDownscale, NoisePatches, RandomNoisePatches, get_resize, get_blur, get_noise, get_pad
@@ -554,6 +555,7 @@ def get_default_imethod(img_type='cv2'):
 def get_transform(opt, params=None, grayscale=False, method=None,
                         preprocess_mode=None):
     """
+    Base paired transformations: crop, scale, flip, rotate.
     There are different modes to load images by specifying 'preprocess_mode' along with
         'load_size', 'crop_size' and 'center_crop_size'. Can use options such as:
         - 'resize': resizes the images into square images of side length 'load_size'.
@@ -569,7 +571,6 @@ def get_transform(opt, params=None, grayscale=False, method=None,
     Rotations:
         Horizontal flips and rotations (0, 90, 180, 270 degrees).
         Note: Vertical flip and transpose are used for rotation implementation.
-
     """
     transform_list = []
     load_size = params['load_size'] if params else opt.get('load_size', None)
@@ -676,11 +677,6 @@ def __resize(img, w, h, method=None):
     if not method:
         method = get_default_imethod(img_type)
 
-    # if img_type == 'pil':
-    #     # TODO: test if this will work the same with PIL transforms.Resize like cv2
-    #     return img.resize((w, h), method)
-    # else:
-    #     return transforms.Resize((h,w), interpolation=method)(np.copy(img))
     return transforms.Resize((h,w), interpolation=method)(img)
 
 
@@ -917,7 +913,8 @@ def scale_params(params, scale):
     x, y = scaled_params['crop_pos']
     x_scaled, y_scaled = int(x * scale), int(y * scale)
     scaled_params['crop_pos'] = (x_scaled, y_scaled)
-    scaled_params['load_size'] = scale * scaled_params['load_size']
+    if scaled_params.get('load_size', None):
+        scaled_params['load_size'] = scale * scaled_params['load_size']
     return scaled_params
 
 
@@ -929,6 +926,9 @@ def scale_opt(opt, scale):
         return opt
     scale = 1 / scale
     scaled_opt = opt.copy()
+    scaled_opt['center_crop_size'] = scaled_opt.get('center_crop_size', None)
+    scaled_opt['load_size'] = scaled_opt.get('load_size', None)
+    
     scaled_opt['center_crop_size'] = int(scale * scaled_opt['center_crop_size']) if scaled_opt['center_crop_size'] else None
     scaled_opt['load_size'] = int(scale * scaled_opt['load_size']) if scaled_opt['load_size'] else None
     scaled_opt['crop_size'] = int(scale * scaled_opt['crop_size']) if scaled_opt['crop_size'] else None
@@ -1519,6 +1519,34 @@ def custom_pipeline(custom_transforms, transforms_cfg, noise_patches=None):
 
 
 
+
+@wrap_cv2_function
+def apply_wrapped_cv2transform(img, transform):
+    loader = set_transforms.loader_type
+    set_transforms(loader_type='cv2')
+    img = transform(img)
+    set_transforms(loader_type=loader)
+    return img
+
+@wrap_pil_function
+def apply_wrapped_piltransform(img, transform):
+    loader = set_transforms.loader_type
+    set_transforms(loader_type='pil')
+    img = transform(img)
+    set_transforms(loader_type=loader)
+    return img
+
+def apply_transform_list(img_list: list, transform, wrapper=None, loader=None):
+    img_list_out = []
+    for img in img_list:
+        if wrapper == 'cv2' and wrapper != loader:
+            tr_img = apply_wrapped_cv2transform(img, transform)
+        elif wrapper == 'pil' and wrapper != loader:
+            tr_img = apply_wrapped_piltransform(img, transform)
+        else:
+            tr_img = transform(img)
+        img_list_out.append(tr_img)
+    return img_list_out
 
 
 
