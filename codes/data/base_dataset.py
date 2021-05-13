@@ -245,35 +245,44 @@ def get_dataroots_paths(opt, strict=False, keys_ds=['LR', 'HR']):
 def read_imgs_from_path(opt, index, paths_A, paths_B, A_env, B_env):
     #TODO: check cases where default of 3 channels will be troublesome
     image_channels  = opt.get('image_channels', 3)
+    input_nc = opt.get('input_nc', image_channels)
+    output_nc = opt.get('output_nc', image_channels)
     data_type = opt.get('data_type', 'img')
-    loader = opt.get('data_type', 'cv2')
+    loader = opt.get('data_loader', 'cv2')
 
     # Check if A/LR Path is provided
     if paths_A:
-        # If A/LR is provided, check if 'rand_flip_LR_HR' or 'rand_flip_A_B' is enabled
         if (opt.get('rand_flip_LR_HR', None) or opt.get('rand_flip_A_B', None)) and opt['phase'] == 'train':
+            # If A/LR is provided, check if 'rand_flip_LR_HR' or 'rand_flip_A_B' is enabled
             randomchance = random.uniform(0, 1)
             flip_chance  = opt.get('flip_chance', 0.05)
             # print("Random Flip Enabled")
-        # Normal case, no flipping:
+        elif opt.get('direction', None) == 'BtoA':
+            # if flipping domain translation direction
+            randomchance = 1.
+            flip_chance = 1.
         else:
+            # Normal case, no flipping:
             randomchance = 0.
             flip_chance = 0.
             # print("No Random Flip")
 
         # get B/HR and A/LR images pairs
         # If enabled, random chance that A/LR and B/HR images domains are flipped
-        # Normal case, no flipping
-        # If img_A (A_path) doesn't exist, use img_B (B_path)
         if randomchance < (1- flip_chance):
+            # Normal case, no flipping
+            # If img_A (A_path) doesn't exist, use img_B (B_path)
             B_path = paths_B[index]
             A_path = paths_A[index]
             if A_path is None:
                 A_path = B_path
             # print("HR kept")
-        # Flipped case:
-        # If img_B (A_path) doesn't exist, use img_B (A_path)
         else:
+            # Flipped case:
+            # If img_B (A_path) doesn't exist, use img_B (A_path)
+            t = output_nc
+            output_nc = input_nc
+            input_nc = t
             B_path = paths_A[index]
             A_path = paths_B[index]
             if B_path is None:
@@ -281,8 +290,8 @@ def read_imgs_from_path(opt, index, paths_A, paths_B, A_env, B_env):
             # print("HR flipped")
 
         # Read the A/LR and B/HR images from the provided paths
-        img_A = read_img(env=data_type, path=A_path, lmdb_env=A_env, out_nc=image_channels, loader=loader)
-        img_B = read_img(env=data_type, path=B_path, lmdb_env=B_env, out_nc=image_channels, loader=loader)
+        img_A = read_img(env=data_type, path=A_path, lmdb_env=A_env, out_nc=input_nc, loader=loader)
+        img_B = read_img(env=data_type, path=B_path, lmdb_env=B_env, out_nc=output_nc, loader=loader)
         
         # Even if A/LR dataset is provided, force to generate aug_downscale % of downscales OTF from B/HR
         # The code will later make sure img_A has the correct size
@@ -294,9 +303,8 @@ def read_imgs_from_path(opt, index, paths_A, paths_B, A_env, B_env):
     # If A/LR is not provided, use B/HR and modify on the fly
     else:
         B_path = paths_B[index]
-        img_B = read_img(env=data_type, path=B_path, lmdb_env=B_env, out_nc=image_channels, loader=loader)
+        img_B = read_img(env=data_type, path=B_path, lmdb_env=B_env, out_nc=output_nc, loader=loader)
         img_A = img_B
         A_path = B_path
 
     return img_A, img_B, A_path, B_path
-

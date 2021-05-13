@@ -5,17 +5,18 @@ import cv2
 import torch
 import dataops.common as util
 
-import dataops.augmentations as augmentations #TMP
-from dataops.augmentations import Scale, MLResize, RandomQuantize, KernelDownscale, NoisePatches, RandomNoisePatches, get_resize, get_blur, get_noise, get_pad
-from dataops.debug import tmp_vis, describe_numpy, describe_tensor
+# import dataops.augmentations as augmentations #TMP
+# from dataops.augmentations import Scale, MLResize, RandomQuantize, KernelDownscale, NoisePatches, RandomNoisePatches, get_resize, get_blur, get_noise, get_pad
+# from dataops.debug import tmp_vis, describe_numpy, describe_tensor
 
-import dataops.opencv_transforms.opencv_transforms as transforms
+# import dataops.opencv_transforms.opencv_transforms as transforms
 from data.base_dataset import BaseDataset, get_dataroots_paths, read_imgs_from_path
 
 from dataops.augmentations import generate_A_fn, image_type, get_default_imethod, dim_change_fn, shape_change_fn, random_downscale_B
 from dataops.augmentations import get_unpaired_params, get_augmentations, get_totensor_params, get_totensor
 from dataops.augmentations import get_ds_kernels, get_noise_patches
-from dataops.augmentations import get_params, image_size, scale_params, scale_opt, get_transform
+from dataops.augmentations import get_params, image_size, image_channels, scale_params, scale_opt, get_transform
+from dataops.augmentations import random_rotate_pairs  # TMP
 
 
 class LRHRDataset(BaseDataset):
@@ -30,7 +31,7 @@ class LRHRDataset(BaseDataset):
         # self.opt = opt
         # self.paths_LR, self.paths_HR = None, None
         self.LR_env, self.HR_env = None, None  # environment for lmdb
-        self.output_sample_imgs = None
+        # self.output_sample_imgs = None
         self.vars = opt.get('outputs', 'LRHR')  #'AB'
 
         """
@@ -58,7 +59,7 @@ class LRHRDataset(BaseDataset):
             self.LR_env = util._init_lmdb(opt.get('dataroot_'+self.keys_ds[0]))
             self.HR_env = util._init_lmdb(opt.get('dataroot_'+self.keys_ds[1]))
 
-        #self.random_scale_list = [1]
+        # self.random_scale_list = [1]
 
     def __getitem__(self, index):
         HR_path, LR_path = None, None
@@ -67,16 +68,15 @@ class LRHRDataset(BaseDataset):
         if HR_size:
             LR_size = HR_size // scale
 
+        """
         # Default case: tensor will result in the [0,1] range
         # Alternative: tensor will be z-normalized to the [-1,1] range
         znorm  = self.opt.get('znorm', False)
+        """
 
         ######## Read the images ########
         img_LR, img_HR, LR_path, HR_path = read_imgs_from_path(
             self.opt, index, self.paths_LR, self.paths_HR, self.LR_env, self.HR_env)
-
-        # tmp_vis(img_HR, False)
-        # tmp_vis(img_LR, False)
 
         ######## Modify the images ########
 
@@ -85,19 +85,22 @@ class LRHRDataset(BaseDataset):
             img_HR = util.modcrop(img_HR, scale)
 
         # change color space if necessary
-        # Note: Changing the LR colorspace here could make it so some colors are introduced when 
-        #  doing the augmentations later (ie: with Gaussian or Speckle noise), may be good if the
-        #  model can learn to remove color noise in grayscale images, otherwise move to before
-        #  converting to tensors
-        # self.opt['color'] For both LR and HR as in the the original code, kept for compatibility
-        # self.opt['color_HR'] and self.opt['color_LR'] for independent control
+        # TODO: move to get_transform()
+        """
         if self.opt.get('color', None): # Change both
             img_HR = util.channel_convert(img_HR.shape[2], self.opt['color'], [img_HR])[0]
             img_LR = util.channel_convert(img_LR.shape[2], self.opt['color'], [img_LR])[0]
         if self.opt.get('color_HR', None): # Only change HR
-            img_HR = util.channel_convert(img_HR.shape[2], self.opt['color_HR'], [img_HR])[0] 
+            img_HR = util.channel_convert(img_HR.shape[2], self.opt['color_HR'], [img_HR])[0]
         if self.opt.get('color_LR', None): # Only change LR
             img_LR = util.channel_convert(img_LR.shape[2], self.opt['color_LR'], [img_LR])[0]
+        """
+        color_HR = self.opt.get('color', None) or self.opt.get('color_HR', None)
+        if color_HR:
+            img_HR = util.channel_convert(image_channels(img_HR), color_HR, [img_HR])[0]
+        color_LR = self.opt.get('color', None) or self.opt.get('color_LR', None)
+        if color_LR:
+            img_LR = util.channel_convert(image_channels(img_LR), color_LR, [img_LR])[0]
 
         ######## Augmentations ########
 
@@ -122,8 +125,13 @@ class LRHRDataset(BaseDataset):
             """
             default_int_method = get_default_imethod(image_type(img_LR))
 
-            self.opt['crop_size'] = HR_size  # TODO: TMP
-            self.opt['preprocess'] = 'crop'  # TODO: TMP
+            # self.opt['crop_size'] = HR_size  # TODO: TMP
+            # # self.opt['preprocess'] = 'crop'  # TODO: TMP
+            # self.opt['load_size'] = 512  # TODO: TMP
+            # self.opt['center_crop_size'] = 256  # TODO: TMP
+            # self.opt['aspect_ratio'] = 2  # TODO: TMP
+
+            # random HR downscale
             img_LR, img_HR = random_downscale_B(img_A=img_LR, img_B=img_HR, 
                                 opt=self.opt)
 
@@ -158,6 +166,7 @@ class LRHRDataset(BaseDataset):
                     #print("Warning: img_LR dimensions ratio does not match img_HR dimensions ratio for: ", HR_path)
                     img_LR = img_HR
             """
+            # check that HR and LR have the same dimensions ratio
             img_LR, img_HR = shape_change_fn(
                 img_A=img_LR, img_B=img_HR, opt=self.opt, scale=scale,
                 default_int_method=default_int_method)
@@ -170,7 +179,7 @@ class LRHRDataset(BaseDataset):
                 img_HR, img_LR = augmentations.random_crop_pairs(img_HR, img_LR, HR_size, scaleor)
             """
             #TODO: Note: crops handled later with get_transform(), but order changes. 
-            # Crops now happen after dim_change_fn() and generate_A_fn() 
+            # Crops now happen after dim_change_fn() and generate_A_fn(), pre_crop option added as alternative
 
             #"""
             #TODO: test to be removed
@@ -209,6 +218,7 @@ class LRHRDataset(BaseDataset):
                     LR_pad, _ = get_pad(img_LR, HR_size//scale, fill=fill, padding_mode=self.opt.get('pad_mode', 'constant'))
                     img_LR = LR_pad(np.copy(img_LR))
             """
+            # if the HR images are too small, Resize to the HR_size size and fit LR pair to LR_size too
             img_LR, img_HR = dim_change_fn(
                 img_A=img_LR, img_B=img_HR, opt=self.opt, scale=scale,
                 default_int_method=default_int_method, 
@@ -236,9 +246,11 @@ class LRHRDataset(BaseDataset):
                 # resize = get_resize(size=LR_size, scale=scale, ds_algo=ds_algo)
                 # img_LR = resize(np.copy(img_LR))
             """
-            img_LR = generate_A_fn(img_A=img_LR, img_B=img_HR,
+            # randomly scale LR (from HR) if needed
+            img_LR, img_HR = generate_A_fn(img_A=img_LR, img_B=img_HR,
                             opt=self.opt, scale=scale,
-                            default_int_method=default_int_method,
+                            default_int_method=default_int_method, 
+                            crop_size=HR_size, A_crop_size=LR_size,
                             ds_kernels=self.ds_kernels)
 
             """
@@ -278,9 +290,10 @@ class LRHRDataset(BaseDataset):
             #TODO: Remove TMP
             if self.opt.get('hr_rrot', None):
                 if random.random() > 0.5: # randomize the random rotations, so half the images are the original
-                    img_HR, img_LR = augmentations.random_rotate_pairs(img_HR, img_LR, HR_size, scale)
+                    img_HR, img_LR = random_rotate_pairs(img_HR, img_LR, HR_size, scale)
 
 
+            """
             # Final sizes checks
             # if the resulting HR image size so far is too large or too small, resize HR to the correct size and downscale to generate a new LR on the fly
             # if the resulting LR so far does not have the correct dimensions, also generate a new HR-LR image pair on the fly
@@ -300,6 +313,7 @@ class LRHRDataset(BaseDataset):
                 ds_algo  = self.opt.get('lr_downscale_types', 777) 
                 #img_LR, _ = augmentations.scale_img(img_HR, scale, algo=ds_algo)
                 img_LR, _ = Scale(img_HR, scale, algo=ds_algo)
+            """
 
             # Below are the On The Fly augmentations
 
@@ -404,11 +418,9 @@ class LRHRDataset(BaseDataset):
                     img_LR = transforms.RandomErasing(p=1)(img_LR, mode=[3])
             """
 
+            # get and apply the unpaired transformations below
             lr_aug_params, hr_aug_params = get_unpaired_params(self.opt)
-            # print(lr_aug_params)
-            # print(hr_aug_params)
 
-            # get and apply the unpaired augmentations below
             lr_augmentations = get_augmentations(
                 self.opt, 
                 params=lr_aug_params,
@@ -435,8 +447,9 @@ class LRHRDataset(BaseDataset):
                 img_LR, _ = Scale(img_LR, scale, algo=self.opt.get('lr_downscale_types', 777))
 
         # Alternative position for changing the colorspace of LR. 
-        # if self.opt['color_LR']: # Only change LR
-            # img_LR = util.channel_convert(img_LR.shape[2], self.opt['color'], [img_LR])[0]
+        # color_LR = self.opt.get('color', None) or self.opt.get('color_LR', None)
+        # if color_LR:
+        #     img_LR = util.channel_convert(image_channels(img_LR), color_LR, [img_LR])[0]
 
         """
         # Debug #TODO: use the debugging functions to visualize or save images instead

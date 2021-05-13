@@ -123,7 +123,7 @@ def parse(opt_path: str, is_train: bool = True) -> NoneDict:
         dataset['phase'] = phase
         dataset['scale'] = scale
         is_lmdb = False
-        image_paths = ["HR", "HR_bg", "LR", "A", "B", "lq", "gt", "ref"]
+        image_paths = ["HR", "HR_bg", "LR", "A", "B", "AB", "lq", "gt", "ref"]
         for key in image_paths:
             image_paths = dataset.get('dataroot_' + key, None)
             if image_paths is not None:
@@ -141,6 +141,36 @@ def parse(opt_path: str, is_train: bool = True) -> NoneDict:
                         path or a list of paths are supported.".format(type(image_paths)))
         dataset['data_type'] = 'lmdb' if is_lmdb else 'img'
 
+        if dataset.get('HR_size', None):
+            dataset['crop_size'] = HR_size
+
+        if phase == 'train':
+            preprocess = dataset.get('preprocess', None)
+            if preprocess is not None:
+                aspect_ratio = dataset.get('aspect_ratio', None)
+                load_size = dataset.get('load_size', None)
+                center_crop_size = dataset.get('center_crop_size', None)
+
+                if ('resize' in preprocess or
+                    'scale_width' in preprocess or
+                    'scale_height' in preprocess or
+                    'scale_shortside' in preprocess):
+                    assert load_size, "load_size not defined"
+                if 'center_crop' in preprocess:
+                    assert center_crop_size, "center_crop_size not defined"
+                if 'fixed' in preprocess:
+                    assert aspect_ratio, "aspect_ratio not defined"
+
+            pre_crop = dataset.get('pre_crop', None)
+            if scale !=1 and not pre_crop:
+                i2it_preprocess = ['scale_shortside', 'scale_height', 'scale_width', 'none']
+                if not preprocess:
+                    dataset['preprocess'] = 'crop'
+                else:
+                    for popt in i2it_preprocess:
+                        if popt in preprocess:
+                            raise ValueError(f"Preprocess option {popt} can only be used with 1x scale.")
+    
         if phase == 'train' and bm:
             # compatibility with other forks
             dataset['virtual_batch_size'] = bm * dataset["batch_size"]

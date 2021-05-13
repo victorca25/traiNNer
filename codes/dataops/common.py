@@ -184,7 +184,7 @@ def fix_img_channels(img, out_nc):
         #img = np.expand_dims(img, axis=2)
         img = np.tile(np.expand_dims(img, axis=2), (1, 1, 3))
     # special case: properly remove alpha channel 
-    if out_nc == 3 and img.shape[2] == 4: 
+    if out_nc == 3 and img.shape[2] == 4:
         img = bgra2rgb(img)
     # remove all extra channels 
     elif img.shape[2] > out_nc: 

@@ -12,7 +12,7 @@ import dataops.common as util
 from dataops.common import fix_img_channels, get_image_paths, read_img, np2tensor
 from dataops.minisom import MiniSom
 from dataops.debug import *
-from dataops.imresize import resize as imresize
+from dataops.imresize import resize as imresize  # resize # imresize_np
 
 import dataops.opencv_transforms.opencv_transforms as transforms
 from dataops.opencv_transforms.opencv_transforms.common import wrap_cv2_function, wrap_pil_function
@@ -104,7 +104,7 @@ class MLResize(object):
             
         """
         # return util.imresize_np(img=img, scale=self.scale, antialiasing=self.antialiasing, interpolation=self.interpolation)
-        return imresize(img=img, scale_factors=self.scale, antialiasing=self.antialiasing, interpolation=self.interpolation)
+        return imresize(img, self.scale, antialiasing=self.antialiasing, interpolation=self.interpolation)
 
 
 def get_resize(size, scale=None, ds_algo=None, ds_kernel=None, resize_type=None):
@@ -255,6 +255,8 @@ def get_noise(noise_types: list = [], noise_patches=None, noise_amp: int=1):
             noise = RandomNoisePatches(noise_patches, noise_amp)
             # print("patches")
         #elif noise_type == 'clean':
+        elif noise_type == 'clahe':
+            noise = transforms.CLAHE(p=1)
 
     return noise
 
@@ -510,23 +512,31 @@ def get_params(opt, size):
 
     # if preprocess_mode == 'resize_and_crop':
     if 'resize_and_crop' in preprocess_mode:
+        # assert load_size, "load_size not defined"
         new_h = new_w = load_size
     # elif preprocess_mode == 'scale_width_and_crop':
     elif 'scale_width_and_crop' in preprocess_mode:
+        # assert load_size, "load_size not defined"
         new_w = load_size
         new_h = load_size * h // w
     elif 'scale_height_and_crop' in preprocess_mode:
+        # assert load_size, "load_size not defined"
         new_w = load_size * w // h
         new_h = load_size
     # elif preprocess_mode == 'scale_shortside_and_crop':
     elif 'scale_shortside_and_crop' in preprocess_mode:
+        # assert load_size, "load_size not defined"
         ss, ls = min(w, h), max(w, h)  # shortside and longside
         width_is_shorter = w == ss
         ls = int(load_size * ls / ss)
         new_w, new_h = (ss, ls) if width_is_shorter else (ls, ss)
     elif 'center_crop' in preprocess_mode:
+        # assert center_crop_size, "center_crop_size not defined"
         new_w = center_crop_size
         new_h = center_crop_size
+    # elif 'fixed' in preprocess_mode:
+    #     aspect_ratio = opt.get('aspect_ratio')
+    #     assert aspect_ratio, "aspect_ratio not defined"
 
     x = random.randint(0, np.maximum(0, new_w - crop_size))
     y = random.randint(0, np.maximum(0, new_h - crop_size))
@@ -595,7 +605,7 @@ def get_transform(opt, params=None, grayscale=False, method=None,
         transform_list.append(transforms.Grayscale(1))
     # TODO:
     # elif params and params('color'):
-    #     # other colorspace changes
+    #     # other colorspace changes, deal with CV2 and PIL
 
     if 'resize' in preprocess_mode:
         if isinstance(load_size, list):
@@ -608,27 +618,28 @@ def get_transform(opt, params=None, grayscale=False, method=None,
             transform_list.append(transforms.Resize(osize, method))
     elif 'scale_width' in preprocess_mode:
         transform_list.append(transforms.Lambda(
-            lambda img: __scale_width(img, load_size, crop_size, method)))
+            lambda img: scale_width(img, load_size, crop_size, method)))
     elif 'scale_height' in preprocess_mode:
         transform_list.append(transforms.Lambda(
-            lambda img: __scale_height(img, load_size, crop_size, method)))
+            lambda img: scale_height(img, load_size, crop_size, method)))
     elif 'scale_shortside' in preprocess_mode:
         transform_list.append(transforms.Lambda(
-            lambda img: __scale_shortside(img, load_size, method)))
+            lambda img: scale_shortside(img, load_size, method)))
 
-    if 'crop' in preprocess_mode and preprocess_mode != 'center_crop':
+    # if 'crop' in preprocess_mode and preprocess_mode != 'center_crop':
+    if preprocess_mode == 'crop' or 'and_crop' in preprocess_mode:
         if params is None:
             transform_list.append(transforms.RandomCrop(crop_size))
         else:
             transform_list.append(transforms.Lambda(
-                lambda img: __crop(img, params['crop_pos'],
+                lambda img: crop(img, params['crop_pos'],
                                 size=crop_size, img_type=img_type)))
 
     if preprocess_mode == 'fixed':
         w = crop_size
         h = round(crop_size / opt.get('aspect_ratio'))
         transform_list.append(transforms.Lambda(
-            lambda img: __resize(img, w, h, method)))
+            lambda img: resize(img, w, h, method)))
 
     if preprocess_mode == 'none':
         # no preprocessing, fix dimensions if needed
@@ -636,17 +647,17 @@ def get_transform(opt, params=None, grayscale=False, method=None,
             # only make sure image has dims of power 2
             base = 4  # 32
             transform_list.append(transforms.Lambda(
-                lambda img: __make_power_2(img, base=base, method=method)))
+                lambda img: make_power_2(img, base=base, method=method)))
         elif default_none == 'modcrop':
             # only modcrop size according to scale
             transform_list.append(transforms.Lambda(
-                lambda img: __modcrop(
+                lambda img: modcrop(
                     img, scale=opt.get('scale'), img_type=img_type)))
         elif default_none == 'padbase':
             # only pad dims to base
             base = 4  # 32
             transform_list.append(transforms.Lambda(
-                lambda img: __padbase(img, base=base, img_type=img_type)))
+                lambda img: padbase(img, base=base, img_type=img_type)))
 
     # paired augmentations
     if opt.get('use_flip', None):
@@ -654,7 +665,7 @@ def get_transform(opt, params=None, grayscale=False, method=None,
             transform_list.append(transforms.RandomHorizontalFlip())
         elif params['flip']:
             transform_list.append(transforms.Lambda(
-                lambda img: __flip(img, params['flip'], img_type=img_type)))
+                lambda img: flip(img, params['flip'], img_type=img_type)))
 
     if opt.get('use_rot', None):
         if params is None:
@@ -664,7 +675,7 @@ def get_transform(opt, params=None, grayscale=False, method=None,
                     transforms.RandomRotation(degrees=(90,90)))
         elif params['rot']:
             transform_list.append(transforms.Lambda(
-                lambda img: __rotate90(
+                lambda img: rotate90(
                     img, params['rot'], params['vflip'], img_type=img_type)))
 
     #TODO: missing hrrot function or replacement
@@ -672,7 +683,7 @@ def get_transform(opt, params=None, grayscale=False, method=None,
     return transforms.Compose(transform_list)
 
 
-def __resize(img, w, h, method=None):
+def resize(img, w, h, method=None):
     img_type = image_type(img)
     if not method:
         method = get_default_imethod(img_type)
@@ -680,7 +691,7 @@ def __resize(img, w, h, method=None):
     return transforms.Resize((h,w), interpolation=method)(img)
 
 
-def __scale(img, scale, method=None):
+def scale(img, scale, method=None):
     """
     Returns a rescaled image by a specific factor given in parameter.
     A scalefactor greater than 1 expands the image, between 0 and 1 
@@ -702,10 +713,10 @@ def __scale(img, scale, method=None):
     if h == oh and w == ow:
         return img
 
-    return __resize(img, w, h, method)
+    return resize(img, w, h, method)
 
 
-def __make_power_2(img, base, method=None):
+def make_power_2(img, base, method=None):
     ow, oh = image_size(img)
     h = int(round(oh / base) * base)
     w = int(round(ow / base) * base)
@@ -715,11 +726,11 @@ def __make_power_2(img, base, method=None):
     if not method:
         method = get_default_imethod(image_type(img))
 
-    __print_size_warning(ow, oh, w, h, base)
-    return __resize(img, w, h, method)
+    print_size_warning(ow, oh, w, h, base)
+    return resize(img, w, h, method)
 
 
-def __modcrop(img, scale, img_type=None):
+def modcrop(img, scale, img_type=None):
     """Modulo crop images, removing the remainder of 
         dividing each dimension by a scale factor.
     Args:
@@ -737,14 +748,14 @@ def __modcrop(img, scale, img_type=None):
     if h == oh and w == ow:
         return img
 
-    __print_size_warning(ow, oh, ow-w, oh-h, scale)
+    print_size_warning(ow, oh, ow-w, oh-h, scale)
     if img_type == 'pil':
         return img.crop((0, 0, ow-w, oh-h))
     else:
         return img[0:oh-h, 0:ow-w, ...]
 
 
-def __padbase(img, base, img_type=None):
+def padbase(img, base, img_type=None):
     if not img_type:
         img_type = image_type(img)
     ow, oh = image_size(img)
@@ -754,7 +765,7 @@ def __padbase(img, base, img_type=None):
     if ph == oh and pw == ow:
         return img
 
-    __print_size_warning(ow, oh, pw, ph, base)
+    print_size_warning(ow, oh, pw, ph, base)
     if img_type == 'pil':
         # Note: with PIL if crop sizes > sizes, it adds black padding
         return img.crop((0, 0, pw, ph))
@@ -762,7 +773,7 @@ def __padbase(img, base, img_type=None):
         return transforms.Pad(padding=(0, ph-oh, 0, pw-ow))(img)
 
 
-def __scale_width(img, target_size, crop_size, method=None):
+def scale_width(img, target_size, crop_size, method=None):
     ow, oh = image_size(img)
     if ow == target_size and oh >= crop_size:
         return img
@@ -772,10 +783,10 @@ def __scale_width(img, target_size, crop_size, method=None):
 
     w = target_size
     h = int(max(target_size * oh / ow, crop_size))
-    return __resize(img, w, h, method)
+    return resize(img, w, h, method)
 
 
-def __scale_height(img, target_size, crop_size, method=None):
+def scale_height(img, target_size, crop_size, method=None):
     ow, oh = image_size(img)
     if oh == target_size and ow >= crop_size:
         return img
@@ -785,10 +796,10 @@ def __scale_height(img, target_size, crop_size, method=None):
 
     h = target_size
     w = int(max(target_size * ow / oh, crop_size))
-    return __resize(img, w, h, method)
+    return resize(img, w, h, method)
 
 
-def __scale_shortside(img, target_width, method=None):
+def scale_shortside(img, target_width, method=None):
     ow, oh = image_size(img)
     ss, ls = min(ow, oh), max(ow, oh)  # shortside and longside
     width_is_shorter = ow == ss
@@ -800,10 +811,10 @@ def __scale_shortside(img, target_width, method=None):
 
     ls = int(target_width * ls / ss)
     nw, nh = (ss, ls) if width_is_shorter else (ls, ss)
-    return __resize(img, nw, nh, method)
+    return resize(img, nw, nh, method)
 
 
-def __crop(img, pos, size, img_type=None):
+def crop(img, pos, size, img_type=None):
     if not img_type:
         img_type = image_type(img)
     ow, oh = image_size(img)
@@ -817,7 +828,7 @@ def __crop(img, pos, size, img_type=None):
     return img
 
 
-def __flip(img, flip, img_type=None):
+def flip(img, flip, img_type=None):
     if not img_type:
         img_type = image_type(img)
 
@@ -829,7 +840,7 @@ def __flip(img, flip, img_type=None):
     return img
 
 
-def __rotate90(img, rotate, vflip=None, img_type=None):
+def rotate90(img, rotate, vflip=None, img_type=None):
     if not img_type:
         img_type = image_type(img)
 
@@ -847,15 +858,15 @@ def __rotate90(img, rotate, vflip=None, img_type=None):
     return img
 
 
-def __print_size_warning(ow, oh, w, h, base=4):
+def print_size_warning(ow, oh, w, h, base=4):
     """Print warning information about image size(only print once)"""
-    if not hasattr(__print_size_warning, 'has_printed'):
+    if not hasattr(print_size_warning, 'has_printed'):
         print("The image size needs to be a multiple of {}. "
               "The loaded image size was ({}, {}), so it was adjusted to "
               "({}, {}). This adjustment will be done to all images "
               "whose sizes are not multiples of {}.".format(base,
               ow, oh, w, h, base))
-        __print_size_warning.has_printed = True
+        print_size_warning.has_printed = True
 
 
 
@@ -883,6 +894,19 @@ def image_size(img, img_type=None):
         return img.size
     elif img_type == 'cv2':
         return (img.shape[1], img.shape[0])
+    else:
+        raise Exception("Unrecognized image type")
+
+def image_channels(img, img_type=None):
+    if not img_type:
+        img_type = image_type(img)
+    if img_type == 'pil':
+        return len(img.getbands())
+    elif img_type == 'cv2':
+        if len(img.shape) == 2:
+            return 1
+        else:
+            return img.shape[2]
     else:
         raise Exception("Unrecognized image type")
 
@@ -934,6 +958,7 @@ def scale_opt(opt, scale):
     scaled_opt['crop_size'] = int(scale * scaled_opt['crop_size']) if scaled_opt['crop_size'] else None
     return scaled_opt
 
+
 def random_downscale_B(img_A, img_B, opt):
     crop_size = opt.get('crop_size')
     scale = opt.get('scale')
@@ -947,20 +972,37 @@ def random_downscale_B(img_A, img_B, opt):
             hr_downscale_amt = random.choice(hr_downscale_amt)
         w, h = image_size(img_B)  # shape 1, 0
         w_A, h_A = image_size(img_A)
+
+        if opt.get('pre_crop', False):
+            # speed up downscaling by cropping first
+            pc = PreCrop(img_A, img_B, scale, int(hr_downscale_amt*crop_size))
+            img_Al, img_Bl = pc(img_A, img_B)
+            img_A, img_B = img_Al[0], img_Bl[0]
+            w, h = image_size(img_B)
+            w_A, h_A = image_size(img_A)
+
         # will ignore if 1 or if result is smaller than crop size
         if hr_downscale_amt > 1 and h//hr_downscale_amt >= crop_size and w//hr_downscale_amt >= crop_size:
             if opt.get('img_loader', None) == 'pil':
                 # TODO: simple solution for PIL, but limited
                 img_B = transforms.Resize(
-                    (h//hr_downscale_amt, w//hr_downscale_amt), interpolation=default_int_method)(img_B)
+                    (int(h//hr_downscale_amt), int(w//hr_downscale_amt)), 
+                    interpolation=default_int_method)(img_B)
             else:
                 img_B, _ = Scale(img=img_B, scale=hr_downscale_amt, algo=ds_algo)
-            img_B = __padbase(img_B, base=scale)
+            img_B = make_power_2(img_B, base=4*scale)
             # Downscales LR to match new size of HR if scale does not match after
             w, h = image_size(img_B)
-            if img_A is not None and (h // scale != h_A or w // scale != w_A):
-                img_A = transforms.Resize(
-                    (int(h//scale), int(w//scale)), interpolation=default_int_method)(img_A)
+            if img_A is not None:  # and (h // scale != h_A or w // scale != w_A):
+                # TODO: simple solution for PIL, but limited
+                if opt.get('img_loader', None) == 'pil':
+                    img_A = transforms.Resize(
+                        # (int(h//scale), int(w//scale)),
+                        (int(h_A//hr_downscale_amt), int(w_A//hr_downscale_amt)),
+                        interpolation=default_int_method)(img_A)
+                else:
+                    img_A, _ = Scale(img=img_A, scale=hr_downscale_amt, algo=ds_algo)
+                img_A = make_power_2(img_A, base=4*scale)
 
     return img_A, img_B
 
@@ -977,7 +1019,7 @@ def shape_change_fn(img_A, img_B, opt, scale, default_int_method):
     w_A, h_A = image_size(img_A)
     if h//h_A != w//w_A:
         # make B power2 or padbase before calculating, else dimensions won't fit
-        img_B = __padbase(img_B, base=scale)
+        img_B = make_power_2(img_B, base=scale)
         w, h = image_size(img_B)
 
         shape_change = opt.get('shape_change', 'reshape_lr')
@@ -995,6 +1037,13 @@ def shape_change_fn(img_A, img_B, opt, scale, default_int_method):
         else:
             # generate new A from B
             img_A = img_B
+
+    # fix LR if at wrong scale (should be 1 or scale at this point)
+    w, h = image_size(img_B)
+    w_A, h_A = image_size(img_A)
+    if not (h//h_A == scale or w//w_A == scale) and not (h//h_A == 1 or w//w_A == 1):
+        img_A = transforms.Resize((int(h/scale), int(w/scale)),
+                        interpolation=default_int_method)(img_A)
 
     return img_A, img_B
 
@@ -1042,24 +1091,83 @@ def dim_change_fn(img_A, img_B, opt, scale, default_int_method,
 
     return img_A, img_B
 
-def generate_A_fn(img_A, img_B, opt, scale, default_int_method, ds_kernels):
-    """ Generate A (from B) during training if:
+# TODO: could use in paired_imgs_check() instead of inside the functions?
+class PreCrop:
+    def __init__(self, img_A, img_B, scale, B_crop_size):
+        w_B, h_B = image_size(img_B)
+        w_A, h_A = image_size(img_A)
+        if w_B == w_A and h_B == h_A:
+            scale = 1
+            A_crop_size = B_crop_size
+        else:
+            ims = w_B // w_A
+            scale = ims if ims != scale else scale
+            A_crop_size = B_crop_size // scale
+        
+        x_A = random.randint(0, max(0, w_A - A_crop_size))
+        y_A = random.randint(0, max(0, h_A - A_crop_size))
+        
+        x_B, y_B = int(x_A * scale), int(y_A * scale)
+
+        self.crop_params = {'pos_A': (x_A, y_A),
+                            'A_crop_size': A_crop_size,
+                            'pos_B': (x_B, y_B),
+                            'B_crop_size': B_crop_size}
+
+    def __call__(self, img_A=None, img_B=None):
+        B_rlt = []
+        A_rlt = []
+        
+        if img_B is not None:
+            if not isinstance(img_B, list):
+                img_B = [img_B]
+            for B in img_B:
+                B = crop(B, self.crop_params['pos_B'], 
+                        self.crop_params['B_crop_size'], img_type=None)
+                B_rlt.append(B)
+
+        if img_A is not None:
+            if not isinstance(img_A, list):
+                img_A = [img_A]
+            for A in img_A:
+                A = crop(A, self.crop_params['pos_A'], 
+                        self.crop_params['A_crop_size'], img_type=None)
+                A_rlt.append(A)
+        return A_rlt, B_rlt
+
+
+def generate_A_fn(img_A, img_B, opt, scale, default_int_method,
+        crop_size, A_crop_size, ds_kernels):
+    """ Generate A (from B if needed) during training if:
         - dataset A is not provided (img_A = img_B)
         - dataset A is not in the correct scale
-        - Also to check if A is not at the correct scale already (if img_A was changed to img_B)
+        - Also to check if A is not at the correct scale already (ie. if img_A was changed to img_B)
     """
     #TODO: test to be removed
     # img_A = img_B
 
     w, h = image_size(img_B)
     w_A, h_A = image_size(img_A)
+    
+    # TODO: validate, to fix potential cases with rounding errors (hr_downscale, etc), should not be needed
+    if abs(h_A*scale - h) <= 8 or abs(w_A*scale - w) <= 8:
+        img_A = transforms.Resize((h//scale, w//scale), 
+                interpolation=default_int_method)(img_A)
+        w_A, h_A = image_size(img_A)
+
     # if h_A != A_crop_size or w_A != A_crop_size:
     if h_A != h//scale or w_A != w//scale:
         #TODO: make B and A power2 or padbase before calculating, else dimensions won't fit
-        img_B = __padbase(img_B, base=scale)
-        img_A = __padbase(img_A, base=scale)
+        img_B = make_power_2(img_B, base=scale)
+        img_A = make_power_2(img_A, base=scale)
+
+        if opt.get('pre_crop', False):
+            # speed up A downscaling by cropping first
+            pc = PreCrop(img_A, img_B, scale, crop_size)
+            img_Al, img_Bl = pc(img_A, img_B)
+            img_A, img_B = img_Al[0], img_Bl[0]
+
         w, h = image_size(img_B)
-        w_A, h_A = image_size(img_A)
         ds_algo = 777  # default to matlab-like bicubic downscale
         if opt.get('lr_downscale', None): # if manually set and scale algorithms are provided, then:
             ds_algo  = opt.get('lr_downscale_types', 777)
@@ -1078,7 +1186,7 @@ def generate_A_fn(img_A, img_B, opt, scale, default_int_method, ds_kernels):
         else:
             img_A, _ = Scale(img=img_A, scale=scale, algo=ds_algo, ds_kernel=ds_kernel)
 
-    return img_A
+    return img_A, img_B
 
 def get_ds_kernels(opt):
     """ kernelGAN estimated kernels """
