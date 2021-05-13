@@ -37,12 +37,8 @@ def create_dataset(dataset_opt: dict) -> torch.utils.data.Dataset:
     mode = dataset_opt['mode']
     if mode == 'LR':
         from data.LR_dataset import LRDataset as D
-    elif mode == 'LRHR':
-        from data.LRHR_dataset import LRHRDataset as D
-    elif mode == 'LRHROTF':
-        from data.LRHROTF_dataset import LRHRDataset as D
-    elif mode == 'LRHRC':
-        from data.LRHRC_dataset import LRHRDataset as D
+    elif mode in ['aligned', 'LRHR', 'LRHROTF', 'LRHRC']:
+        from data.aligned_dataset import AlignedDataset as D
     elif mode == 'LRHRseg_bg':
         from data.LRHR_seg_bg_dataset import LRHRSeg_BG_Dataset as D
     elif mode == 'VLRHR':
@@ -55,8 +51,6 @@ def create_dataset(dataset_opt: dict) -> torch.utils.data.Dataset:
         from data.DVD_dataset import DVDDataset as D
     elif mode == 'DVDI':
         from data.DVD_dataset import DVDIDataset as D
-    elif mode == 'aligned':
-        from data.aligned_dataset import AlignedDataset as D
     elif mode == 'unaligned':
         from data.unaligned_dataset import UnalignedDataset as D
     else:

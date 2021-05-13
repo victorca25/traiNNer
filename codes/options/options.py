@@ -141,7 +141,8 @@ def parse(opt_path: str, is_train: bool = True) -> NoneDict:
                         path or a list of paths are supported.".format(type(image_paths)))
         dataset['data_type'] = 'lmdb' if is_lmdb else 'img'
 
-        if dataset.get('HR_size', None):
+        HR_size = dataset.get('HR_size', None)
+        if HR_size:
             dataset['crop_size'] = HR_size
 
         if phase == 'train':

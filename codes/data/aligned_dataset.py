@@ -19,7 +19,7 @@ from dataops.augmentations import get_params, image_size, image_channels, scale_
 from dataops.augmentations import random_rotate_pairs  # TMP
 
 
-class LRHRDataset(BaseDataset):
+class AlignedDataset(BaseDataset):
     """A dataset class for paired image dataset.
     It can work with either a single dataroot directory that contains single images 
     pairs in the form of {A,B} or one directory for images in the A domain (dataroot_A
@@ -34,7 +34,7 @@ class LRHRDataset(BaseDataset):
         Parameters:
             opt (Option dictionary) -- stores all the experiment flags
         """
-        super(LRHRDataset, self).__init__(opt, keys_ds=['LR','HR'])
+        super(AlignedDataset, self).__init__(opt, keys_ds=['LR','HR'])
         # self.opt = opt
         # self.paths_LR, self.paths_HR = None, None
         self.LR_env, self.HR_env = None, None  # environment for lmdb
