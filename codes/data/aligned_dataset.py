@@ -14,7 +14,7 @@ from data.base_dataset import BaseDataset, get_dataroots_paths, read_imgs_from_p
 
 from dataops.augmentations import generate_A_fn, image_type, get_default_imethod, dim_change_fn, shape_change_fn, random_downscale_B
 from dataops.augmentations import get_unpaired_params, get_augmentations, get_totensor_params, get_totensor
-from dataops.augmentations import get_ds_kernels, get_noise_patches
+from dataops.augmentations import set_transforms, get_ds_kernels, get_noise_patches
 from dataops.augmentations import get_params, image_size, image_channels, scale_params, scale_opt, get_transform
 from dataops.augmentations import random_rotate_pairs  # TMP
 
@@ -41,6 +41,7 @@ class AlignedDataset(BaseDataset):
         self.vars = opt.get('outputs', 'LRHR')  #'AB'
         self.ds_kernels = get_ds_kernels(opt)
         self.noise_patches = get_noise_patches(opt)
+        set_transforms(opt.get('img_loader', 'cv2'))
 
         # get images paths (and optional environments for lmdb) from dataroots
         self.paths_LR, self.paths_HR = get_dataroots_paths(opt, strict=False, keys_ds=self.keys_ds)
@@ -61,11 +62,9 @@ class AlignedDataset(BaseDataset):
             B_paths (str): paths B images (can be same as A_paths if 
                 using single images)
         """
-        HR_path, LR_path = None, None
-        scale = self.opt.get('scale', 4)
+        scale = self.opt.get('scale')
         crop_size = self.opt.get('crop_size', 128)
-        if crop_size:
-            A_crop_size = crop_size // scale
+        A_crop_size = crop_size // scale if crop_size else None
 
         ######## Read the images ########
         img_LR, img_HR, LR_path, HR_path = read_imgs_from_path(

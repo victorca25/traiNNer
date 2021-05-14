@@ -970,6 +970,9 @@ def random_downscale_B(img_A, img_B, opt):
         hr_downscale_amt  = opt.get('hr_downscale_amt', 2)
         if isinstance(hr_downscale_amt, list):
             hr_downscale_amt = random.choice(hr_downscale_amt)
+        if hr_downscale_amt <= 1:
+            return img_A, img_B
+
         w, h = image_size(img_B)  # shape 1, 0
         w_A, h_A = image_size(img_A)
 
@@ -1003,6 +1006,12 @@ def random_downscale_B(img_A, img_B, opt):
                 else:
                     img_A, _ = Scale(img=img_A, scale=hr_downscale_amt, algo=ds_algo)
                 img_A = make_power_2(img_A, base=4*scale)
+            
+                # fix cases with rounding errors with some scales
+                w_A, h_A = image_size(img_A)
+                if abs(h_A*scale - h) <= 8*scale or abs(w_A*scale - w) <= 8*scale:
+                    img_A = transforms.Resize((h//scale, w//scale), 
+                            interpolation=default_int_method)(img_A)
 
     return img_A, img_B
 
@@ -1150,10 +1159,10 @@ def generate_A_fn(img_A, img_B, opt, scale, default_int_method,
     w_A, h_A = image_size(img_A)
     
     # TODO: validate, to fix potential cases with rounding errors (hr_downscale, etc), should not be needed
-    if abs(h_A*scale - h) <= 8 or abs(w_A*scale - w) <= 8:
-        img_A = transforms.Resize((h//scale, w//scale), 
-                interpolation=default_int_method)(img_A)
-        w_A, h_A = image_size(img_A)
+    # if abs(h_A*scale - h) <= 40 or abs(w_A*scale - w) <= 40:
+    #     img_A = transforms.Resize((h//scale, w//scale), 
+    #             interpolation=default_int_method)(img_A)
+    #     w_A, h_A = image_size(img_A)
 
     # if h_A != A_crop_size or w_A != A_crop_size:
     if h_A != h//scale or w_A != w//scale:

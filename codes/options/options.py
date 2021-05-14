@@ -148,6 +148,7 @@ def parse(opt_path: str, is_train: bool = True) -> NoneDict:
         if phase == 'train':
             preprocess = dataset.get('preprocess', None)
             if preprocess is not None:
+                crop_size = dataset.get('crop_size', None)
                 aspect_ratio = dataset.get('aspect_ratio', None)
                 load_size = dataset.get('load_size', None)
                 center_crop_size = dataset.get('center_crop_size', None)
@@ -157,8 +158,13 @@ def parse(opt_path: str, is_train: bool = True) -> NoneDict:
                     'scale_height' in preprocess or
                     'scale_shortside' in preprocess):
                     assert load_size, "load_size not defined"
+                    if crop_size:
+                        # crop_size should be smaller than the size of loaded image
+                        assert(load_size >= crop_size)
                 if 'center_crop' in preprocess:
                     assert center_crop_size, "center_crop_size not defined"
+                    if crop_size:
+                        assert(center_crop_size >= crop_size)
                 if 'fixed' in preprocess:
                     assert aspect_ratio, "aspect_ratio not defined"
 

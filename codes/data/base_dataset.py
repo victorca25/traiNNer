@@ -248,7 +248,7 @@ def read_imgs_from_path(opt, index, paths_A, paths_B, A_env, B_env):
     input_nc = opt.get('input_nc', image_channels)
     output_nc = opt.get('output_nc', image_channels)
     data_type = opt.get('data_type', 'img')
-    loader = opt.get('data_loader', 'cv2')
+    loader = opt.get('img_loader', 'cv2')
 
     # Check if A/LR Path is provided
     if paths_A:
