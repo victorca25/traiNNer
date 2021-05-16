@@ -864,7 +864,7 @@ def rotate90(img, rotate, vflip=None, img_type=None):
     return img
 
 
-def rotateHR(img, crop_size=None, rescale=1/4, angle=0, center=0,
+def rotateHR(img, crop_size=None, rescale=1/4, angle=None, center=0,
     img_type=None, crop=True, method=None):
     """Rotate the given image with the given rotation degree
         and crop the black edges
@@ -886,8 +886,11 @@ def rotateHR(img, crop_size=None, rescale=1/4, angle=0, center=0,
     if not method:
         method = get_default_imethod(image_type(img))
 
-    if angle == 0:
-        angle = int(random.uniform(-90, 90))
+    if not angle or angle == 0:
+        if crop and crop_size:
+            return transforms.CenterCrop(crop_size)(img)
+        else:
+            return img
 
     #TODO: add @preserve_shape wrapper to cv2 RandomRotation's function
     rrot = transforms.RandomRotation(

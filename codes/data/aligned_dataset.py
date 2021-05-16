@@ -1,12 +1,10 @@
-import os.path
-import random
-import numpy as np
-import cv2
-import torch
+# import os.path
+# import random
+# import numpy as np
+# import cv2
+# import torch
 import dataops.common as util
 
-# import dataops.augmentations as augmentations #TMP
-# from dataops.augmentations import Scale, MLResize, RandomQuantize, KernelDownscale, NoisePatches, RandomNoisePatches, get_resize, get_blur, get_noise, get_pad
 # from dataops.debug import tmp_vis, describe_numpy, describe_tensor
 
 # import dataops.opencv_transforms.opencv_transforms as transforms
@@ -16,7 +14,6 @@ from dataops.augmentations import generate_A_fn, image_type, get_default_imethod
 from dataops.augmentations import get_unpaired_params, get_augmentations, get_totensor_params, get_totensor
 from dataops.augmentations import set_transforms, get_ds_kernels, get_noise_patches
 from dataops.augmentations import get_params, image_size, image_channels, scale_params, scale_opt, get_transform
-from dataops.augmentations import random_rotate_pairs  # TMP
 
 
 class AlignedDataset(BaseDataset):
