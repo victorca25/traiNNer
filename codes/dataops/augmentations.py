@@ -1,9 +1,7 @@
 import random
-import argparse
 
 import os
-import os.path
-import sys
+# import os.path
 import glob
 
 import numpy as np
@@ -14,11 +12,9 @@ from dataops.minisom import MiniSom
 from dataops.debug import *
 from dataops.imresize import resize as imresize  # resize # imresize_np
 
-import dataops.opencv_transforms.opencv_transforms as transforms
+# import dataops.opencv_transforms.opencv_transforms as transforms
 from dataops.opencv_transforms.opencv_transforms.common import wrap_cv2_function, wrap_pil_function
 from torch.utils.data.dataset import Dataset #TODO TMP, move NoisePatches to a separate dataloader
-
-# from dataops.augmentations import Scale, get_blur, get_noise, get_pad, translate_chan, NoisePatches, KernelDownscale, RandomQuantize, RandomNoisePatches #, MLResize, RandomQuantize, KernelDownscale, NoisePatches, RandomNoisePatches, get_resize, get_blur, get_noise, get_pad
 
 
 
@@ -63,7 +59,7 @@ _n_interpolation_to_str = {
 
 def Scale(img=None, scale: int = None, algo=None, ds_kernel=None, resize_type=None):
 
-    ow, oh = img.shape[0], img.shape[1]
+    ow, oh = image_size(img)
     ## original rounds down:
     # w = int(oh/scale)
     # h = int(ow/scale)
@@ -78,9 +74,9 @@ def Scale(img=None, scale: int = None, algo=None, ds_kernel=None, resize_type=No
     return resize(np.copy(img)), resize_type
 
 
-class MLResize(object):
+class MLResize:
     """Resize the input numpy ndarray to the given size using the Matlab-like
-    algorithm (warning an order of magnitude slower than OpenCV).
+    algorithm (warning: an order of magnitude slower than OpenCV).
 
     Args:
         scale (sequence or int): Desired amount to scale the image. 
@@ -261,8 +257,7 @@ def get_noise(noise_types: list = [], noise_patches=None, noise_amp: int=1):
     return noise
 
 def get_pad(img, size: int, fill = 0, padding_mode: str ='constant'):
-    #TODO: update to work with PIL as well with image_size(img)
-    h, w = img.shape[0], img.shape[1]
+    w, h = image_size(img)
 
     if fill == 'random':
         fill_list = []
@@ -281,7 +276,7 @@ def get_pad(img, size: int, fill = 0, padding_mode: str ='constant'):
 
 
 
-class RandomQuantize(object):
+class RandomQuantize:
     r"""Color quantization using MiniSOM
     Args:
         img (numpy ndarray): Image to be quantized.
@@ -352,7 +347,7 @@ class RandomQuantize(object):
         return self.__class__.__name__ + '(p={})'.format(self.p)
 
 
-class KernelDownscale(object):
+class KernelDownscale:
     '''
     Use the previously extracted realistic kernels to downscale images with
 
@@ -422,7 +417,6 @@ class KernelDownscale(object):
 
 
 
-# class NoisePatches(Object):
 class NoisePatches(Dataset):
     '''
     Load the previously noise patches from real images to apply to the LR images
@@ -565,7 +559,6 @@ def get_default_imethod(img_type='cv2'):
         return "BICUBIC"
 
 
-# TODO: change HR_size to crop_size during parsing in options.py
 def get_transform(opt, params=None, grayscale=False, method=None,
                         preprocess_mode=None):
     """
@@ -686,7 +679,6 @@ def get_transform(opt, params=None, grayscale=False, method=None,
     elif opt.get('use_rot', None):
         if params is None:
             if random.random() < 0.5:
-                #TODO: degrees=(min, max)
                 transform_list.append(
                     transforms.RandomRotation(degrees=(90,90)))
         elif params['rot']:
@@ -775,7 +767,6 @@ def padbase(img, base, img_type=None):
     ow, oh = image_size(img)
     ph = ((oh - 1) // base + 1) * base
     pw = ((ow - 1) // base + 1) * base
-    # padding = (0, pw - ow, 0, ph - oh)
     if ph == oh and pw == ow:
         return img
 
@@ -784,6 +775,7 @@ def padbase(img, base, img_type=None):
         # Note: with PIL if crop sizes > sizes, it adds black padding
         return img.crop((0, 0, pw, ph))
     else:
+        #TODO: test if correct-> # padding = (0, pw - ow, 0, ph - oh)
         return transforms.Pad(padding=(0, ph-oh, 0, pw-ow))(img)
 
 
@@ -961,8 +953,6 @@ def get_crop_pos_rot(h, w, angle):
         # fully constrained case: crop touches all 4 sides
         cos_2a = cos_a*cos_a - sin_a*sin_a
         wr, hr = (w*cos_a - h*sin_a)/cos_2a, (h*cos_a - w*sin_a)/cos_2a
-    # return int(wr/2), int(hr/2)
-    # return int(wr), int(hr)
     return (wr), (hr)
 
 
@@ -1274,7 +1264,7 @@ def generate_A_fn(img_A, img_B, opt, scale, default_int_method,
 
     # if h_A != A_crop_size or w_A != A_crop_size:
     if h_A != h//scale or w_A != w//scale:
-        #TODO: make B and A power2 or padbase before calculating, else dimensions won't fit
+        # make B and A power2 or padbase before calculating, else dimensions won't fit
         img_B = make_power_2(img_B, base=scale)
         img_A = make_power_2(img_A, base=scale)
 
@@ -2534,289 +2524,3 @@ def unsharp_mask(img, blur_algo='median', kernel_size=None, strength=None, unsha
     
     return img_out
 
-
-
-def random_img(img_dir, save_path, crop_size=(128, 128), scale=1, blur_algos=['clean'], noise_types=['clean'], noise_types2=['clean']):
-    img_list = _get_paths_from_dir(img_dir)
-    
-    random_img_path = random.choice(img_list)
-    
-    env = None
-    img = util.read_img(env, random_img_path) #read image from path, opens with OpenCV, value ranges from 0 to 1
-    
-    img_crop = random_crop(img, crop_size)
-    print(img_crop.shape)
-    #"""
-    cv2.imwrite(save_path+'/crop_.png',img_crop*255) 
-    #"""
-    
-    img_resize, _ = resize_img(img, crop_size)
-    print(img_resize.shape)
-    #"""
-    cv2.imwrite(save_path+'/resize_.png',img_resize*255) 
-    #"""
-    
-    img_random_resize, _ = random_resize_img(img, crop_size)
-    print(img_random_resize.shape)
-    #"""
-    cv2.imwrite(save_path+'/random_resize_.png',img_random_resize*255) 
-    #"""
-    
-    img_cutout = cutout(img, img.shape[0] // 2)
-    print(img_cutout.shape)
-    #"""
-    cv2.imwrite(save_path+'/cutout_.png',img_cutout*255) 
-    #"""
-    
-    img_erasing = random_erasing(img)
-    print(img_erasing.shape)
-    #"""
-    cv2.imwrite(save_path+'/erasing_.png',img_erasing*255) 
-    #"""
-    
-    #scale = 4
-    img_scale, interpol_algo = scale_img(img, scale)
-    print(img_scale.shape)    
-    #"""
-    cv2.imwrite(save_path+'/scale_'+str(scale)+'_'+str(interpol_algo)+'_.png',img_scale*255) 
-    #"""
-    
-    img_blur, blur_algo, blur_kernel_size = blur_img(img, blur_algos)
-    print(img_blur.shape)
-    #"""
-    cv2.imwrite(save_path+'/blur_'+str(blur_kernel_size)+'_'+str(blur_algo)+'_.png',img_blur*255) 
-    #"""
-    
-    img_noise, noise_algo = noise_img(img, noise_types)
-    print(img_noise.shape)
-    #"""
-    cv2.imwrite(save_path+'/noise_'+str(noise_algo)+'_.png',img_noise*255) 
-    #"""
-    
-    #img_noise2, noise_algo2 = noise_img(img_noise, noise_types2)
-    #print(img_noise2.shape)
-    #"""
-    #cv2.imwrite(save_path+'/noise2_'+str(noise_algo2)+'_.png',img_noise2*255) 
-    #"""
-    
-    img_rrot, angle = random_rotate(img)
-    print(img_rrot.shape)
-    #"""
-    cv2.imwrite(save_path+'/rrot_'+str(angle)+'_.png',img_rrot*255) 
-    #"""
-    
-    print('Finished')
-    
-
-def single_image(img_path, save_path, crop_size=(128, 128), scale=1, blur_algos=['clean'], noise_types=['clean'], noise_types2=['clean']):
-    env = None
-    img = util.read_img(env, img_path) #read image from path, opens with OpenCV, value ranges from 0 to 1
-    print(img.shape)
-    
-    img_crop = random_crop(img, crop_size)
-    print(img_crop.shape)
-    #"""
-    cv2.imwrite(save_path+'/crop_.png',img_crop*255) 
-    #"""
-    
-    img_resize, _ = resize_img(img, crop_size)
-    print(img_resize.shape)
-    #"""
-    cv2.imwrite(save_path+'/resize_.png',img_resize*255) 
-    #"""
-    
-    img_random_resize, _ = random_resize_img(img, crop_size)
-    print(img_random_resize.shape)
-    #"""
-    cv2.imwrite(save_path+'/random_resize_.png',img_random_resize*255) 
-    #"""
-    
-    img_cutout = cutout(img, img.shape[0] // 2)
-    print(img_cutout.shape)
-    #"""
-    cv2.imwrite(save_path+'/cutout_.png',img_cutout*255) 
-    #"""
-    
-    img_erasing = random_erasing(img)
-    print(img_erasing.shape)
-    #"""
-    cv2.imwrite(save_path+'/erasing_.png',img_erasing*255) 
-    #"""
-    
-    #scale = 4
-    img_scale, interpol_algo = scale_img(img, scale)
-    print(img_scale.shape)    
-    #"""
-    cv2.imwrite(save_path+'/scale_'+str(scale)+'_'+str(interpol_algo)+'_.png',img_scale*255) 
-    #"""
-    
-    img_blur, blur_algo, blur_kernel_size = blur_img(img, blur_algos)
-    print(img_blur.shape)
-    #"""
-    cv2.imwrite(save_path+'/blur_'+str(blur_kernel_size)+'_'+str(blur_algo)+'_.png',img_blur*255) 
-    #"""
-    
-    img_noise, noise_algo = noise_img(img, noise_types)
-    #img_noise, noise_algo = noise_img(img_scale, noise_types)
-    print(img_noise.shape)
-    #"""
-    cv2.imwrite(save_path+'/noise_'+str(noise_algo)+'_.png',img_noise*255) 
-    #"""
-    
-    img_noise2, noise_algo2 = noise_img(img_noise, noise_types2)
-    print(img_noise2.shape)
-    #"""
-    cv2.imwrite(save_path+'/noise2_'+str(noise_algo2)+'_.png',img_noise2*255) 
-    #"""
-    
-    img_rrot, angle = random_rotate(img)
-    print(img_rrot.shape)
-    #"""
-    cv2.imwrite(save_path+'/rrot_'+str(angle)+'_.png',img_rrot*255) 
-    #"""
-    
-    print('Finished')
-
-    
-def apply_dir(img_path, save_path, crop_size=(128, 128), scale=1, blur_algos=['clean'], noise_types=['clean'], noise_types2=['clean']):
-    img_list = _get_paths_from_dir(img_dir)
-    
-    for path in img_list:
-        rann = ''
-        env = None
-        img = util.read_img(env, path)
-        import uuid
-        rann = uuid.uuid4().hex
-
-        img_crop = random_crop(img, crop_size)
-        print(img_crop.shape)
-        #"""
-        cv2.imwrite(save_path+'/'+rann+'mask_.png',img_crop*255) 
-        #"""
-        
-        img_resize, _ = resize_img(img, crop_size)
-        print(img_resize.shape)
-        #"""
-        cv2.imwrite(save_path+'/'+rann+'resize_.png',img_resize*255) 
-        #"""
-        
-        img_random_resize, _ = random_resize_img(img, crop_size)
-        print(img_random_resize.shape)
-        #"""
-        cv2.imwrite(save_path+'/'+rann+'random_resize_.png',img_random_resize*255) 
-        #"""
-        
-        img_cutout = cutout(img, img.shape[0] // 2)
-        print(img_cutout.shape)
-        #"""
-        cv2.imwrite(save_path+'/'+rann+'cutout_.png',img_cutout*255) 
-        #"""
-        
-        img_erasing = random_erasing(img)
-        print(img_erasing.shape)
-        #"""
-        cv2.imwrite(save_path+'/'+rann+'erasing_.png',img_erasing*255) 
-        #"""
-        
-        #scale = 4
-        img_scale, interpol_algo = scale_img(img, scale)
-        print(img_scale.shape)    
-        #"""
-        cv2.imwrite(save_path+'/'+rann+'scale_'+str(scale)+'_'+str(interpol_algo)+'_.png',img_scale*255) 
-        #"""
-        
-        img_blur, blur_algo, blur_kernel_size = blur_img(img, blur_algos)
-        print(img_blur.shape)
-        #"""
-        cv2.imwrite(save_path+'/'+rann+'blur_'+str(blur_kernel_size)+'_'+str(blur_algo)+'_.png',img_blur*255) 
-        #cv2.imwrite(save_path+'/blur__.png',img_blur*255) 
-        #"""
-        
-        img_noise, noise_algo = noise_img(img, noise_types)
-        #img_noise, noise_algo = noise_img(img_scale, noise_types)
-        print(img_noise.shape)
-        #"""
-        cv2.imwrite(save_path+'/'+rann+'noise_'+str(noise_algo)+'_.png',img_noise*255) 
-        #"""
-        
-        img_noise2, noise_algo2 = noise_img(img_noise, noise_types2)
-        print(img_noise2.shape)
-        #"""
-        cv2.imwrite(save_path+'/'+rann+'noise2_'+str(noise_algo2)+'_.png',img_noise2*255) 
-        #"""
-        
-        img_rrot, angle = random_rotate(img)
-        print(img_rrot.shape)
-        #"""
-        cv2.imwrite(save_path+'/'+rann+'rrot_'+str(angle)+'_.png',img_rrot*255) 
-        #"""
-
-    print('Finished')
-
-
-if __name__ == '__main__':
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-mode', type=int, required=False, help='Select mode. 1: Single Image, 2: Random image from directory, 3: Full directory')
-    parser.add_argument('-img_dir', type=str, required=False, help='Image directory') 
-    parser.add_argument('-img_path', type=str, required=False, help='Single image path') 
-    parser.add_argument('-savepath', type=str, required=False, help='Save path') 
-    parser.add_argument('-scale', type=int, required=False, help='Scale to resize')
-    parser.add_argument('-crop', type=int, required=False, help='Crop size')
-    parser.add_argument('-blur', type=str, required=False, help='Blur algorithm') 
-    parser.add_argument('-noise', type=str, required=False, help='Noise algorithm') 
-    parser.add_argument('-noise2', type=str, required=False, help='Secondary noise algorithm') 
-    args = parser.parse_args()
-    print(args)
-    
-    if args.img_dir:
-        img_dir = args.img_dir
-        #print(": " + args.-)
-    else:
-        img_dir = "../../datasets"
-
-    if args.img_path:
-        img_path = args.img_path
-    else:
-        img_path = "../../datasets/0318.png"
-    
-    if args.savepath:
-        savepath = args.savepath
-    else:
-        savepath = "../../datasets/tests_otf/"
-    
-    if args.crop:
-        crop_size=(args.crop,args.crop)
-    else:
-        crop_size=(128, 128)
-    
-    if args.scale:
-        crop_size = args.scale
-    else:
-        scale = 4
-        
-    if args.blur:
-        blur_algos = [args.blur]
-    else:
-        blur_algos = ["average","box","gaussian","bilateral", "clean", "clean", "clean", "clean"]
-        
-    if args.noise:
-        noise_types = [args.noise]
-    else:
-        noise_types = ["gaussian", "gaussian", "JPEG", "JPEG", "quantize", "poisson", "dither", "s&p", "speckle", "clean", "clean", "clean", "clean"]
-    
-    if args.noise2:
-        noise_types2 = [args.noise2]
-    else:    
-        noise_types2 = ["JPEG", "clean", "clean", "clean"]
-    
-    #Select mode. 1: Single Image, 2: Random image from directory, 3: Full directory
-    if args.mode == 1:
-        single_image(img_path, savepath, crop_size, scale, blur_algos, noise_types, noise_types2) #take an image path and apply augmentations
-    elif args.mode == 2:
-        random_img(img_dir, savepath, crop_size, scale, blur_algos, noise_types, noise_types2) #take a random image from the directory and apply augmentations    
-    elif args.mode == 3:
-        apply_dir(img_dir, savepath, crop_size, scale, blur_algos, noise_types, noise_types2) #take a random image from the directory and apply augmentations
-    else:
-        print("Mode not selected, please select one of 1: Single Image, 2: Random image from directory, 3: Full directory")
-    
