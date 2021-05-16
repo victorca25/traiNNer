@@ -52,7 +52,7 @@
       // Rotations augmentations:
       , "use_flip": true //flip images 
       , "use_rot": true //rotate images in 90 degree angles
-      , "hr_rrot": false  //rotate images in random degress between -45 and 45
+      , "use_hrrot": false  //rotate images in random degress between -45 and 45
       
       // Noise and blur augmentations:
       , "lr_blur": false //true | false

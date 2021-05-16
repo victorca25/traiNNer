@@ -136,11 +136,6 @@ class AlignedDataset(BaseDataset):
             img_LR = A_transform(img_LR)
             img_HR = B_transform(img_HR)
 
-            #TODO: move to get_transform()
-            if self.opt.get('hr_rrot', None):
-                if random.random() > 0.5: # randomize the random rotations, so half the images are the original
-                    img_HR, img_LR = random_rotate_pairs(img_HR, img_LR, crop_size, scale)
-
             """
             # Final sizes checks
             # if the resulting HR image size so far is too large or too small, resize HR to the correct size and downscale to generate a new LR on the fly

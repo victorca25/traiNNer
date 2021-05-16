@@ -544,12 +544,16 @@ def get_params(opt, size):
     flip = random.random() > 0.5
     rot = random.random() > 0.5
     vflip = random.random() > 0.5
+    hrrot = random.random() > 0.5
+    angle = int(random.uniform(-90, 90))
 
     return {'load_size': load_size,
             'crop_pos': (x, y),
             'flip': flip,
             'rot': rot,
-            'vflip': vflip}
+            'vflip': vflip,
+            'hrrot': hrrot,
+            'angle': angle,}
 
 
 # TODO: could use the hasattr to set a value for all future calls
@@ -667,7 +671,19 @@ def get_transform(opt, params=None, grayscale=False, method=None,
             transform_list.append(transforms.Lambda(
                 lambda img: flip(img, params['flip'], img_type=img_type)))
 
-    if opt.get('use_rot', None):
+    # hrrot and regular rotation are mutually exclusive
+    if opt.get('use_hrrot', None) and params.get('hrrot', None):
+        if params['angle']:
+            if preprocess_mode == 'crop' or 'and_crop' in preprocess_mode:
+                cs = crop_size
+            else:
+                cs = None
+            transform_list.append(transforms.Lambda(
+                lambda img: rotateHR(
+                    img, crop_size=cs, rescale=1/4,
+                    angle=params['angle'], img_type=img_type,
+                    method=method)))
+    elif opt.get('use_rot', None):
         if params is None:
             if random.random() < 0.5:
                 #TODO: degrees=(min, max)
@@ -677,8 +693,6 @@ def get_transform(opt, params=None, grayscale=False, method=None,
             transform_list.append(transforms.Lambda(
                 lambda img: rotate90(
                     img, params['rot'], params['vflip'], img_type=img_type)))
-
-    #TODO: missing hrrot function or replacement
 
     return transforms.Compose(transform_list)
 
@@ -856,6 +870,100 @@ def rotate90(img, rotate, vflip=None, img_type=None):
             return np.rot90(img, 1) #img.transpose(1, 0, 2)
 
     return img
+
+
+def rotateHR(img, crop_size=None, rescale=1/4, angle=0, center=0,
+    img_type=None, crop=True, method=None):
+    """Rotate the given image with the given rotation degree
+        and crop the black edges
+    Args:
+        img: an image of arbitrary size.
+        crop_size: the size of the image after processing.
+        rescale: upscaling factor (4x) to use like HD Mode7 to reduce
+            jaggy lines after rotating, more accurate underlying
+            "sub-pixel" data.
+        angle: the degree of rotation on the image.
+        crop: crop image to remove black edges if it is True. Will
+            also expand image bounding box during rotation if True.
+    Returns:
+        A rotated image.
+    """
+    if not img_type:
+        img_type = image_type(img)
+
+    if not method:
+        method = get_default_imethod(image_type(img))
+
+    if angle == 0:
+        angle = int(random.uniform(-90, 90))
+
+    #TODO: add @preserve_shape wrapper to cv2 RandomRotation's function
+    rrot = transforms.RandomRotation(
+        degrees=(angle,angle), expand=crop, resample=method)
+
+    if rescale < 1:
+        # img, _ = Scale(img=img, scale=rescale, algo=cv2.INTER_CUBIC) #INTER_AREA #  cv2.INTER_LANCZOS4?
+        wr, hr = image_size(img)
+        img = transforms.Resize(
+                (int(hr//rescale), int(wr//rescale)),
+                interpolation=method)(img)
+
+    w, h = image_size(img)
+    img = rrot(img)
+    if img_type == 'cv2' and len(img.shape) == 2:
+        img = img[..., np.newaxis]
+
+    if crop:
+        x_A, y_A = get_crop_pos_rot(h, w, angle)
+        tw, th = image_size(img)
+
+        # for sin / cos option
+        y1 = (th+2)//2 - int(y_A/2)
+        y2 = y1 + int(y_A)
+        x1 = (tw+2)//2 - int(x_A/2)
+        x2 = x1 + int(x_A)
+
+        if img_type == 'pil':
+            img = img.crop((x1, y1, x2, y2))
+        else:
+            img = img[y1:y2, x1:x2, ...]
+
+    if rescale < 1:
+        # back to original size
+        if crop_size:
+            size = (crop_size, crop_size)
+        else:
+            size = (hr, wr)
+        img = transforms.Resize(
+            size, interpolation=method)(img)
+
+    return img
+
+def get_crop_pos_rot(h, w, angle):
+    """
+    Given a rectangle of size wxh that has been rotated by 'angle',
+    computes the width and height of the largest possible
+    axis-aligned rectangle (maximal area) within the rotated rectangle.
+    """
+    angle = angle * np.pi / 180  # to radians
+
+    width_is_longer = w >= h
+    long_side, short_side = (w,h) if width_is_longer else (h,w)
+    # since the solutions for angle, -angle and 180-angle are all the same,
+    # if suffices to look at the first quadrant and the absolute values of sin,cos:
+    sin_a, cos_a = abs(np.sin(angle)), abs(np.cos(angle))
+    if short_side <= 2.*sin_a*cos_a*long_side or abs(sin_a-cos_a) < 1e-10:
+        # half constrained case: two crop corners touch the longer side,
+        #   the other two corners are on the mid-line parallel to the longer line
+        x = 0.5 * short_side
+        wr, hr = (x/sin_a, x/cos_a) if width_is_longer else (x/cos_a, x/sin_a)
+    else:
+        # fully constrained case: crop touches all 4 sides
+        cos_2a = cos_a*cos_a - sin_a*sin_a
+        wr, hr = (w*cos_a - h*sin_a)/cos_2a, (h*cos_a - w*sin_a)/cos_2a
+    # return int(wr/2), int(hr/2)
+    # return int(wr), int(hr)
+    return (wr), (hr)
 
 
 def print_size_warning(ow, oh, w, h, base=4):
