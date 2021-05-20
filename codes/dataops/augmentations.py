@@ -13,7 +13,7 @@ from dataops.debug import *
 from dataops.imresize import resize as imresize  # resize # imresize_np
 
 # import dataops.opencv_transforms.opencv_transforms as transforms
-from dataops.opencv_transforms.opencv_transforms.common import wrap_cv2_function, wrap_pil_function
+from dataops.opencv_transforms.opencv_transforms.common import wrap_cv2_function, wrap_pil_function, _cv2_interpolation2str
 from torch.utils.data.dataset import Dataset #TODO TMP, move NoisePatches to a separate dataloader
 
 
@@ -135,16 +135,8 @@ def get_resize(size, scale=None, ds_algo=None, ds_kernel=None, resize_type=None)
         if ds_kernel:
             resize = ds_kernel
     else: # use the provided OpenCV2 algorithms
-        #TODO: tmp fix in case ds_kernel was not provided, default to something
-        if resize_type == 999:
-            #TODO: add a log message to explain ds_kernel is missing
-            resize_type = cv2.INTER_CUBIC
-        _cv2_interpolation_to_str = {cv2.INTER_NEAREST:'NEAREST',
-                                cv2.INTER_LINEAR:'BILINEAR',
-                                cv2.INTER_AREA:'AREA',
-                                cv2.INTER_CUBIC:'BICUBIC',
-                                cv2.INTER_LANCZOS4:'LANCZOS'}
-        resize = transforms.Resize(size, interpolation=_cv2_interpolation_to_str[resize_type]) #(np.copy(img_LR))
+        resize = transforms.Resize(size, 
+                interpolation=_cv2_interpolation2str.get(resize_type, 'BICUBIC'))
         # print('cv2')
 
     return resize, resize_type
@@ -352,76 +344,6 @@ class RandomQuantize:
 
     def __repr__(self):
         return self.__class__.__name__ + '(p={})'.format(self.p)
-
-
-class KernelDownscale:
-    '''
-    Use the previously extracted realistic kernels to downscale images with
-
-    Ref:
-    https://openaccess.thecvf.com/content_ICCV_2019/papers/Zhou_Kernel_Modeling_Super-Resolution_on_Real_Low-Resolution_Images_ICCV_2019_paper.pdf
-    https://openaccess.thecvf.com/content_CVPRW_2020/papers/w31/Ji_Real-World_Super-Resolution_via_Kernel_Estimation_and_Noise_Injection_CVPRW_2020_paper.pdf
-    '''
-    #TODO: can make this class into a pytorch dataloader, as an iterator can load all the kernels in init
-
-    def __init__(self, scale, kernel_paths, size=13, permute=True):
-        self.scale = 1.0/scale
-
-        # self.kernel_paths = glob.glob(os.path.join(opt['dataroot_kernels'], '*/*_kernel_x{}.npy'.format(scale)))
-        # using the modified kernelGAN file structure.
-        self.kernel_paths = glob.glob(os.path.join(kernel_paths, '*/kernel_x{}.npy'.format(scale)))
-        if not self.kernel_paths:
-            # try using the original kernelGAN file structure.
-            self.kernel_paths = glob.glob(os.path.join(kernel_paths, '*/*_kernel_x{}.npy'.format(scale)))
-        assert self.kernel_paths, "No kernels found for scale {} in path {}.".format(scale, kernel_paths)
-
-        self.num_kernel = len(self.kernel_paths)
-        # print('num_kernel: ', self.num_kernel)
-
-        if permute:
-            np.random.shuffle(self.kernel_paths)
-
-        # making sure the kernel size (receptive field) is 13x13 (https://arxiv.org/pdf/1909.06581.pdf)
-        self.pre_process = transforms.Compose([transforms.CenterCrop(size)])
-
-        # print(kernel_path)
-        # print(self.kernel.shape)
-
-    def __call__(self, img):
-
-        kernel_path = self.kernel_paths[np.random.randint(0, self.num_kernel)]
-        with open(kernel_path, 'rb') as f:
-            kernel = np.load(f)
-
-        kernel = self.pre_process(kernel)
-        # normalize to make cropped kernel sum 1 again
-        # kernel = kernel / np.sum(kernel)
-        kernel = kernel.astype(np.float32) / np.sum(kernel)
-        # print(kernel.shape)
-
-        input_shape = img.shape
-        # By default, if scale-factor is a scalar assume 2d resizing and duplicate it.
-        if isinstance(self.scale, (int, float)):
-            scale_factor = [self.scale, self.scale]
-        else:
-            scale_factor = self.scale
-
-        # if needed extend the size of scale-factor list to the size of the input 
-        # by assigning 1 to all the unspecified scales
-        if len(scale_factor) != len(input_shape):
-            scale_factor = list(scale_factor)
-            scale_factor.extend([1] * (len(input_shape) - len(scale_factor)))
-
-        # Dealing with missing output-shape. calculating according to scale-factor
-        output_shape = np.uint(np.ceil(np.array(input_shape) * np.array(scale_factor)))
-
-        # First run a correlation (convolution with flipped kernel)
-        out_im = cv2.filter2D(img, -1, kernel)
-
-        # Then subsample and return
-        return out_im[np.round(np.linspace(0, out_im.shape[0] - 1 / scale_factor[0], output_shape[0])).astype(int)[:, None],
-                np.round(np.linspace(0, out_im.shape[1] - 1 / scale_factor[1], output_shape[1])).astype(int), :]
-
 
 
 class NoisePatches(Dataset):
@@ -1298,7 +1220,7 @@ def generate_A_fn(img_A, img_B, opt, scale, default_int_method,
             print("LR image is too large, auto generating new LR")
 
         if opt.get('lr_downscale', None) and opt.get('dataroot_kernels', None) and 999 in opt["lr_downscale_types"]:
-            ds_kernel = ds_kernels #KernelDownscale(scale, kernel_paths, num_kernel)
+            ds_kernel = ds_kernels
         else:
             ds_kernel = None
 
@@ -1308,18 +1230,27 @@ def generate_A_fn(img_A, img_B, opt, scale, default_int_method,
         else:
             img_A = transforms.Resize(
                 (h//scale, w//scale), interpolation=default_int_method)(img_A)
-            
 
     return img_A, img_B
 
+
 def get_ds_kernels(opt):
-    """ kernelGAN estimated kernels """
+    """ 
+    Use the previously extracted realistic estimated kernels 
+        (kernelGAN, etc) to downscale images with.
+    Ref:
+        https://openaccess.thecvf.com/content_ICCV_2019/papers/Zhou_Kernel_Modeling_Super-Resolution_on_Real_Low-Resolution_Images_ICCV_2019_paper.pdf
+        https://openaccess.thecvf.com/content_CVPRW_2020/papers/w31/Ji_Real-World_Super-Resolution_via_Kernel_Estimation_and_Noise_Injection_CVPRW_2020_paper.pdf
+    """
     if opt.get('dataroot_kernels', None) and 999 in opt["lr_downscale_types"]:
-        ds_kernels = KernelDownscale(scale=opt.get('scale', 4), kernel_paths=opt['dataroot_kernels'])
+        #TODO: could make this class into a pytorch dataloader, as an iterator can load all the kernels in init
+        ds_kernels = transforms.ApplyKernel(
+            scale=opt.get('scale', 4), kernels_path=opt['dataroot_kernels'], pattern='kernelgan')
     else:
         ds_kernels = None
 
     return ds_kernels
+
 
 def get_noise_patches(opt):
     if opt['phase'] == 'train' and opt.get('lr_noise_types', 3) and "patches" in opt.get('lr_noise_types', {}):
