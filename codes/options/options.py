@@ -123,22 +123,22 @@ def parse(opt_path: str, is_train: bool = True) -> NoneDict:
         dataset['phase'] = phase
         dataset['scale'] = scale
         is_lmdb = False
-        image_paths = ["HR", "HR_bg", "LR", "A", "B", "AB", "lq", "gt", "ref"]
-        for key in image_paths:
-            image_paths = dataset.get('dataroot_' + key, None)
-            if image_paths is not None:
-                if isinstance(image_paths, str):
-                    is_lmdb = os.path.splitext(image_paths)[1].lower() == ".lmdb"
-                    image_paths = [image_paths]
-                if isinstance(image_paths, list):
-                    image_paths = [os.path.normpath(os.path.expanduser(path)) for path in image_paths]
-                    if len(image_paths) == 1:
+        image_path_keys = ["HR", "HR_bg", "LR", "A", "B", "AB", "lq", "gt", "ref"]
+        for key in image_path_keys:
+            image_path = dataset.get('dataroot_' + key, None)
+            if image_path is not None:
+                if isinstance(image_path, str):
+                    is_lmdb = os.path.splitext(image_path)[1].lower() == ".lmdb"
+                    image_path = [image_path]
+                if isinstance(image_path, list):
+                    image_path = [os.path.normpath(os.path.expanduser(path)) for path in image_path]
+                    if len(image_path) == 1:
                         # if it's a single-item list, act as if it was a str instead of a list
-                        image_paths = image_paths[0]
-                    dataset['dataroot_' + key] = image_paths
+                        image_path = image_path[0]
+                    dataset['dataroot_' + key] = image_path
                 else:
                     raise ValueError("Unexpected path type: {}. Either a single \
-                        path or a list of paths are supported.".format(type(image_paths)))
+                        path or a list of paths are supported.".format(type(image_path)))
         dataset['data_type'] = 'lmdb' if is_lmdb else 'img'
 
         HR_size = dataset.get('HR_size', None)
@@ -170,11 +170,10 @@ def parse(opt_path: str, is_train: bool = True) -> NoneDict:
 
             pre_crop = dataset.get('pre_crop', None)
             if scale !=1 and not pre_crop:
-                i2it_preprocess = ['scale_shortside', 'scale_height', 'scale_width', 'none']
                 if not preprocess:
                     dataset['preprocess'] = 'crop'
                 else:
-                    for popt in i2it_preprocess:
+                    for popt in ['scale_shortside', 'scale_height', 'scale_width', 'none']:
                         if popt in preprocess:
                             raise ValueError(f"Preprocess option {popt} can only be used with 1x scale.")
     

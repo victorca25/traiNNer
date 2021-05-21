@@ -31,6 +31,7 @@ datasets:
     n_workers: 4 # 0 to disable CPU multithreading, or an integrer representing CPU threads to use for dataloading
     batch_size: 8
     virtual_batch_size: 8
+    preprocess: crop # how to process the images after loading
     HR_size: 128 # patch size. Default: 128. Needs to be coordinated with the patch size of the features network
     image_channels: 3 # number of channels to load images in
     quant: 255 #32
@@ -38,7 +39,12 @@ datasets:
     # If manually configuring on the fly generation of LR: (else, it will automatically default to Matlab-like downscale algorithm (777) when/if required
     # dataroot_kernels: '../training/kernels/results/' # location of the image kernels extracted with KernelGAN, for use with the "realistic" downscale type
     # lr_downscale: true # false
-    # lr_downscale_types: ["linear", "cubic", "matlab_bicubic"] # select from ["nearest", "linear", "cubic", "area", "lanczos4", "linear_exact", "matlab_bicubic", "realistic"] #scale_algos #scaling interpolation options
+    # lr_downscale_types: ["linear", "cubic"] # scaling interpolation options. select from ['cv2_nearest', 'cv2_linear', 'cv2_area', 'cv2_cubic', 'cv2_lanczos4', 'cv2_linear_exact', 'linear', 'box' ,'lanczos2', 'lanczos3', 'bicubic', 'mitchell', 'hermite', 'lanczos4', 'lanczos5', 'bell', 'catrom', 'hanning', 'hamming', 'gaussian', 'sinc2', 'sinc3', 'sinc4', 'sinc5', 'blackman2', 'blackman3', 'blackman4', 'blackman5', 'realistic']
+
+    # Enable random downscaling of HR images (will fix LR pair to correct size)
+    # hr_downscale: true
+    # hr_downscale_amt: [2, 1.75, 1.5, 1]
+    # #pre_crop: true
 
     # Rotations augmentations:
     use_flip: true # flip images
