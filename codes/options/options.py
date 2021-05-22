@@ -176,13 +176,13 @@ def parse(opt_path: str, is_train: bool = True) -> NoneDict:
                     for popt in ['scale_shortside', 'scale_height', 'scale_width', 'none']:
                         if popt in preprocess:
                             raise ValueError(f"Preprocess option {popt} can only be used with 1x scale.")
-    
+
         if phase == 'train' and bm:
             # compatibility with other forks
             dataset['virtual_batch_size'] = bm * dataset["batch_size"]
         if dataset.get('virtual_batch_size', None):
             dataset['virtual_batch_size'] = max(dataset['virtual_batch_size'], dataset["batch_size"])
-        
+
         if phase == 'train' and 'subset_file' in dataset and dataset['subset_file'] is not None:
             dataset['subset_file'] = os.path.normpath(os.path.expanduser(dataset['subset_file']))
 
@@ -196,7 +196,7 @@ def parse(opt_path: str, is_train: bool = True) -> NoneDict:
         for k in ['lr_blur_types', 'lr_noise_types', 'lr_noise_types2', 'hr_noise_types']:
             if dataset.get(k, None):
                 dataset[k] = parse2lists(dataset[k])
-        
+
         tensor_shape = dataset.get('tensor_shape', None)
         if tensor_shape:
             opt['tensor_shape'] = tensor_shape
@@ -205,7 +205,7 @@ def parse(opt_path: str, is_train: bool = True) -> NoneDict:
     for key, path in opt['path'].items():
         if path and key in opt['path']:
             opt['path'][key] = os.path.normpath(os.path.expanduser(path))
-    
+
     if is_train:
         experiments_root = os.path.join(opt['path']['root'], 'experiments', opt['name'])
         opt['path']['experiments_root'] = experiments_root
@@ -253,7 +253,7 @@ def parse(opt_path: str, is_train: bool = True) -> NoneDict:
         if 'swa_start_iter_rel' in opt['train']:
             opt['train']['swa_start_iter'] = int(opt['train']['swa_start_iter_rel'] * niter)
             opt['train'].pop('swa_start_iter_rel')
-    
+
     # export CUDA_VISIBLE_DEVICES
     gpu_list = ','.join(str(x) for x in opt['gpu_ids'])
     os.environ['CUDA_VISIBLE_DEVICES'] = gpu_list
@@ -298,16 +298,16 @@ def check_resume(opt: dict, resume_iter = None):
             state_idx = resume_iter
         else:
             state_idx = os.path.basename(opt['path']['resume_state']).split('.')[0]
-        
+
         opt['path']['pretrain_model_G'] = os.path.normpath(os.path.join(opt['path']['models'],
                                                    '{}_G.pth'.format(state_idx)))
         logger.info('Set [pretrain_model_G] to {}'.format(opt['path']['pretrain_model_G']))
-        
+
         if 'gan' in opt['model']:
             opt['path']['pretrain_model_D'] = os.path.normpath(os.path.join(opt['path']['models'],
                                                        '{}_D.pth'.format(state_idx)))
             logger.info('Set [pretrain_model_D] to {}'.format(opt['path']['pretrain_model_D']))
-        
+
         if 'swa' in opt['model'] or opt['swa']:
             opt['path']['pretrain_model_swaG'] = os.path.normpath(os.path.join(opt['path']['models'],
                                                    '{}_swaG.pth'.format(state_idx)))

@@ -73,7 +73,7 @@ datasets:
     
     # hr_crop: false #disabled
     # lr_downscale: false
-    # lr_downscale_types: ["linear", "cubic"] # select from ["nearest", "linear", "cubic", "area", "lanczos4", "linear_exact", "matlab_bicubic"] #scale_algos #scaling interpolation options
+    # lr_downscale_types: ["linear", "cubic"] # scaling interpolation options, same as in train dataset
     
 path:
   strict: false # true | false
