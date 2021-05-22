@@ -77,8 +77,8 @@ def Scale(img=None, scale: int = None, algo=None,
     if (h == oh) and (w == ow):
         return img, None
 
-    resize, resize_type = get_resize(size=(w, h), scale=scale, ds_algo=algo, ds_kernel=ds_kernel, resize_type=resize_type)
-    return resize(np.copy(img)), resize_type
+    resize_fn, resize_type = get_resize(size=(w, h), scale=scale, ds_algo=algo, ds_kernel=ds_kernel, resize_type=resize_type)
+    return resize_fn(np.copy(img)), resize_type
 
 
 class MLResize:
@@ -120,7 +120,7 @@ def get_resize(size, scale=None, ds_algo=None, ds_kernel=None, resize_type=None)
     #elif(!isinstance(resize_types, list)):
         #Error, unexpected type
 
-    resize = None
+    resize_fn = None
     if resize_type == 0:
         pass
     elif not resize_type:
@@ -129,17 +129,17 @@ def get_resize(size, scale=None, ds_algo=None, ds_kernel=None, resize_type=None)
     # print(resize_type)
     if resize_type in custom_ktypes:
         # print('matlab')
-        resize = MLResize(scale=scale, interpolation=_n_interpolation_to_str[resize_type]) #(np.copy(img_LR))
+        resize_fn = MLResize(scale=scale, interpolation=_n_interpolation_to_str[resize_type]) #(np.copy(img_LR))
     elif resize_type == 999: # use realistic downscale kernels
         # print('kernelgan')
         if ds_kernel:
-            resize = ds_kernel
+            resize_fn = ds_kernel
     else: # use the provided OpenCV2 algorithms
-        resize = transforms.Resize(size, 
+        resize_fn = transforms.Resize(size, 
                 interpolation=_cv2_interpolation2str.get(resize_type, 'BICUBIC'))
         # print('cv2')
 
-    return resize, resize_type
+    return resize_fn, resize_type
 
 
 #TODO: use options to set the blur types parameters if configured, else random_params=True
@@ -896,13 +896,14 @@ def get_crop_pos_rot(h, w, angle):
 
 
 def print_size_warning(ow, oh, w, h, base=4):
-    """Print warning information about image size(only print once)"""
+    """Print warning information about image size (only print once)"""
     if not hasattr(print_size_warning, 'has_printed'):
-        print("The image size needs to be a multiple of {}. "
-              "The loaded image size was ({}, {}), so it was adjusted to "
-              "({}, {}). This adjustment will be done to all images "
-              "whose sizes are not multiples of {}.".format(base,
-              ow, oh, w, h, base))
+        if ow != w or oh != h:
+            print("The image size needs to be a multiple of {}. "
+                "The loaded image size was ({}, {}), so it was adjusted to "
+                "({}, {}). This adjustment will be done to all images "
+                "whose sizes are not multiples of {}.".format(base,
+                ow, oh, w, h, base))
         print_size_warning.has_printed = True
 
 
@@ -1275,15 +1276,24 @@ def paired_imgs_check(img_A, img_B, opt, ds_kernels=None):
         # print("Image LR: ", LR_path, ("was not loaded correctly, using HR pair to downscale on the fly."))
         print("Image was not loaded correctly, using pair to generate on the fly.")
 
+    # check that B and A have the same dimensions ratio
     img_A, img_B = shape_change_fn(
-        img_A, img_B, opt, scale, default_int_method)
+        img_A=img_A, img_B=img_B, opt=opt, scale=scale,
+        default_int_method=default_int_method)
 
+    # if the B images are too small, Resize to the crop_size size and fit A pair to A_crop_size too
     img_A, img_B = dim_change_fn(
-        img_A, img_B, opt, scale, default_int_method,
-        crop_size, A_crop_size, ds_kernels)
+        img_A=img_A, img_B=img_B, opt=opt, scale=scale,
+        default_int_method=default_int_method,
+        crop_size=crop_size, A_crop_size=A_crop_size,
+        ds_kernels=ds_kernels)
 
-    img_A = generate_A_fn(
-        img_A, img_B, opt, scale, default_int_method, ds_kernels)
+    # randomly scale A (ie. from B) if needed
+    img_A, img_B = generate_A_fn(
+        img_A=img_A, img_B=img_B, opt=opt, scale=scale,
+        default_int_method=default_int_method,
+        crop_size=crop_size, A_crop_size=A_crop_size,
+        ds_kernels=ds_kernels)
 
     return img_A, img_B
 
