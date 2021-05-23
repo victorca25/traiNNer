@@ -2,7 +2,7 @@ from dataops.common import _init_lmdb, channel_convert
 
 # from dataops.debug import tmp_vis, describe_numpy, describe_tensor
 
-from data.base_dataset import BaseDataset, get_dataroots_paths, read_imgs_from_path
+from data.base_dataset import BaseDataset, get_dataroots_paths, read_imgs_from_path, read_single_dataset, read_split_single_dataset
 
 from dataops.augmentations import (generate_A_fn, image_type, get_default_imethod, dim_change_fn,
                     shape_change_fn, random_downscale_B, paired_imgs_check,
@@ -29,17 +29,25 @@ class AlignedDataset(BaseDataset):
         """
         super(AlignedDataset, self).__init__(opt, keys_ds=['LR','HR'])
         self.LR_env, self.HR_env = None, None  # environment for lmdb
-        self.vars = opt.get('outputs', 'LRHR')  #'AB'
-        self.ds_kernels = get_ds_kernels(opt)
-        self.noise_patches = get_noise_patches(opt)
-        set_transforms(opt.get('img_loader', 'cv2'))
+        self.vars = self.opt.get('outputs', 'LRHR')  #'AB'
+        self.ds_kernels = get_ds_kernels(self.opt)
+        self.noise_patches = get_noise_patches(self.opt)
+        set_transforms(self.opt.get('img_loader', 'cv2'))
 
         # get images paths (and optional environments for lmdb) from dataroots
-        self.paths_LR, self.paths_HR = get_dataroots_paths(opt, strict=False, keys_ds=self.keys_ds)
+        dir_AB = self.opt.get('dataroot', None) or self.opt.get('dataroot_AB', None)
+        if dir_AB:
+            self.AB_env = None
+            self.AB_paths = read_single_dataset(self.opt, dir_AB)
+            if self.opt.get('data_type') == 'lmdb':
+                self.AB_env = _init_lmdb(dir_AB)
+        else:
+            self.paths_LR, self.paths_HR = get_dataroots_paths(self.opt, strict=False, keys_ds=self.keys_ds)
+            self.AB_paths = None
 
-        if self.opt.get('data_type') == 'lmdb':
-            self.LR_env = _init_lmdb(opt.get('dataroot_'+self.keys_ds[0]))
-            self.HR_env = _init_lmdb(opt.get('dataroot_'+self.keys_ds[1]))
+            if self.opt.get('data_type') == 'lmdb':
+                self.LR_env = _init_lmdb(self.opt.get('dataroot_'+self.keys_ds[0]))
+                self.HR_env = _init_lmdb(self.opt.get('dataroot_'+self.keys_ds[1]))
 
     def __getitem__(self, index):
         """Return a data point and its metadata information.
@@ -56,8 +64,12 @@ class AlignedDataset(BaseDataset):
         scale = self.opt.get('scale')
 
         ######## Read the images ########
-        img_LR, img_HR, LR_path, HR_path = read_imgs_from_path(
-            self.opt, index, self.paths_LR, self.paths_HR, self.LR_env, self.HR_env)
+        if self.AB_paths:
+            img_LR, img_HR, LR_path, HR_path = read_split_single_dataset(
+                self.opt, index, self.AB_paths, self.AB_env)
+        else:
+            img_LR, img_HR, LR_path, HR_path = read_imgs_from_path(
+                self.opt, index, self.paths_LR, self.paths_HR, self.LR_env, self.HR_env)
 
         ######## Modify the images ########
 
@@ -157,5 +169,9 @@ class AlignedDataset(BaseDataset):
             return {'LR': img_LR, 'HR': img_HR, 'LR_path': LR_path, 'HR_path': HR_path}
 
     def __len__(self):
-        return len(self.paths_HR)
+        """Return the total number of images in the dataset."""
+        if self.AB_paths:
+            return len(self.AB_paths)
+        else:
+            return len(self.paths_HR)
 

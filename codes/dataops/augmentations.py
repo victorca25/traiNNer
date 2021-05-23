@@ -837,6 +837,7 @@ def rotateHR(img, crop_size=None, rescale=1/4, angle=None, center=0,
         degrees=(angle,angle), expand=crop, resample=method)
 
     if rescale < 1:
+        wr, hr = image_size(img)
         # TODO: 'pil' images will use default method, adjust algo to take in method
         img, _ = Scale(img=img, scale=rescale, algo=cv2.INTER_CUBIC, img_type=img_type) #INTER_AREA #  cv2.INTER_LANCZOS4?
 
@@ -908,6 +909,26 @@ def print_size_warning(ow, oh, w, h, base=4):
                 ow, oh, w, h, base))
         print_size_warning.has_printed = True
 
+
+def split_paired_image(AB, loader):
+    """ For single image datasets that need to be splitted in two
+        images (pix2pix, etc). Assumes A is left image and B is
+        right image, can be flipped by using 'direction' = 'BtoA'
+        flag in options file. Also assumes the original image can
+        be exactly splitted in two images with the same sizes.
+    """
+    w, h = image_size(AB)
+    w2 = int(w / 2)
+    if loader == 'pil':
+        img_A = AB.crop((0, 0, w2, h))
+        img_B = AB.crop((w2, 0, w, h))
+    else:
+        img_A = AB[0:h, 0:w2, ...]
+        img_B = AB[0:h, w2:w, ...]
+    
+    assert image_size(img_A) == image_size(img_B)
+
+    return img_A, img_B
 
 
 #TODO: using hasattr here, but there can be cases where I

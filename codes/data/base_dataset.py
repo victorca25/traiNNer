@@ -1,14 +1,11 @@
-"""This module implements a 'BaseDataset' for datasets.
-It also includes common dataroot validation functions and PIL transformation functions 
-(e.g., get_transform, __scale_width), which can be later used in subclasses.
-"""
+"""This module implements a 'BaseDataset' for datasets."""
 import os
 import random
 import numpy as np
 import torch.utils.data as data
 
 from dataops.common import get_image_paths, read_img
-
+from dataops.augmentations import split_paired_image
 
 
 
@@ -55,14 +52,14 @@ class BaseDataset(data.Dataset):
 
 ############# Testing below
 
-def process_img_paths(images_paths=None, data_type='img'):
+def process_img_paths(images_paths=None, data_type='img', max_dataset_size=float("inf")):
     if not images_paths:
         return images_paths
 
     # process images_paths
     paths_list = []
     for path in images_paths:
-        paths = get_image_paths(data_type, path)
+        paths = get_image_paths(data_type, path, max_dataset_size)
         for imgs in paths:
             paths_list.append(imgs)
     paths_list = sorted(paths_list)
@@ -77,7 +74,7 @@ def read_subset(dataroot, subset_file):
 
 def format_paths(dataroot=None):
     """
-    Check if dataroot_HR is a list of directories or a single directory. 
+    Check if dataroot is a list of directories or a single directory. 
     Note: lmdb will not currently work with a list
     """
     # if receiving a single path in str format, convert to list
@@ -113,7 +110,7 @@ def paired_dataset_validation(A_images_paths, B_images_paths, data_type='img', m
 def check_data_keys(opt, keys_ds=['LR', 'HR']):
     keys_A = ['LR', 'A', 'lq']
     keys_B = ['HR', 'B', 'gt']
-    
+
     root_A = 'dataroot_' + keys_ds[0]
     root_B = 'dataroot_' + keys_ds[1]
     for pair_keys in zip(keys_A, keys_B):
@@ -125,7 +122,7 @@ def check_data_keys(opt, keys_ds=['LR', 'HR']):
         if opt.get(A_el, None) and A_el != root_A:
             opt[root_A] = opt[A_el]
             opt.pop(A_el)
-    
+
     return opt
 
 
@@ -152,7 +149,7 @@ def read_dataroots(opt, keys_ds=['LR','HR']):
     else:  # read image list from lmdb or image files
         A_images_paths = format_paths(opt[root_A])
         B_images_paths = format_paths(opt[root_B])
-        
+
         # special case when dealing with duplicate B_images_paths or A_images_paths
         # lmdb not be supported with this option
         if len(B_images_paths) != len(set(B_images_paths)) or \
@@ -189,7 +186,7 @@ def validate_paths(paths_A, paths_B, strict=True, keys_ds=['LR','HR']):
     - If all LR are provided and 'lr_downscale' is enabled, randomize use of provided 
         LR and OTF LR for augmentation
     """
-    
+
     if not strict:
         assert len(paths_B) >= len(paths_A), \
             '{} dataset contains less images than {} dataset  - {}, {}.'.format(\
@@ -292,14 +289,14 @@ def read_imgs_from_path(opt, index, paths_A, paths_B, A_env, B_env):
         # Read the A/LR and B/HR images from the provided paths
         img_A = read_img(env=data_type, path=A_path, lmdb_env=A_env, out_nc=input_nc, loader=loader)
         img_B = read_img(env=data_type, path=B_path, lmdb_env=B_env, out_nc=output_nc, loader=loader)
-        
+
         # Even if A/LR dataset is provided, force to generate aug_downscale % of downscales OTF from B/HR
         # The code will later make sure img_A has the correct size
         if opt.get('aug_downscale', None):
             # if np.random.rand() < opt['aug_downscale']:
             if random.random() < opt['aug_downscale']:
                 img_A = img_B
-        
+
     # If A/LR is not provided, use B/HR and modify on the fly
     else:
         B_path = paths_B[index]
@@ -308,3 +305,34 @@ def read_imgs_from_path(opt, index, paths_A, paths_B, A_env, B_env):
         A_path = B_path
 
     return img_A, img_B, A_path, B_path
+
+
+def read_single_dataset(opt=None, dataroot=None, max_dataset_size=float("inf")):
+    images_paths = format_paths(dataroot)
+    img_paths = process_img_paths(images_paths, opt['data_type'], max_dataset_size)
+
+    return img_paths
+
+def read_split_single_dataset(opt, index, AB_paths, env):
+    loader = opt.get('img_loader', 'cv2')
+
+    # read a image given a random integer index
+    AB_path = AB_paths[index]
+    AB = read_img(env=env, path=AB_path, loader=loader)
+    
+    # split AB image into A and B
+    A, B = split_paired_image(AB=AB, loader=loader)
+    
+    A_path = AB_path
+    B_path = AB_path
+
+    if opt.get('direction', None) == 'BtoA':
+        img_A = B
+        img_B = A
+    else:
+        img_A = A
+        img_B = B
+
+    return img_A, img_B, A_path, B_path
+
+
