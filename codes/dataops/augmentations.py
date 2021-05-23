@@ -77,7 +77,7 @@ def Scale(img=None, scale: int = None, algo=None,
     if (h == oh) and (w == ow):
         return img, None
 
-    resize_fn, resize_type = get_resize(size=(w, h), scale=scale, ds_algo=algo, ds_kernel=ds_kernel, resize_type=resize_type)
+    resize_fn, resize_type = get_resize(size=(h, w), scale=scale, ds_algo=algo, ds_kernel=ds_kernel, resize_type=resize_type)
     return resize_fn(np.copy(img)), resize_type
 
 
@@ -224,6 +224,8 @@ def get_noise(noise_types: list = [], noise_patches=None, noise_amp: int=1):
         elif noise_type == 'quantize':
             noise = RandomQuantize(p=1, num_colors=32)
             # print("quantize")
+        elif noise_type == 'km_quantize':
+            noise = transforms.RandomQuantize(p=1, num_colors=32)
         elif noise_type == 'gaussian':
             noise = transforms.RandomGaussianNoise(p=1, random_params=True, gtype='bw')
             # print("gaussian")
@@ -1234,6 +1236,36 @@ def generate_A_fn(img_A, img_B, opt, scale, default_int_method,
 
     return img_A, img_B
 
+def final_shapes_check(img_A, img_B, opt, scale, default_int_method,
+        crop_size, A_crop_size, ds_kernels):
+    """
+    Final image sizes checks (only if using pre_crop option):
+    if the resulting HR image size so far is too large or too small,
+        resize HR to the correct size and downscale to generate a new
+        LR on the fly
+    if the resulting LR so far does not have the correct dimensions,
+        also generate a new HR-LR image pair on the fly
+    TODO: can add a check when not using pre_crop without crop_size
+    """
+    w, h = image_size(img_B)
+    w_A, h_A = image_size(img_A)
+
+    if opt.get('pre_crop', False) and (w != crop_size or
+            h != crop_size or w_A != A_crop_size or h_A != A_crop_size):
+        img_type = image_type(img_A)
+        # rescale HR image to the crop_size (should not be needed in LR
+        # case, but something went wrong before, just for sanity)
+        img_B = transforms.Resize(
+                (crop_size, crop_size), interpolation=default_int_method)(img_B)
+        # if manually provided and scale algorithms are provided, then 
+        # use it, else use matlab imresize to generate LR pair
+        ds_algo  = opt.get('lr_downscale_types', 777)
+        img_A, _ = Scale(img=img_B, scale=scale,
+                algo=ds_algo, ds_kernel=ds_kernels, img_type=img_type)
+    
+    return img_A, img_B
+    
+
 
 def get_ds_kernels(opt):
     """ 
@@ -1294,6 +1326,14 @@ def paired_imgs_check(img_A, img_B, opt, ds_kernels=None):
         default_int_method=default_int_method,
         crop_size=crop_size, A_crop_size=A_crop_size,
         ds_kernels=ds_kernels)
+
+    # final sizes checks 
+    # Note: should not be needed
+    # img_A, img_B = final_shapes_check(
+    #     img_A=img_A, img_B=img_B, opt=opt, scale=scale,
+    #     default_int_method=default_int_method,
+    #     crop_size=crop_size, A_crop_size=A_crop_size,
+    #     ds_kernels=ds_kernels)
 
     return img_A, img_B
 

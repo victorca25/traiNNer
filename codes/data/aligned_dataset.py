@@ -1,8 +1,3 @@
-# import os.path
-# import random
-# import numpy as np
-# import cv2
-# import torch
 from dataops.common import _init_lmdb, channel_convert
 
 # from dataops.debug import tmp_vis, describe_numpy, describe_tensor
@@ -122,28 +117,6 @@ class AlignedDataset(BaseDataset):
                 method=default_int_method)
             img_LR = A_transform(img_LR)
             img_HR = B_transform(img_HR)
-
-            """
-            # Final sizes checks
-            # if the resulting HR image size so far is too large or too small, resize HR to the correct size and downscale to generate a new LR on the fly
-            # if the resulting LR so far does not have the correct dimensions, also generate a new HR-LR image pair on the fly
-            if img_HR.shape[0] != crop_size or img_HR.shape[1] != crop_size or img_LR.shape[0] != A_crop_size or img_LR.shape[1] != A_crop_size:
-
-                #if img_HR.shape[0] != crop_size or img_HR.shape[1] != crop_size:
-                    #TODO: temp disabled to test
-                    #print("Image: ", HR_path, " size does not match HR size: (", crop_size,"). The image size is: ", img_HR.shape)
-                #if img_LR.shape[0] != A_crop_size or img_LR.shape[0] != A_crop_size:
-                    #TODO: temp disabled to test
-                    #print("Image: ", LR_path, " size does not match LR size: (", crop_size//scale,"). The image size is: ", img_LR.shape)
-
-                # rescale HR image to the crop_size (should not be needed in LR case, but something went wrong before, just for sanity)
-                #img_HR, _ = augmentations.resize_img(np.copy(img_HR), newdim=(crop_size,crop_size), algo=cv2.INTER_LINEAR)
-                img_HR = transforms.Resize((crop_size, crop_size), interpolation="BILINEAR")(np.copy(img_HR))
-                # if manually provided and scale algorithms are provided, then use it, else use matlab imresize to generate LR pair
-                ds_algo  = self.opt.get('lr_downscale_types', 777) 
-                #img_LR, _ = augmentations.scale_img(img_HR, scale, algo=ds_algo)
-                img_LR, _ = Scale(img_HR, scale, algo=ds_algo)
-            """
 
             # Below are the On The Fly augmentations
 
