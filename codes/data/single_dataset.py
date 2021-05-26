@@ -1,42 +1,77 @@
-import numpy as np
-import torch
-import dataops.common as util
-from data.base_dataset import BaseDataset, get_dataroots_paths
+from dataops.common import _init_lmdb, channel_convert
+from data.base_dataset import BaseDataset, get_single_dataroot_path, read_single_dataset
+from dataops.augmentations import (set_transforms, image_channels, image_type, image_size,
+                get_params, get_transform, get_totensor_params, get_totensor, get_default_imethod)
 
 
-class LRDataset(BaseDataset):
-    '''Read LR images only in the test phase.'''
+class SingleDataset(BaseDataset):
+    """This dataset class can load a set of images specified by a single
+    dataroot path: /path/to/data. It can be used for generating results
+    in the testing phase of the models, for example the LR image or for
+    CycleGAN only for one side with the model option '-model test'.
+    """
 
     def __init__(self, opt):
-        super(LRDataset, self).__init__(opt, keys_ds=['LR','HR'])
-        # self.opt = opt
-        self.paths_LR = None
-        self.LR_env = None  # environment for lmdb
-        self.znorm = opt.get('znorm', False) # Alternative: images are z-normalized to the [-1,1] range
+        """Initialize this dataset class.
+        Parameters:
+            opt (Option dictionary): stores all the experiment flags
+        """
+        super(SingleDataset, self).__init__(opt, keys_ds=['LR','HR'])
+        self.vars = self.opt.get('outputs', 'LR')  #'A'
+        self.A_env = None  # environment for lmdb
+        set_transforms(self.opt.get('img_loader', 'cv2'))
 
-        # read image list from lmdb or image files
-        self.paths_LR = util.get_image_paths(opt['data_type'], opt['dataroot_LR'])
+        # get images paths (and optional environments for lmdb) from dataroots
+        dir_A = self.opt.get(f'dataroot_{self.keys_ds[0]}')
+        self.A_paths = get_single_dataroot_path(self.opt, dir_A)
         if self.opt.get('data_type') == 'lmdb':
-            self.LR_env = util._init_lmdb(opt.get('dataroot_'+self.keys_ds[0]))
-        
-        assert self.paths_LR, 'Error: LR paths are empty.'
+            self.A_env = _init_lmdb(dir_A)
+
+        # get reusable totensor transform
+        totensor_params = get_totensor_params(self.opt)
+        self.tensor_transform = get_totensor(self.opt,
+                params=totensor_params, toTensor=True, grayscale=False)
+
+        assert self.A_paths, f'Error: image path {dir_A} empty.'
 
     def __getitem__(self, index):
-        LR_path = None
-        data_type = self.opt.get('data_type', 'img')
-        # get LR image
-        LR_path = self.paths_LR[index]
-        img_LR = util.read_img(env=data_type, path=LR_path, lmdb_env=self.LR_env)
-        H, W, C = img_LR.shape
+        """Return a data point and its metadata information.
+        Parameters:
+            index (int): a random integer for data indexing
+        Returns a dictionary that contains A and A_paths or
+            LR and LR_path
+            A (tensor): an image in the input domain
+            A_paths (str): the path of the image
+        """
+
+        # get single image
+        img_A, A_path = read_single_dataset(
+                self.opt, index, self.A_paths, self.A_env)
 
         # change color space if necessary
-        if self.opt['color']:
-            img_LR = util.channel_convert(C, self.opt['color'], [img_LR])[0]
+        # TODO: move to get_transform()
+        if self.opt.get('color', None):
+            img_A = channel_convert(image_channels(img_A), self.opt['color'], [img_A])[0]
 
-        # BGR to RGB, HWC to CHW, numpy to tensor
-        img_LR = util.np2tensor(img_LR, normalize=self.znorm, add_batch=False)
+        # # apply transforms if any
+        # default_int_method = get_default_imethod(image_type(img_A))
+        # transform_params = get_params(self.opt, image_size(img_A))
+        # A_transform = get_transform(
+        #         self.opt,
+        #         transform_params,
+        #         # grayscale=(input_nc == 1),
+        #         method=default_int_method)
+        # img_A = A_transform(img_A)
 
-        return {'LR': img_LR, 'LR_path': LR_path}
+        ######## Convert images to PyTorch Tensors ########
+
+        img_A = self.tensor_transform(img_A)
+
+        if self.vars == 'A':
+            return {'A': img_A, 'A_path': A_path}
+        else:
+            return {'LR': img_A, 'LR_path': A_path}
 
     def __len__(self):
-        return len(self.paths_LR)
+        """Return the total number of images in the dataset."""
+        return len(self.A_paths)

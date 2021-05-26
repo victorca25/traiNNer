@@ -1,15 +1,12 @@
 from dataops.common import _init_lmdb, channel_convert
-
-# from dataops.debug import tmp_vis, describe_numpy, describe_tensor
-
-from data.base_dataset import BaseDataset, get_dataroots_paths, read_imgs_from_path, read_single_dataset, read_split_single_dataset
-
+from data.base_dataset import BaseDataset, get_dataroots_paths, read_imgs_from_path, get_single_dataroot_path, read_split_single_dataset
 from dataops.augmentations import (generate_A_fn, image_type, get_default_imethod, dim_change_fn,
                     shape_change_fn, random_downscale_B, paired_imgs_check,
                     get_unpaired_params, get_augmentations, get_totensor_params, get_totensor,
                     set_transforms, get_ds_kernels, get_noise_patches,
                     get_params, image_size, image_channels, scale_params, scale_opt, get_transform,
                     Scale, modcrop)
+# from dataops.debug import tmp_vis, describe_numpy, describe_tensor
 
 
 class AlignedDataset(BaseDataset):
@@ -25,10 +22,9 @@ class AlignedDataset(BaseDataset):
     def __init__(self, opt):
         """Initialize this dataset class.
         Parameters:
-            opt (Option dictionary) -- stores all the experiment flags
+            opt (Option dictionary): stores all the experiment flags
         """
         super(AlignedDataset, self).__init__(opt, keys_ds=['LR','HR'])
-        self.LR_env, self.HR_env = None, None  # environment for lmdb
         self.vars = self.opt.get('outputs', 'LRHR')  #'AB'
         self.ds_kernels = get_ds_kernels(self.opt)
         self.noise_patches = get_noise_patches(self.opt)
@@ -37,22 +33,26 @@ class AlignedDataset(BaseDataset):
         # get images paths (and optional environments for lmdb) from dataroots
         dir_AB = self.opt.get('dataroot', None) or self.opt.get('dataroot_AB', None)
         if dir_AB:
-            self.AB_env = None
-            self.AB_paths = read_single_dataset(self.opt, dir_AB)
+            self.AB_env = None  # environment for lmdb
+            self.AB_paths = get_single_dataroot_path(self.opt, dir_AB)
             if self.opt.get('data_type') == 'lmdb':
                 self.AB_env = _init_lmdb(dir_AB)
         else:
-            self.paths_LR, self.paths_HR = get_dataroots_paths(self.opt, strict=False, keys_ds=self.keys_ds)
+            self.A_paths, self.B_paths = get_dataroots_paths(self.opt, strict=False, keys_ds=self.keys_ds)
             self.AB_paths = None
+            self.A_env, self.B_env = None, None  # environment for lmdb
 
             if self.opt.get('data_type') == 'lmdb':
-                self.LR_env = _init_lmdb(self.opt.get('dataroot_'+self.keys_ds[0]))
-                self.HR_env = _init_lmdb(self.opt.get('dataroot_'+self.keys_ds[1]))
+                self.A_env = _init_lmdb(self.opt.get(f'dataroot_{self.keys_ds[0]}'))
+                self.B_env = _init_lmdb(self.opt.get(f'dataroot_{self.keys_ds[1]}'))
+
+        # get reusable totensor params
+        self.totensor_params = get_totensor_params(self.opt)
 
     def __getitem__(self, index):
         """Return a data point and its metadata information.
         Parameters:
-            index: a random integer for data indexing
+            index (int): a random integer for data indexing
         Returns a dictionary that contains A, B, A_paths and B_paths
             (or LR, HR, LR_paths and HR_paths)
             A (tensor): an image in the input domain
@@ -65,58 +65,58 @@ class AlignedDataset(BaseDataset):
 
         ######## Read the images ########
         if self.AB_paths:
-            img_LR, img_HR, LR_path, HR_path = read_split_single_dataset(
+            img_A, img_B, A_path, B_path = read_split_single_dataset(
                 self.opt, index, self.AB_paths, self.AB_env)
         else:
-            img_LR, img_HR, LR_path, HR_path = read_imgs_from_path(
-                self.opt, index, self.paths_LR, self.paths_HR, self.LR_env, self.HR_env)
+            img_A, img_B, A_path, B_path = read_imgs_from_path(
+                self.opt, index, self.A_paths, self.B_paths, self.A_env, self.B_env)
 
         ######## Modify the images ########
 
         # for the validation / test phases
         if self.opt['phase'] != 'train':
-            img_type = image_type(img_HR)
-            # HR modcrop
-            img_HR = modcrop(img_HR, scale=scale, img_type=img_type)
-            # modcrop and downscale LR if enabled
+            img_type = image_type(img_B)
+            # B/HR modcrop
+            img_B = modcrop(img_B, scale=scale, img_type=img_type)
+            # modcrop and downscale A/LR if enabled
             if self.opt['lr_downscale']:
-                img_LR = modcrop(img_LR, scale=scale, img_type=img_type)
+                img_A = modcrop(img_A, scale=scale, img_type=img_type)
                 # TODO: 'pil' images will use default method for scaling
-                img_LR, _ = Scale(img_LR, scale,
+                img_A, _ = Scale(img_A, scale,
                     algo=self.opt.get('lr_downscale_types', 777), img_type=img_type)
 
         # change color space if necessary
         # TODO: move to get_transform()
-        color_HR = self.opt.get('color', None) or self.opt.get('color_HR', None)
-        if color_HR:
-            img_HR = channel_convert(image_channels(img_HR), color_HR, [img_HR])[0]
-        color_LR = self.opt.get('color', None) or self.opt.get('color_LR', None)
-        if color_LR:
-            img_LR = channel_convert(image_channels(img_LR), color_LR, [img_LR])[0]
+        color_B = self.opt.get('color', None) or self.opt.get('color_HR', None)
+        if color_B:
+            img_B = channel_convert(image_channels(img_B), color_B, [img_B])[0]
+        color_A = self.opt.get('color', None) or self.opt.get('color_LR', None)
+        if color_A:
+            img_A = channel_convert(image_channels(img_A), color_A, [img_A])[0]
 
         ######## Augmentations ########
 
         #Augmentations during training
         if self.opt['phase'] == 'train':
 
-            default_int_method = get_default_imethod(image_type(img_LR))
+            default_int_method = get_default_imethod(image_type(img_A))
 
             # random HR downscale
-            img_LR, img_HR = random_downscale_B(img_A=img_LR, img_B=img_HR, 
+            img_A, img_B = random_downscale_B(img_A=img_A, img_B=img_B,
                                 opt=self.opt)
 
-            # validate there's an img_LR, if not, use img_HR
-            if img_LR is None:
-                img_LR = img_HR
-                print("Image LR: ", LR_path, ("was not loaded correctly, using HR pair to downscale on the fly."))
+            # validate there's an img_A, if not, use img_B
+            if img_A is None:
+                img_A = img_B
+                print(f"Image A: {A_path} was not loaded correctly, using B pair to downscale on the fly.")
 
             # validate proper dimensions between paired images, generate A if needed
-            img_LR, img_HR = paired_imgs_check(
-                img_LR, img_HR, opt=self.opt, ds_kernels=self.ds_kernels)
+            img_A, img_B = paired_imgs_check(
+                img_A, img_B, opt=self.opt, ds_kernels=self.ds_kernels)
 
             # get and apply the paired transformations below
             transform_params = get_params(
-                scale_opt(self.opt, scale), image_size(img_LR))
+                scale_opt(self.opt, scale), image_size(img_A))
             A_transform = get_transform(
                 scale_opt(self.opt, scale),
                 transform_params,
@@ -127,51 +127,50 @@ class AlignedDataset(BaseDataset):
                 scale_params(transform_params, scale),
                 # grayscale=(output_nc == 1),
                 method=default_int_method)
-            img_LR = A_transform(img_LR)
-            img_HR = B_transform(img_HR)
+            img_A = A_transform(img_A)
+            img_B = B_transform(img_B)
 
             # Below are the On The Fly augmentations
 
             # get and apply the unpaired transformations below
-            lr_aug_params, hr_aug_params = get_unpaired_params(self.opt)
+            a_aug_params, b_aug_params = get_unpaired_params(self.opt)
 
-            lr_augmentations = get_augmentations(
+            a_augmentations = get_augmentations(
                 self.opt, 
-                params=lr_aug_params,
+                params=a_aug_params,
                 noise_patches=self.noise_patches,
                 )
-            hr_augmentations = get_augmentations(
+            b_augmentations = get_augmentations(
                 self.opt, 
-                params=hr_aug_params,
+                params=b_aug_params,
                 noise_patches=self.noise_patches,
                 )
 
-            img_LR = lr_augmentations(img_LR)
-            img_HR = hr_augmentations(img_HR)
+            img_A = a_augmentations(img_A)
+            img_B = b_augmentations(img_B)
 
-        # Alternative position for changing the colorspace of LR. 
-        # color_LR = self.opt.get('color', None) or self.opt.get('color_LR', None)
-        # if color_LR:
-        #     img_LR = channel_convert(image_channels(img_LR), color_LR, [img_LR])[0]
+        # Alternative position for changing the colorspace of A/LR.
+        # color_A = self.opt.get('color', None) or self.opt.get('color_A', None)
+        # if color_A:
+        #     img_A = channel_convert(image_channels(img_A), color_A, [img_A])[0]
 
         ######## Convert images to PyTorch Tensors ########
 
-        totensor_params = get_totensor_params(self.opt)
-        tensor_transform = get_totensor(self.opt, params=totensor_params, toTensor=True, grayscale=False)
-        img_LR = tensor_transform(img_LR)
-        img_HR = tensor_transform(img_HR)
+        tensor_transform = get_totensor(
+            self.opt, params=self.totensor_params, toTensor=True, grayscale=False)
+        img_A = tensor_transform(img_A)
+        img_B = tensor_transform(img_B)
 
-        if LR_path is None:
-            LR_path = HR_path
+        if A_path is None:
+            A_path = B_path
         if self.vars == 'AB':
-            return {'A': img_LR, 'B': img_HR, 'A_paths': LR_path, 'B_paths': HR_path}
+            return {'A': img_A, 'B': img_B, 'A_path': A_path, 'B_path': B_path}
         else:
-            return {'LR': img_LR, 'HR': img_HR, 'LR_path': LR_path, 'HR_path': HR_path}
+            return {'LR': img_A, 'HR': img_B, 'LR_path': A_path, 'HR_path': B_path}
 
     def __len__(self):
         """Return the total number of images in the dataset."""
         if self.AB_paths:
             return len(self.AB_paths)
         else:
-            return len(self.paths_HR)
-
+            return len(self.B_paths)

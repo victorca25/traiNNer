@@ -50,8 +50,6 @@ class BaseDataset(data.Dataset):
 
 
 
-############# Testing below
-
 def process_img_paths(images_paths=None, data_type='img', max_dataset_size=float("inf")):
     if not images_paths:
         return images_paths
@@ -77,9 +75,10 @@ def format_paths(dataroot=None):
     Check if dataroot is a list of directories or a single directory. 
     Note: lmdb will not currently work with a list
     """
-    # if receiving a single path in str format, convert to list
+
     if dataroot:
         if type(dataroot) is str:
+            # if receiving a single path in str format, convert to list
             dataroot = os.path.join(dataroot)
             dataroot = [dataroot]
         else:
@@ -108,6 +107,9 @@ def paired_dataset_validation(A_images_paths, B_images_paths, data_type='img', m
 
 
 def check_data_keys(opt, keys_ds=['LR', 'HR']):
+    if len(keys_ds) < 2:
+        return opt
+
     keys_A = ['LR', 'A', 'lq']
     keys_B = ['HR', 'B', 'gt']
 
@@ -307,7 +309,7 @@ def read_imgs_from_path(opt, index, paths_A, paths_B, A_env, B_env):
     return img_A, img_B, A_path, B_path
 
 
-def read_single_dataset(opt=None, dataroot=None, max_dataset_size=float("inf")):
+def get_single_dataroot_path(opt=None, dataroot=None, max_dataset_size=float("inf")):
     images_paths = format_paths(dataroot)
     img_paths = process_img_paths(images_paths, opt['data_type'], max_dataset_size)
 
@@ -335,4 +337,22 @@ def read_split_single_dataset(opt, index, AB_paths, env):
 
     return img_A, img_B, A_path, B_path
 
+
+def read_single_dataset(opt, index, paths, env, idx_case=None, d_size=None):
+    loader = opt.get('img_loader', 'cv2')
+
+    if idx_case == 'inrange' or idx_case == 'serial':
+        # make sure index is within the range of dataset.
+        # if used for both unpaired datasets, will always return
+        # the same pair of images
+        index = index % d_size
+    elif idx_case == 'random':
+        # randomize the index for domain B in unpaired dataset to
+        # avoid fixed pairs.
+        index = random.randint(0, d_size - 1)
+
+    path = paths[index]
+    img = read_img(env=env, path=path, loader=loader)
+
+    return img, path
 

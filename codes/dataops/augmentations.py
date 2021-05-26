@@ -1326,7 +1326,7 @@ def paired_imgs_check(img_A, img_B, opt, ds_kernels=None):
     # Validate there's an img_A, if not, use img_B
     if img_A is None:
         img_A = img_B
-        # print("Image LR: ", LR_path, ("was not loaded correctly, using HR pair to downscale on the fly."))
+        # print(f"Image LR: {LR_path} was not loaded correctly, using HR pair to downscale on the fly.")
         print("Image was not loaded correctly, using pair to generate on the fly.")
 
     # check that B and A have the same dimensions ratio
