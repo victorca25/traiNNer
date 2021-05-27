@@ -17,7 +17,7 @@ optimizer = Ranger(params, lr=1e-3, betas=(.95, 0.999), eps=1e-5,
                  use_gc=True, gc_conv_only=False, gc_loc=True)
 ```
 
-Note: for best training results, make sure you use run with a scheduler with a flat lr for some time and then cosine descent the lr, for example, use a 75% flat lr, then step down and run lower lr for 25%, or cosine descend last 25%.
+Note: for best training results, make sure you use run with a scheduler with a flat lr for some time and then cosine descent the lr, for example, use a 75% flat lr, then step down and run lower lr for 25%, or cosine descend last 25%. For this purpose, the `FlatCosineDecay` scheduler option available in this repo can be used with a parameter `fixed_niter_rel` equal to 0.75.
 
 ## Arguments
 `Ranger` shares arguments with [torch.optim.Adam](https://pytorch.org/docs/stable/optim.html#torch.optim.Adam).

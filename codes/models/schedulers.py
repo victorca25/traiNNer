@@ -7,24 +7,56 @@ from torch.optim.lr_scheduler import _LRScheduler
 
 
 def get_schedulers(optimizers=None, schedulers=None, train_opt=None):
-    ''' Returns a learning rate scheduler for each optimizer 
+    """ Returns a learning rate scheduler for each optimizer
     provided, according to the configuration in train_opt
     
     Parameters:
-        optimizers (list)  -- the list of optimizers, one for each of the networks
-        schedulers (list)  -- the list where the schedulers will be appended to, one for each of the networks
-        train_opt          -- stores all the experiment flags;
-                              train_opt['lr_scheme'] is the name of learning rate policy
-    For 'linear', we keep the same learning rate for the first <niter> epochs
+        optimizers (list): the list of optimizers, one for each of the networks
+        schedulers (list): the list where the schedulers will be appended to, one for each of the networks
+        train_opt (dictionary): stores all the experiment flags;
+                            train_opt['lr_scheme'] is the name of learning rate policy
+
+    For 'Linear', we keep the same learning rate for the first <fixed_niter> epochs
         and linearly decay the rate to zero over the next <niter_decay> epochs.
+    Similarly, for 'FlatCosineDecay', we keep the same learning rate for the first
+        <fixed_niter> epochs and decay the rate to zero over the next <niter_decay> epochs.
+    For these two, <fixed_niter_rel> can be provided alternatively and <fixed_niter> and
+        <niter_decay> are calculated relative to the total training <niter>.
+    Additional schedulers have also been added below.
     For other schedulers (step, multistep, plateau, cosine, etc), we use the default PyTorch schedulers.
     See https://pytorch.org/docs/stable/optim.html for more details.
-    '''
+    """
     for optimizer in optimizers:
         if train_opt['lr_scheme'] == 'Linear':
             def lambda_rule(epoch):
-                lr_l = 1.0 - max(0, epoch + 1 - train_opt['fixed_niter']) / float(train_opt['niter_decay'] + 1)
+                rel = train_opt.get('fixed_niter_rel', None)
+                if rel:
+                    assert 0 < rel <= 1.0
+                    fixed_niter = train_opt['niter'] * rel
+                    niter_decay = train_opt['niter'] - fixed_niter
+                else:
+                    fixed_niter = train_opt['fixed_niter']
+                    niter_decay = train_opt['niter_decay']
+
+                lr_l = 1.0 - max(0, epoch + 1 - fixed_niter) / max(1, niter_decay)
                 return max(0, lr_l) # make sure lr is always >= 0
+
+            sched = lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda_rule)
+
+        if train_opt['lr_scheme'] == 'FlatCosineDecay':
+            def lambda_rule(epoch):
+                rel = train_opt.get('fixed_niter_rel', None)
+                if rel:
+                    assert 0 < rel <= 1.0
+                    fixed_niter = train_opt['niter'] * rel
+                    niter_decay = train_opt['niter'] - fixed_niter
+                else:
+                    fixed_niter = train_opt['fixed_niter']
+                    niter_decay = train_opt['niter_decay']
+
+                lr_l = max(0, epoch + 1 - fixed_niter) / max(1, niter_decay)
+                # normalize cosine and make sure lr is always >= 0
+                return max(0, (math.cos(math.pi * lr_l) + 1)/2)
 
             sched = lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda_rule)
 
@@ -202,9 +234,11 @@ class CosineAnnealingLR_Restart(_LRScheduler):
 
 
 if __name__ == "__main__":
+    N_iter = 1000000
     optimizer = torch.optim.Adam([torch.zeros(3, 64, 3, 3)], lr=2e-4, weight_decay=0,
                                  betas=(0.9, 0.99))
 
+    """
     ##############################
     # MultiStepLR_Restart
     ##############################
@@ -231,7 +265,9 @@ if __name__ == "__main__":
 
     scheduler = MultiStepLR_Restart(optimizer, lr_steps, restarts, restart_weights, gamma=0.5,
                                     clear_state=False)
+    """
 
+    """
     ##############################
     # Cosine Annealing Restart
     ##############################
@@ -248,13 +284,32 @@ if __name__ == "__main__":
 
     scheduler = CosineAnnealingLR_Restart(optimizer, T_period, eta_min=1e-7, restarts=restarts,
                                           weights=restart_weights)
+    """
+
+    ##############################
+    # Linear / FlatCosineDecay
+    ##############################
+
+    ##
+    fixed_niter = 500000
+    niter_decay = N_iter - fixed_niter
+
+    # def lambda_rule(epoch):
+    #     lr_l = 1.0 - max(0, epoch + 1 - fixed_niter) / float(niter_decay + 1)
+    #     return max(0, lr_l) # make sure lr is always >= 0
+
+    def lambda_rule(epoch):
+        lr_l = max(0, epoch + 1 - fixed_niter) / max(1, niter_decay)
+        # normalize cosine and make sure lr is always >= 0
+        return max(0, (math.cos(math.pi * lr_l) + 1)/2)
+
+    scheduler = lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda_rule)
 
 
     ##############################
     # Draw figure
     ##############################
 
-    N_iter = 1000000
     lr_l = list(range(N_iter))
     for i in range(N_iter):
         scheduler.step()
