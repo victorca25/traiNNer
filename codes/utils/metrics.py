@@ -95,15 +95,15 @@ class MetricsDict():
         self.lpips_sum += value
     
     def get_averages(self):
-        averages_list = []
+        averages_dict = {}
         if self.psnr:
-            averages_list.append({'name': 'psnr', 'average': self.psnr_sum / self.count})
+            averages_dict['psnr'] = self.psnr_sum / self.count
         if self.ssim:
-            averages_list.append({'name': 'ssim', 'average': self.ssim_sum / self.count})
+            averages_dict['ssim'] = self.ssim_sum / self.count
         if self.lpips:
-            averages_list.append({'name': 'lpips', 'average': self.lpips_sum / self.count})
+            averages_dict['lpips'] = self.lpips_sum / self.count
         self.reset()
-        return averages_list
+        return averages_dict
 
 
 # Matlab removes the border before calculating PSNR and SSIM

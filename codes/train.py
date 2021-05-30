@@ -49,7 +49,7 @@ def configure_loggers(opt=None):
         util.get_root_logger(None, opt['path']['log'], 'test', level=logging.INFO, screen=True, tofile=tofile)
     logger = util.get_root_logger()  # 'base'
     logger.info(options.dict2str(opt))
-    
+
     # initialize tensorboard logger
     tb_logger = None
     if opt.get('use_tb_logger', False) and 'debug' not in opt['name']:
@@ -115,7 +115,7 @@ def get_dataloaders(opt):
 
     gpu_ids = opt.get('gpu_ids', None)
     gpu_ids = gpu_ids if gpu_ids else []
-    
+
     # Create datasets and dataloaders
     dataloaders = {}
     data_params = {}
@@ -123,7 +123,7 @@ def get_dataloaders(opt):
     for phase, dataset_opt in opt['datasets'].items():
         if opt['is_train'] and phase not in ['train', 'val']:
             raise NotImplementedError('Phase [{:s}] is not recognized.'.format(phase))
-        
+
         name = dataset_opt['name']
         dataset = create_dataset(dataset_opt)
 
@@ -154,7 +154,7 @@ def get_dataloaders(opt):
             logger.info('Number of {:s} images in [{:s}]: {:,d}'.format(phase, name, len(dataset)))
             if phase != 'val':
                 znorm[name] = dataset_opt.get('znorm', False)                    
-    
+
     if not opt['is_train']:
         data_params['znorm'] = znorm
 
@@ -199,7 +199,7 @@ def fit(model, opt, dataloaders, steps_states, data_params, loggers):
     # read loggers
     logger = util.get_root_logger()
     tb_logger = loggers["tb_logger"]
-    
+
     # training
     logger.info('Start training from epoch: {:d}, iter: {:d}'.format(start_epoch, current_step))
     try:
@@ -241,10 +241,11 @@ def fit(model, opt, dataloaders, steps_states, data_params, loggers):
                     message = '<epoch:{:3d}, iter:{:8,d}, lr:{:.3e}, t:{:.4f}s, td:{:.4f}s, eta:{:.4f}h> '.format(
                         epoch, current_step, model.get_current_learning_rate(current_step), avg_time, 
                         avg_data_time, eta(avg_time))
-                    
+
                     # tensorboard training logger
                     if opt['use_tb_logger'] and 'debug' not in opt['name']:
                         if current_step % opt['logger'].get('tb_sample_rate', 1) == 0: # Reduce rate of tb logs
+                            # tb_logger.add_scalar('loss/nll', nll, current_step)  # srflow
                             tb_logger.add_scalar('lr/base', model.get_current_learning_rate(), current_step)
                             tb_logger.add_scalar('time/iteration', timer.get_last_iteration(), current_step)
                             tb_logger.add_scalar('time/data', timerData.get_last_iteration(), current_step)
@@ -266,7 +267,7 @@ def fit(model, opt, dataloaders, steps_states, data_params, loggers):
                 # update learning rate
                 if model.optGstep and model.optDstep and take_step:
                     model.update_learning_rate(current_step, warmup_iter=opt['train'].get('warmup_iter', -1))
-                
+
                 # save latest models and training states every <save_checkpoint_freq> iterations
                 if current_step % opt['logger']['save_checkpoint_freq'] == 0 and take_step:
                     if model.swa: 
@@ -280,31 +281,55 @@ def fit(model, opt, dataloaders, steps_states, data_params, loggers):
                     )
                     logger.info('Models and training states saved.')
 
-                # validation
+                # validation (for SR and other models with validations)
                 if dataloaders.get('val', None) and current_step % opt['train']['val_freq'] == 0 and take_step:
                     val_metrics = metrics.MetricsDict(metrics=opt['train'].get('metrics', None))
+                    nlls = []  # srflow
                     for val_data in dataloaders['val']:
-                        
+
                         model.feed_data(val_data)  # unpack data from data loader
                         model.test()  # run inference
+                        if hasattr(model, 'nll'):
+                            nll = model.nll if model.nll else 0
+                            nlls.append(nll)
 
                         """
                         Get Visuals
                         """
                         visuals = model.get_current_visuals()  # get image results
-                        sr_img = tensor2np(visuals['SR'], denormalize=opt['datasets']['train']['znorm'])
-                        gt_img = tensor2np(visuals['HR'], denormalize=opt['datasets']['train']['znorm'])
-
-                        # Save SR images for reference
                         img_name = os.path.splitext(os.path.basename(val_data['LR_path'][0]))[0]
                         img_dir = os.path.join(opt['path']['val_images'], img_name)
                         util.mkdir(img_dir)
+
+                        # Save SR images for reference
+                        sr_img = None
+                        if hasattr(model, 'heats'):  # SRFlow
+                            opt['train']['val_comparison'] = False
+                            for heat in model.heats:
+                                for i in range(model.n_sample):
+                                    sr_img = tensor2np(visuals['SR', heat, i], denormalize=opt['datasets']['train']['znorm'])
+                                    if opt['train']['overwrite_val_imgs']:
+                                        save_img_path = os.path.join(img_dir,
+                                                                '{:s}_h{:03d}_s{:d}.png'.format(img_name, int(heat * 100), i))
+                                    else:
+                                        save_img_path = os.path.join(img_dir,
+                                                                '{:s}_{:09d}_h{:03d}_s{:d}.png'.format(img_name,
+                                                                                                        current_step,
+                                                                                                        int(heat * 100), i))
+                                    util.save_img(sr_img, save_img_path)
+                        else:  # regular SR
+                            sr_img = tensor2np(visuals['SR'], denormalize=opt['datasets']['train']['znorm'])
+
                         if opt['train']['overwrite_val_imgs']:
                             save_img_path = os.path.join(img_dir, '{:s}.png'.format(img_name))
                         else:
                             save_img_path = os.path.join(img_dir, '{:s}_{:d}.png'.format(img_name, current_step))
+                            if not opt['train']['val_comparison']:
+                                util.save_img(sr_img, save_img_path)
+                        assert sr_img is not None
 
                         # Save GT images for reference
+                        gt_img = tensor2np(visuals['HR'], denormalize=opt['datasets']['train']['znorm'])
                         if opt['train']['save_gt']:
                             save_img_path_gt = os.path.join(img_dir,
                                                             '{:s}_GT.png'.format(img_name))
@@ -323,8 +348,8 @@ def fit(model, opt, dataloaders, steps_states, data_params, loggers):
                         if opt['train']['val_comparison']:
                             lr_img = tensor2np(visuals['LR'], denormalize=opt['datasets']['train']['znorm'])
                             util.save_img_comp([lr_img, sr_img], save_img_path)
-                        else:
-                            util.save_img(sr_img, save_img_path)
+                        # else:
+                        #     util.save_img(sr_img, save_img_path)
 
                         """
                         Get Metrics
@@ -333,29 +358,72 @@ def fit(model, opt, dataloaders, steps_states, data_params, loggers):
                         val_metrics.calculate_metrics(sr_img, gt_img, crop_size=opt['scale'])  # , only_y=True)
 
                     avg_metrics = val_metrics.get_averages()
+                    if nlls:  # srflow
+                        avg_nll = sum(nlls) / len(nlls)
                     del val_metrics
 
+                    # for ReduceLROnPlateau scheduler, get metric average value
+                    if opt['train']['lr_scheme'] == 'ReduceLROnPlateau':
+                        plateau_metric = opt['train']['plateau_metric']
+                        if plateau_metric in avg_metrics:
+                            model.metric = avg_metrics[plateau_metric]
+                            print(plateau_metric, model.metric)
+
                     # log
-                    logger_m = ''
-                    for r in avg_metrics:
-                        formatted_res = r['name'].upper() + ': {:.5g}, '.format(r['average'])
-                        logger_m += formatted_res
+                    logger_m = ''.join(f'{met.upper()}: {avgr:.5g}, ' for met, avgr in avg_metrics.items())
+                    if nlls:
+                        logger_m += 'avg_nll: {:.4e}  '.format(avg_nll)
 
                     logger.info('# Validation # ' + logger_m[:-2])
                     logger_val = logging.getLogger('val')  # validation logger
                     logger_val.info('<epoch:{:3d}, iter:{:8,d}> '.format(epoch, current_step) + logger_m[:-2])
                     # memory_usage = torch.cuda.memory_allocated()/(1024.0 ** 3) # in GB
-                    
+
                     # tensorboard logger
                     if opt['use_tb_logger'] and 'debug' not in opt['name']:
-                        for r in avg_metrics:
-                            tb_logger.add_scalar(r['name'], r['average'], current_step)
-                            # tb_logger.flush()
-                            # tb_logger_valid.add_scalar(r['name'], r['average'], current_step)
-                            # tb_logger_valid.flush()
-                    
+                        # for r in avg_metrics:
+                        for met, avgr in avg_metrics.items():
+                            # tb_logger.add_scalar(r['name'], r['average'], current_step)
+                            tb_logger.add_scalar(met, avgr, current_step)
+                        if nlls:
+                            tb_logger.add_scalar('average nll', avg_nll, current_step)
+                        # tb_logger.flush()
+                        # tb_logger_valid.add_scalar(r['name'], r['average'], current_step)
+                        # tb_logger_valid.flush()
+
+                # sampling training data (for image2image translation and others without validation step)
+                if opt['train'].get('display_freq', None) and current_step % opt['train']['display_freq'] == 0 and take_step:
+                    visuals = model.get_current_visuals()
+
+                    img_name = ''
+                    img_dir = opt['path']['disp_images']
+                    util.mkdir(img_dir)
+                    reala_img = tensor2np(visuals['real_A'], denormalize=opt['datasets']['train']['znorm'])
+                    fakeb_img = tensor2np(visuals['fake_B'], denormalize=opt['datasets']['train']['znorm'])
+                    realb_img = tensor2np(visuals['real_B'], denormalize=opt['datasets']['train']['znorm'])
+                    if 'fake_A' in visuals and 'rec_A' in visuals and 'rec_B' in visuals:
+                        fakea_img = tensor2np(visuals['fake_A'], denormalize=opt['datasets']['train']['znorm'])
+                        reca_img = tensor2np(visuals['rec_A'], denormalize=opt['datasets']['train']['znorm'])
+                        recb_img = tensor2np(visuals['rec_B'], denormalize=opt['datasets']['train']['znorm'])
+                        if 'idt_B' in visuals and 'idt_A' in visuals:
+                            idta_img = tensor2np(visuals['idt_A'], denormalize=opt['datasets']['train']['znorm'])
+                            idtb_img = tensor2np(visuals['idt_B'], denormalize=opt['datasets']['train']['znorm'])
+                    if opt['train'].get('overwrite_disp_imgs', None):
+                        save_img_path = os.path.join(img_dir, '{:s}.png'.format(\
+                            img_name))
+                    else:
+                        save_img_path = os.path.join(img_dir, '{:s}_{:d}.png'.format(\
+                            img_name, current_step))
+                    if 'fake_A' in visuals and 'rec_A' in visuals and 'rec_B' in visuals:
+                        if 'idt_B' in visuals and 'idt_A' in visuals:
+                            util.save_img_comp([reala_img, fakeb_img, reca_img, idtb_img, realb_img, fakea_img, recb_img, idta_img], save_img_path)
+                        else:
+                            util.save_img_comp([reala_img, fakeb_img, reca_img, realb_img, fakea_img, recb_img], save_img_path)
+                    else:
+                        util.save_img_comp([reala_img, fakeb_img, realb_img], save_img_path)
+
                 timerData.tick()
-            
+
             timerEpoch.tock()
             logger.info('End of epoch {} / {} \t Time Taken: {:.4f} sec'.format(
                 epoch, total_epochs, timerEpoch.get_last_iteration()))
@@ -376,7 +444,7 @@ def fit(model, opt, dataloaders, steps_states, data_params, loggers):
         n = n if 'n' in locals() else 0
         model.save_training_state(epoch + (n >= len(dataloaders['train'])), current_step, True)
         logger.info('Training interrupted. Latest models and training states saved.')
-    
+
 
 def main():
     # parse training options

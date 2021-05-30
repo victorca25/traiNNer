@@ -135,18 +135,12 @@ def test_loop(model, opt, dataloaders, data_params):
             avg_metrics_y = test_metrics_y.get_averages()
 
             # prepare log average metrics message
-            agg_logger_m = ''
-            for r in avg_metrics:
-                formatted_res = r['name'].upper() + ': {:.6f}, '.format(r['average'])
-                agg_logger_m += formatted_res
+            agg_logger_m = ''.join(f'{met.upper()}: {avgr:.6f}, ' for met, avgr in avg_metrics.items())
             logger.info('----Average metrics results for {}----\n\t'.format(name) + agg_logger_m[:-2])
             
             if len(avg_metrics_y > 0):
                 # prepare log average Y channel metrics message
-                agg_logger_m = ''
-                for r in avg_metrics_y:
-                    formatted_res = r['name'].upper() + '_Y' + ': {:.6f}, '.format(r['average'])
-                    agg_logger_m += formatted_res
+                agg_logger_m = ''.join(f'{met.upper()}_Y: {avgr:.6f}, ' met, avgr in avg_metrics_y.items())
                 logger.info('----Y channel, average metrics ----\n\t' + agg_logger_m[:-2])
 
 
