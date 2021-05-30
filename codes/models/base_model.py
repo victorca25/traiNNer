@@ -282,7 +282,11 @@ class BaseModel:
                 return self.swa_scheduler.get_last_lr()[0]
             else:
                 # Regular G scheduler lr
-                return self.schedulers[0].get_last_lr()[0]
+                if self.opt['train']['lr_scheme'] == 'ReduceLROnPlateau':
+                    #TODO: to deal with PyTorch bug: https://github.com/pytorch/pytorch/issues/50715
+                    return self.schedulers[0]._last_lr[0]
+                else:
+                    return self.schedulers[0].get_last_lr()[0]
         else:
             # return self.schedulers[0].get_lr()[0]
             return self.optimizers[0].param_groups[0]['lr']
@@ -394,6 +398,12 @@ class BaseModel:
                 state_dict=load_net,
                 model_type=model_type
             )
+
+        # to remove running_mean and running_var from models using
+        # InstanceNorm2d trained with PyTorch before 0.4.0:
+        # for k in list(load_net.keys()):
+        #     if (k.find('running_mean') > 0) or (k.find('running_var') > 0):
+        #         del load_net[k]
 
         network.load_state_dict(load_net, strict=strict)
 

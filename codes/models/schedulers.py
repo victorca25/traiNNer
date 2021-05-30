@@ -43,7 +43,7 @@ def get_schedulers(optimizers=None, schedulers=None, train_opt=None):
 
             sched = lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda_rule)
 
-        if train_opt['lr_scheme'] == 'FlatCosineDecay':
+        elif train_opt['lr_scheme'] == 'FlatCosineDecay':
             def lambda_rule(epoch):
                 rel = train_opt.get('fixed_niter_rel', None)
                 if rel:
@@ -98,7 +98,6 @@ def get_schedulers(optimizers=None, schedulers=None, train_opt=None):
                         weights=train_opt['restart_weights'])
         
         elif train_opt['lr_scheme'] == 'ReduceLROnPlateau':
-            #lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.2, threshold=0.01, patience=5)
             sched = lr_scheduler.ReduceLROnPlateau(optimizer, mode=train_opt['plateau_mode'], 
                         factor=train_opt['plateau_factor'], threshold=train_opt['plateau_threshold'], 
                         patience=train_opt['plateau_patience'])
