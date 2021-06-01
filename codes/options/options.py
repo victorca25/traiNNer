@@ -325,7 +325,7 @@ def check_resume(opt: dict, resume_iter = None):
                 logger.info(f'Set [pretrain_model_D{mkey}] to {dpath}')
 
             if 'swa' in opt['model'] or opt['use_swa']:
-                sdkey = f"pretrain_model_swaG{mkey}"
+                sgkey = f"pretrain_model_swaG{mkey}"
                 spath = os.path.normpath(os.path.join(opt['path']['models'], f'{state_idx}_swaG{mkey}.pth'))
-                opt['path'][sdkey] = spath
+                opt['path'][sgkey] = spath
                 logger.info(f'Set [pretrain_model_swaG{mkey}] to {spath}')
