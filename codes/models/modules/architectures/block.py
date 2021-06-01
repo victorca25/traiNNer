@@ -58,7 +58,7 @@ class Swish(nn.Module):
           dimensions
         - Output: (N, *), same shape as the input
         """
-        super(Swish).__init__()
+        super(Swish, self).__init__()
         self.inplace = inplace
         # self.beta = beta # user-defined beta parameter, non-trainable
         # self.beta = beta * torch.nn.Parameter(torch.ones(1)) # learnable beta parameter, create a tensor out of beta

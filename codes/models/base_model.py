@@ -101,38 +101,15 @@ class BaseModel:
             if isinstance(name, str):
                 net = getattr(self, 'net' + name)
                 s, n = self.get_network_description(net)
-                if isinstance(net, nn.DataParallel) or isinstance(self.netG, nn.parallel.DistributedDataParallel):
+                if isinstance(net, nn.DataParallel) or isinstance(net, nn.parallel.DistributedDataParallel):
                     net_struc_str = '{} - {}'.format(net.__class__.__name__,
                                                      net.module.__class__.__name__)
                 else:
                     net_struc_str = '{}'.format(net.__class__.__name__)
             
-            logger.info('Network {} structure: {}, with parameters: {:,d}'.format(name, net_struc_str, n))
+            logger.info(f'Network {name} structure: {net_struc_str}, with parameters: {n:,d}')
             if verbose:
                 logger.info(s)
-
-        # # Generator
-        # s, n = self.get_network_description(self.netG)
-        # if isinstance(self.netG, nn.DataParallel):
-        #     net_struc_str = '{} - {}'.format(self.netG.__class__.__name__,
-        #                                      self.netG.module.__class__.__name__)
-        # else:
-        #     net_struc_str = '{}'.format(self.netG.__class__.__name__)
-
-        # logger.info('Network G structure: {}, with parameters: {:,d}'.format(net_struc_str, n))
-        # logger.info(s)
-        # if self.is_train:
-        #     # Discriminator
-        #     if self.cri_gan:
-        #         s, n = self.get_network_description(self.netD)
-        #         if isinstance(self.netD, nn.DataParallel):
-        #             net_struc_str = '{} - {}'.format(self.netD.__class__.__name__,
-        #                                             self.netD.module.__class__.__name__)
-        #         else:
-        #             net_struc_str = '{}'.format(self.netD.__class__.__name__)
-
-        #         logger.info('Network D structure: {}, with parameters: {:,d}'.format(net_struc_str, n))
-        #         logger.info(s)
 
         #TODO: feature network is not being trained, is it necessary to visualize? Maybe just name?
         # maybe show the generatorlosses instead?
@@ -147,7 +124,7 @@ class BaseModel:
             else:
                 net_struc_str = '{}'.format(self.generatorlosses.netF.__class__.__name__)
 
-            logger.info('Network F structure: {}, with parameters: {:,d}'.format(net_struc_str, n))
+            logger.info('Network F structure: {net_struc_str}, with parameters: {n:,d}')
             logger.info(s)
         '''
 
@@ -186,32 +163,35 @@ class BaseModel:
         for name in self.model_names:
             if isinstance(name, str):
                 net = getattr(self, 'net' + name)
-                load_path_opt = 'pretrain_model_{}'.format(name)
+                load_path_opt = f'pretrain_model_{name}'
                 load_path = self.opt['path'][load_path_opt]
                 load_submodule = self.opt['path'].get('load_submodule', None)  # 'RRDB' -> pretrained RRDB for SRFlow
                 if load_path is not None:
-                    logger.info('Loading pretrained model for {} [{:s}] ...'.format(name, load_path))
-                    strict = self.opt['network_{}'.format(name)].get('strict', None)
+                    logger.info(f'Loading pretrained model for {name} [{load_path:s}]')
+                    model_type = 'D' if 'D' in name else 'G'
+                    strict = self.opt[f'network_{model_type}'].get('strict', None)
                     self.load_network(load_path, net, strict, model_type=name, submodule=load_submodule)
-
-        # load_path_G = self.opt['path']['pretrain_model_G']
-        # if load_path_G is not None:
-        #     logger.info('Loading pretrained model for G [{:s}] ...'.format(load_path_G))
-        #     strict = self.opt['network_G'].get('strict', None)
-        #     self.load_network(load_path_G, self.netG, strict, model_type='G')
-        # if self.opt['is_train'] and self.opt['train']['gan_weight']:
-        #     load_path_D = self.opt['path']['pretrain_model_D']
-        #     if self.opt['is_train'] and load_path_D is not None:
-        #         logger.info('Loading pretrained model for D [{:s}] ...'.format(load_path_D))
-        #         strict = self.opt['network_D'].get('strict', None)
-        #         self.load_network(load_path_D, self.netD, model_type='D')
 
     def load_swa(self):
         if self.opt['is_train'] and self.opt['use_swa']:
             load_path_swaG = self.opt['path']['pretrain_model_swaG']
             if self.opt['is_train'] and load_path_swaG is not None:
-                logger.info('Loading pretrained model for SWA G [{:s}] ...'.format(load_path_swaG))
+                logger.info(f'Loading pretrained model for SWA G [{load_path_swaG:s}]')
                 self.load_network(load_path_swaG, self.swa_model)
+
+        # if self.opt['is_train'] and self.opt['use_swa']:
+        #     if self.opt['model'] == 'cyclegan':
+        #         #TODO: SWA for cyclegan complete and test
+        #         model_keys = ['_A', '_B']
+        #     else:
+        #         model_keys = ['']
+
+        #     for mkey in model_keys:
+        #         swanet = getattr(self, 'swa_model' + mkey)
+        #         load_path_swaG = self.opt['path'][f"pretrain_model_swaG{mkey}"]
+        #         if self.opt['is_train'] and load_path_swaG is not None:
+        #             logger.info(f'Loading pretrained model for SWA G{mkey} [{load_path_swaG:s}]')
+        #             self.load_network(load_path_swaG, swanet)
 
     def _set_lr(self, lr_groups_l: list):
         """
@@ -328,12 +308,12 @@ class BaseModel:
 
     def save_network(self, network: nn.Module, network_label: str, iter_step: int, latest=False):
         if latest:
-            save_filename = 'latest_{}.pth'.format(network_label)
+            save_filename = f'latest_{network_label}.pth'
         else:
-            save_filename = '{}_{}.pth'.format(iter_step, network_label)
+            save_filename = f'{iter_step}_{network_label}.pth'
         save_path = os.path.join(self.opt['path']['models'], save_filename)
         if os.path.exists(save_path):
-            prev_path = os.path.join(self.opt['path']['models'], 'previous_{}.pth'.format(network_label))
+            prev_path = os.path.join(self.opt['path']['models'], f'previous_{network_label}.pth')
             copyfile(save_path, prev_path)
         if isinstance(network, (nn.DataParallel, nn.parallel.DistributedDataParallel)):
             network = network.module
@@ -384,10 +364,10 @@ class BaseModel:
             load_net = load_net[param_key]
 
         # remove unnecessary 'module.' if needed
-        for k, v in deepcopy(load_net).items():
-            if k.startswith('module.'):
-                load_net[k[7:]] = v
-                load_net.pop(k)
+        # for k, v in deepcopy(load_net).items():
+        #     if k.startswith('module.'):
+        #         load_net[k[7:]] = v
+        #         load_net.pop(k)
 
         # validate model type to be loaded in the network can do
         # any additional conversion or modification steps here
@@ -434,7 +414,7 @@ class BaseModel:
         if latest:
             save_filename = 'latest.state'
         else:
-            save_filename = '{}.state'.format(iter_step)
+            save_filename = f'{iter_step}.state'
         save_path = os.path.join(self.opt['path']['training_state'], save_filename)
         if os.path.exists(save_path):
             prev_path = os.path.join(self.opt['path']['training_state'], 'previous.state')

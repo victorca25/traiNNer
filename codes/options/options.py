@@ -3,6 +3,8 @@ import logging
 from collections import OrderedDict
 import cv2
 
+from .defaults import get_network_defaults
+
 #PAD_MOD
 _cv2_str2pad = {'constant':cv2.BORDER_CONSTANT,
                 'edge':cv2.BORDER_REPLICATE,
@@ -239,8 +241,12 @@ def parse(opt_path: str, is_train: bool = True) -> NoneDict:
         opt['path']['results_root'] = results_root
         opt['path']['log'] = results_root
 
-    # network_G
-    opt['network_G']['scale'] = scale
+    #TODO: do any check of in_nc and out_nc in the networks here
+
+    # networks pre-flight check
+    opt = get_network_defaults(opt)
+    #TODO: note that alternatively, this could take place in get_network()
+    # in networks.py instead. evaluate pros/cons.
 
     # relative learning rate and options
     if 'train' in opt:
@@ -291,7 +297,9 @@ def check_resume(opt: dict, resume_iter = None):
     logger = logging.getLogger('base')
     if opt['path']['resume_state']:
         opt['path']['resume_state'] = os.path.normpath(opt['path']['resume_state'])
-        if opt['path']['pretrain_model_G'] or opt['path']['pretrain_model_D']:
+        if (opt['path']['pretrain_model_G'] or opt['path']['pretrain_model_D']
+            or opt['path']['pretrain_model_G_A'] or opt['path']['pretrain_model_D_A']
+            or opt['path']['pretrain_model_G_B'] or opt['path']['pretrain_model_D_B']):
             logger.warning('pretrain_model paths will be ignored when resuming training from a .state file.')
 
         if resume_iter:
@@ -299,16 +307,25 @@ def check_resume(opt: dict, resume_iter = None):
         else:
             state_idx = os.path.basename(opt['path']['resume_state']).split('.')[0]
 
-        opt['path']['pretrain_model_G'] = os.path.normpath(os.path.join(opt['path']['models'],
-                                                   '{}_G.pth'.format(state_idx)))
-        logger.info('Set [pretrain_model_G] to {}'.format(opt['path']['pretrain_model_G']))
+        if opt['model'] == 'cyclegan':
+            model_keys = ['_A', '_B']
+        else:
+            model_keys = ['']
 
-        if 'gan' in opt['model']:
-            opt['path']['pretrain_model_D'] = os.path.normpath(os.path.join(opt['path']['models'],
-                                                       '{}_D.pth'.format(state_idx)))
-            logger.info('Set [pretrain_model_D] to {}'.format(opt['path']['pretrain_model_D']))
+        for mkey in model_keys:
+            pgkey = f"pretrain_model_G{mkey}"
+            gpath = os.path.normpath(os.path.join(opt['path']['models'], f'{state_idx}_G{mkey}.pth'))
+            opt['path'][pgkey] = gpath
+            logger.info(f'Set [pretrain_model_G{mkey}] to {gpath}')
 
-        if 'swa' in opt['model'] or opt['swa']:
-            opt['path']['pretrain_model_swaG'] = os.path.normpath(os.path.join(opt['path']['models'],
-                                                   '{}_swaG.pth'.format(state_idx)))
-            logger.info('Set [pretrain_model_swaG] to {}'.format(opt['path']['pretrain_model_swaG']))
+            if 'gan' in opt['model']:
+                pdkey = f"pretrain_model_D{mkey}"
+                dpath = os.path.normpath(os.path.join(opt['path']['models'], f'{state_idx}_D{mkey}.pth'))
+                opt['path'][pdkey] = dpath
+                logger.info(f'Set [pretrain_model_D{mkey}] to {dpath}')
+
+            if 'swa' in opt['model'] or opt['use_swa']:
+                sdkey = f"pretrain_model_swaG{mkey}"
+                spath = os.path.normpath(os.path.join(opt['path']['models'], f'{state_idx}_swaG{mkey}.pth'))
+                opt['path'][sdkey] = spath
+                logger.info(f'Set [pretrain_model_swaG{mkey}] to {spath}')
