@@ -367,14 +367,15 @@ def fit(model, opt, dataloaders, steps_states, data_params, loggers):
                         plateau_metric = opt['train']['plateau_metric']
                         if plateau_metric in avg_metrics:
                             model.metric = avg_metrics[plateau_metric]
-                            print(plateau_metric, model.metric)
+                        elif plateau_metric == 'nll':
+                            model.metric = avg_nll
 
                     # log
                     logger_m = ''.join(f'{met.upper()}: {avgr:.5g}, ' for met, avgr in avg_metrics.items())
                     if nlls:
                         logger_m += 'avg_nll: {:.4e}  '.format(avg_nll)
 
-                    logger.info('# Validation # ' + logger_m[:-2])
+                    logger.info(f'# Validation # {logger_m[:-2]}')
                     logger_val = logging.getLogger('val')  # validation logger
                     logger_val.info('<epoch:{:3d}, iter:{:8,d}> '.format(epoch, current_step) + logger_m[:-2])
                     # memory_usage = torch.cuda.memory_allocated()/(1024.0 ** 3) # in GB
