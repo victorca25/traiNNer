@@ -17,7 +17,7 @@ def get_network_G_config(network_G, scale, crop_size):
     full_network_G['strict'] = network_G.pop('strict', False) # True | False: whether to load the model in strict mode or not
 
     # SR networks
-    if kind_G == 'rrdb_net' or kind_G == 'esrgan' or kind_G == 'evsrgan' or kind_G == 'esrgan-lite':
+    if kind_G in ('rrdb_net', 'esrgan', 'evsrgan', 'esrgan-lite'):
         # ESRGAN (or EVSRGAN):
         full_network_G['type'] = "rrdb_net" # RRDB_net (original ESRGAN arch)
         full_network_G['norm_type'] = network_G.pop('norm_type', None)  # "instance" normalization, "batch" normalization or no norm
@@ -42,7 +42,7 @@ def get_network_G_config(network_G, scale, crop_size):
         full_network_G['finalact'] =  network_G.pop('finalact', None)  # Activation function, ie use "tanh" to make outputs fit in [-1, 1] range. Default = None. Coordinate with znorm.
         full_network_G['upscale'] =  network_G.pop('scale', scale)
         full_network_G['upsample_mode'] =  network_G.pop('upsample_mode', "upconv") # the type of upsample to use
-    elif kind_G == 'mrrdb_net' or kind_G == 'mesrgan':
+    elif kind_G in ('mrrdb_net', 'mesrgan'):
         # ESRGAN modified arch:
         full_network_G['type'] = "mrrdb_net" # MRRDB_net (modified/"new" arch) | sr_resnet
         full_network_G['in_nc'] = network_G.pop('in_nc', 3) # num. of input image channels: 3 for RGB and 1 for grayscale
@@ -76,7 +76,7 @@ def get_network_G_config(network_G, scale, crop_size):
         full_network_G['spectral_norm'] =  network_G.pop('spectral_norm', True)
         full_network_G['max_pool'] =  network_G.pop('max_pool', True)
         full_network_G['poolsize'] =  network_G.pop('poolsize', 4)
-    elif kind_G == 'sr_resnet' or kind_G == 'srresnet' or kind_G == 'srgan':
+    elif kind_G in ('sr_resnet', 'srresnet', 'srgan'):
         # SRGAN:
         full_network_G['type'] = "sr_resnet"  # SRResNet
         full_network_G['in_nc'] = network_G.pop('in_nc', 3) # num. of input image channels: 3 for RGB and 1 for grayscale
@@ -92,9 +92,9 @@ def get_network_G_config(network_G, scale, crop_size):
         full_network_G['finalact'] =  network_G.pop('finalact', None)  # Activation function, ie use "tanh" to make outputs fit in [-1, 1] range. Default = None. Coordinate with znorm.
         full_network_G['res_scale'] =  network_G.pop('res_scale', 1)
     #TODO: msrresnet
-    elif kind_G == 'sft_arch' or kind_G == 'sft_net':
+    elif kind_G in ('sft_arch', 'sft_net'):
         full_network_G['type'] = "sft_arch"  # SFT-GAN
-    elif kind_G == 'pan_net' or kind_G == 'pan':
+    elif kind_G in ('pan_net', 'pan'):
         # PAN:
         full_network_G['type'] = "pan_net"  # PAN_net
         full_network_G['in_nc'] = network_G.pop('in_nc', 3) # num. of input image channels: 3 for RGB and 1 for grayscale
@@ -106,12 +106,12 @@ def get_network_G_config(network_G, scale, crop_size):
         full_network_G['self_attention'] =  network_G.pop('self_attention', False)
         full_network_G['double_scpa'] =  network_G.pop('double_scpa', False)
         full_network_G['ups_inter_mode'] =  network_G.pop('ups_inter_mode', "nearest")
-    elif kind_G == 'abpn_net' or kind_G == 'abpn':
+    elif kind_G in ('abpn_net', 'abpn'):
         full_network_G['type'] = "abpn_net"  # ABPN_net
         full_network_G['input_dim'] = network_G.pop('in_nc', None) or network_G.pop('input_dim', 3) # num. of input image channels: 3 for RGB and 1 for grayscale
         full_network_G['dim'] = network_G.pop('dim', 32)
     # SRFlow
-    elif kind_G == 'srflow_net' or kind_G == 'srflow':
+    elif kind_G in ('srflow_net', 'srflow'):
         # SRFLOW:
         full_network_G['type'] = "srflow_net"  # SRFlow_net
         full_network_G['in_nc'] = network_G.pop('in_nc', 3) # num. of input image channels: 3 for RGB and 1 for grayscale
@@ -197,7 +197,7 @@ def get_network_G_config(network_G, scale, crop_size):
         full_network_G['upsample_mode'] =  network_G.pop('upsample_mode', "deconv") # deconv | upconv # the type of upsample to use, deconvolution or upsample+convolution
         full_network_G['padding_type'] =  network_G.pop('padding_type', "reflect")
     # video networks
-    elif kind_G == 'sofvsr_net' or kind_G == 'sofvsr':
+    elif kind_G in ('sofvsr_net', 'sofvsr'):
         full_network_G['type'] = "sofvsr_net"  # RRDB_net (original ESRGAN arch)
         full_network_G['n_frames'] =  network_G.pop('n_frames', 3)  # number of frames the network will use to estimate the central frame (n-1)/2. Must coincide with "num_frames" in the dataset.
         full_network_G['channels'] =  network_G.pop('channels', 320)  # feature extraction layer with 320 kernels of size 3 × 3
@@ -223,7 +223,7 @@ def get_network_G_config(network_G, scale, crop_size):
         # full_network_G['sr_act_type'] =  network_G.pop('sr_net_act', None) or network_G.pop('sr_act_type', "leakyrelu")  # swish | leakyrelu
         # full_network_G['sr_finalact'] =  network_G.pop('sr_finalact', None)  # Activation function, ie use "tanh" to make outputs fit in [-1, 1] range. Default = None. Coordinate with znorm.
         # full_network_G['sr_upsample_mode'] =  network_G.pop('sr_upsample_mode', "upconv") # the type of upsample to use
-    elif kind_G == 'sr3d_net' or kind_G == 'sr3d':
+    elif kind_G in ('sr3d_net', 'sr3d'):
         # SR3D:
         full_network_G['type'] = "sr3d_net"  # SR3DNet
         full_network_G['in_nc'] = network_G.pop('in_nc', 3) # num. of input image channels: 3 for RGB and 1 for grayscale
@@ -232,7 +232,7 @@ def get_network_G_config(network_G, scale, crop_size):
         full_network_G['nb'] = network_G.pop('nb', 23)  # number of Conv3D  blocks
         full_network_G['scale'] =  network_G.pop('scale', scale)
         full_network_G['n_frames'] =  network_G.pop('n_frames', 5)  # number of frames the network will use to estimate the central frame (n-1)/2. Must coincide with "num_frames" in the dataset.
-    elif kind_G == 'edvr_net' or kind_G == 'edvr':
+    elif kind_G in ('edvr_net', 'edvr'):
         # EDVR:
         full_network_G['type'] = "edvr_net"  # EDVR
         full_network_G['num_in_ch'] = network_G.pop('in_nc', 3) # num. of input image channels: 3 for RGB and 1 for grayscale
@@ -249,7 +249,7 @@ def get_network_G_config(network_G, scale, crop_size):
         full_network_G['upsample_mode'] =  network_G.pop('upsample_mode', "pixelshuffle")  # pixelshuffle | upconv
         full_network_G['add_rrdb'] =  network_G.pop('add_rrdb', False)  # adds RRDB blocks before upsample step to improve SR
         full_network_G['nb'] = network_G.pop('nb', 23)  # number of blocks, only applies to add_rrdb's RRDB blocks
-    elif kind_G == 'rife_net' or kind_G == 'rife':
+    elif kind_G in ('rife_net', 'rife'):
         full_network_G['type'] = "rife_net"  # RIFE
     elif kind_G == 'dvd_net':
         full_network_G['type'] = "dvd_net"  # DVD
@@ -295,7 +295,7 @@ def get_network_D_config(network_D, scale, crop_size, model_G):
     elif kind_D == 'discriminator_vgg_128_sn':
         # TODO: will be replaced by regular discriminator_vgg with optional spectral norm
         full_network_D['type'] = network_D.pop('type', "discriminator_vgg_128_SN")
-    elif kind_D == 'adiscriminator' or kind_D == 'adiscriminator_s':
+    elif kind_D in ('adiscriminator', 'adiscriminator_s'):
         # TODO: replace with discriminator_vgg_fea
         full_network_D['type'] = network_D.pop('type', "adiscriminator")
         full_network_D['spectral_norm'] = network_D.pop('spectral_norm', True)
@@ -322,11 +322,11 @@ def get_network_D_config(network_D, scale, crop_size, model_G):
             full_network_D['max_pool'] = network_D.pop('max_pool', False)
             full_network_D['poolsize'] = network_D.pop('poolsize', 4)
     elif kind_D in ['patchgan', 'nlayerdiscriminator', 'multiscale', 'pixelgan', 'pixeldiscriminator']:
-        if kind_D == 'patchgan' or kind_D == 'nlayerdiscriminator':
+        if kind_D in ('patchgan', 'nlayerdiscriminator'):
             full_network_D['type'] = 'patchgan'
         elif kind_D == 'multiscale':
             full_network_D['type'] = 'multiscale'
-        elif kind_D == 'pixelgan' or kind_D == 'pixeldiscriminator':
+        elif kind_D in ('pixelgan', 'pixeldiscriminator'):
             full_network_D['type'] = 'pixelgan'
         full_network_D['input_nc'] = network_D.pop('in_nc', 3)  # num. of input image channels: 3 for RGB and 1 for grayscale
         full_network_D['ndf'] = network_D.pop('nf', 64)  # num. of features in conv layers

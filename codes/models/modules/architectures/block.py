@@ -12,11 +12,11 @@ from models.networks import weights_init_normal, weights_init_xavier, weights_in
 ####################
 
 # Swish activation funtion
-def swish_func(x, beta=1.0):
+def swish_func(x, beta=1.0, inplace=False):
     """
     "Swish: a Self-Gated Activation Function"
     Searching for Activation Functions (https://arxiv.org/abs/1710.05941)
-    
+
     If beta=1 applies the Sigmoid Linear Unit (SiLU) function element-wise
     If beta=0, Swish becomes the scaled linear function (identity 
       activation) f(x) = x/2
@@ -24,27 +24,24 @@ def swish_func(x, beta=1.0):
       (unit step), and multiplying that by x gives us f(x)=2max(0,x), which 
       is the ReLU multiplied by a constant factor of 2, so Swish becomes like 
       the ReLU function.
-    
+
     Including beta, Swish can be loosely viewed as a smooth function that 
       nonlinearly interpolate between identity (linear) and ReLU function.
       The degree of interpolation can be controlled by the model if beta is 
       set as a trainable parameter.
-    
+
     Alt: 1.78718727865 * (x * sigmoid(x) - 0.20662096414)
     """
-    
-    # In-place implementation, may consume less GPU memory: 
-    """ 
-    result = x.clone()
-    torch.sigmoid_(beta*x)
-    x *= result
-    return x
-    #"""
-    
-    # Normal out-of-place implementation:
-    #"""
-    return x * torch.sigmoid(beta * x)
-    #"""
+
+    if inplace:
+        # In-place implementation, may consume less GPU memory:
+        result = x.clone()
+        torch.sigmoid_(beta*x)
+        x *= result
+        return x
+    else:
+        # Normal out-of-place implementation:
+        return x * torch.sigmoid(beta * x)
     
 # Swish module
 class Swish(nn.Module):
@@ -70,7 +67,7 @@ class Swish(nn.Module):
         # self.slope = torch.nn.Parameter(torch.tensor(slope)) # learnable slope parameter, create a tensor out of slope
         # self.slope.requiresGrad = True # set requiresGrad to true to true to make it trainable
     
-    def forward(self, input):
+    def forward(self, x):
         """
         # Disabled, using inplace causes:
         # "RuntimeError: one of the variables needed for gradient computation has been modified by an inplace operation"
@@ -80,7 +77,7 @@ class Swish(nn.Module):
         else:
             return 2 * self.slope * swish_func(input, self.beta)
         """
-        return 2 * self.slope * swish_func(input, self.beta)
+        return 2 * self.slope * swish_func(x, self.beta, self.inplace)
 
 
 def act(act_type, inplace=True, neg_slope=0.2, n_prelu=1, beta=1.0):
@@ -91,11 +88,11 @@ def act(act_type, inplace=True, neg_slope=0.2, n_prelu=1, beta=1.0):
     act_type = act_type.lower()
     if act_type == 'relu':
         layer = nn.ReLU(inplace)
-    elif act_type == 'leakyrelu' or act_type == 'lrelu':
+    elif act_type in ('leakyrelu', 'lrelu'):
         layer = nn.LeakyReLU(neg_slope, inplace)
     elif act_type == 'prelu':
         layer = nn.PReLU(num_parameters=n_prelu, init=neg_slope)
-    elif act_type == 'Tanh' or act_type == 'tanh':  # [-1, 1] range output
+    elif act_type == 'tanh':  # [-1, 1] range output
         layer = nn.Tanh()
     elif act_type == 'sigmoid':  # [0, 1] range output
         layer = nn.Sigmoid()

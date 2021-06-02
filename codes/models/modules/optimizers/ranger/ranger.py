@@ -48,9 +48,9 @@ class Ranger(Optimizer):
     def __init__(self, params, lr=1e-3, betas=(.95, 0.999), eps=1e-5,
                  weight_decay=0, alpha=0.5, k=6, N_sma_threshhold=5,
                  use_gc=True, gc_conv_only=False, gc_loc=True):
-        if not 0.0 < lr:
-            raise ValueError(f'Invalid learning Rate: {lr}')
-        if not 0.0 < eps:
+        if lr <= 0.0:
+            raise ValueError(f'Invalid learning rate: {lr}')
+        if eps <= 0.0:
             raise ValueError(f'Invalid epsilon value: {eps}')
         if not 0.0 <= betas[0] < 1.0:
             raise ValueError(f'Invalid beta parameter at index 0: {betas[0]}')
@@ -58,7 +58,7 @@ class Ranger(Optimizer):
             raise ValueError(f'Invalid beta parameter at index 1: {betas[1]}')
         if not 0.0 <= alpha <= 1.0:
             raise ValueError(f'Invalid slow update rate: {alpha}')
-        if not 1 <= k:
+        if k < 1:
             raise ValueError(f'Invalid lookahead steps: {k}')
 
         defaults = dict(lr=lr, betas=betas, eps=eps, weight_decay=weight_decay,
@@ -189,7 +189,7 @@ class Ranger(Optimizer):
                     G_grad.add_(p_data_fp32, alpha=group['weight_decay'])
 
                 # GC operation
-                if self.gc_loc == False:
+                if self.gc_loc is False:
                     G_grad = centralized_gradient(G_grad, use_gc=self.use_gc, gc_conv_only=self.gc_conv_only)
 
                 p_data_fp32.add_(G_grad, alpha=-step_size * group['lr'])

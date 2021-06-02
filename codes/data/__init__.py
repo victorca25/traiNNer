@@ -34,24 +34,24 @@ def create_dataset(dataset_opt: dict) -> torch.utils.data.Dataset:
     Create Dataset.
     :param dataset_opt: Dataset configuration from opt file
     """
-    mode = dataset_opt['mode']
-    if mode == 'single' or mode == 'LR':
+    mode = dataset_opt['mode'].lower()
+    if mode in ('single', 'lr'):
         from data.single_dataset import SingleDataset as D
-    elif mode in ['aligned', 'LRHR', 'LRHROTF', 'LRHRC']:
+    elif mode in ['aligned', 'lrhr', 'lrhrotf', 'lrhrc']:
         from data.aligned_dataset import AlignedDataset as D
     elif mode == 'unaligned':
         from data.unaligned_dataset import UnalignedDataset as D
     elif mode == 'LRHRseg_bg':
         from data.LRHR_seg_bg_dataset import LRHRSeg_BG_Dataset as D
-    elif mode == 'VLRHR':
+    elif mode == 'vlrhr':
         from data.Vid_dataset import VidTrainsetLoader as D
-    elif mode == 'VLR':
+    elif mode == 'vlr':
         from data.Vid_dataset import VidTestsetLoader as D
-    elif mode == 'LRHRPBR':
+    elif mode == 'lrhrpbr':
         from data.LRHRPBR_dataset import LRHRDataset as D
-    elif mode == 'DVD':
+    elif mode == 'dvd':
         from data.DVD_dataset import DVDDataset as D
-    elif mode == 'DVDI':
+    elif mode == 'dvdi':
         from data.DVD_dataset import DVDIDataset as D
     else:
         raise NotImplementedError('Dataset [{:s}] is not recognized.'.format(mode))

@@ -12,34 +12,26 @@ logger = logging.getLogger('base')
 ####################
 
 def weights_init_normal(m, bias_fill=0, mean=0.0, std=0.02):
-    # classname = m.__class__.__name__
-    # if classname.find('Conv') != -1 and classname != "DiscConvBlock": #ASRResNet's DiscConvBlock causes confusion
-    # elif classname.find('Linear') != -1:
-    if hasattr(m, 'weight') and isinstance(m, nn.Conv2d) or isinstance(m, nn.Linear):
-        # init.normal_(m.weight.data, 0.0, std)
-        init.normal_(m.weight, mean=mean, std=std)
-        if m.bias is not None:
+    classname = m.__class__.__name__
+    if hasattr(m, 'weight') and (classname.find('Conv') != -1 or classname.find('Linear') != -1):
+        init.normal_(m.weight.data, mean=mean, std=std)
+        if hasattr(m, 'bias') and m.bias is not None:
             m.bias.data.fill_(bias_fill)
-    # elif classname.find('BatchNorm2d') != -1:
-    elif isinstance(m, nn.modules.batchnorm._BatchNorm):
+    elif isinstance(m, (nn.BatchNorm2d, nn.GroupNorm)):
         init.normal_(m.weight.data, mean=1.0, std=std)  # BN also uses norm
         if hasattr(m, 'bias') and m.bias is not None:
             # init.constant_(m.bias.data, 0.0)
             m.bias.data.fill_(bias_fill)
 
 def weights_init_xavier(m, scale=1, bias_fill=0, **kwargs):
-    # classname = m.__class__.__name__
-    # if classname.find('Conv') != -1 and classname != "DiscConvBlock": #ASRResNet's DiscConvBlock causes confusion
-    # elif classname.find('Linear') != -1:
-    if hasattr(m, 'weight') and isinstance(m, nn.Conv2d) or isinstance(m, nn.Linear):
+    classname = m.__class__.__name__
+    if hasattr(m, 'weight') and (classname.find('Conv') != -1 or classname.find('Linear') != -1):
         # init.xavier_normal_(m.weight.data, gain=gain)
         init.xavier_normal_(m.weight, **kwargs)
         m.weight.data *= scale
-        if m.bias is not None:
+        if hasattr(m, 'bias') and m.bias is not None:
             m.bias.data.fill_(bias_fill)
-    # elif classname.find('BatchNorm2d') != -1:
-    # elif isinstance(m, _BatchNorm):
-    elif isinstance(m, nn.modules.batchnorm._BatchNorm):
+    elif isinstance(m, (nn.BatchNorm2d, nn.GroupNorm)):
         # init.constant_(m.weight.data, 1.0)
         init.constant_(m.weight, 1)
         if hasattr(m, 'bias') and m.bias is not None:
@@ -47,40 +39,34 @@ def weights_init_xavier(m, scale=1, bias_fill=0, **kwargs):
             m.bias.data.fill_(bias_fill)
 
 def weights_init_kaiming(m, scale=1, bias_fill=0, **kwargs):
-    # classname = m.__class__.__name__
-    # if classname.find('Conv') != -1 and classname != "DiscConvBlock": #ASRResNet's DiscConvBlock causes confusion
-    # elif classname.find('Linear') != -1:
-    if hasattr(m, 'weight') and isinstance(m, nn.Conv2d) or isinstance(m, nn.Linear):
+    classname = m.__class__.__name__
+    if hasattr(m, 'weight') and (classname.find('Conv') != -1 or classname.find('Linear') != -1):
         # init.kaiming_normal_(m.weight.data, a=0, mode='fan_in')
         init.kaiming_normal_(m.weight, **kwargs)
         m.weight.data *= scale
         if hasattr(m, 'bias') and m.bias is not None:
             m.bias.data.fill_(bias_fill)
-    # elif classname.find('BatchNorm2d') != -1:
-    # elif isinstance(m, _BatchNorm):
-    elif isinstance(m, nn.modules.batchnorm._BatchNorm):
-        # init.constant_(m.weight.data, 1.0)
-        init.constant_(m.weight, 1)
-        if m.bias is not None:
-            # init.constant_(m.bias.data, 0.0)
-            m.bias.data.fill_(bias_fill)
-
-def weights_init_orthogonal(m, bias_fill=0, **kwargs):
-    # classname = m.__class__.__name__
-    # if classname.find('Conv') != -1:
-    # elif classname.find('Linear') != -1:
-    if hasattr(m, 'weight') and isinstance(m, nn.Conv2d) or isinstance(m, nn.Linear):
-        # init.orthogonal_(m.weight.data, gain=1)
-        init.orthogonal_(m.weight.data, **kwargs)
-        if m.bias is not None:
-            m.bias.data.fill_(bias_fill)
-    # elif classname.find('BatchNorm2d') != -1:
-    elif isinstance(m, nn.modules.batchnorm._BatchNorm):
+    elif isinstance(m, (nn.BatchNorm2d, nn.GroupNorm)):
         # init.constant_(m.weight.data, 1.0)
         init.constant_(m.weight, 1)
         if hasattr(m, 'bias') and m.bias is not None:
             # init.constant_(m.bias.data, 0.0)
             m.bias.data.fill_(bias_fill)
+
+def weights_init_orthogonal(m, bias_fill=0, **kwargs):
+    classname = m.__class__.__name__
+    if hasattr(m, 'weight') and (classname.find('Conv') != -1 or classname.find('Linear') != -1):
+        # init.orthogonal_(m.weight.data, gain=1)
+        init.orthogonal_(m.weight.data, **kwargs)
+        if hasattr(m, 'bias') and m.bias is not None:
+            m.bias.data.fill_(bias_fill)
+    elif isinstance(m, (nn.BatchNorm2d, nn.GroupNorm)):
+        # init.constant_(m.weight.data, 1.0)
+        init.constant_(m.weight, 1)
+        if hasattr(m, 'bias') and m.bias is not None:
+            # init.constant_(m.bias.data, 0.0)
+            m.bias.data.fill_(bias_fill)
+
 
 def init_weights(net, init_type='kaiming', scale=1, std=0.02, gain=0.02):
     """Initialize network weights.
@@ -98,7 +84,7 @@ def init_weights(net, init_type='kaiming', scale=1, std=0.02, gain=0.02):
     'kaiming' is used in the ESRGAN paper, 'normal' in the original pix2pix and CycleGAN paper.
     kaiming and xavier might work better for some applications.
     """
-    logger.info('Initialization method [{:s}]'.format(init_type))
+    logger.info(f'Initialization method [{init_type:s}]')
     if init_type == 'normal':
         weights_init_normal_ = functools.partial(weights_init_normal, std=std)
         net.apply(weights_init_normal_)
@@ -111,7 +97,7 @@ def init_weights(net, init_type='kaiming', scale=1, std=0.02, gain=0.02):
     elif init_type == 'orthogonal':
         net.apply(weights_init_orthogonal)
     else:
-        raise NotImplementedError('initialization method [{:s}] not implemented'.format(init_type))
+        raise NotImplementedError(f'initialization method [{init_type:s}] not implemented')
 
 
 ####################
@@ -205,10 +191,10 @@ def get_network(opt, step=0, selector=None):
     elif kind == 'discriminator_vgg_128':
         from models.modules.architectures import discriminators
         net = discriminators.Discriminator_VGG_128
-    elif kind == 'discriminator_vgg_192' or kind == 'discriminator_192': #vic in PPON its called Discriminator_192, instead of BasicSR's Discriminator_VGG_192
+    elif kind in ('discriminator_vgg_192', 'discriminator_192'): #vic in PPON its called Discriminator_192, instead of BasicSR's Discriminator_VGG_192
         from models.modules.architectures import discriminators
         net = discriminators.Discriminator_VGG_192
-    elif kind == 'discriminator_vgg_256' or kind == 'discriminator_256':
+    elif kind in ('discriminator_vgg_256', 'discriminator_256'):
         from models.modules.architectures import discriminators
         net = discriminators.Discriminator_VGG_256
     elif kind == 'discriminator_vgg': # General adaptative case
@@ -226,10 +212,10 @@ def get_network(opt, step=0, selector=None):
     elif kind == 'discriminator_vgg_fea': #VGG-like discriminator with features extraction
         from models.modules.architectures import discriminators
         net = discriminators.Discriminator_VGG_fea
-    elif kind == 'patchgan' or kind == 'nlayerdiscriminator':
+    elif kind in ('patchgan', 'nlayerdiscriminator'):
         from models.modules.architectures import discriminators
         net = discriminators.NLayerDiscriminator
-    elif kind == 'pixelgan' or kind == 'pixeldiscriminator':
+    elif kind in ('pixelgan', 'pixeldiscriminator'):
         from models.modules.architectures import discriminators
         net = discriminators.PixelDiscriminator
     elif kind == 'multiscale':
@@ -440,20 +426,18 @@ def mod2normal(state_dict):
 def model_val(opt_net=None, state_dict=None, model_type=None):
     if model_type == 'G':
         model = opt_get(opt_net, ['network_G', 'type']).lower()
-        if model == 'rrdb_net' or model == 'esrgan': # tonormal
+        if model in ('rrdb_net', 'esrgan'): # tonormal
             return mod2normal(state_dict)
         elif model == 'mrrdb_net' or model == 'srflow_net': # tomod
             return normal2mod(state_dict)
-        else:
-            return state_dict
+        return state_dict
     elif model_type == 'D':
         # no particular Discriminator validation at the moment
         # model = opt_get(opt_net, ['network_G', 'type']).lower()
         return state_dict
-    else:
-        # if model_type not provided, return unchanged 
-        # (can do other validations here)
-        return state_dict
+    # if model_type not provided, return unchanged
+    # (can do other validations here)
+    return state_dict
 
 def cem2normal(state_dict):
     if str(list(state_dict.keys())[0]).startswith('generated_image_model'):

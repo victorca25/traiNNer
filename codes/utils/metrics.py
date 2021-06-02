@@ -267,7 +267,7 @@ def calculate_lpips(img1_im, img2_im, use_gpu=False, net='squeeze', spatial=Fals
             img2 = img2.cuda()
             
         # Compute distance
-        if spatial == False:
+        if spatial is False:
             dist01 = model.forward(img2,img1)
         else:
             dist01 = model.forward(img2,img1).mean() # Add .mean, if using add spatial=True

@@ -135,8 +135,7 @@ class UnalignedDataset(BaseDataset):
 
         if self.vars == 'AB':
             return {'A': img_A, 'B': img_B, 'A_path': A_path, 'B_path': B_path}
-        else:
-            return {'LR': img_A, 'HR': img_B, 'LR_path': A_path, 'HR_path': B_path}
+        return {'LR': img_A, 'HR': img_B, 'LR_path': A_path, 'HR_path': B_path}
 
     def __len__(self):
         """Return the total number of images in the dataset.

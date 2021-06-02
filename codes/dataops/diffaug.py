@@ -27,7 +27,7 @@ def DiffAugment(x, policy='', channels_first=True):
         for p in policy.split(','):
             # can condition here to only use one of the functions in "p"
             # zoom_in, zoom_out and rand_translation should be mutually exclusive
-            if (p == 'zoom' or p == 'transl_zoom') and len(AUGMENT_FNS[p]) > 1:
+            if (p in ('zoom', 'transl_zoom')) and len(AUGMENT_FNS[p]) > 1:
               f = random.choice(AUGMENT_FNS[p])
               x = f(x)
             else: #original

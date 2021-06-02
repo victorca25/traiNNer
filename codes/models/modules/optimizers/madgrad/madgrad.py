@@ -52,7 +52,7 @@ class MADGRAD(Optimizer):
         if weight_decay < 0:
             raise ValueError(f"Weight decay {weight_decay} must be non-negative")
         if eps < 0:
-            raise ValueError(f"Epsilon must be non-negative")
+            raise ValueError("Epsilon must be non-negative")
 
         defaults = dict(lr=lr, eps=eps, momentum=momentum, weight_decay=weight_decay)
         super(MADGRAD, self).__init__(params, defaults)

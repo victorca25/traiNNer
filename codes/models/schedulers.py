@@ -234,7 +234,7 @@ class CosineAnnealingLR_Restart(_LRScheduler):
 
 if __name__ == "__main__":
     N_iter = 1000000
-    optimizer = torch.optim.Adam([torch.zeros(3, 64, 3, 3)], lr=2e-4, weight_decay=0,
+    t_optimizer = torch.optim.Adam([torch.zeros(3, 64, 3, 3)], lr=2e-4, weight_decay=0,
                                  betas=(0.9, 0.99))
 
     """
@@ -262,7 +262,7 @@ if __name__ == "__main__":
     restarts = [250000, 500000, 750000]
     restart_weights = [1, 1, 1]
 
-    scheduler = MultiStepLR_Restart(optimizer, lr_steps, restarts, restart_weights, gamma=0.5,
+    scheduler = MultiStepLR_Restart(t_optimizer, lr_steps, restarts, restart_weights, gamma=0.5,
                                     clear_state=False)
     """
 
@@ -281,7 +281,7 @@ if __name__ == "__main__":
     restarts = [250000, 500000, 750000]
     restart_weights = [1, 1, 1]
 
-    scheduler = CosineAnnealingLR_Restart(optimizer, T_period, eta_min=1e-7, restarts=restarts,
+    scheduler = CosineAnnealingLR_Restart(t_optimizer, T_period, eta_min=1e-7, restarts=restarts,
                                           weights=restart_weights)
     """
 
@@ -294,15 +294,15 @@ if __name__ == "__main__":
     niter_decay = N_iter - fixed_niter
 
     # def lambda_rule(epoch):
-    #     lr_l = 1.0 - max(0, epoch + 1 - fixed_niter) / float(niter_decay + 1)
-    #     return max(0, lr_l) # make sure lr is always >= 0
+    #     t = 1.0 - max(0, epoch + 1 - fixed_niter) / float(niter_decay + 1)
+    #     return max(0, t) # make sure lr is always >= 0
 
     def lambda_rule(epoch):
-        lr_l = max(0, epoch + 1 - fixed_niter) / max(1, niter_decay)
+        t = max(0, epoch + 1 - fixed_niter) / max(1, niter_decay)
         # normalize cosine and make sure lr is always >= 0
-        return max(0, (math.cos(math.pi * lr_l) + 1)/2)
+        return max(0, (math.cos(math.pi * t) + 1)/2)
 
-    scheduler = lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda_rule)
+    scheduler = lr_scheduler.LambdaLR(t_optimizer, lr_lambda=lambda_rule)
 
 
     ##############################
@@ -312,7 +312,7 @@ if __name__ == "__main__":
     lr_l = list(range(N_iter))
     for i in range(N_iter):
         scheduler.step()
-        current_lr = optimizer.param_groups[0]['lr']
+        current_lr = t_optimizer.param_groups[0]['lr']
         lr_l[i] = current_lr
 
     import matplotlib as mpl

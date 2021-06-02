@@ -521,7 +521,7 @@ def tensor2np(img, rgb2bgr=True, remove_batch=True, data_range=255,
     
     img = img.float().cpu()  
     
-    if n_dim == 4 or n_dim == 3:
+    if n_dim in (4, 3):
         #if n_dim == 4, has to convert to 3 dimensions, either removing batch or by creating a grid
         if n_dim == 4 and remove_batch:
             if img.shape[0] > 1:
@@ -573,7 +573,7 @@ def tensor2np(img, rgb2bgr=True, remove_batch=True, data_range=255,
 # Convert (Tensor) Images to Patches
 ####################
 
-def extract_patches_2d(img, patch_shape, step=[1.0,1.0], batch_first=False):
+def extract_patches_2d(img, patch_shape, step=None, batch_first=False):
     """
     Convert a 4D tensor into a 5D tensor of patches (crops) of the original tensor.
     Uses unfold to extract sliding local blocks from an batched input tensor.
@@ -591,6 +591,7 @@ def extract_patches_2d(img, patch_shape, step=[1.0,1.0], batch_first=False):
     Reference: 
     https://gist.github.com/dem123456789/23f18fd78ac8da9615c347905e64fc78
     """
+    if step is None: step = [1.0, 1.0]
     patch_H, patch_W = patch_shape[0], patch_shape[1]
     
     # pad to fit patch dimensions
@@ -628,7 +629,7 @@ def extract_patches_2d(img, patch_shape, step=[1.0,1.0], batch_first=False):
     return patches
 
 
-def reconstruct_from_patches_2d(patches, img_shape, step=[1.0,1.0], batch_first=False):
+def reconstruct_from_patches_2d(patches, img_shape, step=None, batch_first=False):
     """
     Reconstruct a batch of images from the cropped patches. 
     Inverse operation from extract_patches_2d(). 
@@ -643,6 +644,7 @@ def reconstruct_from_patches_2d(patches, img_shape, step=[1.0,1.0], batch_first=
         batch_first: if the incoming tensor has batch as the first
             dimension or not
     """
+    if step is None: step = [1.0, 1.0]
     if(batch_first):
         patches = patches.permute(1, 0, 2, 3, 4)
     
@@ -693,7 +695,7 @@ def reconstruct_from_patches_2d(patches, img_shape, step=[1.0,1.0], batch_first=
     return img
 
 
-def recompose_tensor(patches, height, width, step=[1.0,1.0], scale=1):
+def recompose_tensor(patches, height, width, step=None, scale=1):
     """ Reconstruct images that have been cropped to patches.
     Unlike reconstruct_from_patches_2d(), this function allows to 
     use blending between the patches if they were generated a 
@@ -713,7 +715,7 @@ def recompose_tensor(patches, height, width, step=[1.0,1.0], scale=1):
     https://gist.github.com/dem123456789/23f18fd78ac8da9615c347905e64fc78
 
     """
-
+    if step is None: step = [1.0, 1.0]
     assert isinstance(step, float) and step >= 0.5 and step <= 1.0
 
     full_height = scale * height

@@ -101,7 +101,7 @@ class BaseModel:
             if isinstance(name, str):
                 net = getattr(self, 'net' + name)
                 s, n = self.get_network_description(net)
-                if isinstance(net, nn.DataParallel) or isinstance(net, nn.parallel.DistributedDataParallel):
+                if isinstance(net, (nn.DataParallel, nn.parallel.DistributedDataParallel)):
                     net_struc_str = '{} - {}'.format(net.__class__.__name__,
                                                      net.module.__class__.__name__)
                 else:
@@ -260,13 +260,11 @@ class BaseModel:
                                                         int) and current_step > self.swa_start_iter:
                 # SWA scheduler lr
                 return self.swa_scheduler.get_last_lr()[0]
-            else:
-                # Regular G scheduler lr
-                if self.opt['train']['lr_scheme'] == 'ReduceLROnPlateau':
-                    #TODO: to deal with PyTorch bug: https://github.com/pytorch/pytorch/issues/50715
-                    return self.schedulers[0]._last_lr[0]
-                else:
-                    return self.schedulers[0].get_last_lr()[0]
+            # Regular G scheduler lr
+            if self.opt['train']['lr_scheme'] == 'ReduceLROnPlateau':
+                #TODO: to deal with PyTorch bug: https://github.com/pytorch/pytorch/issues/50715
+                return self.schedulers[0]._last_lr[0]
+            return self.schedulers[0].get_last_lr()[0]
         else:
             # return self.schedulers[0].get_lr()[0]
             return self.optimizers[0].param_groups[0]['lr']
@@ -408,7 +406,7 @@ class BaseModel:
             state['swa_scheduler'] = []
             if self.swa and isinstance(self.swa_start_iter, int) and iter_step > self.swa_start_iter:
                 state['swa_scheduler'].append(self.swa_scheduler.state_dict())
-        if self.opt['is_train'] and self.opt['use_amp'] and state.get('amp_scaler', None):
+        if self.opt['is_train'] and self.opt['use_amp'] and state.get('amp_scaler'):
                 state['amp_scaler'] = self.amp_scaler.state_dict()
 
         if latest:

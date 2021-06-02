@@ -2,7 +2,7 @@ import os
 import torch
 from torch.autograd import Variable
 #from pdb import set_trace as st
-from IPython import embed
+# from IPython import embed
 
 class BaseModel():
     def __init__(self):
@@ -11,7 +11,8 @@ class BaseModel():
     def name(self):
         return 'BaseModel'
 
-    def initialize(self, use_gpu=True, gpu_ids=[0]):
+    def initialize(self, use_gpu=True, gpu_ids=None):
+        if gpu_ids is None: gpu_ids = [0]
         self.use_gpu = use_gpu
         self.gpu_ids = gpu_ids
 
@@ -46,7 +47,7 @@ class BaseModel():
         print('Loading network from %s'%save_path)
         network.load_state_dict(torch.load(save_path))
 
-    def update_learning_rate():
+    def update_learning_rate(self):
         pass
 
     def get_image_paths(self):

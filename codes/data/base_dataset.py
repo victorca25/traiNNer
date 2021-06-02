@@ -18,7 +18,7 @@ class BaseDataset(data.Dataset):
     -- <name>: returns the dataset name if defined, else returns BaseDataset
     """
 
-    def __init__(self, opt, keys_ds=['A','B']):
+    def __init__(self, opt, keys_ds=None):
         """Initialize the class; save the options in the class
         Parameters:
             opt (Options dictionary): stores all the experiment flags
@@ -28,6 +28,7 @@ class BaseDataset(data.Dataset):
                 first element.
         """
 
+        if keys_ds is None: keys_ds = ['A', 'B']
         opt = check_data_keys(opt, keys_ds=keys_ds)
         self.opt = opt
         self.keys_ds = keys_ds
@@ -106,7 +107,8 @@ def paired_dataset_validation(A_images_paths, B_images_paths, data_type='img', m
     return paths_A, paths_B
 
 
-def check_data_keys(opt, keys_ds=['LR', 'HR']):
+def check_data_keys(opt, keys_ds=None):
+    if keys_ds is None: keys_ds = ['LR', 'HR']
     if len(keys_ds) < 2:
         return opt
 
@@ -129,7 +131,7 @@ def check_data_keys(opt, keys_ds=['LR', 'HR']):
 
 
 
-def read_dataroots(opt, keys_ds=['LR','HR']):
+def read_dataroots(opt, keys_ds=None):
     """ Read the dataroots from the options dictionary
     Parameters:
         opt (Options dictionary): stores all the experiment flags
@@ -137,6 +139,7 @@ def read_dataroots(opt, keys_ds=['LR','HR']):
             Note that `LR` dataset corresponds to `A` or `lq` domain, while `HR` 
             corresponds to `B` or `gt`
     """
+    if keys_ds is None: keys_ds = ['LR', 'HR']
     paths_A, paths_B = None, None
     root_A = 'dataroot_' + keys_ds[0]
     root_B = 'dataroot_' + keys_ds[1]
@@ -172,7 +175,7 @@ def read_dataroots(opt, keys_ds=['LR','HR']):
     return paths_A, paths_B
 
 
-def validate_paths(paths_A, paths_B, strict=True, keys_ds=['LR','HR']):
+def validate_paths(paths_A, paths_B, strict=True, keys_ds=None):
     """ Validate the constructed images path lists are consistent. 
     Can allow using B/HR and A/LR folders with different amount of images
     Parameters:
@@ -189,6 +192,7 @@ def validate_paths(paths_A, paths_B, strict=True, keys_ds=['LR','HR']):
         LR and OTF LR for augmentation
     """
 
+    if keys_ds is None: keys_ds = ['LR', 'HR']
     if not strict:
         assert len(paths_B) >= len(paths_A), \
             '{} dataset contains less images than {} dataset  - {}, {}.'.format(\
@@ -227,7 +231,8 @@ def validate_paths(paths_A, paths_B, strict=True, keys_ds=['LR','HR']):
     return paths_A, paths_B
 
 
-def get_dataroots_paths(opt, strict=False, keys_ds=['LR', 'HR']):
+def get_dataroots_paths(opt, strict=False, keys_ds=None):
+    if keys_ds is None: keys_ds = ['LR', 'HR']
     paths_A, paths_B = read_dataroots(opt, keys_ds=keys_ds)
     assert paths_B, 'Error: {} path is empty.'.format(keys_ds[1])
     if strict:
@@ -279,9 +284,7 @@ def read_imgs_from_path(opt, index, paths_A, paths_B, A_env, B_env):
         else:
             # Flipped case:
             # If img_B (A_path) doesn't exist, use img_B (A_path)
-            t = output_nc
-            output_nc = input_nc
-            input_nc = t
+            input_nc, output_nc = output_nc, input_nc
             B_path = paths_A[index]
             A_path = paths_B[index]
             if B_path is None:
@@ -341,7 +344,7 @@ def read_split_single_dataset(opt, index, AB_paths, env):
 def read_single_dataset(opt, index, paths, env, idx_case=None, d_size=None):
     loader = opt.get('img_loader', 'cv2')
 
-    if idx_case == 'inrange' or idx_case == 'serial':
+    if idx_case in ('inrange', 'serial'):
         # make sure index is within the range of dataset.
         # if used for both unpaired datasets, will always return
         # the same pair of images

@@ -5,7 +5,6 @@ import os
 import glob
 
 import numpy as np
-import cv2
 import dataops.common as util
 from dataops.common import fix_img_channels, get_image_paths, read_img, np2tensor
 from dataops.minisom import MiniSom
@@ -902,11 +901,10 @@ def print_size_warning(ow, oh, w, h, base=4):
     """Print warning information about image size (only print once)"""
     if not hasattr(print_size_warning, 'has_printed'):
         if ow != w or oh != h:
-            print("The image size needs to be a multiple of {}. "
-                "The loaded image size was ({}, {}), so it was adjusted to "
-                "({}, {}). This adjustment will be done to all images "
-                "whose sizes are not multiples of {}.".format(base,
-                ow, oh, w, h, base))
+            print(f"The image size needs to be a multiple of {base}. "
+                f"The loaded image size was ({ow}, {oh}), so it was adjusted to "
+                f"({w}, {h}). This adjustment will be done to all images "
+                f"whose sizes are not multiples of {base}.")
         print_size_warning.has_printed = True
 
 
@@ -1104,7 +1102,8 @@ def shape_change_fn(img_A, img_B, opt, scale, default_int_method):
     # fix LR if at wrong scale (should be 1 or scale at this point)
     w, h = image_size(img_B)
     w_A, h_A = image_size(img_A)
-    if not (h//h_A == scale or w//w_A == scale) and not (h//h_A == 1 or w//w_A == 1):
+    # if not (h//h_A == scale or w//w_A == scale) and not (h//h_A == 1 or w//w_A == 1):
+    if not (scale in (h // h_A, w // w_A)) and not (1 in (h // h_A, w // w_A)):
         img_A = transforms.Resize((int(h/scale), int(w/scale)),
                         interpolation=default_int_method)(img_A)
 

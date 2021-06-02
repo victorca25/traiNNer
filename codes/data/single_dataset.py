@@ -69,8 +69,7 @@ class SingleDataset(BaseDataset):
 
         if self.vars == 'A':
             return {'A': img_A, 'A_path': A_path}
-        else:
-            return {'LR': img_A, 'LR_path': A_path}
+        return {'LR': img_A, 'LR_path': A_path}
 
     def __len__(self):
         """Return the total number of images in the dataset."""

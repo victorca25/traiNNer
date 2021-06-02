@@ -51,7 +51,7 @@ class NoneDict(dict):
 def dict_to_nonedict(opt: (dict , list, any)) -> (NoneDict, list, any):
     """Recursively convert to NoneDict, which returns None for missing keys."""
     if isinstance(opt, dict):
-        new_opt = dict()
+        new_opt = {}
         for key, sub_opt in opt.items():
             new_opt[key] = dict_to_nonedict(sub_opt)
         return NoneDict(**new_opt)
@@ -281,9 +281,12 @@ def dict2str(opt: dict, indent_l: int = 1) -> str:
     return msg
 
 
-def opt_get(opt=None, keys=[], default=None):
+def opt_get(opt=None, keys=None, default=None):
     if opt is None:
         return default
+
+    if keys is None: keys = []
+
     ret = opt
     for k in keys:
         ret = ret.get(k, None)

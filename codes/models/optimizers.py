@@ -7,8 +7,11 @@ from models.modules.optimizers.madgrad import MADGRAD
 
 
 def get_optimizers(cri_gan=None, netD=None, netG=None, train_opt=None,
-    logger=None, optimizers=None, optim_paramsG=[], optim_paramsD=[]):
+    logger=None, optimizers=None, optim_paramsG=None, optim_paramsD=None):
     # optimizers
+    if optim_paramsG is None: optim_paramsG = []
+    if optim_paramsD is None: optim_paramsD = []
+
     # G
     if not optim_paramsG:
         optim_paramsG = []
@@ -117,7 +120,8 @@ def get_optimizers(cri_gan=None, netD=None, netG=None, train_opt=None,
 
     return optimizers, optimizer_G
 
-def get_optimizers_filter(cri_gan=None, netD=None, netG=None, train_opt=None, logger=None, optimizers=None, param_filter=None):
+def get_optimizers_filter(cri_gan=None, netD=None, netG=None, train_opt=None,
+    logger=None, optimizers=None, param_filter=None):
     if param_filter:
         assert isinstance(param_filter, str)
         param_filter = '.{}.'.format(param_filter)  # '.RRDB.'

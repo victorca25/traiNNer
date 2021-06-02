@@ -179,7 +179,7 @@ class FlowUpsamplerNet(nn.Module):
         return affineInCh
 
     def check_image_shape(self):
-        assert self.C == 1 or self.C == 3, ("image_shape should be HWC, like (64, 64, 3)"
+        assert self.C in (1, 3), ("image_shape should be HWC, like (64, 64, 3)"
                                             "self.C == 1 or self.C == 3")
 
     def forward(self, gt=None, rrdbResults=None, z=None, epses=None, logdet=0., reverse=False, eps_std=None,
