@@ -36,12 +36,12 @@ def get_network_G_config(network_G, scale, crop_size):
             full_network_G['convtype'] = network_G.pop('convtype', "Conv3D")  # Conv3D for video
         else:
             full_network_G['convtype'] = network_G.pop('convtype', "Conv2D")  # Conv2D | PartialConv2D | DeformConv2D | Conv3D
-        full_network_G['act_type'] =  network_G.pop('net_act', None) or network_G.pop('act_type', "leakyrelu")  # swish | leakyrelu
-        full_network_G['gaussian_noise'] =  network_G.pop('gaussian', True)  # add gaussian noise in the net latent # True | False
-        full_network_G['plus'] =  network_G.pop('plus', False)  # use the ESRGAN+ modifications # true | false
-        full_network_G['finalact'] =  network_G.pop('finalact', None)  # Activation function, ie use "tanh" to make outputs fit in [-1, 1] range. Default = None. Coordinate with znorm.
-        full_network_G['upscale'] =  network_G.pop('scale', scale)
-        full_network_G['upsample_mode'] =  network_G.pop('upsample_mode', "upconv") # the type of upsample to use
+        full_network_G['act_type'] = network_G.pop('net_act', None) or network_G.pop('act_type', "leakyrelu")  # swish | leakyrelu
+        full_network_G['gaussian_noise'] = network_G.pop('gaussian', True)  # add gaussian noise in the net latent # True | False
+        full_network_G['plus'] = network_G.pop('plus', False)  # use the ESRGAN+ modifications # true | false
+        full_network_G['finalact'] = network_G.pop('finalact', None)  # Activation function, ie use "tanh" to make outputs fit in [-1, 1] range. Default = None. Coordinate with znorm.
+        full_network_G['upscale'] = network_G.pop('scale', scale)
+        full_network_G['upsample_mode'] = network_G.pop('upsample_mode', "upconv") # the type of upsample to use
     elif kind_G in ('mrrdb_net', 'mesrgan'):
         # ESRGAN modified arch:
         full_network_G['type'] = "mrrdb_net" # MRRDB_net (modified/"new" arch) | sr_resnet
@@ -57,25 +57,25 @@ def get_network_G_config(network_G, scale, crop_size):
         full_network_G['out_nc'] = network_G.pop('out_nc', 3) # num. of output image channels: 3 for RGB and 1 for grayscale
         full_network_G['nf'] = network_G.pop('nf', 64)  # number of filters in the first conv layer
         full_network_G['nb'] = network_G.pop('nb', 23)  # number of RRDB blocks
-        full_network_G['upscale'] =  network_G.pop('scale', scale)
-        full_network_G['act_type'] =  network_G.pop('net_act', None) or network_G.pop('act_type', "leakyrelu")  # swish | leakyrelu
+        full_network_G['upscale'] = network_G.pop('scale', scale)
+        full_network_G['act_type'] = network_G.pop('net_act', None) or network_G.pop('act_type', "leakyrelu")  # swish | leakyrelu
     elif 'asr_cnn' in kind_G:
         full_network_G['type'] = "asr_cnn"  # ASRCNN
-        full_network_G['upscale_factor'] =  network_G.pop('scale', scale)
-        full_network_G['spectral_norm'] =  network_G.pop('spectral_norm', True)
-        full_network_G['self_attention'] =  network_G.pop('self_attention', True)
-        full_network_G['spectral_norm'] =  network_G.pop('spectral_norm', True)
-        full_network_G['max_pool'] =  network_G.pop('max_pool', True)
-        full_network_G['poolsize'] =  network_G.pop('poolsize', 4)
-        full_network_G['finalact'] =  network_G.pop('finalact', 'tanh')
+        full_network_G['upscale_factor'] = network_G.pop('scale', scale)
+        full_network_G['spectral_norm'] = network_G.pop('spectral_norm', True)
+        full_network_G['self_attention'] = network_G.pop('self_attention', True)
+        full_network_G['spectral_norm'] = network_G.pop('spectral_norm', True)
+        full_network_G['max_pool'] = network_G.pop('max_pool', True)
+        full_network_G['poolsize'] = network_G.pop('poolsize', 4)
+        full_network_G['finalact'] = network_G.pop('finalact', 'tanh')
     elif 'asr_resnet' in kind_G:
         full_network_G['type'] = "asr_resnet"  # ASRResNet
-        full_network_G['scale_factor'] =  network_G.pop('scale', scale)
-        full_network_G['spectral_norm'] =  network_G.pop('spectral_norm', True)
-        full_network_G['self_attention'] =  network_G.pop('self_attention', True)
-        full_network_G['spectral_norm'] =  network_G.pop('spectral_norm', True)
-        full_network_G['max_pool'] =  network_G.pop('max_pool', True)
-        full_network_G['poolsize'] =  network_G.pop('poolsize', 4)
+        full_network_G['scale_factor'] = network_G.pop('scale', scale)
+        full_network_G['spectral_norm'] = network_G.pop('spectral_norm', True)
+        full_network_G['self_attention'] = network_G.pop('self_attention', True)
+        full_network_G['spectral_norm'] = network_G.pop('spectral_norm', True)
+        full_network_G['max_pool'] = network_G.pop('max_pool', True)
+        full_network_G['poolsize'] = network_G.pop('poolsize', 4)
     elif kind_G in ('sr_resnet', 'srresnet', 'srgan'):
         # SRGAN:
         full_network_G['type'] = "sr_resnet"  # SRResNet
@@ -83,14 +83,14 @@ def get_network_G_config(network_G, scale, crop_size):
         full_network_G['out_nc'] = network_G.pop('out_nc', 3) # num. of output image channels: 3 for RGB and 1 for grayscale
         full_network_G['nf'] = network_G.pop('nf', 64)  # number of filters in the first conv layer
         full_network_G['nb'] = network_G.pop('nb', 16)  # number of RRDB blocks
-        full_network_G['upscale'] =  network_G.pop('scale', scale)
+        full_network_G['upscale'] = network_G.pop('scale', scale)
         full_network_G['norm_type'] = network_G.pop('norm_type', None)  # "instance" normalization, "batch" normalization or no norm
-        full_network_G['act_type'] =  network_G.pop('net_act', None) or network_G.pop('act_type', "leakyrelu")  # swish | relu | leakyrelu
+        full_network_G['act_type'] = network_G.pop('net_act', None) or network_G.pop('act_type', "leakyrelu")  # swish | relu | leakyrelu
         full_network_G['mode'] = network_G.pop('mode', "CNA")  # CNA: conv->norm->act, NAC: norm->act->conv
-        full_network_G['upsample_mode'] =  network_G.pop('upsample_mode', "pixelshuffle") # the type of upsample to use
+        full_network_G['upsample_mode'] = network_G.pop('upsample_mode', "pixelshuffle") # the type of upsample to use
         full_network_G['convtype'] = network_G.pop('convtype', "Conv2D")  # Conv2D | PartialConv2D | DeformConv2D | Conv3D
-        full_network_G['finalact'] =  network_G.pop('finalact', None)  # Activation function, ie use "tanh" to make outputs fit in [-1, 1] range. Default = None. Coordinate with znorm.
-        full_network_G['res_scale'] =  network_G.pop('res_scale', 1)
+        full_network_G['finalact'] = network_G.pop('finalact', None)  # Activation function, ie use "tanh" to make outputs fit in [-1, 1] range. Default = None. Coordinate with znorm.
+        full_network_G['res_scale'] = network_G.pop('res_scale', 1)
     #TODO: msrresnet
     elif kind_G in ('sft_arch', 'sft_net'):
         full_network_G['type'] = "sft_arch"  # SFT-GAN
@@ -102,10 +102,10 @@ def get_network_G_config(network_G, scale, crop_size):
         full_network_G['nf'] = network_G.pop('nf', 40)  # number of filters in each conv layer
         full_network_G['unf'] = network_G.pop('unf', 24)  # number of filters during upscale
         full_network_G['nb'] = network_G.pop('nb', 16)  # number of blocks
-        full_network_G['scale'] =  network_G.pop('scale', scale)
-        full_network_G['self_attention'] =  network_G.pop('self_attention', False)
-        full_network_G['double_scpa'] =  network_G.pop('double_scpa', False)
-        full_network_G['ups_inter_mode'] =  network_G.pop('ups_inter_mode', "nearest")
+        full_network_G['scale'] = network_G.pop('scale', scale)
+        full_network_G['self_attention'] = network_G.pop('self_attention', False)
+        full_network_G['double_scpa'] = network_G.pop('double_scpa', False)
+        full_network_G['ups_inter_mode'] = network_G.pop('ups_inter_mode', "nearest")
     elif kind_G in ('abpn_net', 'abpn'):
         full_network_G['type'] = "abpn_net"  # ABPN_net
         full_network_G['input_dim'] = network_G.pop('in_nc', None) or network_G.pop('input_dim', 3) # num. of input image channels: 3 for RGB and 1 for grayscale
@@ -119,8 +119,8 @@ def get_network_G_config(network_G, scale, crop_size):
         full_network_G['nf'] = network_G.pop('nf', 64)  # number of filters in the first conv layer
         full_network_G['nb'] = network_G.pop('nb', 23)  # number of RRDB blocks
         full_network_G['gc'] = network_G.pop('gc', 32)  #
-        full_network_G['scale'] =  network_G.pop('scale', scale)
-        full_network_G['upscale'] =  full_network_G['scale']
+        full_network_G['scale'] = network_G.pop('scale', scale)
+        full_network_G['upscale'] = full_network_G['scale']
         flow_config = network_G['flow'] if ('flow' in network_G) else {}
         full_network_G['K'] = flow_config.pop('K', 16) if flow_config else 16
         #Note: the network also needs opt and step, below options not used as network parameters, but for GLOW
@@ -177,7 +177,7 @@ def get_network_G_config(network_G, scale, crop_size):
         full_network_G['use_dropout'] = network_G.pop('use_dropout', False) # whether to use dropout or not
         #TODO: add:
         # full_network_G['dropout_prob'] = network_G.pop('dropout_prob', 0.5) # the default dropout probability
-        full_network_G['upsample_mode'] =  network_G.pop('upsample_mode', "deconv") # deconv | upconv # the type of upsample to use, deconvolution or upsample+convolution
+        full_network_G['upsample_mode'] = network_G.pop('upsample_mode', "deconv") # deconv | upconv # the type of upsample to use, deconvolution or upsample+convolution
     elif 'resnet' in kind_G and kind_G != 'sr_resnet':
         #RESNET:
         full_network_G['type'] = "resnet_net"
@@ -194,25 +194,25 @@ def get_network_G_config(network_G, scale, crop_size):
         full_network_G['use_dropout'] = network_G.pop('use_dropout', False) # whether to use dropout or not
         #TODO: add:
         # full_network_G['dropout_prob'] = network_G.pop('dropout_prob', 0.5) # the default dropout probability
-        full_network_G['upsample_mode'] =  network_G.pop('upsample_mode', "deconv") # deconv | upconv # the type of upsample to use, deconvolution or upsample+convolution
-        full_network_G['padding_type'] =  network_G.pop('padding_type', "reflect")
+        full_network_G['upsample_mode'] = network_G.pop('upsample_mode', "deconv") # deconv | upconv # the type of upsample to use, deconvolution or upsample+convolution
+        full_network_G['padding_type'] = network_G.pop('padding_type', "reflect")
     # video networks
     elif kind_G in ('sofvsr_net', 'sofvsr'):
         full_network_G['type'] = "sofvsr_net"  # RRDB_net (original ESRGAN arch)
-        full_network_G['n_frames'] =  network_G.pop('n_frames', 3)  # number of frames the network will use to estimate the central frame (n-1)/2. Must coincide with "num_frames" in the dataset.
-        full_network_G['channels'] =  network_G.pop('channels', 320)  # feature extraction layer with 320 kernels of size 3 × 3
-        full_network_G['scale'] =  network_G.pop('scale', scale)
+        full_network_G['n_frames'] = network_G.pop('n_frames', 3)  # number of frames the network will use to estimate the central frame (n-1)/2. Must coincide with "num_frames" in the dataset.
+        full_network_G['channels'] = network_G.pop('channels', 320)  # feature extraction layer with 320 kernels of size 3 × 3
+        full_network_G['scale'] = network_G.pop('scale', scale)
         full_network_G['img_ch'] = network_G.pop('in_nc', 3) or network_G.pop('img_ch', 3) # num. of input image channels: 3 for RGB and 1 for grayscale
         # for SR network:
-        full_network_G['SR_net'] =  network_G.pop('SR_net', "rrdb")  # sofvsr | rrdb | pan
+        full_network_G['SR_net'] = network_G.pop('SR_net', "rrdb")  # sofvsr | rrdb | pan
         full_network_G['sr_nf'] = network_G.pop('sr_nf', 64)  # for rrdb or pan # number of filters in the first conv layer
         full_network_G['sr_nb'] = network_G.pop('sr_nb', 23)  # for rrdb or pan # number of RRDB blocks
         full_network_G['sr_gc'] = network_G.pop('sr_gc', 32)  # for rrdb
         full_network_G['sr_unf'] = network_G.pop('sr_unf', 24)  # for pan # number of filters during upscale
-        full_network_G['sr_gaussian_noise'] =  network_G.pop('sr_gaussian_noise', True)  # for rrdb # add gaussian noise in the net latent # True | False
-        full_network_G['sr_plus'] =  network_G.pop('sr_plus', False)  # for rrdb # use the ESRGAN+ modifications # true | false
-        full_network_G['sr_sa'] =  network_G.pop('sr_sa', True)  # for pan # self_attention
-        full_network_G['sr_upinter_mode'] =  network_G.pop('sr_upinter_mode', "nearest")  # for pan
+        full_network_G['sr_gaussian_noise'] = network_G.pop('sr_gaussian_noise', True)  # for rrdb # add gaussian noise in the net latent # True | False
+        full_network_G['sr_plus'] = network_G.pop('sr_plus', False)  # for rrdb # use the ESRGAN+ modifications # true | false
+        full_network_G['sr_sa'] = network_G.pop('sr_sa', True)  # for pan # self_attention
+        full_network_G['sr_upinter_mode'] = network_G.pop('sr_upinter_mode', "nearest")  # for pan
         # unused options for RRDB:
         # full_network_G['sr_norm_type'] = network_G.pop('sr_norm_type', None)  # "instance" normalization, "batch" normalization or no norm
         # full_network_G['sr_mode'] = network_G.pop('sr_mode', "CNA")  # CNA: conv->norm->act, NAC: norm->act->conv
@@ -220,9 +220,9 @@ def get_network_G_config(network_G, scale, crop_size):
         # full_network_G['sr_out_nc'] = network_G.pop('sr_out_nc', 3) # num. of output image channels: 3 for RGB and 1 for grayscale
         # full_network_G['sr_group'] = network_G.pop('sr_group', 1)  #
         # full_network_G['sr_convtype'] = network_G.pop('sr_convtype', "Conv2D")  # Conv2D | PartialConv2D | DeformConv2D | Conv3D
-        # full_network_G['sr_act_type'] =  network_G.pop('sr_net_act', None) or network_G.pop('sr_act_type', "leakyrelu")  # swish | leakyrelu
-        # full_network_G['sr_finalact'] =  network_G.pop('sr_finalact', None)  # Activation function, ie use "tanh" to make outputs fit in [-1, 1] range. Default = None. Coordinate with znorm.
-        # full_network_G['sr_upsample_mode'] =  network_G.pop('sr_upsample_mode', "upconv") # the type of upsample to use
+        # full_network_G['sr_act_type'] = network_G.pop('sr_net_act', None) or network_G.pop('sr_act_type', "leakyrelu")  # swish | leakyrelu
+        # full_network_G['sr_finalact'] = network_G.pop('sr_finalact', None)  # Activation function, ie use "tanh" to make outputs fit in [-1, 1] range. Default = None. Coordinate with znorm.
+        # full_network_G['sr_upsample_mode'] = network_G.pop('sr_upsample_mode', "upconv") # the type of upsample to use
     elif kind_G in ('sr3d_net', 'sr3d'):
         # SR3D:
         full_network_G['type'] = "sr3d_net"  # SR3DNet
@@ -230,24 +230,24 @@ def get_network_G_config(network_G, scale, crop_size):
         full_network_G['out_nc'] = network_G.pop('out_nc', 3) # num. of output image channels: 3 for RGB and 1 for grayscale
         full_network_G['nf'] = network_G.pop('nf', 64)  # number of filters in the conv layers
         full_network_G['nb'] = network_G.pop('nb', 23)  # number of Conv3D  blocks
-        full_network_G['scale'] =  network_G.pop('scale', scale)
-        full_network_G['n_frames'] =  network_G.pop('n_frames', 5)  # number of frames the network will use to estimate the central frame (n-1)/2. Must coincide with "num_frames" in the dataset.
+        full_network_G['scale'] = network_G.pop('scale', scale)
+        full_network_G['n_frames'] = network_G.pop('n_frames', 5)  # number of frames the network will use to estimate the central frame (n-1)/2. Must coincide with "num_frames" in the dataset.
     elif kind_G in ('edvr_net', 'edvr'):
         # EDVR:
         full_network_G['type'] = "edvr_net"  # EDVR
         full_network_G['num_in_ch'] = network_G.pop('in_nc', 3) # num. of input image channels: 3 for RGB and 1 for grayscale
         full_network_G['num_out_ch'] = network_G.pop('out_nc', 3) # num. of output image channels: 3 for RGB and 1 for grayscale
         full_network_G['num_feat'] = network_G.pop('nf', 64)  # number of features (M=64, L=128)
-        full_network_G['num_frame'] =  network_G.pop('n_frames', 5)  # number of frames the network will use to estimate the central frame (n-1)/2. Must coincide with "num_frames" in the dataset.
-        full_network_G['upscale'] =  network_G.pop('scale', scale)
-        full_network_G['deformable_groups'] =  network_G.pop('deformable_groups', 8)  # number of deformable offset groups in the deformable layers
-        full_network_G['num_extract_block'] =  network_G.pop('n_extract_block', 5)  # number of extract blocks
-        full_network_G['num_reconstruct_block'] =  network_G.pop('n_reconstruct_block', 10)  # number of reconstruction blocks (M=10, L=40)
-        full_network_G['center_frame_idx'] =  network_G.pop('center_frame_idx', None)  # fix center frame, if None will use num_frame // 2
-        full_network_G['with_predeblur'] =  network_G.pop('predeblur', False)  # use pre-deblur
-        full_network_G['with_tsa'] =  network_G.pop('tsa', True)  # use Temporal Spatial Attention
-        full_network_G['upsample_mode'] =  network_G.pop('upsample_mode', "pixelshuffle")  # pixelshuffle | upconv
-        full_network_G['add_rrdb'] =  network_G.pop('add_rrdb', False)  # adds RRDB blocks before upsample step to improve SR
+        full_network_G['num_frame'] = network_G.pop('n_frames', 5)  # number of frames the network will use to estimate the central frame (n-1)/2. Must coincide with "num_frames" in the dataset.
+        full_network_G['upscale'] = network_G.pop('scale', scale)
+        full_network_G['deformable_groups'] = network_G.pop('deformable_groups', 8)  # number of deformable offset groups in the deformable layers
+        full_network_G['num_extract_block'] = network_G.pop('n_extract_block', 5)  # number of extract blocks
+        full_network_G['num_reconstruct_block'] = network_G.pop('n_reconstruct_block', 10)  # number of reconstruction blocks (M=10, L=40)
+        full_network_G['center_frame_idx'] = network_G.pop('center_frame_idx', None)  # fix center frame, if None will use num_frame // 2
+        full_network_G['with_predeblur'] = network_G.pop('predeblur', False)  # use pre-deblur
+        full_network_G['with_tsa'] = network_G.pop('tsa', True)  # use Temporal Spatial Attention
+        full_network_G['upsample_mode'] = network_G.pop('upsample_mode', "pixelshuffle")  # pixelshuffle | upconv
+        full_network_G['add_rrdb'] = network_G.pop('add_rrdb', False)  # adds RRDB blocks before upsample step to improve SR
         full_network_G['nb'] = network_G.pop('nb', 23)  # number of blocks, only applies to add_rrdb's RRDB blocks
     elif kind_G in ('rife_net', 'rife'):
         full_network_G['type'] = "rife_net"  # RIFE
@@ -309,7 +309,7 @@ def get_network_D_config(network_D, scale, crop_size, model_G):
         full_network_D['base_nf'] = network_D.pop('nf', 64)  # num. of features in conv layers
         full_network_D['norm_type'] = network_D.pop('norm_type', "batch")  # "instance" normalization, "batch" normalization or no norm
         full_network_D['mode'] = network_D.pop('mode', "CNA")  # CNA: conv->norm->act, NAC: norm->act->conv
-        full_network_D['act_type'] =  network_D.pop('net_act', None) or network_D.pop('act_type', "leakyrelu")  # swish | leakyrelu
+        full_network_D['act_type'] = network_D.pop('net_act', None) or network_D.pop('act_type', "leakyrelu")  # swish | leakyrelu
         full_network_D['convtype'] = network_D.pop('convtype', "Conv2D")
         full_network_D['arch'] = network_D.pop('G_arch', model_G)
         if kind_D in ['discriminator_vgg', 'discriminator_vgg_fea']:

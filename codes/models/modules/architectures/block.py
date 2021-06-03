@@ -39,9 +39,8 @@ def swish_func(x, beta=1.0, inplace=False):
         torch.sigmoid_(beta*x)
         x *= result
         return x
-    else:
-        # Normal out-of-place implementation:
-        return x * torch.sigmoid(beta * x)
+    # Normal out-of-place implementation:
+    return x * torch.sigmoid(beta * x)
     
 # Swish module
 class Swish(nn.Module):

@@ -1,6 +1,6 @@
 import numpy as np
 import torch
-from torch import nn as nn
+from torch import nn
 
 from models.modules.architectures.glow import flow, thops
 from models.modules.architectures.SRFlow.Split import Split2d
@@ -255,7 +255,7 @@ class FlowUpsamplerNet(nn.Module):
         # debug.imwrite("fl_fea", fl_fea)
         bypasses = {}
         level_conditionals = {}
-        if not opt_get(self.opt, ['network_G', 'flow', 'levelConditional', 'conditional']) == True:
+        if not opt_get(self.opt, ['network_G', 'flow', 'levelConditional', 'conditional']) is True:
             for level in range(self.L + 1):
                 level_conditionals[level] = rrdbResults[self.levelToName[level]]
 

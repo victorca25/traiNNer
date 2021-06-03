@@ -1,5 +1,5 @@
 import torch
-from torch import nn as nn
+from torch import nn
 
 # import models.modules.architectures.SRFlow
 from . import Permutations, flow, thops, ActNorms

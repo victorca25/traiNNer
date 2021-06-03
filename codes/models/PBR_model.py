@@ -157,7 +157,7 @@ class PBRModel(BaseModel):
             self.amp = load_amp and opt.get('use_amp', False)
             if self.amp:
                 self.cast = autocast
-                self.amp_scaler =  GradScaler()
+                self.amp_scaler = GradScaler()
                 logger.info('AMP enabled')
             else:
                 self.cast = nullcast

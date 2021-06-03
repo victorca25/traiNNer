@@ -1,5 +1,5 @@
 import torch
-from torch import nn as nn
+from torch import nn
 
 from models.modules.architectures.glow import thops
 from models.modules.architectures.glow.Step import FlowStep

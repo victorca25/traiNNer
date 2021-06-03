@@ -10,7 +10,7 @@ import utils.util as util
 from data import create_dataset, create_dataloader
 from dataops.common import bgr2ycbcr, tensor2np
 from models import create_model
-from utils.metrics import calculate_psnr, calculate_ssim
+from utils.metrics import calculate_psnr, calculate_ssim, MetricsDict
 from train import parse_options, dir_check, configure_loggers, get_dataloaders
 
 from models.modules.architectures.CEM import CEMnet
@@ -29,8 +29,8 @@ def test_loop(model, opt, dataloaders, data_params):
     # prepare the metric calculation classes for RGB and Y_only images
     calc_metrics = opt.get('metrics', None)
     if calc_metrics:
-        test_metrics = metrics.MetricsDict(metrics = calc_metrics)
-        test_metrics_y = metrics.MetricsDict(metrics = calc_metrics)
+        test_metrics = MetricsDict(metrics = calc_metrics)
+        test_metrics_y = MetricsDict(metrics = calc_metrics)
 
     for phase, dataloader in dataloaders.items():
         name = dataloader.dataset.opt['name']
@@ -114,7 +114,7 @@ def test_loop(model, opt, dataloaders, data_params):
                     formatted_res = k.upper() + ': {:.6f}, '.format(v)
                     logger_m += formatted_res
 
-                if gt_img.shape[2] == 3:  # RGB image, calculate y_only metrics
+                if metric_imgs[1].shape[2] == 3:  # RGB image, calculate y_only metrics
                     test_results_y = test_metrics_y.calculate_metrics(metric_imgs[0], metric_imgs[1], 
                                                                       crop_size=opt['scale'], only_y=True)
                     
@@ -138,7 +138,7 @@ def test_loop(model, opt, dataloaders, data_params):
             agg_logger_m = ''.join(f'{met.upper()}: {avgr:.6f}, ' for met, avgr in avg_metrics.items())
             logger.info('----Average metrics results for {}----\n\t'.format(name) + agg_logger_m[:-2])
             
-            if len(avg_metrics_y > 0):
+            if avg_metrics_y:
                 # prepare log average Y channel metrics message
                 agg_logger_m = ''.join(f'{met.upper()}_Y: {avgr:.6f}, ' for met, avgr in avg_metrics_y.items())
                 logger.info('----Y channel, average metrics ----\n\t' + agg_logger_m[:-2])

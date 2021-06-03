@@ -19,10 +19,10 @@ def find_model(model_name):
     ]
 
     lc_filenames = [x.lower() for x in model_filenames]
-    model_filename =  "{}_model".format(model_name)
+    model_filename = "{}_model".format(model_name)
     
     if model_filename in lc_filenames:
-        model_filename =  "models.{}".format(
+        model_filename = "models.{}".format(
             model_filenames[lc_filenames.index(model_filename)])
 
     # import the model module

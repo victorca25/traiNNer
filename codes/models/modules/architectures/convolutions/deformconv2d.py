@@ -1,8 +1,8 @@
 import math
 import torch
-from torch import nn as nn
+from torch import nn
 from torch.nn import functional as F
-from torch.nn import init as init
+from torch.nn import init
 from torch.nn.modules.batchnorm import _BatchNorm
 from torch.nn.modules.utils import _pair, _single
 

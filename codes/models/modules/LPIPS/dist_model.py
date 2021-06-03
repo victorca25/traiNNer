@@ -201,7 +201,7 @@ class DistModel(BaseModel):
             self.save_network(self.net, path, '', label)
         self.save_network(self.rankLoss.net, path, 'rank', label)
 
-    def update_learning_rate(self,nepoch_decay):
+    def update_learning_rate(self, nepoch_decay):
         lrd = self.lr / nepoch_decay
         lr = self.old_lr - lrd
 

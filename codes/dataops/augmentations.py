@@ -26,7 +26,7 @@ except ImportError:
 
 try:
     import cv2
-    cv2_available =  True
+    cv2_available = True
 except ImportError:
     cv2_available = False
 
@@ -42,6 +42,7 @@ def set_transforms(loader_type=None):
 
         set_transforms.loader_type = loader_type
 
+transforms = None
 set_transforms()
 
 
@@ -1103,7 +1104,8 @@ def shape_change_fn(img_A, img_B, opt, scale, default_int_method):
     w, h = image_size(img_B)
     w_A, h_A = image_size(img_A)
     # if not (h//h_A == scale or w//w_A == scale) and not (h//h_A == 1 or w//w_A == 1):
-    if not (scale in (h // h_A, w // w_A)) and not (1 in (h // h_A, w // w_A)):
+    if (scale not in (h // h_A, w // w_A)) and (1 not in (h // h_A, w // w_A)):
+        print("YES")
         img_A = transforms.Resize((int(h/scale), int(w/scale)),
                         interpolation=default_int_method)(img_A)
 

@@ -14,7 +14,7 @@ class CEMnet:
         self.conf = conf
         self.ds_factor = np.array(conf.scale_factor, dtype=np.int32)
         assert np.round(self.ds_factor)==self.ds_factor,'Currently only supporting integer scale factors'
-        assert upscale_kernel is None or isinstance(upscale_kernel, str) or isinstance(upscale_kernel, np.ndarray),'To support given kernels, change the Return_Invalid_Margin_Size_in_LR function and make sure everything else works'
+        assert upscale_kernel is None or isinstance(upscale_kernel, (str, np.ndarray)),'To support given kernels, change the Return_Invalid_Margin_Size_in_LR function and make sure everything else works'
         self.imres = ImRes(None, [self.ds_factor, self.ds_factor], kernel=upscale_kernel, alg=self.conf.default_kernel_alg)
         self.ds_kernel = self.imres.return_upscale_kernel(self.ds_factor)
         self.ds_kernel_invalidity_half_size_LR = self.Return_Invalid_Margin_Size_in_LR('ds_kernel', self.conf.filter_pertubation_limit)
