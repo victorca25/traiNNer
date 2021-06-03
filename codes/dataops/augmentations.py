@@ -403,12 +403,14 @@ class RandomNoisePatches():
         # describe_numpy(img, all=True)
         h, w = img.shape[0:2]
         n_h, n_w = noise.shape[0:2]
+
         if n_h < h or n_w < w:
             # pad noise patch to image size if smaller
             i = random.randint(0, h - n_h)
             j = random.randint(0, w - n_w)
             #top, bottom, left, right borders
-            noise = transforms.Pad(padding=(i, h-(i+n_h), j, w-(j+n_w)))(noise)
+            noise = transforms.Pad(
+                padding=(i, h-(i+n_h), j, w-(j+n_w)), padding_mode='reflect')(noise)
         elif n_h > h or n_w > w:
             # crop noise patch to image size if larger
             noise = transforms.RandomCrop(size=(w,h))(noise)
@@ -1105,7 +1107,6 @@ def shape_change_fn(img_A, img_B, opt, scale, default_int_method):
     w_A, h_A = image_size(img_A)
     # if not (h//h_A == scale or w//w_A == scale) and not (h//h_A == 1 or w//w_A == 1):
     if (scale not in (h // h_A, w // w_A)) and (1 not in (h // h_A, w // w_A)):
-        print("YES")
         img_A = transforms.Resize((int(h/scale), int(w/scale)),
                         interpolation=default_int_method)(img_A)
 
