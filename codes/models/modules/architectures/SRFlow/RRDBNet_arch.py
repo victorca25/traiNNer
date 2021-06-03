@@ -1,6 +1,6 @@
 import functools
 import torch
-import torch.nn
+from torch import nn
 import torch.nn.functional as F
 from models.modules.architectures import block as B
 from models.modules.architectures.RRDBNet_arch import ResidualDenseBlock_5CM, RRDBM

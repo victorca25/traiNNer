@@ -93,9 +93,9 @@ def parse(opt_path: str, is_train: bool = True) -> NoneDict:
             try:
                 # use SafeLoader's over Loader to prevent against arbitrary python object execution
                 # Use C loaders if possible, faster
-                from yaml import CLoader as Loader #CSafeLoader as Loader
+                from yaml import CSafeLoader as Loader  # CLoader
             except ImportError:
-                from yaml import Loader #SafeLoader as Loader
+                from yaml import SafeLoader as Loader  # Loader
             _mapping_tag = yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG
 
             def dict_constructor(loader, node):
@@ -113,7 +113,7 @@ def parse(opt_path: str, is_train: bool = True) -> NoneDict:
                 |[-+]?\\.(?:inf|Inf|INF)
                 |\\.(?:nan|NaN|NAN))$''', re.X),
                 list(u'-+0123456789.'))
-            opt = yaml.safe_load(f, Loader=Loader)
+            opt = yaml.load(f, Loader=Loader)
 
     opt['is_train'] = is_train
     scale = opt.get('scale', 1)

@@ -1,4 +1,4 @@
-import torch.nn
+from torch import nn
 
 
 def f_conv2d_bias(in_channels, out_channels):
