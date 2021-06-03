@@ -143,7 +143,7 @@ def get_resize(size, scale=None, ds_algo=None, ds_kernel=None, resize_type=None)
 
 
 #TODO: use options to set the blur types parameters if configured, else random_params=True
-def get_blur(blur_types: list = []):
+def get_blur(blur_types: list):
 
     blur = None
     if(isinstance(blur_types, list)):
@@ -183,10 +183,10 @@ def get_blur(blur_types: list = []):
 
 
 #TODO: use options to set the noise types parameters if configured, else random_params=True
-def get_noise(noise_types: list = [], noise_patches=None, noise_amp: int=1):
+def get_noise(noise_types: list, noise_patches=None, noise_amp: int=1):
 
     noise = None
-    if(isinstance(noise_types, list)):
+    if noise_types:
         noise_type = random.choice(noise_types)
 
         # if noise_type == 'dither':
@@ -1742,7 +1742,7 @@ def custom_pipeline(custom_transforms, transforms_cfg, noise_patches=None):
         elif transform == 'cutout':
             transform_list.append(transforms.Cutout(
                 p=transforms_cfg.get('cutout_p', 0.5),
-                mask_size=crop_size//2))
+                mask_size=transforms_cfg.get('crop_size')//2))
 
         # random erasing
         elif transform == 'erasing':

@@ -190,7 +190,7 @@ def test_loop(model, opt, dataloaders, data_params):
                 
                 # prepare single image metrics log message
                 logger_m = '{:20s} -'.format(img_name)
-                for k, v in test_results:
+                for k, v in test_results.items():
                     formatted_res = k.upper() + ': {:.6f}, '.format(v)
                     logger_m += formatted_res
 
@@ -199,7 +199,7 @@ def test_loop(model, opt, dataloaders, data_params):
                                                                       crop_size=opt['scale'], only_y=True)
                     
                     # add the y only results to the single image log message
-                    for k, v in test_results_y:
+                    for k, v in test_results_y.items():
                         formatted_res = k.upper() + ': {:.6f}, '.format(v)
                         logger_m += formatted_res
                 

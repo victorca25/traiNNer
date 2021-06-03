@@ -113,7 +113,7 @@ def parse(opt_path: str, is_train: bool = True) -> NoneDict:
                 |[-+]?\\.(?:inf|Inf|INF)
                 |\\.(?:nan|NaN|NAN))$''', re.X),
                 list(u'-+0123456789.'))
-            opt = yaml.load(f, Loader=Loader)
+            opt = yaml.safe_load(f, Loader=Loader)
 
     opt['is_train'] = is_train
     scale = opt.get('scale', 1)

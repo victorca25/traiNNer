@@ -1,5 +1,5 @@
 import torch
-import torch.nn as nn
+import torch.nn
 import torch.nn.functional as F
 import numpy as np
 
@@ -29,8 +29,10 @@ class Conv2d(nn.Conv2d):
         return padding
 
     def __init__(self, in_channels, out_channels,
-                 kernel_size=[3, 3], stride=[1, 1],
+                 kernel_size=None, stride=None,
                  padding="same", do_actnorm=True, weight_std=0.05):
+        if kernel_size is None: kernel_size = [3, 3]
+        if stride is None: stride = [1, 1]
         padding = Conv2d.get_padding(padding, kernel_size, stride)
         super().__init__(in_channels, out_channels, kernel_size, stride,
                          padding, bias=(not do_actnorm))
@@ -51,8 +53,10 @@ class Conv2d(nn.Conv2d):
 
 class Conv2dZeros(nn.Conv2d):
     def __init__(self, in_channels, out_channels,
-                 kernel_size=[3, 3], stride=[1, 1],
+                 kernel_size=None, stride=None,
                  padding="same", logscale_factor=3):
+        if kernel_size is None: kernel_size = [3, 3]
+        if stride is None: stride = [1, 1]
         padding = Conv2d.get_padding(padding, kernel_size, stride)
         super().__init__(in_channels, out_channels, kernel_size, stride, padding)
         # logscale_factor
