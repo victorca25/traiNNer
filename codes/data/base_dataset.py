@@ -101,7 +101,7 @@ def paired_dataset_validation(A_images_paths, B_images_paths, data_type='img', m
         for imgs in zip(A_paths, B_paths):
             _, A_filename = os.path.split(imgs[0])
             _, B_filename = os.path.split(imgs[1])
-            assert A_filename == B_filename, 'Wrong pair of images {} and {}'.format(A_filename, B_filename)
+            assert A_filename == B_filename, f'Wrong pair of images {A_filename} and {B_filename}'
             paths_A.append(imgs[0])
             paths_B.append(imgs[1])
     return paths_A, paths_B
@@ -147,10 +147,10 @@ def read_dataroots(opt, keys_ds=None):
     # read image list from subset list txt
     if opt['subset_file'] is not None and opt['phase'] == 'train':
         paths_B = read_subset(opt[root_B], opt['subset_file'])
-        if opt[root_A] is not None and opt.get('subset_file_'+keys_ds[0], None):
+        if opt[root_A] is not None and opt.get(f'subset_file_{keys_ds[0]}', None):
             paths_A = read_subset(opt[root_A], opt['subset_file'])
         else:
-            print('Using subset will generate {}s on-the-fly.').format(keys_ds[0])
+            print(f'Using subset will generate {keys_ds[0]}s on-the-fly.')
     else:  # read image list from lmdb or image files
         A_images_paths = format_paths(opt[root_A])
         B_images_paths = format_paths(opt[root_B])
@@ -163,8 +163,7 @@ def read_dataroots(opt, keys_ds=None):
             # only resolve when the two path lists coincide in the number of elements, 
             # they have to be ordered specifically as they will be used in the options file
             assert len(B_images_paths) == len(A_images_paths), \
-                'Error: When using duplicate paths, {} and {} must contain the same number of elements.'.format(
-                    root_B, root_A)
+                f'Error: When using duplicate paths, {root_B} and {root_A} must contain the same number of elements.'
 
             paths_A, paths_B = paired_dataset_validation(A_images_paths, B_images_paths, 
                                         opt['data_type'], opt.get('max_dataset_size', float("inf")))
@@ -234,9 +233,9 @@ def validate_paths(paths_A, paths_B, strict=True, keys_ds=None):
 def get_dataroots_paths(opt, strict=False, keys_ds=None):
     if keys_ds is None: keys_ds = ['LR', 'HR']
     paths_A, paths_B = read_dataroots(opt, keys_ds=keys_ds)
-    assert paths_B, 'Error: {} path is empty.'.format(keys_ds[1])
+    assert paths_B, f'Error: {keys_ds[1]} path is empty.'
     if strict:
-        assert paths_A, 'Error: {} path is empty.'.format(keys_ds[0])
+        assert paths_A, f'Error: {keys_ds[0]} path is empty.'
 
     if paths_A and paths_B:
         paths_A, paths_B = validate_paths(paths_A, paths_B, strict=strict, keys_ds=keys_ds)

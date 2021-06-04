@@ -1,7 +1,7 @@
 import torch
-import torch.nn as nn
+from torch import nn
 import functools
-from models.modules.architectures.block import upconv_block
+from models.modules.architectures.block import upconv_block, Upsample
 # from models.modules.architectures.RRDBNet_arch import RRDBNet
 
 ####################
@@ -17,7 +17,7 @@ class UnetGenerator(nn.Module):
     From: https://github.com/junyanz/pytorch-CycleGAN-and-pix2pix/blob/master/models/networks.py
     """
 
-    def __init__(self, input_nc, output_nc, num_downs, ngf=64, norm_type="batch", 
+    def __init__(self, input_nc, output_nc, num_downs, ngf=64, norm_type="batch",
                 use_dropout=False, upsample_mode="deconv"):
         """Construct a Unet generator
         Parameters:
@@ -34,9 +34,9 @@ class UnetGenerator(nn.Module):
         It is a recursive process.
         """
         super(UnetGenerator, self).__init__()
-        if norm_type == "BN" or norm_type == "batch":
+        if norm_type in ('BN', 'batch'):
             norm_layer = nn.BatchNorm2d
-        elif norm_type == "IN" or norm_type == "instance":
+        elif norm_type in ('IN', 'instance'):
             norm_layer = nn.InstanceNorm2d
         else:
             raise NameError("Unknown norm layer")
@@ -96,7 +96,7 @@ class UnetSkipConnectionBlock(nn.Module):
         super(UnetSkipConnectionBlock, self).__init__()
         self.outermost = outermost
         
-        if type(norm_layer) == functools.partial:
+        if type(norm_layer) is functools.partial:
             use_bias = norm_layer.func == nn.InstanceNorm2d
         else:
             use_bias = norm_layer == nn.InstanceNorm2d
@@ -204,7 +204,7 @@ if __name__ == "__main__":
     x = torch.zeros(1, 3, 256, 256).requires_grad_(True).cuda()
     # g = make_dot(model(x))
     # g.render("models/Digraph.gv", view=False)
-    out = model(x)
+    out = model_pix2pix(x)
     print(x.shape)
 
 

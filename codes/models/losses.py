@@ -19,21 +19,21 @@ from dataops.debug import *
 
 
 #loss builder
-def get_loss_fn(loss_type=None, 
-                weight=0, 
-                recurrent=False, 
-                reduction='mean', 
-                network = None, 
-                device = 'cuda:0', 
+def get_loss_fn(loss_type=None,
+                weight=0,
+                recurrent=False,
+                reduction='mean',
+                network = None,
+                device = 'cuda',
                 opt = None,
                 allow_featnets = True):
     if loss_type == 'skip':
         loss_function = None
     # pixel / content losses
-    if loss_type == 'MSE' or loss_type == 'l2':
+    if loss_type in ('MSE', 'l2'):
         loss_function = nn.MSELoss(reduction=reduction)
         loss_type = 'pix-{}'.format(loss_type)
-    elif loss_type == 'L1' or loss_type == 'l1':
+    elif loss_type in ('L1', 'l1'):
         loss_function = nn.L1Loss(reduction=reduction)
         loss_type = 'pix-{}'.format(loss_type)
     elif loss_type == 'cb':
@@ -49,7 +49,7 @@ def get_loss_fn(loss_type=None,
     #elif loss_type == 'relativel2':
         #loss_function = RelativeL2(reduction=reduction)
         #loss_type = 'pix-{}'.format(loss_type)
-    elif loss_type == 'l1cosinesim' or loss_type == 'L1CosineSim':
+    elif loss_type in ('l1cosinesim', 'L1CosineSim'):
         loss_function = L1CosineSim(reduction=reduction)
         loss_type = 'pix-{}'.format(loss_type)
     elif loss_type == 'clipl1':
@@ -63,18 +63,18 @@ def get_loss_fn(loss_type=None,
         loss_type = 'pix-{}'.format(loss_type)
     # SSIM losses
     #TODO: pass SSIM options from opt_train
-    elif loss_type == 'ssim' or loss_type == 'SSIM': #l_ssim_type
+    elif loss_type in ('ssim', 'SSIM'): #l_ssim_type
         if not allow_featnets:
             image_channels = 1
         else:
             image_channels = opt['image_channels'] if opt['image_channels'] else 3
-        loss_function =  SSIM(window_size=11, window_sigma=1.5, size_average=True, data_range=1., channels=image_channels)
-    elif loss_type == 'ms-ssim' or loss_type == 'MSSSIM': #l_ssim_type
+        loss_function = SSIM(window_size=11, window_sigma=1.5, size_average=True, data_range=1., channels=image_channels)
+    elif loss_type in ('ms-ssim', 'MSSSIM'): #l_ssim_type
         if not allow_featnets:
             image_channels = 1
         else:
             image_channels = opt['image_channels'] if opt['image_channels'] else 3
-        loss_function =  MS_SSIM(window_size=11, window_sigma=1.5, size_average=True, data_range=1., channels=image_channels, normalize='relu')
+        loss_function = MS_SSIM(window_size=11, window_sigma=1.5, size_average=True, data_range=1., channels=image_channels, normalize='relu')
     # HFEN loss
     elif loss_type.find('hfen') >= 0:
         hfen_loss_f = get_loss_fn(loss_type.split('-')[1], recurrent=True, reduction='sum')
@@ -183,7 +183,7 @@ def check_loss_names(pixel_criterion=None, feature_criterion=None, feature_netwo
 
     #//, "hfen_criterion": "l1" //hfen: "l1" | "l2" | "rel_l1" | "rel_l2" //helps in deblurring and finding edges, lines
     if hfen_criterion:
-        if hfen_criterion == 'rel_l1' or hfen_criterion == 'rel_l2': #TODO, rel_l2 not available, easy to do
+        if hfen_criterion in ('rel_l1', 'rel_l2'): #TODO, rel_l2 not available, easy to do
             hfen_criterion = 'hfen-relativel1'
         #elif hfen_criterion == 'rel_l2':
             #hfen_criterion = 'hfen-relativel2'
@@ -194,9 +194,9 @@ def check_loss_names(pixel_criterion=None, feature_criterion=None, feature_netwo
     #//, "tv_type": "normal" //helps in denoising, reducing upscale artefacts
     if tv_type and tv_norm:
         #get norm
-        if tv_norm == 1 or tv_norm == 'L1':
+        if tv_norm in (1, 'L1'):
             tv_norm = 'l1'
-        elif tv_norm == 2 or tv_norm == 'L2':
+        elif tv_norm in (2, 'L2'):
             tv_norm = 'l2'
         #get type
         if tv_type == 'normal':
@@ -245,125 +245,192 @@ class PerceptualLoss(nn.Module):
 
 
 class Adversarial(nn.Module):
-    def __init__(self, train_opt=None, device = 'cpu', diffaug = False, dapolicy = ''):
+    def __init__(self, train_opt=None, device = 'cpu', diffaug = False, dapolicy = '',
+                 conditional = False):
         super(Adversarial, self).__init__()
 
         self.device = device
         self.diffaug = diffaug
         self.dapolicy = dapolicy
+        self.conditional = conditional
         self.gan_type = train_opt['gan_type']
         self.use_featmaps  = train_opt.get('gan_featmaps', None)
         if self.use_featmaps:
             dis_feature_criterion  = train_opt.get('dis_feature_criterion', 'l1')
             dis_feature_weight  = train_opt.get('dis_feature_weight', 0.0001)
-            self.cri_disfea = get_loss_fn(dis_feature_criterion, dis_feature_weight) 
-        
+            self.cri_disfea = get_loss_fn(dis_feature_criterion, dis_feature_weight)
+
         self.cri_gan = GANLoss(train_opt['gan_type'], 1.0, 0.0).to(self.device)
         self.l_gan_w = train_opt['gan_weight']
+        # self.simple_dis = True  # TODO: non-relativistic GAN TMP check
 
-        if self.gan_type == 'wgan-gp': 
+        if self.gan_type == 'wgan-gp':
             self.random_pt = torch.Tensor(1, 1, 1, 1).to(self.device)
             # gradient penalty loss
             self.cri_gp = GradientPenaltyLoss(device=self.device).to(self.device)
             self.l_gp_w = train_opt['gp_weigth']
 
 
-    def forward(self, fake, real, netD=None, stage='discriminator', fsfilter = None): # (fake_H,self.var_ref)
+    def forward(self, fake, real, realB=None, netD=None, stage='discriminator',
+                fsfilter = None): # (fake_H,self.var_ref)
+        #Note: "fake" is fakeB, "real" is realA
 
-        if fsfilter: # filter
-            real = fsfilter(real)
-            fake = fsfilter(fake)
+        if self.conditional:
+            # using conditional GANs, we need to feed both input and output to the discriminator
+            if stage == 'generator':
+                # updating generator
+                # G(A) should fake the discriminator
+                fake_AB = torch.cat((real, fake), 1)  # Fake G(A)
 
-        if self.diffaug:
-            real = DiffAugment(real, policy=self.dapolicy)
-            fake = DiffAugment(fake, policy=self.dapolicy)
+                #TODO: test
+                # if fsfilter: # filter
+                #     fake_AB = fsfilter(fake_AB)
+                # if self.diffaug:
+                #     fake_AB = DiffAugment(fake_AB, policy=self.dapolicy)
 
-        #tmp_vis(real) # to visualize the batch for debugging
-        #tmp_vis(fake) # to visualize the batch for debugging
-        
-        if stage == 'generator':
-            # updating generator
-            #For the Generator only if GAN is enabled, everything else can happen any time
-            # G gan + cls loss
-            if self.use_featmaps: # extrating feature maps from discriminator
-                pred_g_real = netD(real, return_maps=self.use_featmaps)
-                #TODO: test. if is a list, its [pred_g_real, feats_d_real], else its just pred_g_real
-                if isinstance(pred_g_real, list):
-                    feats_d_real = pred_g_real[1]
-                    pred_g_real = pred_g_real[0].detach() # detach to avoid backpropagation to D
-                
-                pred_g_fake = netD(fake, return_maps=self.use_featmaps)
-                #TODO: test. if is a list, its [pred_g_fake, feats_d_fake], else its just pred_g_fake
-                if isinstance(pred_g_fake, list) and self.use_featmaps:
-                    feats_d_fake = pred_g_fake[1]
-                    pred_g_fake = pred_g_fake[0]
-            else: # normal gan
-                pred_g_real = netD(real) #.detach() # detach to avoid backpropagation to D
-                pred_g_fake = netD(fake)
+                pred_g_fake = netD(fake_AB)
+                l_g_gan = self.l_gan_w * self.cri_gan(pred_g_fake, True)
+                return l_g_gan
+            else: # elif stage == 'discriminator':
+                # updating discriminator
+                fake_AB = torch.cat((real, fake), 1)  # Fake G(A)
+                real_AB = torch.cat((real, realB), 1)  # Real B
 
-            if isinstance(pred_g_real, list) and isinstance(pred_g_fake, list):
-                # for multiscale discriminator
-                l_g_gan = 0
-                for preds in zip(pred_g_real, pred_g_fake):
-                    l_g_gan += self.l_gan_w * (self.cri_gan(preds[0][0].detach() - torch.mean(preds[1][0]), False) +
-                                        self.cri_gan(preds[1][0] - torch.mean(preds[0][0].detach()), True)) / 2
-            else: # regular single scale discriminators
-                pred_g_real = pred_g_real.detach() # detach to avoid backpropagation to D
-                l_g_gan = self.l_gan_w * (self.cri_gan(pred_g_real - torch.mean(pred_g_fake), False) +
-                                            self.cri_gan(pred_g_fake - torch.mean(pred_g_real), True)) / 2
-            
-            # SRPGAN-like Features Perceptual loss, extracted from the discriminator
-            if self.use_featmaps:
-                l_g_disfea = 0
-                for hr_feat_map, sr_feat_map in zip(feats_d_fake, feats_d_real):
-                    l_g_disfea += self.cri_disfea['function'](sr_feat_map, hr_feat_map)
-                l_g_disfea = (self.cri_disfea['weight']*l_g_disfea)/len(sr_feat_map)
-                l_g_gan += l_g_disfea
-            
-            return l_g_gan
+                #TODO: test
+                # if fsfilter: # filter
+                #     fake_AB = fsfilter(fake_AB)
+                #     real_AB = fsfilter(real_AB)
+                # if self.diffaug:
+                #     fake_AB = DiffAugment(fake_AB, policy=self.dapolicy)
+                #     real_AB = DiffAugment(real_AB, policy=self.dapolicy)
 
-        else: # elif stage == 'discriminator':
-            # updating discriminator
-            pred_d_real = netD(real)
-            pred_d_fake = netD(fake.detach())  # detach to avoid backpropagation to G
-            
-            if isinstance(pred_d_real, list) and isinstance(pred_d_fake, list):
-                # for multiscale discriminator
-                l_d_real = 0
-                l_d_fake = 0
-                for preds in zip(pred_d_real, pred_d_fake):
-                    l_d_real += self.cri_gan(preds[0][0] - torch.mean(preds[1][0]), True)
-                    l_d_fake += self.cri_gan(preds[1][0] - torch.mean(preds[0][0]), False)
-                pred_d_real = pred_d_real[0][0] # leave only the largest D for the logs
-                pred_d_fake = pred_d_fake[0][0] # leave only the largest D for the logs
-            else: # regular single scale discriminators
-                l_d_real = self.cri_gan(pred_d_real - torch.mean(pred_d_fake), True)
-                l_d_fake = self.cri_gan(pred_d_fake - torch.mean(pred_d_real), False)
+                # stop backprop to the generator by detaching fake_AB
+                pred_d_fake = netD(fake_AB.detach())
+                l_d_fake = self.cri_gan(pred_d_fake, False)
 
-            l_d_total = (l_d_real + l_d_fake) / 2
+                pred_d_real = netD(real_AB)
+                l_d_real = self.cri_gan(pred_d_real, True)
 
-            #logs for losses and D outputs
-            gan_logs = {
+                # combine loss and log
+                l_d_total = (l_d_fake + l_d_real) * 0.5
+
+                gan_logs = {
                     'l_d_real': l_d_real.item(),
                     'l_d_fake': l_d_fake.item(),
                     'D_real': torch.mean(pred_d_real.detach()).item(),
                     'D_fake': torch.mean(pred_d_fake.detach()).item()
                     }
 
-            if self.gan_type == 'wgan-gp':
-                batch_size = real.size(0)
-                if self.random_pt.size(0) != batch_size:
-                    self.random_pt.resize_(batch_size, 1, 1, 1)
-                self.random_pt.uniform_()  # Draw random interpolation points
-                interp = self.random_pt * fake.detach() + (1 - self.random_pt) * real
-                interp.requires_grad = True
-                interp_crit = netD(interp)
-                l_d_gp = self.l_gp_w * self.cri_gp(interp, interp_crit)
-                l_d_total += l_d_gp
-                # attach gradient penalty loss to log
-                gan_logs['l_d_gp'] = l_d_gp.item()
-            
-            return l_d_total, gan_logs
+                return l_d_total, gan_logs
+
+        else:
+            # use regular discriminator for real and fake samples
+
+            # apply frequency separation
+            if fsfilter: # filter
+                real = fsfilter(real)
+                fake = fsfilter(fake)
+
+            # apply differential augmentations
+            if self.diffaug:
+                real = DiffAugment(real, policy=self.dapolicy)
+                fake = DiffAugment(fake, policy=self.dapolicy)
+
+            #tmp_vis(real) # to visualize the batch for debugging
+            #tmp_vis(fake) # to visualize the batch for debugging
+
+            if stage == 'generator':
+                # updating generator
+                # for the Generator only if GAN is enabled, everything else can happen any time
+                # G gan + cls loss
+                if self.use_featmaps:  # extrating feature maps from discriminator
+                    pred_g_real = netD(real, return_maps=self.use_featmaps)
+                    #TODO: test. if is a list, its [pred_g_real, feats_d_real], else its just pred_g_real
+                    if isinstance(pred_g_real, list):
+                        feats_d_real = pred_g_real[1]
+                        pred_g_real = pred_g_real[0].detach() # detach to avoid backpropagation to D
+
+                    pred_g_fake = netD(fake, return_maps=self.use_featmaps)
+                    #TODO: test. if is a list, its [pred_g_fake, feats_d_fake], else its just pred_g_fake
+                    if isinstance(pred_g_fake, list) and self.use_featmaps:
+                        feats_d_fake = pred_g_fake[1]
+                        pred_g_fake = pred_g_fake[0]
+                else: # normal gan
+                    pred_g_real = netD(real) #.detach() # detach to avoid backpropagation to D
+                    pred_g_fake = netD(fake)
+
+                if isinstance(pred_g_real, list) and isinstance(pred_g_fake, list):
+                    # for multiscale discriminator
+                    l_g_gan = 0
+                    for preds in zip(pred_g_real, pred_g_fake):
+                        l_g_gan += self.l_gan_w * (self.cri_gan(preds[0][0].detach() - torch.mean(preds[1][0]), False) +
+                                            self.cri_gan(preds[1][0] - torch.mean(preds[0][0].detach()), True)) / 2
+                #TODO: TMP check
+                # elif self.simple_dis:
+                #     # pred_g_real not needed if non-relativistic
+                #     l_g_gan = self.l_gan_w * self.cri_gan(pred_g_fake, True)
+                else: # regular single scale discriminators
+                    pred_g_real = pred_g_real.detach() # detach to avoid backpropagation to D
+                    l_g_gan = self.l_gan_w * (self.cri_gan(pred_g_real - torch.mean(pred_g_fake), False) +
+                                                self.cri_gan(pred_g_fake - torch.mean(pred_g_real), True)) / 2
+
+                # SRPGAN-like Features Perceptual loss, extracted from the discriminator
+                if self.use_featmaps:
+                    l_g_disfea = 0
+                    for hr_feat_map, sr_feat_map in zip(feats_d_fake, feats_d_real):
+                        l_g_disfea += self.cri_disfea['function'](sr_feat_map, hr_feat_map)
+                    l_g_disfea = (self.cri_disfea['weight']*l_g_disfea)/len(feats_d_real)
+                    l_g_gan += l_g_disfea
+
+                return l_g_gan
+
+            else: # elif stage == 'discriminator':
+                # updating discriminator
+                pred_d_real = netD(real)  # Real
+                pred_d_fake = netD(fake.detach())  # detach Fake to avoid backpropagation to G
+
+                if isinstance(pred_d_real, list) and isinstance(pred_d_fake, list):
+                    # for multiscale discriminator
+                    l_d_real = 0
+                    l_d_fake = 0
+                    for preds in zip(pred_d_real, pred_d_fake):
+                        l_d_real += self.cri_gan(preds[0][0] - torch.mean(preds[1][0]), True)
+                        l_d_fake += self.cri_gan(preds[1][0] - torch.mean(preds[0][0]), False)
+                    pred_d_real = pred_d_real[0][0] # leave only the largest D for the logs
+                    pred_d_fake = pred_d_fake[0][0] # leave only the largest D for the logs
+                #TODO: TMP check
+                # elif self.simple_dis:
+                #     l_d_real = self.criterionGAN(pred_d_real, True)
+                #     l_d_fake = self.criterionGAN(pred_d_fake, False)
+                else: # regular single scale discriminators
+                    l_d_real = self.cri_gan(pred_d_real - torch.mean(pred_d_fake), True)
+                    l_d_fake = self.cri_gan(pred_d_fake - torch.mean(pred_d_real), False)
+
+                # combined loss
+                l_d_total = (l_d_real + l_d_fake) / 2
+
+                #logs for losses and D outputs
+                gan_logs = {
+                        'l_d_real': l_d_real.item(),
+                        'l_d_fake': l_d_fake.item(),
+                        'D_real': torch.mean(pred_d_real.detach()).item(),
+                        'D_fake': torch.mean(pred_d_fake.detach()).item()
+                        }
+
+                if self.gan_type == 'wgan-gp':
+                    batch_size = real.size(0)
+                    if self.random_pt.size(0) != batch_size:
+                        self.random_pt.resize_(batch_size, 1, 1, 1)
+                    self.random_pt.uniform_()  # Draw random interpolation points
+                    interp = self.random_pt * fake.detach() + (1 - self.random_pt) * real
+                    interp.requires_grad = True
+                    interp_crit = netD(interp)
+                    l_d_gp = self.l_gp_w * self.cri_gp(interp, interp_crit)
+                    l_d_total += l_d_gp
+                    # attach gradient penalty loss to log
+                    gan_logs['l_d_gp'] = l_d_gp.item()
+
+                return l_d_total, gan_logs
 
 
 class GeneratorLoss(nn.Module):
@@ -517,7 +584,7 @@ class GeneratorLoss(nn.Module):
             self.loss_list.append(cri_avg)
 
 
-    def forward(self, sr, hr, log_dict, fsfilter=None, selector=[]):
+    def forward(self, sr, hr, log_dict, fsfilter=None, selector=None):
         if fsfilter: #low-pass filter
             hr_f = fsfilter(hr)
             sr_f = fsfilter(sr)
@@ -528,7 +595,7 @@ class GeneratorLoss(nn.Module):
         #tmp_vis(sr_f)
         #tmp_vis(hr_f)
 
-        if selector:
+        if selector and isinstance(selector, list):
             loss_list = []
             for selected_loss in selector:
                 for i, l in enumerate(self.loss_list):
@@ -551,7 +618,7 @@ class GeneratorLoss(nn.Module):
                         effective_loss = l['weight']*l['function'](sr_f) # fake_H
                     elif l['name'].find('pix') >= 0 or l['name'].find('hfen') >= 0 \
                             or l['name'].find('cpl') >= 0 or l['name'].find('gpl') >= 0 \
-                            or l['name'].find('gradient') >= 0:
+                            or l['name'].find('gradient') >= 0 or l['name'].find('fdpl') >= 0:
                         effective_loss = l['weight']*l['function'](sr_f, hr_f) # (fake_H, var_H)
                     elif l['name'].find('ssim') >= 0:
                         effective_loss = l['weight']*(1 - l['function'](sr_f, hr_f)) # (fake_H, var_H)
@@ -571,13 +638,13 @@ class GeneratorLoss(nn.Module):
         return loss_results, log_dict
 
 class PreciseGeneratorLoss(nn.Module):
-    '''
+    """
     To separately instantiate losses that require high precision calculations and 
         cannot be inside the AMP context. 
         In principle, it's the same as GeneratorLoss, but each one initialize 
         different losses if configured in the options.
         If not using AMP, both classes will be equivalent.
-    '''
+    """
     def __init__(self, opt=None, device = 'cpu', allow_featnets=True):
         super(PreciseGeneratorLoss, self).__init__()
 
@@ -683,7 +750,7 @@ class PreciseGeneratorLoss(nn.Module):
             cri_range = get_loss_fn(range_type, range_weight, device = device, opt = opt)
             self.loss_list.append(cri_range)
 
-    def forward(self, sr, hr, log_dict, fsfilter=None, selector=[]):
+    def forward(self, sr, hr, log_dict, fsfilter=None, selector=None):
         # make sure both sr and hr are not in float16 or int, change to float32 (torch.float32/torch.float)
         # in some cases could even need torch.float64/torch.double, may have to add the case here
         if sr.dtype == torch.float16 or sr.dtype == torch.int8 or sr.dtype == torch.int32:
@@ -706,7 +773,7 @@ class PreciseGeneratorLoss(nn.Module):
         #tmp_vis(sr_f)
         #tmp_vis(hr_f)
 
-        if selector:
+        if selector and isinstance(selector, list):
             loss_list = []
             for selected_loss in selector:
                 for i, l in enumerate(self.loss_list):
@@ -729,7 +796,7 @@ class PreciseGeneratorLoss(nn.Module):
                         effective_loss = l['weight']*l['function'](sr_f) # fake_H
                     elif l['name'].find('pix') >= 0 or l['name'].find('hfen') >= 0 \
                             or l['name'].find('cpl') >= 0 or l['name'].find('gpl') >= 0 \
-                            or l['name'].find('gradient') >= 0:
+                            or l['name'].find('gradient') >= 0 or l['name'].find('fdpl') >= 0:
                         effective_loss = l['weight']*l['function'](sr_f, hr_f) # (fake_H, var_H)
                     elif l['name'].find('ssim') >= 0:
                         effective_loss = l['weight']*(1 - l['function'](sr_f, hr_f)) # (fake_H, var_H)
