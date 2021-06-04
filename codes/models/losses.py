@@ -18,7 +18,7 @@ from dataops.debug import *
 
 
 
-#loss builder
+# loss builder
 def get_loss_fn(loss_type=None,
                 weight=0,
                 recurrent=False,
@@ -45,10 +45,10 @@ def get_loss_fn(loss_type=None,
     elif loss_type == 'relativel1':
         loss_function = RelativeL1(reduction=reduction)
         loss_type = 'pix-{}'.format(loss_type)
-    #TODO
-    #elif loss_type == 'relativel2':
-        #loss_function = RelativeL2(reduction=reduction)
-        #loss_type = 'pix-{}'.format(loss_type)
+    # TODO
+    # elif loss_type == 'relativel2':
+        # loss_function = RelativeL2(reduction=reduction)
+        # loss_type = 'pix-{}'.format(loss_type)
     elif loss_type in ('l1cosinesim', 'L1CosineSim'):
         loss_function = L1CosineSim(reduction=reduction)
         loss_type = 'pix-{}'.format(loss_type)
@@ -62,14 +62,14 @@ def get_loss_fn(loss_type=None,
         loss_function = MultiscalePixelLoss(loss_f=ms_loss_f)
         loss_type = 'pix-{}'.format(loss_type)
     # SSIM losses
-    #TODO: pass SSIM options from opt_train
-    elif loss_type in ('ssim', 'SSIM'): #l_ssim_type
+    # TODO: pass SSIM options from opt_train
+    elif loss_type in ('ssim', 'SSIM'):  # l_ssim_type
         if not allow_featnets:
             image_channels = 1
         else:
             image_channels = opt['image_channels'] if opt['image_channels'] else 3
         loss_function = SSIM(window_size=11, window_sigma=1.5, size_average=True, data_range=1., channels=image_channels)
-    elif loss_type in ('ms-ssim', 'MSSSIM'): #l_ssim_type
+    elif loss_type in ('ms-ssim', 'MSSSIM'):  # l_ssim_type
         if not allow_featnets:
             image_channels = 1
         else:
@@ -78,25 +78,25 @@ def get_loss_fn(loss_type=None,
     # HFEN loss
     elif loss_type.find('hfen') >= 0:
         hfen_loss_f = get_loss_fn(loss_type.split('-')[1], recurrent=True, reduction='sum')
-        #print(hfen_loss_f)
-        #TODO: can pass function options from opt_train
+        # print(hfen_loss_f)
+        # TODO: can pass function options from opt_train
         loss_function = HFENLoss(loss_f=hfen_loss_f)
     # Gradient loss
     elif loss_type.find('grad') >= 0:
         gradientdir = loss_type.split('-')[1]
         grad_loss_f = get_loss_fn(loss_type.split('-')[2], recurrent=True)
-        #TODO: can pass function options from opt_train
+        # TODO: can pass function options from opt_train
         loss_function = GradientLoss(loss_f=grad_loss_f, gradientdir=gradientdir)
     # SPL losses
     # Gradient Profile Loss
     elif loss_type == 'gpl':
-        #TODO fix parameters to training variables (spl_denorm, yuv_denorm)
-        #currently won't work in range [-1,1]
+        # TODO fix parameters to training variables (spl_denorm, yuv_denorm)
+        # currently won't work in range [-1,1]
         loss_function = GPLoss(spl_denorm=False)
     # Color Profile Loss
     elif loss_type == 'cpl':
-        #TODO fix parameters to training variables (spl_denorm, yuv_denorm)
-        #currently won't work in range [-1,1]
+        # TODO fix parameters to training variables (spl_denorm, yuv_denorm)
+        # currently won't work in range [-1,1]
         loss_function = CPLoss(rgb=True,yuv=True,yuvgrad=True,spl_denorm=False,yuv_denorm=False)
     # TV regularization
     elif loss_type.find('tv') >= 0:
@@ -109,28 +109,28 @@ def get_loss_fn(loss_type=None,
         if tv_type == 'tv':
             loss_function = TVLoss(tv_type = 'tv', p = tv_norm)
         elif tv_type == 'dtv': 
-            loss_function = TVLoss(tv_type = 'dtv', p = tv_norm) #DTV
-    #Feature loss
-    #fea-vgg19-l1, fea-vgg16-l2, fea-lpips-... ("vgg" | "alex" | "squeeze" / net-lin | net )
-    #TODO: pass rotation, flips and other options, from opt_train, else defaults
+            loss_function = TVLoss(tv_type = 'dtv', p = tv_norm)  # DTV
+    # Feature loss
+    # fea-vgg19-l1, fea-vgg16-l2, fea-lpips-... ("vgg" | "alex" | "squeeze" / net-lin | net )
+    # TODO: pass rotation, flips and other options, from opt_train, else defaults
     elif loss_type.find('fea') >= 0:
         if loss_type.split('-')[1] == 'lpips':
-            #TODO: make lpips behave more like regular feature networks
+            # TODO: make lpips behave more like regular feature networks
             # lpips needs normalize = true if images are in [0,1] range
             norm = opt['datasets']['train'].get('znorm', False)
             loss_function = PerceptualLoss(criterion='lpips', network=network, normalize=(not norm), rotations=False, flips=False)
         else: #if loss_type.split('-')[1][:3] == 'vgg': #if vgg16, vgg19, resnet, etc
-            fea_loss_f = get_loss_fn(loss_type.split('-')[2], recurrent=True, reduction='mean') #sum? also worked on accidental test, but larger loss magnitudes
-            #TODO
-            #network = networks.define_F(opt, use_bn=False).to(self.device)
-            #TMP #loss_type.split('-')[1] # = vgg16, vgg19, resnet, ...
-            #network = define_F(use_bn=False, feat_network = loss_type.split('-')[1])
+            fea_loss_f = get_loss_fn(loss_type.split('-')[2], recurrent=True, reduction='mean')  # sum? also worked on accidental test, but larger loss magnitudes
+            # TODO
+            # network = networks.define_F(opt, use_bn=False).to(self.device)
+            # TMP #loss_type.split('-')[1] # = vgg16, vgg19, resnet, ...
+            # network = define_F(use_bn=False, feat_network = loss_type.split('-')[1])
             loss_function = PerceptualLoss(criterion=fea_loss_f, network=network, rotations=False, flips=False)
     # Contextual Loss
     elif loss_type == 'contextual':
         layers = opt.get('cx_vgg_layers', {"conv_3_2": 1.0, "conv_4_2": 1.0})
         loss_function = Contextual_Loss(layers, max_1d_size=64, distance_type = 'cosine', calc_type = 'regular')
-        #loss_function = Contextual_Loss(layers, max_1d_size=32, distance_type = 0, crop_quarter=True) # for L1, L2
+        # loss_function = Contextual_Loss(layers, max_1d_size=32, distance_type = 0, crop_quarter=True) # for L1, L2
     elif loss_type == 'fft':
         loss_function = FFTloss()
     elif loss_type == 'overflow':
@@ -152,7 +152,7 @@ def get_loss_fn(loss_type=None,
         loss_function = FDPLLoss(dataset_diff_means_file=diff_means, device=device)
     else:
         loss_function = None
-        #raise NotImplementedError('Loss type [{:s}] not recognized.'.format(loss_type))
+        # raise NotImplementedError('Loss type [{:s}] not recognized.'.format(loss_type))
 
     if loss_function:
         if recurrent:
@@ -160,7 +160,7 @@ def get_loss_fn(loss_type=None,
         else:
             loss = {
                     'name': loss_type,
-                    'weight': float(weight), #TODO: check if float is needed
+                    'weight': float(weight), # TODO: check if float is needed
                     'function': loss_function.to(device)}
             return loss
                     
@@ -174,36 +174,36 @@ def check_loss_names(pixel_criterion=None, feature_criterion=None, feature_netwo
     if pixel_criterion:
         return 'pix-{}'.format(pixel_criterion.lower())
 
-    #, "feature_criterion": "l1" //"l1" | "l2" | "cb" | "elastic" //feature loss (VGG feature network)
+    # , "feature_criterion": "l1" //"l1" | "l2" | "cb" | "elastic" //feature loss (VGG feature network)
     if feature_criterion:
         return 'fea-{}-{}'.format(feature_network.lower(), feature_criterion.lower())
 
-    #//, "dis_feature_criterion": "l1" //"l1" | "l2" | "cb" | "elastic" //discriminator feature loss (only for asrragan)
-    #TODO
+    # //, "dis_feature_criterion": "l1" //"l1" | "l2" | "cb" | "elastic" //discriminator feature loss (only for asrragan)
+    # TODO
 
-    #//, "hfen_criterion": "l1" //hfen: "l1" | "l2" | "rel_l1" | "rel_l2" //helps in deblurring and finding edges, lines
+    # //, "hfen_criterion": "l1" //hfen: "l1" | "l2" | "rel_l1" | "rel_l2" //helps in deblurring and finding edges, lines
     if hfen_criterion:
-        if hfen_criterion in ('rel_l1', 'rel_l2'): #TODO, rel_l2 not available, easy to do
+        if hfen_criterion in ('rel_l1', 'rel_l2'): # TODO, rel_l2 not available, easy to do
             hfen_criterion = 'hfen-relativel1'
-        #elif hfen_criterion == 'rel_l2':
-            #hfen_criterion = 'hfen-relativel2'
+        # elif hfen_criterion == 'rel_l2':
+            # hfen_criterion = 'hfen-relativel2'
             return hfen_criterion
         else:
             return 'hfen-{}'.format(hfen_criterion.lower())
 
-    #//, "tv_type": "normal" //helps in denoising, reducing upscale artefacts
+    # //, "tv_type": "normal" //helps in denoising, reducing upscale artefacts
     if tv_type and tv_norm:
-        #get norm
+        # get norm
         if tv_norm in (1, 'L1'):
             tv_norm = 'l1'
         elif tv_norm in (2, 'L2'):
             tv_norm = 'l2'
-        #get type
+        # get type
         if tv_type == 'normal':
             tv_type = 'tv'
         elif tv_type == '4D':
             tv_type = 'dtv'
-        #final combined type
+        # final combined type
         tv_type = '{}-{}'.format(tv_type, tv_norm)
         return tv_type
     
@@ -246,7 +246,7 @@ class PerceptualLoss(nn.Module):
 
 class Adversarial(nn.Module):
     def __init__(self, train_opt=None, device = 'cpu', diffaug = False, dapolicy = '',
-                 conditional = False):
+                 conditional=False):
         super(Adversarial, self).__init__()
 
         self.device = device
@@ -272,8 +272,8 @@ class Adversarial(nn.Module):
 
 
     def forward(self, fake, real, realB=None, netD=None, stage='discriminator',
-                fsfilter = None): # (fake_H,self.var_ref)
-        #Note: "fake" is fakeB, "real" is realA
+                fsfilter=None):  # (fake_H,self.var_ref)
+        # Note: "fake" is fakeB, "real" is realA
 
         if self.conditional:
             # using conditional GANs, we need to feed both input and output to the discriminator
@@ -282,7 +282,7 @@ class Adversarial(nn.Module):
                 # G(A) should fake the discriminator
                 fake_AB = torch.cat((real, fake), 1)  # Fake G(A)
 
-                #TODO: test
+                # TODO: test
                 # if fsfilter: # filter
                 #     fake_AB = fsfilter(fake_AB)
                 # if self.diffaug:
@@ -291,12 +291,12 @@ class Adversarial(nn.Module):
                 pred_g_fake = netD(fake_AB)
                 l_g_gan = self.l_gan_w * self.cri_gan(pred_g_fake, True)
                 return l_g_gan
-            else: # elif stage == 'discriminator':
+            else:  # elif stage == 'discriminator':
                 # updating discriminator
                 fake_AB = torch.cat((real, fake), 1)  # Fake G(A)
                 real_AB = torch.cat((real, realB), 1)  # Real B
 
-                #TODO: test
+                # TODO: test
                 # if fsfilter: # filter
                 #     fake_AB = fsfilter(fake_AB)
                 #     real_AB = fsfilter(real_AB)
@@ -327,7 +327,7 @@ class Adversarial(nn.Module):
             # use regular discriminator for real and fake samples
 
             # apply frequency separation
-            if fsfilter: # filter
+            if fsfilter:  # filter
                 real = fsfilter(real)
                 fake = fsfilter(fake)
 
@@ -336,8 +336,8 @@ class Adversarial(nn.Module):
                 real = DiffAugment(real, policy=self.dapolicy)
                 fake = DiffAugment(fake, policy=self.dapolicy)
 
-            #tmp_vis(real) # to visualize the batch for debugging
-            #tmp_vis(fake) # to visualize the batch for debugging
+            # tmp_vis(real) # to visualize the batch for debugging
+            # tmp_vis(fake) # to visualize the batch for debugging
 
             if stage == 'generator':
                 # updating generator
@@ -345,18 +345,18 @@ class Adversarial(nn.Module):
                 # G gan + cls loss
                 if self.use_featmaps:  # extrating feature maps from discriminator
                     pred_g_real = netD(real, return_maps=self.use_featmaps)
-                    #TODO: test. if is a list, its [pred_g_real, feats_d_real], else its just pred_g_real
+                    # TODO: test. if is a list, its [pred_g_real, feats_d_real], else its just pred_g_real
                     if isinstance(pred_g_real, list):
                         feats_d_real = pred_g_real[1]
-                        pred_g_real = pred_g_real[0].detach() # detach to avoid backpropagation to D
+                        pred_g_real = pred_g_real[0].detach()  # detach to avoid backpropagation to D
 
                     pred_g_fake = netD(fake, return_maps=self.use_featmaps)
-                    #TODO: test. if is a list, its [pred_g_fake, feats_d_fake], else its just pred_g_fake
+                    # TODO: test. if is a list, its [pred_g_fake, feats_d_fake], else its just pred_g_fake
                     if isinstance(pred_g_fake, list) and self.use_featmaps:
                         feats_d_fake = pred_g_fake[1]
                         pred_g_fake = pred_g_fake[0]
-                else: # normal gan
-                    pred_g_real = netD(real) #.detach() # detach to avoid backpropagation to D
+                else:  # normal gan
+                    pred_g_real = netD(real)  # .detach() # detach to avoid backpropagation to D
                     pred_g_fake = netD(fake)
 
                 if isinstance(pred_g_real, list) and isinstance(pred_g_fake, list):
@@ -365,12 +365,12 @@ class Adversarial(nn.Module):
                     for preds in zip(pred_g_real, pred_g_fake):
                         l_g_gan += self.l_gan_w * (self.cri_gan(preds[0][0].detach() - torch.mean(preds[1][0]), False) +
                                             self.cri_gan(preds[1][0] - torch.mean(preds[0][0].detach()), True)) / 2
-                #TODO: TMP check
+                # TODO: TMP check
                 # elif self.simple_dis:
                 #     # pred_g_real not needed if non-relativistic
                 #     l_g_gan = self.l_gan_w * self.cri_gan(pred_g_fake, True)
-                else: # regular single scale discriminators
-                    pred_g_real = pred_g_real.detach() # detach to avoid backpropagation to D
+                else:  # regular single scale discriminators
+                    pred_g_real = pred_g_real.detach()  # detach to avoid backpropagation to D
                     l_g_gan = self.l_gan_w * (self.cri_gan(pred_g_real - torch.mean(pred_g_fake), False) +
                                                 self.cri_gan(pred_g_fake - torch.mean(pred_g_real), True)) / 2
 
@@ -384,7 +384,7 @@ class Adversarial(nn.Module):
 
                 return l_g_gan
 
-            else: # elif stage == 'discriminator':
+            else:  # elif stage == 'discriminator':
                 # updating discriminator
                 pred_d_real = netD(real)  # Real
                 pred_d_fake = netD(fake.detach())  # detach Fake to avoid backpropagation to G
@@ -396,20 +396,20 @@ class Adversarial(nn.Module):
                     for preds in zip(pred_d_real, pred_d_fake):
                         l_d_real += self.cri_gan(preds[0][0] - torch.mean(preds[1][0]), True)
                         l_d_fake += self.cri_gan(preds[1][0] - torch.mean(preds[0][0]), False)
-                    pred_d_real = pred_d_real[0][0] # leave only the largest D for the logs
-                    pred_d_fake = pred_d_fake[0][0] # leave only the largest D for the logs
-                #TODO: TMP check
+                    pred_d_real = pred_d_real[0][0]  # leave only the largest D for the logs
+                    pred_d_fake = pred_d_fake[0][0]  # leave only the largest D for the logs
+                # TODO: TMP check
                 # elif self.simple_dis:
                 #     l_d_real = self.criterionGAN(pred_d_real, True)
                 #     l_d_fake = self.criterionGAN(pred_d_fake, False)
-                else: # regular single scale discriminators
+                else:  # regular single scale discriminators
                     l_d_real = self.cri_gan(pred_d_real - torch.mean(pred_d_fake), True)
                     l_d_fake = self.cri_gan(pred_d_fake - torch.mean(pred_d_real), False)
 
                 # combined loss
                 l_d_total = (l_d_real + l_d_fake) / 2
 
-                #logs for losses and D outputs
+                # logs for losses and D outputs
                 gan_logs = {
                         'l_d_real': l_d_real.item(),
                         'l_d_fake': l_d_fake.item(),
@@ -753,9 +753,9 @@ class PreciseGeneratorLoss(nn.Module):
     def forward(self, sr, hr, log_dict, fsfilter=None, selector=None):
         # make sure both sr and hr are not in float16 or int, change to float32 (torch.float32/torch.float)
         # in some cases could even need torch.float64/torch.double, may have to add the case here
-        if sr.dtype == torch.float16 or sr.dtype == torch.int8 or sr.dtype == torch.int32:
+        if sr.dtype in (torch.float16, torch.int8, torch.int32):
             sr = sr.float()
-        if hr.dtype == torch.float16 or hr.dtype == torch.int8 or hr.dtype == torch.int32:
+        if hr.dtype in (torch.float16, torch.int8, torch.int32):
             hr = hr.float()
         
         assert sr.dtype == hr.dtype, \

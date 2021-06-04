@@ -10,17 +10,17 @@ import torch.nn as nn
 import models.networks as networks
 from .base_model import BaseModel, nullcast
 
-logger = logging.getLogger('base')
-
 from . import losses
 from . import optimizers
 from . import schedulers
 from . import swa
 
 from dataops.batchaug import BatchAug
-from dataops.filters import FilterHigh, FilterLow #, FilterX
+from dataops.filters import FilterHigh, FilterLow  # , FilterX
 from dataops.common import extract_patches_2d, recompose_tensor
 from models.modules.architectures.CEM import CEMnet
+
+logger = logging.getLogger('base')
 
 load_amp = (hasattr(torch.cuda, "amp") and hasattr(torch.cuda.amp, "autocast"))
 if load_amp:
@@ -68,10 +68,10 @@ class SRRaGANModel(BaseModel):
             """
             self.mixup = train_opt.get('mixup', None)
             if self.mixup: 
-                #TODO: cutblur and cutout need model to be modified so LR and HR have the same dimensions (1x)
-                self.mixopts = train_opt.get('mixopts', ["blend", "rgb", "mixup", "cutmix", "cutmixup"]) #, "cutout", "cutblur"]
-                self.mixprob = train_opt.get('mixprob', [1.0, 1.0, 1.0, 1.0, 1.0]) #, 1.0, 1.0]
-                self.mixalpha = train_opt.get('mixalpha', [0.6, 1.0, 1.2, 0.7, 0.7]) #, 0.001, 0.7]
+                # TODO: cutblur and cutout need model to be modified so LR and HR have the same dimensions (1x)
+                self.mixopts = train_opt.get('mixopts', ["blend", "rgb", "mixup", "cutmix", "cutmixup"])  # , "cutout", "cutblur"]
+                self.mixprob = train_opt.get('mixprob', [1.0, 1.0, 1.0, 1.0, 1.0])  # , 1.0, 1.0]
+                self.mixalpha = train_opt.get('mixalpha', [0.6, 1.0, 1.2, 0.7, 0.7])  # , 0.001, 0.7]
                 self.aux_mixprob = train_opt.get('aux_mixprob', 1.0)
                 self.aux_mixalpha = train_opt.get('aux_mixalpha', 1.2)
                 self.mix_p = train_opt.get('mix_p', None)
@@ -91,7 +91,7 @@ class SRRaGANModel(BaseModel):
             """
             Initialize losses
             """
-            #Initialize the losses with the opt parameters
+            # Initialize the losses with the opt parameters
             # Generator losses:
             # for the losses that don't require high precision (can use half precision)
             self.generatorlosses = losses.GeneratorLoss(opt, self.device)
@@ -105,8 +105,8 @@ class SRRaGANModel(BaseModel):
                 self.cri_gan = True
                 diffaug = train_opt.get('diffaug', None)
                 dapolicy = None
-                if diffaug: #TODO: this if should not be necessary
-                    dapolicy = train_opt.get('dapolicy', 'color,translation,cutout') #original
+                if diffaug:  # TODO: this if should not be necessary
+                    dapolicy = train_opt.get('dapolicy', 'color,translation,cutout')  # original
                 self.adversarial = losses.Adversarial(train_opt=train_opt, device=self.device, diffaug = diffaug, dapolicy = dapolicy)
                 # D_update_ratio and D_init_iters are for WGAN
                 self.D_update_ratio = train_opt.get('D_update_ratio', 1)
@@ -133,13 +133,12 @@ class SRRaGANModel(BaseModel):
             self.schedulers = schedulers.get_schedulers(
                 optimizers=self.optimizers, schedulers=self.schedulers, train_opt=train_opt)
 
-            #Keep log in loss class instead?
+            # Keep log in loss class instead?
             self.log_dict = OrderedDict()
 
             """
             Configure SWA
             """
-            #https://pytorch.org/blog/pytorch-1.6-now-includes-stochastic-weight-averaging/
             self.swa = opt.get('use_swa', False)
             if self.swa:
                 self.swa_start_iter = train_opt.get('swa_start_iter', 0)
@@ -147,11 +146,11 @@ class SRRaGANModel(BaseModel):
                 swa_lr = train_opt.get('swa_lr', 0.0001)
                 swa_anneal_epochs = train_opt.get('swa_anneal_epochs', 10)
                 swa_anneal_strategy = train_opt.get('swa_anneal_strategy', 'cos')
-                #TODO: Note: This could be done in resume_training() instead, to prevent creating
+                # TODO: Note: This could be done in resume_training() instead, to prevent creating
                 # the swa scheduler and model before they are needed
                 self.swa_scheduler, self.swa_model = swa.get_swa(
                         self.optimizer_G, self.netG, swa_lr, swa_anneal_epochs, swa_anneal_strategy)
-                self.load_swa() #load swa from resume state
+                self.load_swa()  # load swa from resume state
                 logger.info('SWA enabled. Starting on iter: {}, lr: {}'.format(self.swa_start_iter, swa_lr))
 
             """
@@ -189,7 +188,7 @@ class SRRaGANModel(BaseModel):
                         loc = (loc*3)-2
                     elif "patchgan" in disc:
                         loc = (loc*3)-1
-                    #TODO: TMP, for now only tested with the vgg-like or patchgan discriminators
+                    # TODO: TMP, for now only tested with the vgg-like or patchgan discriminators
                     if "discriminator_vgg" in disc or "patchgan" in disc:
                         self.feature_loc = loc
                         logger.info('FreezeD enabled')
@@ -215,7 +214,7 @@ class SRRaGANModel(BaseModel):
         Network summary? Make optional with parameter
             could be an selector between traditional print_network() and summary()
         """
-        self.print_network(verbose=False) #TODO: pass verbose flag from config file
+        self.print_network(verbose=False)  # TODO: pass verbose flag from config file
 
     def feed_data(self, data, need_HR=True):
         # LR images
@@ -248,9 +247,9 @@ class SRRaGANModel(BaseModel):
             wrapped_netG = CEM_net.WrapArchitecture(self.netG)
             self.fake_H = wrapped_netG(self.var_L)  # G(LR)
         else:
-            if self.outm: #if the model has the final activation option
+            if self.outm:  # if the model has the final activation option
                 self.fake_H = self.netG(self.var_L, outm=self.outm)
-            else: #regular models without the final activation option
+            else:  # regular models without the final activation option
                 self.fake_H = self.netG(self.var_L)  # G(LR)
 
     def optimize_parameters(self, step):       
@@ -271,7 +270,7 @@ class SRRaGANModel(BaseModel):
         ### Network forward, generate SR
         with self.cast():
             self.forward()
-        #/with self.cast():
+        # /with self.cast():
 
         # batch (mixup) augmentations
         # cutout-ed pixels are discarded when calculating loss by masking removed pixels
@@ -301,11 +300,11 @@ class SRRaGANModel(BaseModel):
                     # adversarial loss
                     l_g_gan = self.adversarial(
                         self.fake_H, self.var_ref, netD=self.netD, 
-                        stage='generator', fsfilter = self.f_high) # (sr, hr)
+                        stage='generator', fsfilter = self.f_high)  # (sr, hr)
                     self.log_dict['l_g_gan'] = l_g_gan.item()
                     l_g_total += l_g_gan / self.accumulations
 
-            #/with self.cast():
+            # /with self.cast():
             # high precision generator losses (can be affected by AMP half precision)
             if self.precisegeneratorlosses.loss_list:
                 precise_loss_results, self.log_dict = self.precisegeneratorlosses(
@@ -322,12 +321,12 @@ class SRRaGANModel(BaseModel):
             if (step + 1) % self.accumulations == 0:
                 if self.amp:
                     # unscale gradients of the optimizer's params, call 
-                    # optimizer.step() if no infs/NaNs in gradients, else, skipped
+                    # optimizer.step() if no infs/NaNs in gradients, else, skip
                     self.amp_scaler.step(self.optimizer_G)
                     # Update GradScaler scale for next iteration.
                     self.amp_scaler.update() 
-                    #TODO: remove. for debugging AMP
-                    #print("AMP Scaler state dict: ", self.amp_scaler.state_dict())
+                    # TODO: remove. for debugging AMP
+                    # print("AMP Scaler state dict: ", self.amp_scaler.state_dict())
                 else:
                     self.optimizer_G.step()
                 self.optimizer_G.zero_grad()
@@ -335,28 +334,23 @@ class SRRaGANModel(BaseModel):
 
         if self.cri_gan:
             # update discriminator
+            self.requires_grad(self.netD, flag=True)  # unfreeze all D
             if isinstance(self.feature_loc, int):
-                # unfreeze all D
-                self.requires_grad(self.netD, flag=True)
                 # then freeze up to the selected layers
                 for loc in range(self.feature_loc):
                     self.requires_grad(self.netD, False, target_layer=loc, net_type='D')
-            else:
-                # unfreeze discriminator
-                self.requires_grad(self.netD, flag=True)
-            
-            l_d_total = 0
-            
+
+            l_d_total = 0            
             with self.cast(): # Casts operations to mixed precision if enabled, else nullcontext
                 l_d_total, gan_logs = self.adversarial(
                     self.fake_H, self.var_ref, netD=self.netD, 
-                    stage='discriminator', fsfilter = self.f_high) # (sr, hr)
+                    stage='discriminator', fsfilter = self.f_high)  # (sr, hr)
 
                 for g_log in gan_logs:
                     self.log_dict[g_log] = gan_logs[g_log]
 
                 l_d_total /= self.accumulations
-            #/with autocast():
+            # /with autocast():
             
             if self.amp:
                 # call backward() on scaled loss to create scaled gradients.
