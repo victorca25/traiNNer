@@ -367,7 +367,7 @@ def fit(model, opt, dataloaders, steps_states, data_params, loggers):
                         plateau_metric = opt['train']['plateau_metric']
                         if plateau_metric in avg_metrics:
                             model.metric = avg_metrics[plateau_metric]
-                        elif plateau_metric == 'nll':
+                        elif nlls and plateau_metric == 'nll':
                             model.metric = avg_nll
 
                     # log

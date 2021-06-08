@@ -240,7 +240,7 @@ class Pix2PixModel(BaseModel):
         l_d_total = 0
         with self.cast():
             l_d_total, gan_logs = self.adversarial(
-                self.fake_B, self.real_A, self.real_B, netD=self.netD,
+                self.fake_B, self.real_B, self.real_A, netD=self.netD,
                 stage='discriminator', fsfilter=self.f_high)
 
             for g_log in gan_logs:
@@ -264,7 +264,7 @@ class Pix2PixModel(BaseModel):
                 # First, G(A) should fake the discriminator
                 # adversarial loss
                 l_g_gan = self.adversarial(
-                    self.fake_B, self.real_A, netD=self.netD,
+                    self.fake_B, condition=self.real_A, netD=self.netD,
                     stage='generator', fsfilter=self.f_high)
                 self.log_dict['l_g_gan'] = l_g_gan.item()
                 l_g_total += l_g_gan / self.accumulations

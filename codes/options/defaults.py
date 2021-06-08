@@ -56,7 +56,7 @@ def get_network_G_config(network_G, scale, crop_size):
         full_network_G['in_nc'] = network_G.pop('in_nc', 3) # num. of input image channels: 3 for RGB and 1 for grayscale
         full_network_G['out_nc'] = network_G.pop('out_nc', 3) # num. of output image channels: 3 for RGB and 1 for grayscale
         full_network_G['nf'] = network_G.pop('nf', 64)  # number of filters in the first conv layer
-        full_network_G['nb'] = network_G.pop('nb', 23)  # number of RRDB blocks
+        full_network_G['nb'] = network_G.pop('nb', 24)  # number of RRDB blocks
         full_network_G['upscale'] = network_G.pop('scale', scale)
         full_network_G['act_type'] = network_G.pop('net_act', None) or network_G.pop('act_type', "leakyrelu")  # swish | leakyrelu
     elif 'asr_cnn' in kind_G:

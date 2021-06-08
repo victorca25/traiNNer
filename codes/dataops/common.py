@@ -577,7 +577,6 @@ def extract_patches_2d(img, patch_shape, step=None, batch_first=False):
     """
     Convert a 4D tensor into a 5D tensor of patches (crops) of the original tensor.
     Uses unfold to extract sliding local blocks from an batched input tensor.
-    
     Arguments:
         img: the image batch to crop
         patch_shape: tuple with the shape of the last two dimensions (H,W) 
@@ -587,13 +586,12 @@ def extract_patches_2d(img, patch_shape, step=None, batch_first=False):
             patch size * step
         batch_first: return tensor with batch as the first dimension or the 
             second
-
     Reference: 
     https://gist.github.com/dem123456789/23f18fd78ac8da9615c347905e64fc78
     """
     if step is None: step = [1.0, 1.0]
     patch_H, patch_W = patch_shape[0], patch_shape[1]
-    
+
     # pad to fit patch dimensions
     if(img.size(2) < patch_H):
         num_padded_H_Top = (patch_H - img.size(2)) // 2
@@ -605,25 +603,25 @@ def extract_patches_2d(img, patch_shape, step=None, batch_first=False):
         num_padded_W_Right = patch_W - img.size(3) - num_padded_W_Left
         padding_W = nn.ConstantPad2d((num_padded_W_Left, num_padded_W_Right, 0, 0), 0)
         img = padding_W(img)
-    
+
     # steps to overlay crops of the images
     step_int = [0, 0]
     step_int[0] = int(patch_H * step[0]) if(isinstance(step[0], float)) else step[0]
     step_int[1] = int(patch_W * step[1]) if(isinstance(step[1], float)) else step[1]
-    
+
     patches_fold_H = img.unfold(2, patch_H, step_int[0])
     if((img.size(2) - patch_H) % step_int[0] != 0):
         patches_fold_H = torch.cat((patches_fold_H,
                                     img[:, :, -patch_H:, :].permute(0, 1, 3, 2).unsqueeze(2)),dim=2)
-    
+
     patches_fold_HW = patches_fold_H.unfold(3, patch_W, step_int[1])
     if((img.size(3) - patch_W) % step_int[1] != 0):
         patches_fold_HW = torch.cat((patches_fold_HW,
                                      patches_fold_H[:, :, :, -patch_W:, :].permute(0, 1, 2, 4, 3).unsqueeze(3)), dim=3)
-    
+
     patches = patches_fold_HW.permute(2, 3, 0, 1, 4, 5)
     patches = patches.reshape(-1, img.size(0), img.size(1), patch_H, patch_W)
-    
+
     if(batch_first):
         patches = patches.permute(1, 0, 2, 3, 4)
     return patches
@@ -647,24 +645,24 @@ def reconstruct_from_patches_2d(patches, img_shape, step=None, batch_first=False
     if step is None: step = [1.0, 1.0]
     if(batch_first):
         patches = patches.permute(1, 0, 2, 3, 4)
-    
+
     patch_H, patch_W = patches.size(3), patches.size(4)
     img_size = (patches.size(1), patches.size(2),max(img_shape[0], patch_H), max(img_shape[1], patch_W))
-    
+
     step_int = [0, 0]
     step_int[0] = int(patch_H * step[0]) if(isinstance(step[0], float)) else step[0]
     step_int[1] = int(patch_W * step[1]) if(isinstance(step[1], float)) else step[1]
-    
+
     nrow, ncol = 1 + (img_size[-2] - patch_H)//step_int[0], 1 + (img_size[-1] - patch_W)//step_int[1]
     r_nrow = nrow + 1 if((img_size[2] - patch_H) % step_int[0] != 0) else nrow
     r_ncol = ncol + 1 if((img_size[3] - patch_W) % step_int[1] != 0) else ncol
-    
+
     patches = patches.reshape(r_nrow, r_ncol, img_size[0], img_size[1], patch_H, patch_W)
-    
+
     img = torch.zeros(img_size, device = patches.device)
-    
+
     overlap_counter = torch.zeros(img_size, device = patches.device)
-    
+
     for i in range(nrow):
         for j in range(ncol):
             img[:, :, i * step_int[0]:i * step_int[0] + patch_H, j * step_int[1]:j * step_int[1] + patch_W] += patches[i, j,]
@@ -681,7 +679,7 @@ def reconstruct_from_patches_2d(patches, img_shape, step=None, batch_first=False
         img[:, :, -patch_H:, -patch_W:] += patches[-1, -1,]
         overlap_counter[:, :, -patch_H:, -patch_W:] += 1
     img /= overlap_counter
-    
+
     # remove the extra padding if image is smaller than the patch sizes
     if(img_shape[0] < patch_H):
         num_padded_H_Top = (patch_H - img_shape[0])//2
@@ -691,7 +689,7 @@ def reconstruct_from_patches_2d(patches, img_shape, step=None, batch_first=False
         num_padded_W_Left = (patch_W - img_shape[1])//2
         num_padded_W_Right = patch_W - img_shape[1] - num_padded_W_Left
         img = img[:, :, :, num_padded_W_Left:-num_padded_W_Right]
-    
+
     return img
 
 
@@ -701,7 +699,6 @@ def recompose_tensor(patches, height, width, step=None, scale=1):
     use blending between the patches if they were generated a 
     step between 0.5 (50% overlap) and 1.0 (0% overlap), 
     relative to the original patch size
-
     Arguments:
         patches: the image patches
         height: the original image height
@@ -709,11 +706,9 @@ def recompose_tensor(patches, height, width, step=None, scale=1):
         step: the overlap step factor, from 0.5 to 1.0
         scale: the scale at which the patches are in relation to the 
             original image
-
     References:
     https://github.com/sunreef/BlindSR/blob/master/src/image_utils.py
     https://gist.github.com/dem123456789/23f18fd78ac8da9615c347905e64fc78
-
     """
     if step is None: step = [1.0, 1.0]
     assert isinstance(step, float) and step >= 0.5 and step <= 1.0
@@ -761,7 +756,7 @@ def recompose_tensor(patches, height, width, step=None, scale=1):
         blending_patch = blending_patch.cuda()
         blending_image = blending_image.cuda()
         recomposed_tensor = recomposed_tensor.cuda()
-    
+
     patch_index = 0
     for b in range(final_batch_size):
         for h in range(n_patches_height):

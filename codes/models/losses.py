@@ -271,38 +271,41 @@ class Adversarial(nn.Module):
             self.l_gp_w = train_opt['gp_weigth']
 
 
-    def forward(self, fake, real, realB=None, netD=None, stage='discriminator',
+    def forward(self, fake, real=None, condition=None, netD=None, stage='discriminator',
                 fsfilter=None):  # (fake_H,self.var_ref)
-        # Note: "fake" is fakeB, "real" is realA
+        # Note: "fake" is fakeB, "real" is realB, "condition" is ie realA (for conditional case)
+
+        # apply frequency separation
+        if fsfilter:  # filter
+            fake = fsfilter(fake)
+            if isinstance(real, torch.Tensor):
+                real = fsfilter(real)
+
+        # apply differential augmentations
+        if self.diffaug:
+            fake = DiffAugment(fake, policy=self.dapolicy)
+            if isinstance(real, torch.Tensor):
+                real = DiffAugment(real, policy=self.dapolicy)
+
+        # tmp_vis(fake) # to visualize the batch for debugging
+        # if isinstance(real, torch.Tensor):
+        #     tmp_vis(real) # to visualize the batch for debugging
 
         if self.conditional:
             # using conditional GANs, we need to feed both input and output to the discriminator
+            # TODO: add relativistic GAN option
             if stage == 'generator':
                 # updating generator
                 # G(A) should fake the discriminator
-                fake_AB = torch.cat((real, fake), 1)  # Fake G(A)
-
-                # TODO: test
-                # if fsfilter: # filter
-                #     fake_AB = fsfilter(fake_AB)
-                # if self.diffaug:
-                #     fake_AB = DiffAugment(fake_AB, policy=self.dapolicy)
+                fake_AB = torch.cat((condition, fake), 1)  # Real A, Fake G(A)
 
                 pred_g_fake = netD(fake_AB)
                 l_g_gan = self.l_gan_w * self.cri_gan(pred_g_fake, True)
                 return l_g_gan
             else:  # elif stage == 'discriminator':
                 # updating discriminator
-                fake_AB = torch.cat((real, fake), 1)  # Fake G(A)
-                real_AB = torch.cat((real, realB), 1)  # Real B
-
-                # TODO: test
-                # if fsfilter: # filter
-                #     fake_AB = fsfilter(fake_AB)
-                #     real_AB = fsfilter(real_AB)
-                # if self.diffaug:
-                #     fake_AB = DiffAugment(fake_AB, policy=self.dapolicy)
-                #     real_AB = DiffAugment(real_AB, policy=self.dapolicy)
+                fake_AB = torch.cat((condition, fake), 1)  # Real A, Fake G(A)
+                real_AB = torch.cat((condition, real), 1)  # Real A, Real B
 
                 # stop backprop to the generator by detaching fake_AB
                 pred_d_fake = netD(fake_AB.detach())
@@ -325,19 +328,6 @@ class Adversarial(nn.Module):
 
         else:
             # use regular discriminator for real and fake samples
-
-            # apply frequency separation
-            if fsfilter:  # filter
-                real = fsfilter(real)
-                fake = fsfilter(fake)
-
-            # apply differential augmentations
-            if self.diffaug:
-                real = DiffAugment(real, policy=self.dapolicy)
-                fake = DiffAugment(fake, policy=self.dapolicy)
-
-            # tmp_vis(real) # to visualize the batch for debugging
-            # tmp_vis(fake) # to visualize the batch for debugging
 
             if stage == 'generator':
                 # updating generator
