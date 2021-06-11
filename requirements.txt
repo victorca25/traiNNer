@@ -4,4 +4,3 @@ torch
 numpy
 opencv-python
 tensorboardX
-lmdb

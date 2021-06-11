@@ -4,7 +4,7 @@ The overall code framework is shown in the following figure. It mainly consists 
 [Model], and [Network].
 
 <p align="center">
-   <img src="https://github.com/xinntao/public_figures/blob/master/BasicSR/code_framework.png" height="450">
+   <img src="https://user-images.githubusercontent.com/41912303/121567451-dff2e800-ca1e-11eb-9e46-a6b45a72a9ff.png" height="450">
 </p>
 
 For example, once [train.py] is called (i.e. `python train.py -opt options/train/train_template.yml`), a sequence of actions will follow this command:

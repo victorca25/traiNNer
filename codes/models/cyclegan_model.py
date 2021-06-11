@@ -139,7 +139,6 @@ class CycleGANModel(BaseModel):
 
             """
             Setup frequency separation
-            #TODO: test
             """
             self.fs = train_opt.get('fs', None)
             self.f_low = None

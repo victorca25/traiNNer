@@ -1,22 +1,67 @@
+# Changelog
 
-:black_square_button: TODO
+This is a general and non-exhaustive changelog of the mayor changes at certain milestones of the development of the repository, marked by the version tags. For some future directions, visit the [projects](https://github.com/victorca25/BasicSR/projects) page.
 
-- [ ] Test TV loss/regularization (needs to balance loss weight with other losses). 
-- [ ] Test HFEN loss (needs to balance loss weight with other losses). 
-- [ ] Test [Partial Convolution based Padding](https://github.com/NVIDIA/partialconv) (PartialConv2D).
-- [ ] Test PartialConv2D with random masks.
-- [ ] Add automatic model scale change (preserve conv layers, estimate upscale layers).
-- [ ] Add automatic loading of old models and new ESRGAN models.
-- [ ] Downscale images before and/or after inference. Helps in cleaning up some noise or bring images back to the original scale.
-- [ ] Adopt SRPGAN's extraction of features from the discriminator to test if it reduces compute usage
-- [ ] Import GMFN's recurrent network and add the feature loss to their MSE model, should have better MSE results with SRGAN's features/textures (Needs testing)
-- [ ] Test PPON training code. Inference is the same as the PPON repo.
 
-Done
-- [:white_check_mark:] Add on the fly augmentations (gaussian noise, blur, JPEG compression).
-- [:white_check_mark:] Add TV loss/regularization options. Useful for denoising tasks, reduces Total Variation.
-- [:white_check_mark:] Add HFEN loss. Useful to keep high frequency information. Used Gaussian filter to reduce the effect of noise.
-- [:white_check_mark:] Add [Partial Convolution based Padding](https://github.com/NVIDIA/partialconv) (PartialConv2D). It should help prevent edge padding issues. Zero padding is the default and typically has best performance, PartialConv2D has better performance and converges faster for segmentation and classification (https://arxiv.org/pdf/1811.11718.pdf). Code has been added, but the switch makes pretained models using Conv2D incompatible. Training new models for testing. (May be able to test inpainting and denoising)
-- [:white_check_mark:] Added SSIM and MS-SSIM loss functions. Originally needed to replicate the PPON training code, it can also be used on ESRGAN models
-- [:white_check_mark:] Import PPON's inference network to train using BasicSR's framework. They use dilated convolutions to increase receptive field and compare against ESRGAN with perceptually good results
-- [:white_check_mark:] Almost complete implementation of the PPON training, based on the original published paper. It's missing the Multiscale L1 loss in phase 2 (currently it only does the L1 calculation at full scale, together with the MS-SSIM loss). Added TV Loss to phase 1 (Content Reconstruction), HFEN to phase 2 (Structure Reconstruction) and left phase 3 (Perceptual Reconstruction) with the same GAN and VGG_Feature loss as the original and can use an alternative learning rate scheme (MultiStepLR_Restart) or the original StepLR_Restart from the paper (all these options are configurable in the JSON file). Training doesn't necessarily have to stop after finishing phase 3, but it should to be the same as in the paper.
+## v3.0 (current)
+-   Abstract common dataset base into BaseDataset and move functions share by all dataloaders to base_dataset.
+-   Finished converting main dataloaders to use composable functions based on [opencv_transforms](https://github.com/victorca25/opencv_transforms), with focus on reusable functions and performance improvements.
+-   Merged all previous `LRHR*_dataset` loaders into a single `aligned_dataset`, modified `LR_dataset` into `single_dataset` for single image dataset loading and added the `unaligned_dataset` for unpaired images training.
+-   Added support to use `PIL` as the images backend (with Torchvision transforms), in parallel to the existing `OpenCV2` backend (with [opencv_transforms](https://github.com/victorca25/opencv_transforms) composable functions. `PIL` options and functionality is more limited, but can be extended as needed, `CV2` remains the main backend to use due to better performance and optimized functions available. Minor notes: added a `pre_crop` option (option: `pre_crop`) to accelerate steps in the pipeline that perform resizing before cropping (like "random downscale HR/B" and when generating LR/A iamge on the fly), and remade `hr_rot` function for accurate free-range random rotations (option: `use_hrrot`).
+-   Enabled additional augmentations from opencv_transforms: cv2 k-means based color quantization (`km_quantize`), option to compress images with webp or jpeg (`webp`, `jpeg`), expose bilateral filter transform, extended new `ApplyKernel` function for convolving with arbitrary kernels (besides estimaged images kernels: KernelGAN) to add simple and complex motion blur transforms with randomly generated motion kernels (`motion`, `complexmotion`) and [CLAHE](https://en.wikipedia.org/wiki/Adaptive_histogram_equalization#Contrast_Limited_AHE) augmentation (`clahe`).
+-   Added new interpolation methods kernels options for use with the accurate and antialiased Matlab-like `imresize` function, intended to train models with a wider variety of kernels and some that are specific to some use cases. All the methods available are: `blackman5`, `blackman4`, `blackman3`, `blackman2`, `sinc5`, `sinc4`, `sinc3`, `sinc2`, `gaussian`, `hamming`, `hanning`, `catrom`, `bell`, `hermite`, `mitchell`, `cubic` (bicubic), `lanczos5`, `lanczos4`, `lanczos3`, `lanczos2`, `box`, `linear` (bilinear). The OpenCV methos now have the prefix `cv2_` and realistic kernels (ie. extracted with KernelGAN) can be combined during training. Note: Using PIL as the image backend currently only allows to use the PIL bicubic method to resize.
+-   Updated the `imresize` function with a new version adapted from [ResizeRight](https://github.com/assafshocher/ResizeRight) to solve the incorrectness issues from standard frameworks (OpenCV, PIL, Torch, TensorFlow, others).
+-   Included an flag to select the image pre-processing option that is more adequate for the model training task. Besides the default `crop` to crop patches for super-resolution, denoising and deblurring, now there are also `resize`, `scale_width`, `scale_height`, `scale_shortside` and `fixed` for image to image translation and other cases. Can also be combined using `_and_` as a connector (for example: `resize_and_crop`). Can also use `center_crop` to first extract a center crop. (option: `preprocess`, must coordinate with `load_size`, `center_crop_size`, `aspect_ratio`).
+-   Added [AdamP](https://arxiv.org/abs/2006.08217), [SGDP](https://arxiv.org/abs/2006.08217), [MADGRAD](https://arxiv.org/abs/2101.11075) and [Ranger](https://github.com/lessw2020/Ranger-Deep-Learning-Optimizer) optimizers as alternative to the ones included in PyTorch (Adam, SGD, RMSprop).
+-   Added `FlatCosineDecay` scheduler to complement the Ranger optimizer strategy (similar to linear decay after fixed lr rate, but with a cosine function).
+-   Fully integrated the `ReduceLROnPlateau` scheduler with the metrics builded, so it can be used by selecting the metric to use for evaluation from the ones computed during validation step. **Note**: `nll` is an optional metric that can be used when training SRFlow (select `min` as the `plateau_mode`).
+-   Added `multiscale` pixel loss and experimental `color`, `average`, `fft`, `overflow` and `range` losses.
+-   Added [pix2pix](https://arxiv.org/abs/1611.07004) and [CycleGAN](https://arxiv.org/pdf/1703.10593.pdf) networks and training strategies. Besides the options available in the original code (image pool for discriminator, conditional GAN training, etc) Can also use the discriminators, losses and other functions available here, such as `AMP`, frequency separation, differential augmentations and others. **Note**: the original `AB` paired datasets from `pix2pix` can can be used and will be automatically split into the `A` input domain and the `B` target domain, by using the `outputs: AB` and `dataroot_AB` option and path in the options file.
+-   Use of configuration presets and default values injection, instead of editing full configuration files (with `defaults.py`). Starting with pre-flight networks configuration check.
+
+## v2.0:
+-   Add automatic loading models of either the original ESRGAN architecture or the modified one.
+-   Large rewrite of code was made to reduce code redundancy and duplicates, reorganize the code and make it more modular.
+-   The filters and image manipulations used by the different functions (`HFEN`, `SSIM`/`MS-SSIM`, `SPL`, `TV`/`DTV`, etc) are now consolidated in filters.py and colors.py.
+-   Reusable loss builder/factory to reduce the changes needed when using a new model and adding new losses only once for all models.
+-   Metrics builder to include only the selected ones during validation.
+-   Integrated Automatic Mixed Precision ([AMP](https://pytorch.org/docs/master/amp.html)). (Code updated to work with Pytorch >= 1.6.0 and 1.3.0). Option `use_amp`.
+-   `Contextual Loss` ([CX](https://arxiv.org/abs/1803.02077), [CX](https://arxiv.org/abs/1803.04626)). Option: `cx_type`.
+-   `Differential Augmentations` for efficient gan training ([Paper](https://arxiv.org/pdf/2006.10738)). Option: `diffaug`.
+-   Batch augmentations (based on [Cutblur](https://arxiv.org/abs/2004.00448)). Option: `mixup`.
+-   `ESRGAN+` improvements to the ESRGAN network ([ESRGAN+](https://arxiv.org/pdf/2001.08073)). Options: 'gaussian' and 'plus'.
+-   Adapted `frequency filtering` per loss function ([Reference](https://arxiv.org/pdf/1911.07850)). In general, content losses receive the low-frequency images, feature losses non-filtered images and the discriminator high-frequency images. Option: `fs`.
+-   Added on the fly use of realistic image kernels extracted with KernelGAN ([Paper](https://openaccess.thecvf.com/content_ICCV_2019/papers/Zhou_Kernel_Modeling_Super-Resolution_on_Real_Low-Resolution_Images_ICCV_2019_paper.pdf) and injection of noise extracted from real images patches ([Reference](https://openaccess.thecvf.com/content_cvpr_2018/papers/Chen_Image_Blind_Denoising_CVPR_2018_paper.pdf)).
+-   Enabled option to use the feature maps from the VGG-like discriminator in training for feature similarity ([Reference](https://arxiv.org/abs/1712.05927)). Option: `discriminator_vgg_128_fea`.
+-   PatchGAN option for the discriminator ([Reference](https://arxiv.org/pdf/1611.07004v3.pdf)). Option: `patchgan`.
+-   Multiscale PatchGAN option for the discriminator ([Reference](https://arxiv.org/pdf/1711.11585.pdf)). Option: `multiscale`.
+-   Added a modified Pixel Attention Network for Efficient Image Super-Resolution ([PAN](https://arxiv.org/pdf/2010.01073.pdf)), which includes a self-attention layer in the residual path, among other changes. A basic pretrained model for 4x scale can be found [here](https://mega.nz/file/mpRgVThY#tRi1q_PrY5OX4MVOTtjWlXzBXcLZs2tP1duo-mEkWSs).
+-   Stochastic Weight Averaging ([SWA](https://arxiv.org/pdf/1803.05407.pdf), [Pytorch](https://pytorch.org/blog/pytorch-1.6-now-includes-stochastic-weight-averaging/)) added as an option. Currently the change only applies to the generator network, changing the original learning rate scheduler to the SWA scheduler after a defined number of iterations have passed (the original paper refers to the later 25% part of training). The resulting `SWA` model can be converted to a regular model after training using the scripts/swa2normal.py script. Option `use_swa` and configure the swa scheduler.
+-   Migrate all main on the fly augmnetations to a new repository ([opencv_transforms](https://github.com/victorca25/opencv_transforms)) and initiate change to use openCV-based composable transformation for augmentations with a new dataloader.
+-   Added the basic idea behind "Freeze Discriminator: A Simple Baseline for Fine-tuning GANs" ([FreezeD](https://arxiv.org/pdf/2002.10964.pdf)) to accelerate training with transfer learning. It is possible to use a pretrained discriminator model and freeze the initial (bottom) X number of layers. Option: `freeze_loc`, enabled for any of the VGG-like discriminators or patchgan (multiscale patchgan not yet added).
+-   Integrated the Consistency Enforcing Module (`CEM`) from Explorable Super Resolution ([Paper](http://openaccess.thecvf.com/content_CVPR_2020/papers/Bahat_Explorable_Super_Resolution_CVPR_2020_paper.pdf), [Web](https://yuvalbahat.github.io/Explorable-Super-Resolution/)). Available both for use during inference, as well as during training (only using a default downsampling kernel ATM). Can be easily extended to use estimaged Kernels from the images for downscaling using `KernelGAN` from [DLIP](https://github.com/victorca25/DLIP). More information on CEM [here](https://github.com/victorca25/BasicSR/tree/master/codes/models/modules/architectures/CEM).
+-   Added the training and testing codes for Super-Resolution using Normalizing Flow in PyTorch ([SRFlow](https://arxiv.org/pdf/2006.14200.pdf) models (including the GLOW reference [code](https://github.com/chaiyujin/glow-pytorch/)). A starter pretrained model can be found [here](https://mega.nz/file/6tJhWK4Y#1K3TDWtquIIHcOIglsUWpYPUhCmWz-95VroUikpsL2o), which used a model based on the original ESRGAN architecture for the RRDB module (it is necessary to use it to later be able to test model interpolations). Otherwise, the original SRFlow model used the modified ESRGAN pretrained model that can also be used.
+-   Other changes: added graceful interruption of training to continue from where it was interrupted, virtual batch option, `strict` model loading flag, support for using YAML or JSON options files, color transfer script (color_transfer.py) with multiple algorithms to transfer image statistics (colors) from a reference image to another, integrated the `forward_chop` function into the SR model to crop images into patches before upscaling for inference in VRAM constrained systems (use option test_mode: chop), general fixes and code refactoring.
+
+## v2.0 video architectures (still WIP):
+-   Video network for optical flow and video super-resolution ([SOFVSR](http://arxiv.org/abs/2001.02129)). Pretrained model using 3 frames, trained on a subset of `REDS` dataset [here](https://mega.nz/file/28JmyLrK#xhRP-EZKR7Vg7UjIRZQqotiFLix21JaGGLSvZq7cjt4). 
+-   Added option to use different image upscaling networks with the HR optical flow estimation for video (Pretrained using 3 frames and default ESRGAN as SR network [here](https://mega.nz/file/TwwEWD7Q#wCfUvVudI17weYc1JLeM3nTeK2xiMlVdc_JN1Nov3ac)).
+-   Initial integration of `RIFE` ([Paper](https://arxiv.org/abs/2011.06294)) architecture for Video Frame Interpolation (Converted trained model from three pickle files into a single pth model [here](https://mega.nz/file/DhBWgRYQ#hLkR4Eiks6s3ZvwLCl4eA57J3baR0eDXjyaV9yzmTeM)).
+-   Video ESRGAN (`EVSRGAN`) and `SR3D` networks using 3D convolution for video super-resolution, inspired on "3DSRnet: Video Super-resolution using 3D Convolutional Neural Networks" ([Paper](https://arxiv.org/pdf/1812.09079.pdf)). EVSRGAN Pretrained using 3 frames and default arch options [here](https://u.pcloud.link/publink/show?code=XZ2Wg8XZebryABNV8Q0GsSE2ifkLdh9NzzaX).
+-   Real-time Deep Video Deinterlacing ([Paper](https://arxiv.org/pdf/1708.00187.pdf)) training and testing codes implemented. Pretrained DVD models can be found [here](https://u.pcloud.link/publink/show?code=kZIIfQXZYLGBJF4sQVJ2aONxgwiPr8iQPxo7).
+
+## v1.0:
+-   On the fly (`OTF`) augmentations pipeline (gaussian/s&p/speckle/Poisson/dither noise, gaussian/box/average blur, JPEG compression, quantization based on self-organizing maps, others), with fully randomized application.
+-   Total Variation (`TV`) regularization options. Useful for denoising tasks.
+-   High-frequency error norm ([HFEN](https://www.sciencedirect.com/science/article/pii/S2211379721000905)) loss. Useful to keep high frequency information.
+-   `SSIM` and `MS-SSIM` image structure loss functions.
+-   Alternative content/pixel based loss functions: `Charbonnier`, `Elastic`, `RelativeL1`, `L1CosineSim`.
+-   Experimental Spatial Profile Loss ([SPL](https://arxiv.org/abs/1908.00274)).
+-   Partial Convolution based Padding ([PartialConv2D](https://github.com/NVIDIA/partialconv)). It should help prevent edge padding issues. Zero padding is the default and typically has best performance, PartialConv2D has better performance and converges faster for segmentation and classification (https://arxiv.org/pdf/1811.11718.pdf). Code has been added, but the switch makes pretained models using Conv2D incompatible. Test for inpainting and denoising.
+-   Initial implementation of the `PPON` training, based on the original published [paper](https://arxiv.org/abs/1907.10399). Including Multiscale L1 loss in phase 2.
+-   Update `ESRGAN` training model (`SRRAGAN`)
+-   Implement extraction of features from the discriminator to be used as a feature loss, as an alternative to classification networks like `VGG` (similar to `SRPGAN`).
+
+# Pre-v1.0
+-   Use of the [Relativist GAN](https://arxiv.org/abs/1807.00734) GAN training strategy.
+-   Original BasicSR codes, used to train [ESRGAN](https://arxiv.org/abs/1809.00219).

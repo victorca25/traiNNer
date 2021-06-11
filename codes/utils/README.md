@@ -1,15 +1,11 @@
 # Utils
 
-## Tensorboard Logger (tb_logger)
+This directory includes a miscellaneous collection of useful helper functions.
 
-[tensorboard](https://www.tensorflow.org/programmers_guide/summaries_and_tensorboard) is a nice visualization tool for visualizing/comparing training loss, validation PSNR and etc.
+- `image_pool.py` implements an image buffer that stores previously generated images. This buffer enables us to update discriminators using a history of generated images rather than the ones produced by the latest generators. The original idea was discussed in [this](http://openaccess.thecvf.com/content_cvpr_2017/papers/Shrivastava_Learning_From_Simulated_CVPR_2017_paper.pdf) paper. The size of the buffer is controlled by the `pool_size` option.
 
-You can turn it on/off in json option file with the key: `use_tb_logger`.
+- `metrics.py` contains a metrics object building, which allows dynamic selection of the metrics to calculate (between `psnr`, `ssim` and `lpips`) and the output of the averaging call integrates with the `ReduceLROnPlateau` optimizer option.
 
-### Install
-1. `pip install tensorflow` - Maybe it is the easiest way to install tensorboard, though we will install tensorflow at the same time.
-1. `pip install tensorboard_logger` - install [tensorboard_logger](https://github.com/TeamHG-Memex/tensorboard_logger)
+- `util.py` consists of simple helper functions that are repeatelly used in the code such as mkdirs (create multiple directories), scandir (scan a directory to find defined files), get_root_logger (create or fetch a root logger) and others.
 
-### Run
-1. In terminal: `tensorboard --logdir xxx/xxx`.
-1. Open TensorBoard UI at http://localhost:6006 in your browser
+- `progress_bar.py` a convenient progress bar. Currently only used by the `lmdb` dataset creation script.

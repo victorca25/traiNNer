@@ -94,7 +94,6 @@ class Pix2PixModel(BaseModel):
 
             """
             Setup frequency separation
-            #TODO: test
             """
             self.fs = train_opt.get('fs', None)
             self.f_low = None

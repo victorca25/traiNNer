@@ -1,0 +1,3 @@
+lmdb
+scipy
+Pillow
