@@ -10,7 +10,7 @@
 
 BasicSR (Basic Super Restoration) is an open source image and video restoration (super-resolution, denoising, deblurring and others) and image to image translation toolbox based on PyTorch.
 
-Here you will find: boilerplate code for training and testing computer vision (CV) models, different methods and strategies integrated in a single pipeline and modularity to add and remove components as needed, including new network architectures. The code is under a constant state of change, so if you find an issue or bug please open a [issue](https://github.com/victorca25/BasicSR/issues), a [discussion](https://github.com/victorca25/BasicSR/discussions) or write in one of the [Discord channels](##additional-help) for help.
+Here you will find: boilerplate code for training and testing computer vision (CV) models, different methods and strategies integrated in a single pipeline and modularity to add and remove components as needed, including new network architectures and templates for different training strategies. The code is under a constant state of change, so if you find an issue or bug please open a [issue](https://github.com/victorca25/BasicSR/issues), a [discussion](https://github.com/victorca25/BasicSR/discussions) or write in one of the [Discord channels](##additional-help) for help.
 
 Different from other repositories, here the focus is not only on repeating previous papers' results, but to enable more people to train their own models more easily, using their own custom datasets, as well as integrating new ideas to increase the performance of the models. For these reasons, a lot of the code is made in order to automatically take care of fixing potential issues, whenever possible.
 
@@ -60,7 +60,7 @@ Additionally, it is complemented by other repositories like [DLIP](https://githu
 
 In order to train your own models, you will need to create a [dataset](#datasets) consisting of images, and prepare these images, both considering [IO](https://github.com/victorca25/BasicSR/wiki/IO-speed) constrains, as well as the task the model should target. Detailed data preparation can be seen in [`codes/data`](https://github.com/victorca25/BasicSR/tree/master/codes/data).
 
-**Pretrained models**  are available in [Pretrained models](#pretrained-models).
+[**Pretrained models**](#pretrained-models) that can be used for fine-tuning are available.
 
 Detailed instructions on [how to train](https://github.com/victorca25/BasicSR/blob/master/docs/howtotrain.md) are also available.
 
@@ -77,15 +77,15 @@ If you are interested in obtaining results that can automatically return evaluat
 ## Pretrained models
 The most recent community pretrained models can be found in the [Wiki](https://upscale.wiki/wiki/Model_Database), Discord channels ([game upscale](https://discord.gg/nbB4A5F) and [animation upscale](https://discord.gg/vMaeuTEPh9)) and [nmkd's models](https://nmkd.de/?esrgan).
 
-For more details about the original and experimental pretrained models, please see [`experiments/pretrained_models`](https://github.com/victorca25/BasicSR/tree/master/experiments/pretrained_models).
+For more details about the original and experimental pretrained models, please see [`pretrained models`](https://github.com/victorca25/BasicSR/tree/master/docs/pretrained.md).
 
-You can put the downloaded models in the default `experiments/pretrained_models` folder and use them in the options files with the corresponding network architectures.
+You can put the downloaded models in the default `experiments/pretrained_models` directory and use them in the options files with the corresponding network architectures.
 
 
 ### Model interpolation
 Models that were trained using the same pretrained model or are derivates of the same pretrained model are able to be interpolated to combine the properties of both. The original author demostrated this by interpolating the PSNR pretrained model (which is not perceptually good, but results in smooth images) with the ESRGAN resulting models that have more details but sometimes is excessive to control a balance in the resulting images, instead of interpolating the resulting images from both models, giving much better results.
 
-The capabilities of linearly interpolating models are also explored in "DNI": [Deep Network Interpolation for Continuous Imagery Effect Transition](https://xinntao.github.io/projects/DNI) (CVPR19) with very interesting results and examples. The script for interpolation can be found in the [net_interp.py](https://github.com/victorca25/BasicSR/blob/master/codes/scripts/net_interp.py) file. This is an alternative to create new models without additional training and also to create pretrained models for easier fine tuning. 
+The capabilities of linearly interpolating models are also explored in "DNI": [Deep Network Interpolation for Continuous Imagery Effect Transition](https://xinntao.github.io/projects/DNI) (CVPR19) with very interesting results and examples. The script for interpolation can be found in the [net_interp.py](https://github.com/victorca25/BasicSR/blob/master/codes/scripts/net_interp.py) file. This is an alternative to create new models without additional training and also to create pretrained models for easier fine tuning. Below is an example of interpolating between a PSNR-oriented and a perceptual `ESRGAN` model (first row), and examples of interpolating `CycleGAN` style transfer models.
 
 <p align="center">
    <img src="https://camo.githubusercontent.com/913baa366ba395595a9638ab6282a9cbb088ab98/68747470733a2f2f78696e6e74616f2e6769746875622e696f2f70726f6a656374732f444e495f7372632f7465617365722e6a7067" height="300">
@@ -103,7 +103,9 @@ Any dataset can be augmented to expose the model to information that might not b
 
 There are multiple ways to help this project. The first one is by using it and trying to train your own models. You can open an [issue](https://github.com/victorca25/BasicSR/issues) if you find any bugs or start a [discussion](https://github.com/victorca25/BasicSR/discussions) if you have ideas, questions or would like to showcase your results.
 
-You can also join the [discord servers](#additional-Help) and share other users.
+If you would like to contribute in the form of adding or fixing code, you can do so be cloning this repo and creating a [PR](https://github.com/victorca25/BasicSR/pulls). Ideally, it's better for PR to be precise and not chaning many parts of the code at the same time, so it can be reviewed and tested. If possible, open an issue or discussion prior to creating the PR and we can talk about any ideas.
+
+You can also join the [discord servers](#additional-Help) and share results and questions with other users.
 
 * * *
 ## Additional Help

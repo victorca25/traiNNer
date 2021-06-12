@@ -110,7 +110,6 @@ Several standard SR datasets are listed below.
     <td>facades</td>
     <td><sub>400 images from the <a href="http://cmp.felk.cvut.cz/~tylecr1/facade">CMP Facades dataset</a>.</sub></td>
     <td rowspan="5"><a href="http://efrosgans.eecs.berkeley.edu/pix2pix/datasets/">Server</a></td>
-    <td rowspan="5"></td>
   </tr>
   <tr>
     <td>maps</td>
@@ -134,7 +133,6 @@ Several standard SR datasets are listed below.
     <td>facades</td>
     <td><sub>400 images from the <a href="http://cmp.felk.cvut.cz/~tylecr1/facade">CMP Facades dataset</a>.</sub></td>
     <td rowspan="7"><a href="https://people.eecs.berkeley.edu/~taesung_park/CycleGAN/datasets">Server</a></td>
-    <td rowspan="7"></td>
   </tr>
   <tr>
     <td>maps</td>
@@ -166,7 +164,6 @@ Several standard SR datasets are listed below.
     <td>Cityscapes</td>
     <td><sub>2975 images from the Cityscapes dataset.<sup>*2</sup></sub></td>
     <td rowspan="1"><a href="https://cityscapes-dataset.com">Server</a></td>
-    <td rowspan="1"></td>
   </tr>
 
 </table>
@@ -191,7 +188,6 @@ Several standard SR datasets are listed below.
     <td>Multiple</td>
     <td><sub>REDS video dataset. Includes deblurring, super-resolution and high FPS datasets.</sub></td>
     <td rowspan="1"><a href="https://seungjunnah.github.io/Datasets/reds.html">Server</a></td>
-    <td rowspan="1"></td>
   </tr>
 
 </table>

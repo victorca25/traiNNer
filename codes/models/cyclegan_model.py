@@ -216,6 +216,7 @@ class CycleGANModel(BaseModel):
             Configure SWA
             """
             # TODO: configure SWA for two Generators
+            self.swa = False
             # self.swa = opt.get('use_swa', False)
             # if self.swa:
             #     self.swa_start_iter = train_opt.get('swa_start_iter', 0)

@@ -76,9 +76,9 @@ Lastly, you can control what phase you want to train with the ppon_stages option
 SRFlow allows for the use of any differentiable architecture for the LR encoding network, since ir itself does not need to be invertible. SRFlow uses by default an RRDB network (ESRGAN) network for this purpose. In the original work, a pretrained ESRGAN model is loaded and according to the paper, the remaining flow network is trained for half the training time and the RRDB module is only unfrozen after that period. The option "train_RRDB_delay: 0.5" does that automatically, but you can lower it to start earlier if required. Besides these main differences, the training process is similar to other SR networks.
 
 1. Prepare datasets, usually the DIV2K dataset. More details are in [`codes/data`](https://github.com/victorca25/BasicSR/tree/master/codes/data).
-2. Optional: If the intention is to replicate the original paper here you would use an ESRGAN pretrained model. The original paper used the ESRGAN modified architecture model for this purpose. You can also use the original `RRDB_PSNR_x4.pth` as the pretrained model for that purpose, otherwise *any* existing model will work as pretrained. In `options/train/train_srflow.yml` set path.pretrain_model_G: `RRDB_ESRGAN_x4_mod_arch.pth` (or any ESRGAN model) and path.load_submodule: `true` for this purpose. If using an SRFlow model as pretrained, only setting pretrain_model_G is required.
+2. Optional: If the intention is to replicate the original paper here you would use an ESRGAN pretrained model. The original paper used the ESRGAN modified architecture model for this purpose. You can also use the original `RRDB_PSNR_x4.pth` as the pretrained model for that purpose, otherwise *any* existing model will work as pretrained. In `options/train/train.yml` set path.pretrain_model_G: `RRDB_ESRGAN_x4_mod_arch.pth` (or any ESRGAN model) and path.load_submodule: `true` for this purpose. If using an SRFlow model as pretrained, only setting pretrain_model_G is required.
 3. Modify the configuration file, `options/train/train_srflow.yml` as needed.
-4. Run command: `python train_srflow.py -opt options/train/train_srflow.yml`
+4. Run command: `python train.py -opt options/train/train_srflow.yml`
 
 Notes:
 - While SRFlow only needs the nll to train, it is possible to add any of the losses (except GAN) from the regular training template for training and they will work. They will operate on the deterministic version of the super resolved image with temperature τ= 0. 
@@ -146,7 +146,8 @@ The identity loss can regularize the generator to be close to an identity mappin
 
 This Distill [blog](https://distill.pub/2016/deconv-checkerboard/) discussed one of the potential causes of the checkerboard artifacts. You can fix that issue by switching from `deconv` ("deconvolution") to an `upconv` (regular upsampling followed by regular convolution). Currently the network parameters for both pix2pix and CycleGAN allow to make this change (using the `upsample_mode` option), but here's an alternative reference implementation using `ReflectionPad2d`:
 
-```nn.Upsample(scale_factor = 2, mode='bilinear'),
+```
+nn.Upsample(scale_factor = 2, mode='bilinear'),
 nn.ReflectionPad2d(1),
 nn.Conv2d(ngf * mult, int(ngf * mult / 2), kernel_size=3, stride=1, padding=0),
 ```

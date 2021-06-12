@@ -2,6 +2,10 @@
 
 Following are the original trained models that authors made available for the different architectures, compiled here only for convenience. Also some experimental models that have been trained using this repository for use as pretrained models have been added.
 
+Additional custom models can be found in the [model database](https://upscale.wiki/wiki/Model_Database).
+
+In order to use these models, they can be downloaded and saved in any directory and the path should be added to the configuration file (usually `pretrain_model_G`). The default path to use is `experiments/pretrained_models`.
+
 ## Super Resolution
 
 <table>
@@ -14,15 +18,13 @@ Following are the original trained models that authors made available for the di
 
   <tr>
     <th rowspan="2">ESRGAN</th>
-    <td>4x_RRDB_ESRGAN.pth
-    4x_RRDB_ESRGAN_modarch.pth</td>
+    <td>4x_RRDB_ESRGAN.pth, 4x_RRDB_ESRGAN_modarch.pth</td>
     <td><sub>the final ESRGAN model used in the paper and the modified architecture version from current repo</sub></td>
     <td rowspan="2"><a href="https://drive.google.com/drive/folders/1O9qLq2CjywbS4FJXvJMggX8DjX4e-GAV?usp=sharing">Google Drive</a></td>
   </tr>
 
   <tr>
-    <td>4x_RRDB_PSNR.pth
-    4x_RRDB_PSNR_modarch.pth</td>
+    <td>4x_RRDB_PSNR.pth, 4x_RRDB_PSNR_modarch.pth</td>
     <td><sub>model with high PSNR performance and the modified architecture version from current repo</sub></td>
   </tr>
 
@@ -35,8 +37,7 @@ Following are the original trained models that authors made available for the di
 
   <tr>
     <td >SRResNet<sup>*2</sup></td>
-    <td>**multiple, see notes below**
-        SRResNet_bicx4_in3nf64nb16.pth</td>
+    <td>**multiple, see notes below**, SRResNet_bicx4_in3nf64nb16.pth</td>
      <td><sub> 4x SRResNet model (with modification), trained on DIV2K, w/o BN, bicubic downsampling.</sub></td>
     <td><a href="https://drive.google.com/drive/folders/1Yrql9XI9goMAmsoQHHP8jG1k3RIAVhbK?usp=sharing">Google Drive</a></td>
   </tr>
@@ -102,17 +103,62 @@ These initial models are the same as the ones in the original [`pix2pix and Cycl
   </tr>
 
   <tr>
-    <td>pix2pix</td>
-    <td>**multiple models**</td>
-     <td><sub>models originally available in the pix2pix repo</sub></td>
-    <td><a href="https://drive.google.com/drive/folders/1gYeEOM1QIO-o3CG3aywtvKcCNmREf0bB?usp=sharing">Google Drive</a></td>
+    <th rowspan="6">pix2pix</th>
+    <td>facades_label2photo.pth</td>
+     <td><sub>models originally available in the pix2pix repo. These correspond to the Pix2pix <a href="https://github.com/victorca25/BasicSR/blob/master/docs/datasets.md#image-to-image-translation">datasets</a>.</sub></td>
+    <td rowspan="6"><a href="https://drive.google.com/drive/folders/1gYeEOM1QIO-o3CG3aywtvKcCNmREf0bB?usp=sharing">Google Drive</a></td>
+  </tr>
+  <tr>
+    <td>sat2map.pth</td>
+  </tr>
+  <tr>
+    <td>map2sat.pth</td>
+  </tr>
+  <tr>
+    <td>edges2shoes.pth</td>
+  </tr>
+  <tr>
+    <td>edges2handbags.pth</td>
+  </tr>
+  <tr>
+    <td>day2night.pth</td>
   </tr>
 
   <tr>
-    <td>CycleGAN</td>
-    <td>**multiple models**</td>
-     <td><sub>models originally available in the pix2pix repo</sub></td>
-    <td><a href="https://drive.google.com/drive/folders/1MTE_uQmTcHI5ieXo3-p2h9HftCLB03-t?usp=sharing">Google Drive</a></td>
+    <th rowspan="11">CycleGAN</th>
+    <td>facades_label2photo.pth, facades_photo2label.pth</td>
+     <td><sub>models originally available in the CycleGAN repo. These correspond to the CycleGAN <a href="https://github.com/victorca25/BasicSR/blob/master/docs/datasets.md#image-to-image-translation">datasets</a>. In some cases, only one generator of the cycle was provided, but the missing generator can be trained with the original dataset.</sub></td>
+    <td rowspan="11"><a href="https://drive.google.com/drive/folders/1MTE_uQmTcHI5ieXo3-p2h9HftCLB03-t?usp=sharing">Google Drive</a></td>
+  </tr>
+  <tr>
+    <td>sat2map.pth, map2sat.pth</td>
+  </tr>
+  <tr>
+    <td>horse2zebra.pth, zebra2horse.pth</td>
+  </tr>
+  <tr>
+    <td>summer2winter_yosemite.pth, winter2summer_yosemite.pth</td>
+  </tr>
+  <tr>
+    <td>cityscapes_photo2label.pth, cityscapes_label2photo.pth</td>
+  </tr>
+  <tr>
+    <td>apple2orange.pth, orange2apple.pth</td>
+  </tr>
+  <tr>
+    <td>monet2photo.pth, photo2monet.pth</td>
+  </tr>
+  <tr>
+    <td>photo2ukiyoe.pth</td>
+  </tr>
+  <tr>
+    <td>photo2cezanne.pth</td>
+  </tr>
+  <tr>
+    <td>photo2vangogh.pth</td>
+  </tr>
+  <tr>
+    <td>iphone2dslr_flower.pth</td>
   </tr>
 
 </table>

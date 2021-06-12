@@ -53,6 +53,7 @@ SFTGAN is used for a part of outdoor scenes.
 - In the case of Pix2pix trainin, the corresponding images in a pair {A,B} must be the same size and have the same filename, e.g., `/path/to/data/A/train/1.jpg` is considered to correspond to `/path/to/data/B/train/1.jpg` and the size at which the network will use the images to train must be coordinated in the network configuration and the `load_size` option.
 - For CycleGAN, you similarly need two directories that contain images from domain `A` and `B`. You should not expect the method to work on just any random combination of input and output datasets (e.g. `cats<->keyboards`). From experiments, it works better if two datasets share similar visual content. For example, `landscape painting<->landscape photographs` works much better than `portrait painting <-> landscape photographs`. `zebras<->horses` achieves compelling results while `cats<->dogs` completely fails.
 
+More details about the data configuration for image to image translation [here](https://github.com/victorca25/BasicSR/blob/master/docs/howtotrain.md#image-to-image-translation)
 
 ## General Data Process
 
