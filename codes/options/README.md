@@ -4,7 +4,7 @@
 -   The code converts the the option file to a python dictionary in `options.py`, which is used later in all modules.
 -   In `yaml` files `#` are used for comments, while in `json` files it's with  `//`. Use `null` for `None` in both cases.
 -   The recommendation is to find the template file for the task (network,strategy, etc) you're interested in and create a copy you can edit to customize.
--   The main change to get up and running, for testing is to add the path to the generator model in `pretrain_model_G`. For training, it is also usually recommended to use a pretrain model in `pretrain_model_G`, but you need to provide the dataset to train on. `dataroot_B` (or `dataroot_HR`) for the target images and if not generating the input pair on the fly, also the `dataroot_A` (or `dataroot_LR`) path.
+-   The main change to get up and running, for testing is to add the path to the generator model in `pretrain_model_G`. For training, it is also usually recommended to use a pretrain model in `pretrain_model_G`, but you need to provide the dataset to train on. `dataroot_B` (or `dataroot_HR`, either name can be used) for the target images and if not generating the input pair on the fly, also the `dataroot_A` (or `dataroot_LR`, either name can be used) path.
 
 # Common
 

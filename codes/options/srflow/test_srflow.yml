@@ -9,12 +9,12 @@ gpu_ids: [0]
 datasets:
   test:
     name: seta
-    mode: LRHRC
-    dataroot_HR: '../test1/HR'
-    dataroot_LR: '../test1/LR'
+    mode: aligned
+    dataroot_B: '../test1/HR'
+    dataroot_A: '../test1/LR'
     
 path:
-  root: 'D:/Code/GitHub/BasicSR'
+  root: '../'
   pretrain_model_G: ../experiments/pretrained_models/SRFlow_DF2K_4X.pth
 
 #### network structures

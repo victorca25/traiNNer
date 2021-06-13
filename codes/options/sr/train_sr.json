@@ -85,8 +85,8 @@
     , "val": {
       "name": "val_set14_part"
       , "mode": "aligned"
-      , "dataroot_HR": "../datasets/val/hr"
-      , "dataroot_LR": "../datasets/val/lr"
+      , "dataroot_B": "../datasets/val/hr"
+      , "dataroot_A": "../datasets/val/lr"
       
       , "znorm": false
       

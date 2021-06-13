@@ -1,6 +1,5 @@
 # General settings
-# name: srflowtest #train
-name: debug_001_template # use "debug" or "debug_nochkp" in the name to run a test session and check everything is working. Does validation and state saving every 8 iterations.
+name: 001_srflow_template
 use_tb_logger: true
 model: srflow
 scale: 4
@@ -12,9 +11,7 @@ gpu_ids: [0]
 datasets:
   train:
     name: DIV2K
-    mode: LRHRC
-    # dataroot_HR: '../datasets/train/hr' # Original, with a single directory
-    # dataroot_LR: '../datasets/train/lr' # Original, with a single directory
+    mode: aligned
     dataroot_HR: [
       '../datasets/train/hr1', 
       '../datasets/train/hr2', 
@@ -24,60 +21,63 @@ datasets:
       '../datasets/train/lr1', 
       '../datasets/train/lr2' #,
       # '../datasets/train/lr3'
-      ] # low resolution images. If there are missing LR images, they will be generated on the fly from HR
+      ] # low resolution images
     subset_file: null
     use_shuffle: true
-    znorm: false # true | false # To normalize images in [-1, 1] range. Default = None (range [0,1]). Can use with activation function like tanh.
-    n_workers: 4 # 0 to disable CPU multithreading, or an integrer representing CPU threads to use for dataloading
+    znorm: false
+    n_workers: 4
     batch_size: 8
     virtual_batch_size: 8
-    preprocess: crop # how to process the images after loading
-    HR_size: 128 # patch size. Default: 128. Needs to be coordinated with the patch size of the features network
+    preprocess: crop
+    crop_size: 128
     image_channels: 3 # number of channels to load images in
     quant: 255 #32
 
-    # If manually configuring on the fly generation of LR: (else, it will automatically default to Matlab-like downscale algorithm (777) when/if required
-    # dataroot_kernels: '../training/kernels/results/' # location of the image kernels extracted with KernelGAN, for use with the "realistic" downscale type
-    # lr_downscale: true # false
-    # lr_downscale_types: ["linear", "cubic"] # scaling interpolation options. select from ['cv2_nearest', 'cv2_linear', 'cv2_area', 'cv2_cubic', 'cv2_lanczos4', 'cv2_linear_exact', 'linear', 'box' ,'lanczos2', 'lanczos3', 'bicubic', 'mitchell', 'hermite', 'lanczos4', 'lanczos5', 'bell', 'catrom', 'hanning', 'hamming', 'gaussian', 'sinc2', 'sinc3', 'sinc4', 'sinc5', 'blackman2', 'blackman3', 'blackman4', 'blackman5', 'realistic']
+    # LR and HR modifiers.
+    # aug_downscale: 0.2
+    # shape_change: reshape_lr
 
     # Enable random downscaling of HR images (will fix LR pair to correct size)
     # hr_downscale: true
     # hr_downscale_amt: [2, 1.75, 1.5, 1]
     # #pre_crop: true
 
+    # On the fly generation of LR:
+    # dataroot_kernels: '../training/kernels/results/'
+    lr_downscale: true
+    lr_downscale_types: ["linear", "bicubic"]
+
     # Rotations augmentations:
-    use_flip: true # flip images
-    use_rot: true # rotate images in 90 degree angles
-    use_hrrot: false # rotate images in random degress between -45 and 45
+    use_flip: true
+    use_rot: true
+    use_hrrot: false
     
     # Noise and blur augmentations:
-    # lr_blur: false # true | false
-    # lr_blur_types: {gaussian: 1, clean: 3} # select from: "average","box","gaussian","bilateral","clean" ##blur options #median and motion aren't working yet
-    # noise_data: ../noise_patches/normal/ # location of the noise patches extracted from real images to use for noise injection with noise option "patches"
-    # lr_noise: false # true | false
-    # lr_noise_types: {gaussian: 1, JPEG: 1, clean: 4} # select from: "gaussian", "JPEG", "quantize", "poisson", "dither", "s&p", "speckle", "patches", "clean"
-    # lr_noise2: false # true | false
-    # lr_noise_types2: {dither: 2, clean: 2} # select from: "gaussian", "JPEG", "quantize", "poisson", "dither", "s&p", "speckle", "patches", "clean"
-    # hr_noise: false # true | false
-    # hr_noise_types: {gaussian: 1, clean: 4} # select from: "gaussian", "JPEG", "quantize", "poisson", "dither", "s&p", "speckle", "clean"
+    # lr_blur: false
+    # lr_blur_types: {gaussian: 1, clean: 3}
+    # # noise_data: ../noise_patches/normal/
+    # lr_noise: false
+    # lr_noise_types: {gaussian: 1, jpeg: 1, clean: 4}
+    # lr_noise2: false
+    # lr_noise_types2: {jpeg: 1, webp: 1, clean: 2}
+    # hr_noise: false
+    # hr_noise_types:  {gaussian: 1, clean: 4}
     
   val: 
     name: val_set14_part
-    mode: LRHROTF
-    dataroot_HR: '../datasets/val/hr'
-    dataroot_LR: '../datasets/val/lr'
+    mode: aligned
+    dataroot_B: '../datasets/val/hr'
+    dataroot_A: '../datasets/val/lr'
     
-    znorm: false # true | false # To normalize images in [-1, 1] range. Default = None (range [0,1]). Can use with activation function like tanh.
+    znorm: false
     quant: 255 #32
     
-    # hr_crop: false #disabled
-    # lr_downscale: false
-    # lr_downscale_types: ["linear", "cubic"] # scaling interpolation options, same as in train dataset
+    lr_downscale: false
+    lr_downscale_types: ["linear", "bicubic"]
     
 path:
   strict: false # true | false
-  root: 'D:/Code/GitHub/BasicSR'
+  root: '../'
   # if using full pretrained SRFlow model (set train_RRDB_delay to 0.0):
   pretrain_model_G: ../experiments/pretrained_models/SRFlow_DF2K_4X.pth
   # if using RRDB model as pretrained:
