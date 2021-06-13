@@ -1,0 +1,159 @@
+name: 001_cyclegan_template
+use_tb_logger: true
+model: cyclegan
+scale: 1
+gpu_ids: [0]
+use_amp: true
+use_swa: false
+pool_size: 50
+
+# Dataset options:
+datasets:
+  train:
+    name: apple2orange
+    mode: unaligned
+    outputs: AB
+    dataroot_B: '../datasets/apple2orange/trainB'
+    dataroot_A: '../datasets/apple2orange/trainA'
+    
+    use_shuffle: true
+    znorm: true
+    n_workers: 4
+    batch_size: 1
+    virtual_batch_size: 1
+    preprocess: 'resize_and_crop'
+    load_size: 296
+    crop_size: 256 # patch size. Default: 256. Needs to be coordinated with the patch size of the features network
+    input_nc: 3 # number of channels to load images in
+    output_nc: 3
+    image_channels: 3
+
+    # Color space conversion
+    # color: 'y'
+    # color_LR: 'y'
+    # color_HR: 'y'
+    
+    # Rotations augmentations:
+    use_flip: true
+    # use_rot: true
+    # use_hrrot: false
+
+path:
+    root: '../'
+    pretrain_model_G_A: '../experiments/pretrained_models/apple2orange.pth'
+    pretrain_model_G_B: '../experiments/pretrained_models/orange2apple.pth'
+    # pretrain_model_D_A: '../experiments/pretrained_models/patchgana2o.pth'
+    # pretrain_model_D_B: '../experiments/pretrained_models/patchgano2a.pth'
+    # resume_state: '../experiments/debug_001_cyclegan_template/training_state/latest.state'
+
+# Generator options:
+network_G:
+    strict: false
+    which_model_G: resnet_net
+
+# Discriminator options:
+network_D:
+    strict: true
+    which_model_D: patchgan
+
+train:
+    # Optimizer options:
+    optim_G: adam
+    lr_G: 2e-4
+    beta1_G: 0.5  # momentum term
+    optim_D: adam
+    lr_D: 2e-4
+    beta1_D: 0.5  # momentum term
+    
+    # Schedulers options:
+    lr_scheme: Linear
+    fixed_niter: 2.5e4  # number of iterations with the initial learning rate
+    niter_decay: 2.5e4  # number of iterations to linearly decay learning rate to zero (=niter-fixed_niter)
+
+    # For SWA scheduler
+    # swa_start_iter_rel: 0.75
+    # swa_lr: 1e-4
+    # swa_anneal_epochs: 10
+    # swa_anneal_strategy: "cos"
+    
+    # Losses:
+    # lambda_identity: 0.5
+    pixel_criterion: l1  # pixel (content) loss
+    pixel_weight: 10
+    # feature_criterion: l1 # feature loss (VGG feature network)
+    # feature_weight: 1
+    # cx_type: contextual  # contextual loss
+    # cx_weight: 1.0
+    # cx_vgg_layers: {conv_3_2: 1, conv_4_2: 1}
+    # hfen_criterion: l1  # hfen
+    # hfen_weight: 1e-6 
+    # grad_type: grad-4d-l1  # image gradient loss
+    # grad_weight: 4e-1
+    # tv_type: normal  # total variation
+    # tv_weight: 1e-5
+    # tv_norm: 1
+    # ssim_type: ssim  # structural similarity
+    # ssim_weight: 1
+    # lpips_weight: 1 # perceptual loss
+    # lpips_type: net-lin
+    # lpips_net: squeeze
+    
+    # Experimental losses
+    # spl_type: spl  # spatial profile loss
+    # spl_weight: 0.1
+    # of_type: overflow  # overflow loss
+    # of_weight: 0.2
+    # range_weight: 1  # range loss
+    # fft_type: fft  # FFT loss
+    # fft_weight: 0.1
+    # color_criterion: color-l1cosinesim  # color consistency loss
+    # color_weight: 1
+    # avg_criterion: avg-l1  # averaging downscale loss
+    # avg_weight: 5
+    # ms_criterion: multiscale-l1  # multi-scale pixel loss
+    # ms_weight: 1e-2
+    # fdpl_type: fdpl  # frequency domain-based perceptual loss
+    # fdpl_weight: 1e-3
+    
+    # Adversarial loss:
+    gan_type: vanilla # lsgan
+    gan_weight: 1
+    # freeze_loc: 4
+    # For wgan-gp:
+    # D_update_ratio: 1
+    # D_init_iters: 0
+    # gp_weigth: 10
+    # Feature matching (if using the discriminator_vgg_128_fea or discriminator_vgg_fea):
+    # gan_featmaps: true
+    # dis_feature_criterion: cb  # discriminator feature loss
+    # dis_feature_weight: 0.01
+
+    # Differentiable Augmentation for Data-Efficient GAN Training
+    # diffaug: true
+    # dapolicy: 'color,transl_zoom,flip,rotate,cutout'
+    
+    # Batch (Mixup) augmentations
+    # mixup: true
+    # mixopts: [blend, rgb, mixup, cutmix, cutmixup] # , "cutout", "cutblur"]
+    # mixprob: [1.0, 1.0, 1.0, 1.0, 1.0] #, 1.0, 1.0]
+    # mixalpha: [0.6, 1.0, 1.2, 0.7, 0.7] #, 0.001, 0.7]
+    # aux_mixprob: 1.0
+    # aux_mixalpha: 1.2
+    ## mix_p: 1.2
+    
+    # Frequency Separator
+    # fs: true
+    # lpf_type: average
+    # hpf_type: average
+    
+    # Other training options:
+    manual_seed: 0
+    niter: 5e4
+    # warmup_iter: -1
+    display_freq: 5e3
+    # overwrite_val_imgs: true
+
+logger:
+    print_freq: 200
+    save_checkpoint_freq: 5e3
+    overwrite_chkp: false

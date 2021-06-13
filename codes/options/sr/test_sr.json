@@ -1,0 +1,45 @@
+{
+  "name": "RRDB_ESRGAN_x4"
+  , "suffix": "_ESRGAN"
+  , "model": "sr"
+  , "scale": 4
+  , "gpu_ids": [0]
+  // , "test_mode": "normal" // normal | chop | x8
+  // , "chop_patch_size": 200
+  // , "chop_step": 0.9
+  // , "val_comparison": true
+
+  // , "use_cem": false
+  // , "cem_config": {
+  //   "cem_kernel": "cubic" // "cubic" | "linear" | "estimated"
+  //   , "out_orig": false
+  //   , "out_filter": true
+  //   , "out_keepY": false
+  //   }
+
+  , "datasets": {
+    "test_1": { // the 1st test dataset
+      "name": "seta"
+      , "mode": "LR"
+      //, "dataroot_HR": "../test1/HR"
+      , "dataroot_LR": "../test1/LR"
+      //, "znorm": true
+    }
+    , "test_2": { // the 2nd test dataset
+      "name": "setb"
+      , "mode": "LR"
+      //, "dataroot_HR": "../test2/HR"
+      , "dataroot_LR": "../test2/LR"
+      //, "znorm": true
+    }
+  }
+
+  , "path": {
+    "root": "../"
+    , "pretrain_model_G": "../experiments/pretrained_models/RRDB_ESRGAN_x4.pth"
+  }
+
+  , "network_G": "esrgan"
+
+  // , "metrics": "psnr,ssim,lpips"
+}

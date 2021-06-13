@@ -1,0 +1,222 @@
+{
+  "name": "001_sr_template"
+  , "use_tb_logger": true
+  , "model":"sr"
+  , "scale": 4
+  , "gpu_ids": [0]
+  , "use_amp": true
+  , "use_swa": false
+  , "use_cem": false
+
+  // Dataset options:
+  , "datasets": {
+    "train": {
+      "name": "DIV2K"
+      , "mode": "aligned"
+      , "dataroot_HR": [
+            "../datasets/train/hr1",
+            "../datasets/train/hr2",
+            "../datasets/train/hr3"
+            ] // high resolution / ground truth images
+      , "dataroot_LR": [
+            "../datasets/train/lr1",
+            "../datasets/train/lr2"
+            // "../datasets/train/lr3"
+            ] // low resolution images
+      , "subset_file": null
+      , "use_shuffle": true
+      , "znorm": false
+      , "n_workers": 4
+      , "batch_size": 8
+      , "virtual_batch_size": 8
+      , "preprocess": "crop"
+      , "crop_size": 128
+      , "image_channels": 3
+      
+      // Color space conversion
+      // , "color": "y"
+      // , "color_LR": "y"
+      // , "color_HR": "y"
+      
+      // LR and HR modifiers.
+      // , "aug_downscale": 0.2
+      // , "shape_change": "reshape_lr"
+      
+      // Enable random downscaling of HR images (will fix LR pair to correct size)
+      // , "hr_downscale": true
+      // , "hr_downscale_amt": [2, 1.75, 1.5, 1]
+      // // , "pre_crop": true
+      
+      // On the fly generation of LR:
+      // , "dataroot_kernels": "../training/kernels/results/"
+      , "lr_downscale": true
+      , "lr_downscale_types": ["linear", "cubic"]
+
+      // Rotations augmentations:
+      , "use_flip": true
+      , "use_rot": true
+      , "use_hrrot": false
+      
+      // Noise and blur augmentations:
+      , "lr_blur": false
+      , "lr_blur_types":  {"gaussian":1, "clean":3}
+      // , "noise_data": "../noise_patches/normal/"
+      , "lr_noise": false
+      , "lr_noise_types": {"gaussian":1, "jpeg":1, "clean":4}
+      , "lr_noise2": false
+      , "lr_noise_types2": {"jpeg":1, "webp":1, "clean":2}
+      , "hr_noise": false
+      , "hr_noise_types": {"gaussian":1, "clean":4}
+      
+      // Color augmentations
+      // , "lr_fringes": true
+      // , "lr_fringes_chance": 0.4
+      // , "auto_levels": "HR"
+      // , "rand_auto_levels": 0.7
+      // , "lr_unsharp_mask": true
+      // , "lr_rand_unsharp": 1
+      // , "hr_unsharp_mask": true
+      // , "hr_rand_unsharp": 1
+      
+      // Augmentations for classification or (maybe) inpainting networks:
+      // , "lr_cutout": false
+      // , "lr_erasing": false
+    }
+    , "val": {
+      "name": "val_set14_part"
+      , "mode": "aligned"
+      , "dataroot_HR": "../datasets/val/hr"
+      , "dataroot_LR": "../datasets/val/lr"
+      
+      , "znorm": false
+      
+      // Color space conversion:
+      // , "color": "y"
+      // , "color_LR": "y"
+      // , "color_HR": "y"
+      
+      , "lr_downscale": false
+      , "lr_downscale_types": ["linear", "cubic"]
+    }
+  }
+
+  , "path": {
+    "root": "../"
+    , "pretrain_model_G": "../experiments/pretrained_models/RRDB_PSNR_x4.pth"
+    // , "pretrain_model_D": "../experiments/pretrained_models/patchgan.pth"
+    // , "resume_state": "../experiments/debug_002_RRDB_ESRGAN_x4_DIV2K/training_state/16.state"
+  }
+
+  // Generator options:
+  , "network_G": "esrgan"
+
+  // Discriminator options:
+  , "network_D": "discriminator_vgg"
+
+  , "train": {
+    // Optimizer options:
+    "optim_G": "adam"
+    , "optim_D": "adam"
+
+    // Schedulers options:
+    , "lr_scheme": "MultiStepLR"
+    , "lr_steps_rel": [0.1, 0.2, 0.4, 0.6]
+    , "lr_gamma": 0.5
+
+    // For SWA scheduler
+    , "swa_start_iter_rel": 0.75
+    , "swa_lr": 1e-4
+    , "swa_anneal_epochs": 10
+    , "swa_anneal_strategy": "cos"
+    
+    // Losses:
+    , "pixel_criterion": "l1" // pixel (content) loss
+    , "pixel_weight": 1e-2
+    , "feature_criterion": "l1" // feature loss (VGG feature network)
+    , "feature_weight": 1
+    // , "cx_type": "contextual" // contextual loss
+    // , "cx_weight": 0.5
+    // , "cx_vgg_layers": {"conv_3_2": 1.0, "conv_4_2": 1.0}
+    // , "hfen_criterion": "l1" // hfen
+    // , "hfen_weight": 1e-6
+    // , "grad_type": "grad-4d-l1" // image gradient loss
+    // , "grad_weight": 4e-3
+    // , "tv_type": "normal" // total variation
+    // , "tv_weight": 1e-5
+    // , "tv_norm": 1
+    // , "ssim_type": "ssim" // structural similarity
+	  // , "ssim_weight": 1
+    // , "lpips_weight": 1 // perceptual loss
+    // , "lpips_type": "net-lin"
+    // , "lpips_net": "squeeze"
+    
+    // Experimental losses
+    // , "spl_type": "spl" // spatial profile loss
+    // , "spl_weight": 1e-1
+    // , "of_type": "overflow" // overflow loss
+    // , "of_weight": 2e-1
+    // , "range_weight": 1 // range loss
+    // , "fft_type": "fft" // FFT loss
+    // , "fft_weight": 1e-1
+    // , "color_criterion": "color-l1cosinesim" // color consistency loss
+    // , "color_weight": 1
+    // , "avg_criterion": "avg-l1" // averaging downscale loss
+    // , "avg_weight": 5
+    // , "ms_criterion": "multiscale-l1" // multi-scale pixel loss
+    // , "ms_weight": 1e-2
+    // , "fdpl_type": "fdpl" // frequency domain-based perceptual loss
+    // , "fdpl_weight": 1e-3
+
+    // Adversarial loss:
+    , "gan_type": "vanilla"
+    , "gan_weight": 5e-3
+    // , "freeze_loc": 4
+    // for wgan-gp
+    // , "D_update_ratio": 1
+    // , "D_init_iters": 0
+    // , "gp_weigth": 10
+    // Feature matching (if using the discriminator_vgg_128_fea or discriminator_vgg_fea):
+    // , "gan_featmaps": true
+    // , "dis_feature_criterion": "cb" // discriminator feature loss
+    // , "dis_feature_weight": 1e-2
+
+    // For PPON:
+    // , "p1_losses": ["pix"]
+    // , "p2_losses": ["pix-multiscale", "ms-ssim"]
+    // , "p3_losses": ["fea"]
+    // , "ppon_stages": [1000, 2000]
+
+    // Differentiable Augmentation for Data-Efficient GAN Training
+    // , "diffaug": true
+    // , "dapolicy": "color,transl_zoom,flip,rotate,cutout"
+
+    // Batch (Mixup) augmentations
+    // , "mixup": true // true | false
+    // , "mixopts": ["blend", "rgb", "mixup", "cutmix", "cutmixup"] //, "cutout", "cutblur"]
+    // , "mixprob": [1.0, 1.0, 1.0, 1.0, 1.0] //, 1.0, 1.0]
+    // , "mixalpha": [0.6, 1.0, 1.2, 0.7, 0.7] //, 0.001, 0.7]
+    // , "aux_mixprob": 1.0
+    // , "aux_mixalpha": 1.2
+    // //, "mix_p": 1.2
+
+    // Frequency Separator
+    // , "fs": true
+    // , "lpf_type": "average"
+    // , "hpf_type": "average"
+
+    // Other training options:
+    , "manual_seed": 0
+    , "niter": 5e5
+    // , "warmup_iter": -1
+    , "val_freq": 5e3
+    // , "overwrite_val_imgs": true
+    // , "val_comparison": true
+    , "metrics": "psnr,ssim,lpips"
+  }
+
+  , "logger": {
+    "print_freq": 200
+    , "save_checkpoint_freq": 5e3
+    , "overwrite_chkp": false
+  }
+}

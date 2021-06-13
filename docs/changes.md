@@ -30,7 +30,7 @@ This is a general and non-exhaustive changelog of the mayor changes at certain m
 -   `Contextual Loss` ([CX](https://arxiv.org/abs/1803.02077), [CX](https://arxiv.org/abs/1803.04626)). Option: `cx_type`.
 -   `Differential Augmentations` for efficient gan training ([Paper](https://arxiv.org/pdf/2006.10738)). Option: `diffaug`.
 -   Batch augmentations (based on [Cutblur](https://arxiv.org/abs/2004.00448)). Option: `mixup`.
--   `ESRGAN+` improvements to the ESRGAN network ([ESRGAN+](https://arxiv.org/pdf/2001.08073)). Options: 'gaussian' and 'plus'.
+-   `ESRGAN+` improvements to the ESRGAN network ([ESRGAN+](https://arxiv.org/pdf/2001.08073)). Options: `gaussian` and `plus`.
 -   Adapted `frequency filtering` per loss function ([Reference](https://arxiv.org/pdf/1911.07850)). In general, content losses receive the low-frequency images, feature losses non-filtered images and the discriminator high-frequency images. Option: `fs`.
 -   Added on the fly use of realistic image kernels extracted with KernelGAN ([Paper](https://openaccess.thecvf.com/content_ICCV_2019/papers/Zhou_Kernel_Modeling_Super-Resolution_on_Real_Low-Resolution_Images_ICCV_2019_paper.pdf) and injection of noise extracted from real images patches ([Reference](https://openaccess.thecvf.com/content_cvpr_2018/papers/Chen_Image_Blind_Denoising_CVPR_2018_paper.pdf)).
 -   Enabled option to use the feature maps from the VGG-like discriminator in training for feature similarity ([Reference](https://arxiv.org/abs/1712.05927)). Option: `discriminator_vgg_128_fea`.
