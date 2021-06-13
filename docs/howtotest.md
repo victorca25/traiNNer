@@ -6,13 +6,13 @@ Otherwise, if you are interested in obtaining results that can automatically ret
 
 ## Test Super-Resolution models (ESRGAN, PPON, PAN, others)
 
-1.  Modify the configuration file `options/test/test_ESRGAN.yml` (or `options/test/test_ESRGAN.json`)
-2.  Run command: `python test.py -opt options/test/test_ESRGAN.yml` (or `python test.py -opt options/test/test_ESRGAN.json`)
+1.  Modify the configuration file `options/sr/test_sr.yml` (or `options/sr/test_sr.json`)
+2.  Run command: `python test.py -opt options/sr/test_sr.yml` (or `python test.py -opt options/sr/test_sr.json`)
 
 ## Test SRFlow models
 
-1.  Modify the configuration file `options/test/test_SRFlow.yml`
-2.  Run command: `python test_srflow.py -opt options/test/test_SRFlow.yml`
+1.  Modify the configuration file `options/srflow/test_srflow.yml`
+2.  Run command: `python test_srflow.py -opt options/srflow/test_srflow.yml`
 
 ## Test SFTGAN models
 
@@ -21,8 +21,8 @@ Otherwise, if you are interested in obtaining results that can automatically ret
 
 ## Test VSR models
 
-1.  Modify the configuration file `options/test/test_video.yml`
-2.  Run command: `python test_vsr.py -opt options/test/test_video.yml`
+1.  Modify the configuration file `options/video/test_video.yml`
+2.  Run command: `python test_vsr.py -opt options/video/test_video.yml`
 
 ## Image to image translation
 
