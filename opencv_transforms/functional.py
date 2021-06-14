@@ -23,8 +23,7 @@ from .common import _cv2_str2pad, _cv2_str2interpolation
 def _is_pil_image(img):
     if accimage is not None:
         return isinstance(img, (Image.Image, accimage.Image))
-    else:
-        return isinstance(img, Image.Image)
+    return isinstance(img, Image.Image)
 
 def _is_tensor_image(img):
     return torch.is_tensor(img) and img.ndimension() == 3
@@ -56,15 +55,15 @@ def to_tensor(pic):
         # backward compatibility
         if isinstance(img, torch.ByteTensor) or img.max() > 127 or img.dtype==torch.uint8:
             return img.float().div(255)
-        else:
-            return img
-    elif _is_tensor_image(pic):
+        return img
+
+    if _is_tensor_image(pic):
         return pic
-    else:
-        try:
-            return to_tensor(np.array(pic))
-        except Exception:
-            raise TypeError('pic should be ndarray. Got {}'.format(type(pic)))
+
+    try:
+        return to_tensor(np.array(pic))
+    except Exception:
+        raise TypeError('pic should be ndarray. Got {}'.format(type(pic)))
 
 
 def to_cv_image(pic, mode=None):
@@ -93,8 +92,7 @@ def to_cv_image(pic, mode=None):
     if mode is None:
         return npimg
 
-    else:
-        return cv2.cvtColor(npimg, mode)
+    return cv2.cvtColor(npimg, mode)
 
 
 def normalize(img, mean, std, max_pixel_value=255.0):
@@ -132,7 +130,8 @@ def normalize(img, mean, std, max_pixel_value=255.0):
         for t, m, s in zip(img, mean, std):
             t.sub_(m).div_(s)
         return img
-    elif _is_numpy_image(img):
+
+    if _is_numpy_image(img):
         mean = np.array(mean, dtype=np.float32)
         mean *= max_pixel_value
 
@@ -145,8 +144,8 @@ def normalize(img, mean, std, max_pixel_value=255.0):
         img -= mean
         img *= denominator
         return img
-    else:
-        raise RuntimeError('Undefined type. Must be a numpy or a torch image.')
+
+    raise RuntimeError('Undefined type. Must be a numpy or a torch image.')
 
 
 @preserve_channel_dim
@@ -210,11 +209,10 @@ def to_rgb_bgr(pic):
     if _is_numpy_image(pic) or _is_tensor_image(pic):
         img = pic[:, :, [2, 1, 0]]
         return img
-    else:
-        try:
-            return to_rgb_bgr(np.array(pic))
-        except Exception:
-            raise TypeError('pic should be numpy.ndarray or torch.Tensor. Got {}'.format(type(pic)))
+    try:
+        return to_rgb_bgr(np.array(pic))
+    except Exception:
+        raise TypeError('pic should be numpy.ndarray or torch.Tensor. Got {}'.format(type(pic)))
 
 
 def pad(img, padding, fill=0, padding_mode='constant'):
@@ -285,9 +283,8 @@ def pad(img, padding, fill=0, padding_mode='constant'):
     if img.shape[2]==1:
         return(cv2.copyMakeBorder(src=img, top=pad_top, bottom=pad_bottom, left=pad_left, right=pad_right,
                                  borderType=_cv2_str2pad[padding_mode], value=fill)[:,:,np.newaxis])
-    else:
-        return(cv2.copyMakeBorder(src=img, top=pad_top, bottom=pad_bottom, left=pad_left, right=pad_right,
-                                     borderType=_cv2_str2pad[padding_mode], value=fill))
+    return(cv2.copyMakeBorder(src=img, top=pad_top, bottom=pad_bottom, left=pad_left, right=pad_right,
+                                    borderType=_cv2_str2pad[padding_mode], value=fill))
 
 
 #def crop(img, i, j, h, w):
@@ -373,10 +370,9 @@ def hflip(img):
     if img.shape[2]==1:
         # return cv2.flip(img, 1)[:,:,np.newaxis]
         return np.copy(img[:, ::-1, ...])[:,:,np.newaxis]
-    else:
-        #return img[:, ::-1, :] # test, appears to be faster  # test with np.copy(img[:, ::-1, ...])
-        # return cv2.flip(img, 1)
-        return np.copy(img[:, ::-1, ...])
+    #return img[:, ::-1, :] # test, appears to be faster  # test with np.copy(img[:, ::-1, ...])
+    # return cv2.flip(img, 1)
+    return np.copy(img[:, ::-1, ...])
 
 
 def vflip(img):
@@ -486,8 +482,7 @@ def adjust_brightness(img, brightness_factor):
     table = np.array([ i*brightness_factor for i in range (0,256)]).clip(0,255).astype('uint8')
     if img.shape[2]==1:
         return cv2.LUT(img, table)[:,:,np.newaxis]
-    else:
-        return cv2.LUT(img, table)
+    return cv2.LUT(img, table)
     
     # alt 2:
     # same thing but a bit slower
@@ -523,8 +518,7 @@ def adjust_contrast(img, contrast_factor):
     # img = enhancer.enhance(contrast_factor) #PIL
     if img.shape[2]==1:
         return cv2.LUT(img, table)[:,:,np.newaxis]
-    else:
-        return cv2.LUT(img,table)
+    return cv2.LUT(img,table)
 
     # alt 2:
     # same results
@@ -586,10 +580,10 @@ def adjust_hue(img, hue_factor):
 
     
     if not(-0.5 <= hue_factor <= 0.5):
-        raise ValueError('hue_factor is not in [-0.5, 0.5].'.format(hue_factor))
+        raise ValueError(f'hue_factor {hue_factor} is not in [-0.5, 0.5].')
     if not _is_numpy_image(img):
-        raise TypeError('img should be numpy Image. Got {}'.format(type(img)))
-    
+        raise TypeError(f'img should be numpy Image. Got {type(img)}')
+
     # alt 1:
     # This function takes 160ms! should be avoided
     # img = Image.fromarray(img) #PIL
@@ -841,7 +835,7 @@ def affine(img, angle, translate, scale, shear, interpolation=cv2.INTER_LINEAR, 
     """
     if not _is_numpy_image(img):
         raise TypeError('img should be numpy Image. Got {}'.format(type(img)))
-    imgtype = img.dtype
+    # imgtype = img.dtype
 
     assert isinstance(translate, (tuple, list)) and len(translate) == 2, \
         "Argument translate should be a list or tuple of length 2"

@@ -2,6 +2,7 @@
 #import torch
 import math
 import random
+import warnings
 
 import numpy as np
 import cv2
@@ -11,7 +12,7 @@ import cv2
 #import warnings
 
 from .common import preserve_shape, preserve_type, preserve_channel_dim, _maybe_process_in_chunks, polar2z, norm_kernel
-from .common import _cv2_str2interpolation, _cv2_interpolation2str, MAX_VALUES_BY_DTYPE
+from .common import _cv2_str2interpolation, _cv2_interpolation2str, MAX_VALUES_BY_DTYPE, from_float, to_float
 
 ## Below are new augmentations not available in the original ~torchvision.transforms
 
@@ -227,7 +228,7 @@ def compression(img: np.ndarray, quality=20, image_type='.jpeg'):
     needs_float = False
 
     if input_dtype == np.float32:
-        warn(
+        warnings.warn(
             "Image compression augmentation "
             "is most effective with uint8 inputs, "
             "{} is used as input.".format(input_dtype),
@@ -501,11 +502,9 @@ def noise_dither_fs(img: np.ndarray, samplingF = 1):
         numpy ndarray: version of the image with dithering applied.
     """
     #for Floyd-Steinberg dithering noise
-    def minmax(v): 
-        if v > 255:
-            v = 255
-        if v < 0:
-            v = 0
+    def minmax(v):
+        v = min(v, 255)
+        v = max(v, 0)
         return v
     
     size = img.shape
@@ -606,10 +605,8 @@ def noise_dither_fs_bw(img, samplingF = 1):
     """
     #for Floyd-Steinberg dithering noise
     def minmax(v): 
-        if v > 255:
-            v = 255
-        if v < 0:
-            v = 0
+        v = min(v, 255)
+        v = max(v, 0)
         return v
 
     if len(img.shape) > 2 and img.shape[2] != 1:
@@ -1010,3 +1007,5 @@ def clahe(img, clip_limit=2.0, tile_grid_size=(8, 8)):
         img = cv2.cvtColor(img, cv2.COLOR_LAB2RGB)
 
     return img
+
+

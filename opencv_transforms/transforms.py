@@ -18,7 +18,7 @@ import warnings
 # import opencv_functional as F
 from . import functional as F
 from . import extra_functional as EF
-from .common import fetch_kernels, to_tuple, _cv2_interpolation2str, convolve
+from .common import fetch_kernels, to_tuple, _cv2_interpolation2str, _cv2_str2interpolation, convolve
 
 
 __all__ = ["Compose", "ToTensor", "ToCVImage",
@@ -37,8 +37,8 @@ __all__ = ["Compose", "ToTensor", "ToCVImage",
            "BayerDitherNoise", "FSDitherNoise", "AverageBWDitherNoise", "BayerBWDitherNoise",
            "BinBWDitherNoise", "FSBWDitherNoise", "RandomBWDitherNoise", 
            "FilterColorBalance", "FilterUnsharp", "CLAHE",
-           "FilterMaxRGB", "RandomQuantize", "SimpleQuantize", 
-           "FilterCanny", "ApplyKernel",
+           "FilterMaxRGB", "RandomQuantize", "SimpleQuantize",
+           "FilterCanny", "ApplyKernel", "Superpixels",
            ]
 
 
@@ -168,7 +168,7 @@ class Resize:
         if isinstance(size, int):
             self.size = (size,size)
         elif isinstance(size, collections.Iterable) and len(size) == 2:
-            if type(size) == list:
+            if type(size) is list:
                 size = tuple(size)
             self.size = size
         else:
@@ -577,7 +577,7 @@ class RandomResizedCrop:
         return F.resized_crop(img, i, j, h, w, self.size, self.interpolation)
 
     def __repr__(self):
-        interpolate_str = _pil_interpolation_to_str[self.interpolation]
+        interpolate_str = _cv2_str2interpolation[self.interpolation]
         # interpolate_str = self.interpolation
         format_string = self.__class__.__name__ + '(size={0}'.format(self.size)
         format_string += ', scale={0}'.format(tuple(round(s, 4) for s in self.scale))
@@ -1012,7 +1012,7 @@ class RandomAffine:
             s += ', fillcolor={fillcolor}'
         s += ')'
         d = dict(self.__dict__)
-        d['resample'] = _pil_interpolation_to_str[d['resample']]
+        d['resample'] = _cv2_str2interpolation[d['resample']]
         # d['resample'] = d['resample']
         return s.format(name=self.__class__.__name__, **d)
 
@@ -1234,7 +1234,7 @@ class RandomErasing:
         Returns:
             tuple: params (i, j, h, w, v) to be passed to ``erase`` for random erasing.
         """
-        img_h, img_w, img_c = img.shape
+        img_h, img_w = img.shape[0:2]
         area = img_h * img_w
 
         erase_area = np.random.uniform(scale[0], scale[1]) * area
@@ -1330,14 +1330,11 @@ class Cutout:
         j = np.random.randint(0 - mask_size // 2, img_w - mask_size) #left = j
         h = i + mask_size
         w = j + mask_size
-        
-        if i < 0:
-            i = 0
-        if j < 0:
-            j = 0
+
+        i = max(i, 0)
+        j = max(j, 0)
 
         return i, j, h, w, mask_value
-
 
     def __call__(self, img):
         if random.uniform(0, 1) < self.p: #np.random.rand() > p:
@@ -1392,13 +1389,13 @@ class RandomPerspective:
 
         assert isinstance(translate, (tuple, list)) and len(translate) == 2, \
             "translate should be a list or tuple and it must be of length 2."
-        assert all([0.0 <= i <= 1.0 for i in translate]), "translation values should be between 0 and 1"
+        assert all(0.0 <= i <= 1.0 for i in translate), "translation values should be between 0 and 1"
         self.translate = translate
 
         if scale is not None:
             assert isinstance(scale, (tuple, list)) and len(scale) == 2, \
                 "scale should be a list or tuple and it must be of length 2."
-            assert all([s > 0 for s in scale]), "scale values should be positive"
+            assert all(s > 0 for s in scale), "scale values should be positive"
         self.scale = scale
 
         self.resample = resample
@@ -1460,17 +1457,17 @@ class RandomPerspective:
 #TBD
 #randomly apply noise types. Extend RandomOrder, must find a way to implement
 #random parameters for the noise types
-'''
-class RandomNoise(RandomTransforms):
-    """Apply a list of noise transformations in a random order
-    """
-    def __call__(self, img):
-        order = list(range(len(self.transforms)))
-        random.shuffle(order)
-        for i in order:
-            img = self.transforms[i](img)
-        return img
-'''
+# '''
+# class RandomNoise(RandomTransforms):
+#     """Apply a list of noise transformations in a random order
+#     """
+#     def __call__(self, img):
+#         order = list(range(len(self.transforms)))
+#         random.shuffle(order)
+#         for i in order:
+#             img = self.transforms[i](img)
+#         return img
+# '''
 
 class RandomBase:
     r"""Base class for randomly applying transform
@@ -1721,7 +1718,7 @@ class RandomCompression:
 
 
 class RandomQuantize(RandomBase):
-    r"""Color quantization (using k-means)
+    r"""Color quantization (using CV2 k-means)
     Args:
         img (numpy ndarray): Image to be quantized.
         num_colors (int): the target number of colors to quantize to
@@ -1738,6 +1735,8 @@ class RandomQuantize(RandomBase):
     def apply(self, image, **params):
         return EF.km_quantize(image, self.num_colors)
 
+    def __repr__(self):
+        return self.__class__.__name__ + '(p={})'.format(self.p)
 
 
 class BlurBase:
@@ -2049,15 +2048,15 @@ class RandomComplexMotionBlur(BlurBase):
             size = (size, size)
         if not isinstance(size, tuple):
             raise TypeError("Size must be TUPLE of 2 positive integers")
-        elif len(size) != 2 or type(size[0]) != type(size[1]) != int:
+        if len(size) != 2 or type(size[0]) != type(size[1]) != int:
             raise TypeError("Size must be tuple of 2 positive INTEGERS")
-        elif size[0] < 0 or size[1] < 0:
+        if size[0] < 0 or size[1] < 0:
             raise ValueError("Size must be tuple of 2 POSITIVE integers")
 
         # check if complexity is float (int) between 0 and 1
         if type(complexity) not in [int, float, np.float32, np.float64]:
             raise TypeError("Complexity must be a number between 0 and 1")
-        elif complexity < 0 or complexity > 1:
+        if complexity < 0 or complexity > 1:
             raise ValueError("Complexity must be a number between 0 and 1")
 
         # saving args
@@ -2430,9 +2429,9 @@ class ApplyKernel:
             # then subsample and return
             return out_im[np.round(np.linspace(st[0], out_im.shape[0] - 1 / scale_factor[0], output_shape[0])).astype(int)[:, None],
                     np.round(np.linspace(st[1], out_im.shape[1] - 1 / scale_factor[1], output_shape[1])).astype(int), :]
-        else:
-            # return convolved image
-            return out_im
+        # else:
+        # return convolved image
+        return out_im
 
 
 class CLAHE(RandomBase):
@@ -2463,3 +2462,4 @@ class CLAHE(RandomBase):
             return self.apply(
                 image, clip_limit=self.get_params()["clip_limit"])
         return image
+

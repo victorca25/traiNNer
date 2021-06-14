@@ -83,8 +83,7 @@ def cv2pil(open_cv_image):
             # Convert BGR to RGB
             open_cv_image = cv2.cvtColor(open_cv_image.copy(), cv2.COLOR_BGR2RGB)
         return Image.fromarray(open_cv_image)
-    else:
-        raise Exception("PIL not available")
+    raise Exception("PIL not available")
 
 def wrap_cv2_function(func):
     """
@@ -154,6 +153,7 @@ def preserve_channel_dim(func):
         return result
     return wrapped_function
 
+
 def get_num_channels(img):
     return img.shape[2] if len(img.shape) == 3 else 1
 
@@ -215,8 +215,8 @@ def preserve_range_float(func):
             if dtype == t_dtype:
                 return func(img, *args, **kwargs)
 
-            t_maxval = MAX_VALUES_BY_DTYPE.get(t_dtype, None)
-            maxval = MAX_VALUES_BY_DTYPE.get(dtype, None)
+            t_maxval = MAX_VALUES_BY_DTYPE.get(t_dtype)
+            maxval = MAX_VALUES_BY_DTYPE.get(dtype)
             if not maxval:
                 if np.issubdtype(dtype, np.integer):
                     info = np.iinfo
@@ -225,14 +225,18 @@ def preserve_range_float(func):
                 maxval = info(dtype).max
             img = img.astype(t_dtype)*t_maxval/maxval
             return (func(img, *args, **kwargs)*maxval).astype(dtype)
-        else:
-            return func(img, *args, **kwargs)
+        return func(img, *args, **kwargs)
     return wrapped_function
 
 
 
 
-
+def add_img_channels(img):
+    """fix image with only 2 dimensions (add "channel" dimension (1))
+    """
+    if img.ndim == 2:
+        img = np.tile(np.expand_dims(img, axis=2), (1, 1, 3))
+    return img
 
 
 @preserve_shape
@@ -240,17 +244,17 @@ def convolve(img, kernel, per_channel=False):
     if per_channel:
         def channel_conv(img, kernel):
             if len(img.shape) < 3:
-                img = fix_img_channels(img, 1)
+                img = add_img_channels(img)
             output = []
             for channel_num in range(img.shape[2]):
                 output.append(
                     cv2.filter2D(img[:,:,channel_num], ddepth=-1, kernel=kernel))
             return np.squeeze(np.stack(output,-1))
         return channel_conv(img, kernel)
-    else:
-        conv_fn = _maybe_process_in_chunks(
-            cv2.filter2D, ddepth=-1, kernel=kernel)
-        return conv_fn(img)
+    # else:
+    conv_fn = _maybe_process_in_chunks(
+        cv2.filter2D, ddepth=-1, kernel=kernel)
+    return conv_fn(img)
 
 def norm_kernel(kernel):
     if np.sum(kernel) == 0.0:
@@ -321,3 +325,27 @@ def to_tuple(param, low=None, bias=None):
         return tuple(bias + x for x in param)
 
     return tuple(param)
+
+
+def to_float(img, max_value=None):
+    if max_value is None:
+        try:
+            max_value = MAX_VALUES_BY_DTYPE[img.dtype]
+        except KeyError:
+            raise RuntimeError(
+                "Can't infer the maximum value for dtype {}. You need to specify the maximum value manually by "
+                "passing the max_value argument".format(img.dtype)
+            )
+    return img.astype("float32") / max_value
+
+
+def from_float(img, dtype, max_value=None):
+    if max_value is None:
+        try:
+            max_value = MAX_VALUES_BY_DTYPE[dtype]
+        except KeyError:
+            raise RuntimeError(
+                "Can't infer the maximum value for dtype {}. You need to specify the maximum value manually by "
+                "passing the max_value argument".format(dtype)
+            )
+    return (img * max_value).astype(dtype)
