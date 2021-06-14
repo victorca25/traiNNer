@@ -18,6 +18,7 @@ import warnings
 # import opencv_functional as F
 from . import functional as F
 from . import extra_functional as EF
+from .minisom import MiniSom
 from .common import fetch_kernels, to_tuple, _cv2_interpolation2str, _cv2_str2interpolation, convolve
 
 
@@ -35,10 +36,10 @@ __all__ = ["Compose", "ToTensor", "ToCVImage",
            "RandomGaussianBlur", "RandomMedianBlur", "RandomMotionBlur",
            "RandomComplexMotionBlur",
            "BayerDitherNoise", "FSDitherNoise", "AverageBWDitherNoise", "BayerBWDitherNoise",
-           "BinBWDitherNoise", "FSBWDitherNoise", "RandomBWDitherNoise", 
+           "BinBWDitherNoise", "FSBWDitherNoise", "RandomBWDitherNoise",
            "FilterColorBalance", "FilterUnsharp", "CLAHE",
-           "FilterMaxRGB", "RandomQuantize", "SimpleQuantize",
-           "FilterCanny", "ApplyKernel", "Superpixels",
+           "FilterMaxRGB", "RandomQuantize", "RandomQuantizeSOM", "SimpleQuantize",
+           "FilterCanny", "ApplyKernel"
            ]
 
 
@@ -1734,6 +1735,75 @@ class RandomQuantize(RandomBase):
 
     def apply(self, image, **params):
         return EF.km_quantize(image, self.num_colors)
+
+    def __repr__(self):
+        return self.__class__.__name__ + '(p={})'.format(self.p)
+
+
+
+class RandomQuantizeSOM:
+    r"""Color quantization (using MiniSOM)
+    Args:
+        img (numpy ndarray): Image to be quantized.
+        num_colors (int): the target number of colors to quantize to
+        sigma (float): the radius of the different neighbors in the SOM
+        learning_rate (float): determines how much weights are adjusted
+            during each SOM iteration
+        neighborhood_function (str): the neighborhood function to use
+            with SOM
+    Returns:
+        numpy ndarray: quantized version of the image.
+    """
+
+    def __init__(self, p = 0.5, num_colors=None, sigma=1.0, learning_rate=0.2, neighborhood_function='bubble'):
+        # assert isinstance(p, numbers.Number) and p >= 0, 'p should be a positive value'
+        self.p = p
+
+        if not num_colors:
+            N = int(np.random.uniform(2, 8))
+        else:
+            N = int(num_colors/2)
+        # assert isinstance(N, numbers.Number) and N >= 0, 'N should be a positive value'
+        # input_len corresponds to the shape of the pixels array (H, W, C)
+        # x and y are the "palette" matrix shape. x=2, y=N means 2xN final colors, but
+        # could reshape to something like x=3, y=3 too
+        # try sigma = 0.1 , 0.2, 1.0, etc
+        self.som = MiniSom(x=2, y=N, input_len=3, sigma=sigma,
+                    learning_rate=0.2, neighborhood_function=neighborhood_function)
+
+    def __call__(self, img):
+        """
+        Args:
+            img (np.ndarray): Image to be quantized.
+
+        Returns:
+            np.ndarray: Quantized image.
+        """
+        if random.random() < self.p:
+
+            img_type = img.dtype
+            if np.issubdtype(img_type, np.integer):
+                img_max = np.iinfo(img_type).max
+            elif np.issubdtype(img_type, np.floating):
+                img_max = np.finfo(img_type).max
+
+            # reshape image as a 2D array
+            pixels = np.reshape(img, (img.shape[0]*img.shape[1], 3))
+
+            # initialize som
+            self.som.random_weights_init(pixels)
+            # save the starting weights (the image’s initial colors)
+            starting_weights = self.som.get_weights().copy()
+            self.som.train_random(pixels, 500, verbose=False)
+            #som.train_random(pixels, 100)
+
+            # Vector quantization: quantize each pixel of the image to reduce the number of colors
+            qnt = self.som.quantization(pixels)
+            clustered = np.zeros(img.shape)
+            for i, q in enumerate(qnt):
+                clustered[np.unravel_index(i, dims=(img.shape[0], img.shape[1]))] = q
+            img = np.clip(clustered, 0, img_max).astype(img_type)
+        return img
 
     def __repr__(self):
         return self.__class__.__name__ + '(p={})'.format(self.p)
