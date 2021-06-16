@@ -317,6 +317,7 @@ def get_network_D_config(network_D, scale, crop_size, model_G):
         if "_fea" in kind_D:
             # feature extraction/maching: 'discriminator_vgg_128_fea', 'discriminator_vgg_fea'
             # TODO: these options are not currently enabled in the networks
+            full_network_D['type'] = network_D.pop('type', "discriminator_vgg_fea")
             full_network_D['spectral_norm'] = network_D.pop('spectral_norm', False)
             full_network_D['self_attention'] = network_D.pop('self_attention', False)
             full_network_D['max_pool'] = network_D.pop('max_pool', False)
