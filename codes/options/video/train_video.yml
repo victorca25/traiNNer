@@ -32,7 +32,7 @@ datasets:
     # If manually configuring on the fly generation of LR: (else, it will automatically default to Matlab-like downscale algorithm (777) when/if required
     dataroot_kernels: '../training/kernels/results/' # location of the image kernels extracted with KernelGAN, for use with the "realistic" downscale type
     lr_downscale: true # false
-    lr_downscale_types: ["linear", "cubic", "matlab_bicubic"] # select from ["nearest", "linear", "cubic", "area", "lanczos4", "linear_exact", "matlab_bicubic", "realistic"] #scale_algos #scaling interpolation options
+    lr_downscale_types: ["bilinear", "bicubic"]
 
     # Rotations augmentations:
     # use_flip: true # flip images

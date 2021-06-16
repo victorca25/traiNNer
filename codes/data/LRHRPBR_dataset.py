@@ -9,7 +9,7 @@ from torch.utils.data.dataset import Dataset
 import dataops.common as util
 
 # import dataops.augmentations as augmentations #TMP
-from dataops.augmentations import Scale, MLResize, RandomQuantize, KernelDownscale, NoisePatches, RandomNoisePatches, get_resize, get_blur, get_noise, get_pad
+from dataops.augmentations import Scale, MLResize, NoisePatches, RandomNoisePatches, get_resize, get_blur, get_noise, get_pad
 from dataops.debug import tmp_vis, describe_numpy, describe_tensor
 
 import dataops.opencv_transforms.opencv_transforms as transforms
@@ -27,10 +27,11 @@ class LRHRDataset(Dataset):
         self.paths_LR, self.paths_HR = None, None
         self.output_sample_imgs = None
 
-        if opt.get('dataroot_kernels', None):
-            #TODO: note: use the model scale to get the right kernel 
-            scale = opt.get('scale', 4)
-            self.ds_kernels = KernelDownscale(scale=scale, kernel_paths=opt['dataroot_kernels'])
+        if opt.get('dataroot_kernels', None) and 999 in opt["lr_downscale_types"]:
+            self.ds_kernels = transforms.ApplyKernel(
+                scale=opt.get('scale', 4), kernels_path=opt['dataroot_kernels'], pattern='kernelgan')
+        else:
+            self.ds_kernels = None
 
         if opt['phase'] == 'train' and opt.get('lr_noise_types', 3) and "patches" in opt['lr_noise_types']:
             assert opt['noise_data']

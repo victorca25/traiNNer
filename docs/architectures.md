@@ -89,7 +89,7 @@ In addition, since they are based on `ESRGAN` and don't modify the general train
 2. Initial integration of [**RIFE**](https://arxiv.org/pdf/2011.06294.pdf) (2020). Combining all 3 separate model files in a single structure. [RIFE repo](https://github.com/hzwer/arXiv2020-RIFE). (Training not yet available, pending for video pipeline overhaul).
 
 <p align="center">
-   <img height="200" src="https://user-images.githubusercontent.com/41912303/121771157-f3f92f80-cb6d-11eb-8a32-f7577d877642.png">
+   <img height="200" src="https://user-images.githubusercontent.com/41912303/122081727-a3990080-cdff-11eb-987d-34ba541c7624.png">
 </p>
 
 

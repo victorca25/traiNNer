@@ -19,6 +19,8 @@ _cv2_str2interpolation = {'cv2_nearest':cv2.INTER_NEAREST,
                          'cv2_cubic':cv2.INTER_CUBIC,
                          'cv2_lanczos4':cv2.INTER_LANCZOS4,
                          'cv2_linear_exact':cv2.INTER_LINEAR_EXACT,
+                         'cubic':777,  # deprecated, remove
+                         'matlab_bicubic':777,  # deprecated, remove
                          'linear':773, 'box':774,'lanczos2':775,
                          'lanczos3':776, 'bicubic':777, 'mitchell':778,
                          'hermite':779, 'lanczos4':780, 'lanczos5':781,

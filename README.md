@@ -103,7 +103,7 @@ Any dataset can be augmented to expose the model to information that might not b
 
 There are multiple ways to help this project. The first one is by using it and trying to train your own models. You can open an [issue](https://github.com/victorca25/BasicSR/issues) if you find any bugs or start a [discussion](https://github.com/victorca25/BasicSR/discussions) if you have ideas, questions or would like to showcase your results.
 
-If you would like to contribute in the form of adding or fixing code, you can do so be cloning this repo and creating a [PR](https://github.com/victorca25/BasicSR/pulls). Ideally, it's better for PR to be precise and not chaning many parts of the code at the same time, so it can be reviewed and tested. If possible, open an issue or discussion prior to creating the PR and we can talk about any ideas.
+If you would like to contribute in the form of adding or fixing code, you can do so be cloning this repo and creating a [PR](https://github.com/victorca25/BasicSR/pulls). Ideally, it's better for PR to be precise and not changing many parts of the code at the same time, so it can be reviewed and tested. If possible, open an issue or discussion prior to creating the PR and we can talk about any ideas.
 
 You can also join the [discord servers](#additional-Help) and share results and questions with other users.
 

@@ -11,7 +11,7 @@ import torch
 from torch.utils.data.dataset import Dataset
 import dataops.common as util
 
-from dataops.augmentations import Scale, MLResize, RandomQuantize, KernelDownscale, NoisePatches, RandomNoisePatches, get_resize, get_blur, get_noise
+from dataops.augmentations import Scale, MLResize, NoisePatches, RandomNoisePatches, get_resize, get_blur, get_noise
 from dataops.debug import tmp_vis, describe_numpy, describe_tensor
 
 import dataops.opencv_transforms.opencv_transforms as transforms
@@ -33,9 +33,11 @@ class VidTrainsetLoader(Dataset):
             f'num_frame must be an odd number, but got {self.num_frames}')
 
         if self.opt['phase'] == 'train':
-            if opt.get('dataroot_kernels', None):
-                scale = opt.get('scale', 4)
-                self.ds_kernels = KernelDownscale(scale=scale, kernel_paths=opt['dataroot_kernels'])
+            if opt.get('dataroot_kernels', None) and 999 in opt["lr_downscale_types"]:
+                self.ds_kernels = transforms.ApplyKernel(
+                    scale=opt.get('scale', 4), kernels_path=opt['dataroot_kernels'], pattern='kernelgan')
+            else:
+                self.ds_kernels = None
 
             # if opt['phase'] == 'train' and opt.get('lr_noise_types', None) and "patches" in opt['lr_noise_types']:
             if opt.get('lr_noise_types', None) and "patches" in opt['lr_noise_types']:
