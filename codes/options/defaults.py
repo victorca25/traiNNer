@@ -302,9 +302,9 @@ def get_network_D_config(network_D, scale, crop_size, model_G):
         full_network_D['self_attention'] = network_D.pop('self_attention', True)
         full_network_D['max_pool'] = network_D.pop('max_pool', False)
         full_network_D['poolsize'] = network_D.pop('poolsize', 4)
-    elif 'discriminator_vgg_' in kind_D or kind_D == 'discriminator_192' or kind_D == 'discriminator_256' or kind_D == 'discriminator_vgg':
+    elif 'discriminator_vgg_' in kind_D or kind_D in ['discriminator_192', 'discriminator_256', 'discriminator_vgg']:
         # 'discriminator_vgg_96', 'discriminator_vgg_128', 'discriminator_vgg_192' or 'discriminator_192', 'discriminator_vgg_256' or 'discriminator_256'
-        full_network_D['type'] = network_D.pop('type', "discriminator_vgg")  # VGG-like discriminator
+        full_network_D['type'] = network_D.pop('type', kind_D)  # VGG-like discriminator ("discriminator_vgg")
         full_network_D['in_nc'] = network_D.pop('in_nc', 3)  # num. of input image channels: 3 for RGB and 1 for grayscale
         full_network_D['base_nf'] = network_D.pop('nf', 64)  # num. of features in conv layers
         full_network_D['norm_type'] = network_D.pop('norm_type', "batch")  # "instance" normalization, "batch" normalization or no norm
@@ -312,16 +312,15 @@ def get_network_D_config(network_D, scale, crop_size, model_G):
         full_network_D['act_type'] = network_D.pop('net_act', None) or network_D.pop('act_type', "leakyrelu")  # swish | leakyrelu
         full_network_D['convtype'] = network_D.pop('convtype', "Conv2D")
         full_network_D['arch'] = network_D.pop('G_arch', model_G)
-        if kind_D in ['discriminator_vgg', 'discriminator_vgg_fea']:
-            full_network_D['size'] = network_D.pop('D_size', crop_size)
         if "_fea" in kind_D:
             # feature extraction/maching: 'discriminator_vgg_128_fea', 'discriminator_vgg_fea'
             # TODO: these options are not currently enabled in the networks
-            full_network_D['type'] = network_D.pop('type', "discriminator_vgg_fea")
             full_network_D['spectral_norm'] = network_D.pop('spectral_norm', False)
             full_network_D['self_attention'] = network_D.pop('self_attention', False)
             full_network_D['max_pool'] = network_D.pop('max_pool', False)
             full_network_D['poolsize'] = network_D.pop('poolsize', 4)
+        if kind_D == 'discriminator_vgg' or kind_D == 'discriminator_vgg_fea':
+            full_network_D['size'] = network_D.pop('D_size', crop_size)
     elif kind_D in ['patchgan', 'nlayerdiscriminator', 'multiscale', 'pixelgan', 'pixeldiscriminator']:
         if kind_D in ('patchgan', 'nlayerdiscriminator'):
             full_network_D['type'] = 'patchgan'
