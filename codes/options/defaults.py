@@ -349,9 +349,12 @@ def get_network_D_config(network_D, scale, crop_size, model_G):
 
     return full_network_D
 
-def get_network_defaults(opt):
+def get_network_defaults(opt, is_train):
     scale = opt.get('scale', 1)
-    crop_size = int(opt['datasets']['train']['crop_size'])
+    if is_train:
+        crop_size = int(opt['datasets']['train']['crop_size'])
+    else:
+        crop_size = opt.get('img_size')
 
     #TODO: could check dataset type to match model, not needed
 

@@ -246,7 +246,7 @@ def parse(opt_path: str, is_train: bool = True) -> NoneDict:
     #TODO: do any check of in_nc and out_nc in the networks here
 
     # networks pre-flight check
-    opt = get_network_defaults(opt)
+    opt = get_network_defaults(opt, is_train)
     #TODO: note that alternatively, this could take place in get_network()
     # in networks.py instead. evaluate pros/cons.
 
