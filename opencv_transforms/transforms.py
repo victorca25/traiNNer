@@ -18,6 +18,7 @@ import warnings
 # import opencv_functional as F
 from . import functional as F
 from . import extra_functional as EF
+from . import superpixels as SP
 from .minisom import MiniSom
 from .common import fetch_kernels, to_tuple, _cv2_interpolation2str, _cv2_str2interpolation, convolve
 
@@ -39,7 +40,7 @@ __all__ = ["Compose", "ToTensor", "ToCVImage",
            "BinBWDitherNoise", "FSBWDitherNoise", "RandomBWDitherNoise",
            "FilterColorBalance", "FilterUnsharp", "CLAHE",
            "FilterMaxRGB", "RandomQuantize", "RandomQuantizeSOM", "SimpleQuantize",
-           "FilterCanny", "ApplyKernel"
+           "FilterCanny", "ApplyKernel", "RandomGamma", "Superpixels",
            ]
 
 
@@ -191,6 +192,7 @@ class Resize:
         interpolate_str = _cv2_interpolation2str[self.interpolation]
         #interpolate_str = self.interpolation        
         return self.__class__.__name__ + '(size={0}, interpolation={1})'.format(self.size, interpolate_str)
+
 
 class Scale(Resize):
     """
@@ -2533,3 +2535,158 @@ class CLAHE(RandomBase):
                 image, clip_limit=self.get_params()["clip_limit"])
         return image
 
+
+class RandomGamma(RandomBase):
+    """
+    Args:
+        gamma_range (float or (float, float)): Range of gamma values
+            to randomly select from. Use integer values, they will
+            be divided by 100 for the proper gamma values.
+            Default: (80, 120) -> will be (0.8, 1.2).
+        gain (int): the gain value, also known as 'A'. Default: 1
+        p (float): probability of applying the transform.
+    Targets:
+        image
+    Image types:
+        uint8, float32
+    """
+
+    def __init__(self, gamma_range=(80, 120), gain=1, p=0.5):
+        super(RandomGamma, self).__init__(p)
+        if isinstance(gamma_range, int):
+            self.gamma_range = (gamma_range, gamma_range)
+        else:
+            self.gamma_range = to_tuple(gamma_range)
+        self.gain = gain
+
+    def apply(self, img, gamma=1, **params):
+        return F.adjust_gamma(img, gamma=gamma, gain=self.gain)
+
+    def get_params(self) -> dict:
+        return {"gamma": random.randint(self.gamma_range[0], self.gamma_range[1]) / 100.0}
+
+    def __call__(self, image):
+        if random.random() < self.p:
+            params = self.get_params()
+            return self.apply(image, gamma=params["gamma"])
+        return image
+
+
+class Superpixels(RandomBase):
+    """Transform images parially/completely to their superpixel representation.
+    This implementation Can use either cv2 (default) or skimage
+    algorithms if available.
+    Args:
+        p_replace (float or tuple of float): Defines for any segment the
+            probability that the pixels within that segment are replaced
+            by their aggregate color (otherwise, the pixels are not changed).
+            Examples:
+                * A probability of ``0.0`` means that the pixels in no
+                  segment are replaced by their aggregate color (image is not
+                  changed at all).
+                * A probability of ``0.5`` means that around half of all
+                  segments are replaced by their aggregate color.
+                * A probability of ``1.0`` means that all segments are
+                  replaced by their aggregate color (resulting in a voronoi
+                  image).
+            Behaviour based on chosen data types for this parameter:
+                * If a ``float``, then that ``float`` will always be used.
+                * If ``tuple`` ``(a, b)``, then a random probability will be
+                  sampled from the interval ``[a, b]`` per image.
+        n_segments (int, or tuple of int): Rough target number of how many
+            superpixels to generate (the algorithm may deviate from this number).
+            Lower value will lead to coarser superpixels. Higher values are
+            computationally more intensive and will hence lead to a slowdown
+            * If a single ``int``, then that value will always be used as the
+              number of segments.
+            * If a ``tuple`` ``(a, b)``, then a value from the discrete
+              interval ``[a..b]`` will be sampled per image.
+        cs (str or None): Colorspace conversion to apply to images before superpixels
+            algorithms for better results. In: ``lab`` or ``hsv``, leave ``None`` for defaults.
+        algo (str): Selection of the superpixels algorithm. OpenCV and scikit-image algorithms
+            are suported. In: 'seeds', 'slic', 'slico', 'mslic', 'sk_slic', 'sk_felzenszwalb'.
+        n_iters (int): Number of iterations to perform (only for OpenCV algorithms and `sk_slic`).
+        kind (str): Kind of color aggregation to apply to segments. The original behavior
+            is to average all the colors in the segment ('avg'), but can also use 'median' or
+            a 'mix' of average and median values (adaptive).
+        reduction (str or None): Apply a post-process segment/color reduction step, for algorithms
+            that produce more segments than ``n_segments`` ('sk_felzenszwalb').
+            In: 'selective', 'cluster', 'rag'.
+        max_size (int or None): Maximum image size at which the augmentation is performed.
+            If the width or height of an image exceeds this value, it will be
+            downscaled before the augmentation so that the longest side matches `max_size`.
+            This is done to speed up the process. The final output image has the same
+            size as the input image. Note that in case `p_replace` is below ``1.0``,
+            the down-/upscaling will affect the not-replaced pixels too.
+            Use ``None`` to apply no down-/upscaling.
+        interpolation (OpenCV flag): flag that is used to specify the interpolation algorithm.
+            Should be one of: 'NEAREST', 'BILINEAR', 'AREA', 'BICUBIC', 'LANCZOS'. Default: 'BILINEAR'.
+        p (float): probability of applying the transform. Default: 0.5.
+    """
+
+    def __init__(
+        self,
+        p_replace=0.1,
+        n_segments=100,
+        cs=None,
+        algo='slic',
+        n_iters: int=10,
+        kind='mix',
+        reduction=None,
+        max_size=128,
+        interpolation: str='BILINEAR',
+        p: float=0.5,
+    ):
+        super(Superpixels, self).__init__(p)
+        self.p_replace = to_tuple(p_replace, p_replace)
+        self.n_segments = to_tuple(n_segments, n_segments)
+        self.max_size = max_size
+        self.interpolation = interpolation
+        self.cs = cs
+        self.n_iters = n_iters
+
+        if min(self.n_segments) < 1:
+            raise ValueError(f"n_segments must be >= 1. Got: {n_segments}")
+
+        if isinstance(algo, str):
+            algo = [algo]
+        self.algo = algo
+
+        if isinstance(kind, str):
+            kind = [kind]
+        self.kind = kind
+
+        if isinstance(reduction, str):
+            reduction = [reduction]
+        self.reduction = reduction
+
+    def get_params(self) -> dict:
+        n_segments = random.randint(*self.n_segments)
+        p = random.uniform(*self.p_replace)
+        algo = random.choice(self.algo)
+        kind = random.choice(self.kind)
+        reduction = random.choice(self.reduction) if self.reduction else None
+
+        return {"replace_samples": np.random.random(n_segments) < p,
+                "n_segments": n_segments,
+                "algo": algo,
+                "kind": kind,
+                "reduction": reduction,
+                }
+
+    def apply(self, img: np.ndarray, replace_samples=(False,), n_segments:int=1,
+        algo='slic', kind='mix', reduction=None, **kwargs):
+        return SP.superpixels(
+            img, n_segments, self.cs, self.n_iters, algo, kind, reduction,
+            replace_samples, self.max_size, self.interpolation)
+
+    def __call__(self, image):
+        if random.random() < self.p:
+            params = self.get_params()
+            return self.apply(
+                image, replace_samples=params["replace_samples"],
+                n_segments=params["n_segments"],
+                algo=params["algo"],
+                kind=params["kind"],
+                reduction=params["reduction"],)
+        return image

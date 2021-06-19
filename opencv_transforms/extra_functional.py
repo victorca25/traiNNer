@@ -391,6 +391,19 @@ def bilateral_blur(img: np.ndarray, kernel_size: int = 3, sigmaColor: int = 5, s
     return blur_fn(img)
 
 
+def apply_kmeans(Z, K=8):
+    """ Utility function to apply cv2 k-means.
+    Defines criteria, uses number of clusters (K) and
+    applies kmeans() algorithm
+    """
+    K = len(Z) if K > len(Z) else K
+    criteria = (
+        cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 10, 1.0)
+    ret, labels, centroids = cv2.kmeans(
+        Z, K, None, criteria, 10, cv2.KMEANS_RANDOM_CENTERS)
+    return ret, labels, centroids
+
+
 @preserve_type
 def km_quantize(img, K=8, single_rnd_color=False):
     r""" Color quantization with CV2 K-Means clustering.
@@ -414,11 +427,7 @@ def km_quantize(img, K=8, single_rnd_color=False):
     # convert image to np.float32
     Z = np.float32(Z)
 
-    # define criteria, number of clusters(K) and apply kmeans()
-    criteria = (
-        cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 10, 1.0)
-    ret, labels, centroids = cv2.kmeans(
-        Z, K, None, criteria, 10, cv2.KMEANS_RANDOM_CENTERS)
+    _, labels, centroids = apply_kmeans(Z, K=8)
 
     res = centroids[labels.flatten()]
     return res.reshape((img.shape))
@@ -1007,5 +1016,4 @@ def clahe(img, clip_limit=2.0, tile_grid_size=(8, 8)):
         img = cv2.cvtColor(img, cv2.COLOR_LAB2RGB)
 
     return img
-
 

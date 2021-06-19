@@ -115,6 +115,59 @@ def wrap_pil_function(func):
         return result
     return wrapped_function
 
+
+def srgb2linear(srgb, gamma=2.4, th=0.04045):
+    """ Convert SRGB images to linear RGB color space.
+        To use the formulat, values have to be in the 0 to 1 range,
+        for that reason srgb must be in range [0,255], uint8 and:
+        signal = input / 255 is applied.
+    Parameters:
+        gamma (float): gamma correction. The default is 2.4, but 2.2
+            approximately matches the power law sensitivity of human vision
+        th (float): threshold value for formula. The default is 0.04045,
+            which is an approximate, exact value is 0.0404482362771082
+    """
+
+    a = 0.055
+    att = 12.92
+    linear = np.float32(srgb) / 255.0
+
+    return np.where(
+        linear<=th, linear/att, np.power((linear+a)/(1+a), gamma))
+
+
+def linear2srgb(linear, gamma=2.4, th=0.0031308):
+    """ Convert linear RGB images to SRGB color space.
+    linear must be in range [0,1], float32 """
+    a = 0.055
+    att = 12.92
+    srgb = np.clip(linear.copy(), 0.0, 1.0)
+
+    srgb = np.where(
+        srgb<=th, srgb*att, (1+a)*np.power(srgb, 1.0/gamma)-a)
+
+    # return srgb * 255.0
+    return np.clip(srgb * 255.0, 0.0, 255).astype(np.uint8)
+
+
+def wrap_linear_function(func):
+    """
+    Ensures that arithmetic operations on sRGB images happen
+    in linear space
+    """
+    @wraps(func)
+    def wrapped_function(img, *args, **kwargs):
+        input_dtype = img.dtype
+        if input_dtype == np.uint8:
+            linear = srgb2linear(img)
+            result = func(linear, *args, **kwargs)
+            result = linear2srgb(result)
+        elif input_dtype == np.float32:
+            result = func(img, *args, **kwargs)
+        return result
+    return wrapped_function
+
+
 def preserve_shape(func):
     """
     Wrapper to preserve shape of the image
@@ -327,25 +380,27 @@ def to_tuple(param, low=None, bias=None):
     return tuple(param)
 
 
-def to_float(img, max_value=None):
-    if max_value is None:
+# TODO: change preserve_range_float() and others to use these
+def to_float(img, maxval=None, t_dtype=np.dtype("float32")):
+    if maxval is None:
+        dtype = img.dtype
+        maxval = MAX_VALUES_BY_DTYPE.get(dtype)
+        if not maxval:
+            if np.issubdtype(dtype, np.integer):
+                info = np.iinfo
+            elif np.issubdtype(dtype, np.floating):
+                info = np.finfo
+            maxval = info(dtype).max
+    return img.astype(t_dtype) / maxval
+
+
+def from_float(img, dtype=np.dtype("uint8"), maxval=None):
+    if maxval is None:
         try:
-            max_value = MAX_VALUES_BY_DTYPE[img.dtype]
+            maxval = MAX_VALUES_BY_DTYPE[dtype]
         except KeyError:
             raise RuntimeError(
                 "Can't infer the maximum value for dtype {}. You need to specify the maximum value manually by "
-                "passing the max_value argument".format(img.dtype)
+                "passing the maxval argument".format(dtype)
             )
-    return img.astype("float32") / max_value
-
-
-def from_float(img, dtype, max_value=None):
-    if max_value is None:
-        try:
-            max_value = MAX_VALUES_BY_DTYPE[dtype]
-        except KeyError:
-            raise RuntimeError(
-                "Can't infer the maximum value for dtype {}. You need to specify the maximum value manually by "
-                "passing the max_value argument".format(dtype)
-            )
-    return (img * max_value).astype(dtype)
+    return (img * maxval).astype(dtype)

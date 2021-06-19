@@ -15,7 +15,7 @@ import types
 import collections
 import warnings
 
-from .common import preserve_channel_dim
+from .common import preserve_channel_dim, preserve_shape
 from .common import _cv2_str2pad, _cv2_str2interpolation
 
 
@@ -611,43 +611,45 @@ def adjust_hue(img, hue_factor):
     return im.astype(img.dtype)
 
 
-def adjust_gamma(img, gamma, gain=1):
+@preserve_shape
+def adjust_gamma(img, gamma=1.0, gain=1):
     r"""Perform gamma correction on an image.
-    Also known as Power Law Transform. Intensities in RGB mode are adjusted
-    based on the following equation:
+    Also known as Power Law Transform, it applies a non-linear histogram
+    adjustment to encode and decode luminance or tristimulus values in images.
+    Intensities in RGB mode are adjusted based on the following equation,
+    defined by the power-law:
     .. math::
         I_{\text{out}} = 255 \times \text{gain} \times \left(\frac{I_{\text{in}}}{255}\right)^{\gamma}
     (I_out = 255 * gain * ((I_in / 255) ** gamma))
+
+    In the case of float images in the [0, 1] range, the equation simplifies to:
+    Iout = gain * ((I_in ** gamma))
+
     See `Gamma Correction`_ for more details.
     .. _Gamma Correction: https://en.wikipedia.org/wiki/Gamma_correction
     Args:
         img (numpy ndarray): numpy ndarray to be adjusted.
-        gamma (float): Non negative real number, same as :math:`\gamma` in the equation.
-            gamma larger than 1 make the shadows darker,
-            while gamma smaller than 1 make dark regions lighter.
-        gain (float): The constant multiplier.
+        gamma (float): Non-negative real number (:math:`\gamma` in the equation).
+            gamma > 1 make the shadows darker (decoding gamma, gamma expansion),
+            while gamma < 1 make dark regions lighter (encoding gamma, gamma compression).
+        gain (float): The constant multiplier (also called `A`).
     """
+
     if not _is_numpy_image(img):
         raise TypeError('img should be numpy Image. Got {}'.format(type(img)))
 
     if gamma < 0:
         raise ValueError('Gamma should be a non-negative real number')
-    
-    # alt 1:
-    # from here
-    # https://stackoverflow.com/questions/33322488/how-to-change-image-illumination-in-opencv-python/41061351
-    # table = np.array([((i / 255.0) ** gamma) * 255 * gain 
-                      # for i in np.arange(0, 256)]).astype('uint8')
-    # if img.shape[2]==1:
-        # return cv2.LUT(img, table)[:,:,np.newaxis]
-    # else:
-        # return cv2.LUT(img,table)
 
-    # alt 2:
-    im = img.astype(np.float32)
-    im = 255. * gain * np.power(im / 255., gamma)
-    im = im.clip(min=0., max=255.)
-    return im.astype(img.dtype)
+    if img.dtype == np.uint8:
+        # build a lookup table mapping the pixel values [0, 255] to their adjusted gamma values
+        table = (np.arange(0, 256.0 / 255, 1.0 / 255) ** gamma) * 255 * gain
+        # apply gamma correction using the lookup table
+        img = cv2.LUT(img, table.astype(np.uint8))
+    else:  # float32
+        img = gain * np.power(img, gamma)
+
+    return img
 
 
 def rotate(img, angle, resample=cv2.INTER_LINEAR, expand=False, center=None, border_value=0, scale=1.0):
