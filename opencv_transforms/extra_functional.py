@@ -3,6 +3,7 @@
 import math
 import random
 import warnings
+import numbers
 
 import numpy as np
 import cv2
@@ -253,23 +254,26 @@ def compression(img: np.ndarray, quality=20, image_type='.jpeg'):
     return compressed_img
 
 
-#Get a valid kernel for the blur operations
+# Get a valid kernel for the blur operations
 def valid_kernel(h: int, w: int, kernel_size: int):
-    #make sure the kernel size is smaller than the image dimensions
-    kernel_size = min(kernel_size,h,w)
+    # make sure the kernel size is smaller than the image dimensions
+    kernel_size = min(kernel_size, h, w)
 
-    #round up and cast to int
+    # round up and cast to int
     kernel_size = int(np.ceil(kernel_size))
-    #kernel size has to be an odd number
-    if kernel_size % 2 == 0:
-        kernel_size+=1 
+
+    # kernel size has to be an odd number
+    if kernel_size != 0 and kernel_size % 2 == 0:
+        kernel_size+=1
     
     return kernel_size
+
 
 @preserve_shape
 @preserve_type
 def average_blur(img: np.ndarray, kernel_size: int = 3):
-    r"""Blurs an image using OpenCV Gaussian Blur.
+    r"""Blurs an image using OpenCV Averaging Filter Blur
+        (Homogeneous filter).
     Args:
         img (numpy ndarray): Image to be augmented.
         kernel_size (int): size of the blur filter to use. Default: 3.
@@ -278,10 +282,9 @@ def average_blur(img: np.ndarray, kernel_size: int = 3):
     """
     h, w = img.shape[0:2]
 
-    #Get a valid kernel size
-    kernel_size = valid_kernel(h,w,kernel_size)
+    # Get a valid kernel size
+    kernel_size = valid_kernel(h, w, kernel_size)
     
-    #Averaging Filter Blur (Homogeneous filter)
     # blurred = cv2.blur(img, (kernel_size,kernel_size))
     blur_fn = _maybe_process_in_chunks(cv2.blur, ksize=(kernel_size,kernel_size))
     return blur_fn(img)
@@ -290,7 +293,7 @@ def average_blur(img: np.ndarray, kernel_size: int = 3):
 @preserve_shape
 @preserve_type
 def box_blur(img: np.ndarray, kernel_size: int = 3):
-    r"""Blurs an image using OpenCV Gaussian Blur.
+    r"""Blurs an image using OpenCV Box Filter Blur.
     Args:
         img (numpy ndarray): Image to be augmented.
         kernel_size (int): size of the blur filter to use. Default: 3.
@@ -299,39 +302,48 @@ def box_blur(img: np.ndarray, kernel_size: int = 3):
     """
     h, w = img.shape[0:2]
 
-    #Get a valid kernel size
-    kernel_size = valid_kernel(h,w,kernel_size)
+    # Get a valid kernel size
+    kernel_size = valid_kernel(h, w, kernel_size)
     
-    #Box Filter Blur 
     # blurred = cv2.boxFilter(img,ddepth=-1,ksize=(kernel_size,kernel_size))
     blur_fn = _maybe_process_in_chunks(cv2.boxFilter, ddepth=-1, ksize=(kernel_size,kernel_size))
     return blur_fn(img)
 
 @preserve_shape
 @preserve_type
-def gaussian_blur(img: np.ndarray, kernel_size: int = 3, sigma=0.0):
-    r"""Blurs an image using OpenCV Gaussian Blur.
+def gaussian_blur(img:np.ndarray, kernel_size:int = 3,
+    sigmaX:float=0.0, sigmaY=None):
+    r"""Blurs an image using OpenCV Gaussian Filter Blur.
     Args:
         img (numpy ndarray): Image to be augmented.
         kernel_size (int): size of the blur filter to use. Default: 3.
+        sigmaX (float): sigma parameter for X axis
+        sigmaY (float): sigma parameter for Y axis
     Returns:
         numpy ndarray: version of the image with blur applied.
     Note: When sigma=0, it is computed as `sigma = 0.3*((kernel_size-1)*0.5 - 1) + 0.8`
     """
+    if not sigmaY:
+        sigmaY = sigmaX
+
     h, w = img.shape[0:2]
 
-    #Get a valid kernel size
-    kernel_size = valid_kernel(h,w,kernel_size)
+    # Get a valid kernel size
+    kernel_size = valid_kernel(h, w, kernel_size)
     
-    #Gaussian Filter Blur
     # blurred = cv2.GaussianBlur(img,(kernel_size,kernel_size),0)
-    blur_fn = _maybe_process_in_chunks(cv2.GaussianBlur, ksize=(kernel_size,kernel_size), sigmaX=sigma)
+    blur_fn = _maybe_process_in_chunks(
+        cv2.GaussianBlur,
+        ksize=(kernel_size,kernel_size),
+        sigmaX=sigmaX,
+        sigmaY=sigmaY)
     return blur_fn(img)
+
 
 @preserve_shape
 @preserve_type
 def median_blur(img: np.ndarray, kernel_size: int = 3):
-    r"""Blurs an image using OpenCV Median Blur.
+    r"""Blurs an image using OpenCV Median Filter Blur.
     Args:
         img (numpy ndarray): Image to be augmented.
         kernel_size (int): size of the blur filter to use. Default: 3.
@@ -340,10 +352,9 @@ def median_blur(img: np.ndarray, kernel_size: int = 3):
     """
     h, w = img.shape[0:2]
 
-    #Get a valid kernel size
-    kernel_size = valid_kernel(h,w,kernel_size)
+    # Get a valid kernel size
+    kernel_size = valid_kernel(h, w, kernel_size)
     
-    #Median Filter Blur
     blur_fn = _maybe_process_in_chunks(cv2.medianBlur, ksize=kernel_size)
     return blur_fn(img)
 
@@ -351,25 +362,33 @@ def median_blur(img: np.ndarray, kernel_size: int = 3):
 @preserve_shape
 @preserve_type
 def bilateral_blur(img: np.ndarray, kernel_size: int = 3, sigmaColor: int = 5, sigmaSpace: int = 5):
-    r"""Blurs an image using OpenCV Gaussian Blur.
+    r"""Blurs an image using OpenCV Bilateral Filter.
+    Regarding the sigma values, for simplicity you can set the 2
+    sigma values to be the same.
+    If they are small (< 10), the filter will not have much effect,
+    whereas if they are large (> 150), they will have a very strong
+    effect, making the image look "cartoonish".
+
     Args:
-        img (numpy ndarray): Image to be augmented.
-        kernel_size (int): size of the blur filter to use. Default: 3. Large filters 
-            (d > 5) are very slow, so it is recommended to use d=5 for real-time 
-            applications, and perhaps d=9 for offline applications that need heavy 
-            noise filtering.
-        Sigma values: For simplicity, you can set the 2 sigma values to be the same. 
-            If they are small (< 10), the filter will not have much effect, whereas 
-            if they are large (> 150), they will have a very strong effect, making 
-            the image look "cartoonish".
-        sigmaColor	Filter sigma in the color space. A larger value of the parameter 
-            means that farther colors within the pixel neighborhood (see sigmaSpace) 
-            will be mixed together, resulting in larger areas of semi-equal color.
-        sigmaSpace	Filter sigma in the coordinate space. A larger value of the parameter 
-            means that farther pixels will influence each other as long as their colors 
-            are close enough (see sigmaColor ). When d>0, it specifies the neighborhood 
-            size regardless of sigmaSpace. Otherwise, d is proportional to sigmaSpace.
-        borderType	border mode used to extrapolate pixels outside of the image
+        img (numpy ndarray): Image to be filtered.
+        kernel_size (int): size of the blur filter to use.
+            Default: 3. Large filters (d > 5) are very slow,
+            so it is recommended to use d=5 for real-time
+            applications, and perhaps d=9 for offline
+            applications that need heavy noise filtering.
+        sigmaColor: Filter sigma in the color space. A larger
+            value of the parameter means that farther colors
+            within the pixel neighborhood (see sigmaSpace)
+            will be mixed together, resulting in larger areas
+            of semi-equal color.
+        sigmaSpace: Filter sigma in the coordinate space. A
+            larger value of the parameter means that farther
+            pixels will influence each other as long as their
+            colors are close enough (see sigmaColor ). When d>0,
+            it specifies the neighborhood size regardless of
+            sigmaSpace. Otherwise, d is proportional to sigmaSpace.
+        borderType:	border mode used to extrapolate pixels outside
+            of the image
     Returns:
         numpy ndarray: version of the image with blur applied.
     """
@@ -381,7 +400,6 @@ def bilateral_blur(img: np.ndarray, kernel_size: int = 3, sigmaColor: int = 5, s
     # if kernel_size > 9:
     #     kernel_size = 9
     
-    #Bilateral Filter
     # blurred = cv2.bilateralFilter(img,kernel_size,sigmaColor,sigmaSpace)
     blur_fn = _maybe_process_in_chunks(
         cv2.bilateralFilter,
@@ -389,6 +407,56 @@ def bilateral_blur(img: np.ndarray, kernel_size: int = 3, sigmaColor: int = 5, s
         sigmaColor=sigmaColor,
         sigmaSpace=sigmaSpace)
     return blur_fn(img)
+
+
+def get_gaussian_kernel(kernel_size:int=5, sigma:float=3,
+    dim:int=2, angle:float=0, noise=None):
+    """ Generate isotropic or anisotropic gaussian kernels
+    for 1d, 2d or 3d images.
+    Arguments:
+        kernel_size (Tuple[int, int]): filter sizes in the
+            x and y direction. Sizes should be odd and positive.
+        sigma (Tuple[float, float]): gaussian standard deviation
+            in the x and y direction.
+        dim: the image dimension (2D=2, 3D=3, etc). Default value
+            is 2 (spatial).
+        angle: rotation angle in degrees for anisotropic cases.
+            Only available for 2D kernels.
+        noise (Tuple[float, float]): range of multiplicative noise
+            to add.
+    Returns:
+        kernel: gaussian filter matrix coefficients.
+    """
+
+    if isinstance(kernel_size, numbers.Number):
+        kernel_size = [kernel_size] * dim
+    if isinstance(sigma, numbers.Number):
+        sigma = [sigma] * dim
+
+    kernel = 1
+    meshgrids = np.meshgrid(
+        *(np.arange(size, dtype=np.float32) for size in kernel_size)
+    )
+
+    # calculate gaussian array
+    for size, std, mgrid in zip(kernel_size, sigma, meshgrids):
+        mean = (size - 1) / 2.
+        kernel *= np.exp(-((mgrid - mean) / std) ** 2 / 2.)
+        kernel = kernel / (std**2 * np.sqrt(2. * np.pi))
+
+    if angle != 0:
+        # rotation only for 2D kernels
+        M = cv2.getRotationMatrix2D((kernel_size[0]//2, kernel_size[1]//2), angle, 1)
+        kernel = cv2.warpAffine(kernel, M, (kernel_size[0], kernel_size[1]))
+
+    if noise is not None:
+        # add multiplicative noise
+        noise_f = np.random.uniform(noise[0], noise[1], size=kernel.shape)
+        kernel = noise_f * kernel
+
+    return norm_kernel(kernel)
+
+
 
 
 def apply_kmeans(Z, K=8):
