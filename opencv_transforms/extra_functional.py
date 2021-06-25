@@ -15,8 +15,10 @@ import cv2
 from .common import (preserve_shape, preserve_type, preserve_channel_dim,
     _maybe_process_in_chunks, polar2z, norm_kernel, _cv2_str2interpolation,
     _cv2_interpolation2str, MAX_VALUES_BY_DTYPE, from_float, to_float,
-    split_channels, merge_channels)
+    split_channels, merge_channels, preserve_range_float)
 from .functional import center_crop, crop
+from .camera import unprocess, random_noise_levels, add_noise, process
+
 
 if float(cv2.__version__[:3]) >= 3.4 and float(cv2.__version__[4:]) >= 2:
     warppolar_available = True
@@ -232,7 +234,8 @@ def compression(img: np.ndarray, quality=20, image_type='.jpeg'):
     elif image_type == ".webp":
         quality_flag = cv2.IMWRITE_WEBP_QUALITY
     else:
-        NotImplementedError("Only '.jpg' and '.webp' compression transforms are implemented. ")
+        NotImplementedError("Only '.jpg' and '.webp' compression "
+                            "transforms are implemented. ")
 
     input_dtype = img.dtype
     needs_float = False
@@ -247,7 +250,7 @@ def compression(img: np.ndarray, quality=20, image_type='.jpeg'):
         img = from_float(img, dtype=np.dtype("uint8"))
         needs_float = True
     elif input_dtype not in (np.uint8, np.float32):
-        raise TypeError("Unexpected dtype {} for compression augmentation".format(input_dtype))
+        raise TypeError(f"Unexpected dtype {input_dtype} for compression augmentation")
 
     #encoding parameters
     encode_param = [int(quality_flag), quality]
@@ -1128,6 +1131,7 @@ def clahe(img, clip_limit=2.0, tile_grid_size=(8, 8)):
     return img
 
 
+# @preserve_type
 def add_fringes(im, pixels: int = 1):
     """Adds a small pixel jitter offset to the Red and Blue channels
     of <im>, resulting in a classic chromatic fringe effect.
@@ -1191,6 +1195,7 @@ def get_polar_dimensions(image):
     }
 
 
+@preserve_type
 def add_chromatic(im, strength:float=1, radial_blur:bool=True):
     """Splits <im> into red, green, and blue channels, then performs a
     1D Vertical Gaussian blur through a polar representation to create
@@ -1256,3 +1261,57 @@ def add_chromatic(im, strength:float=1, radial_blur:bool=True):
 
     # crop the image to the original image dimensions
     return center_crop(imfinal, (dims["h"], dims["w"]))
+
+
+def camera_noise(img:np.ndarray, xyz_arr:str='D50',
+    dmscfn:str='malvar', rg_range:tuple=(1.2, 2.4),
+    bg_range:tuple=(1.2, 2.4)) -> np.ndarray:
+    """ Interface to apply the unprocess/process pipeline to
+        add realistic RAW camera images noise.
+    """
+    input_dtype = img.dtype
+    needs_float = False
+
+    if input_dtype == np.float32:
+        warnings.warn(
+            "Camera noise augmentation "
+            "expects uint8 inputs, "
+            "{} was used as input.".format(input_dtype),
+            UserWarning,
+        )
+        img = from_float(img, dtype=np.dtype("uint8"))
+        needs_float = True
+    elif input_dtype not in (np.uint8, np.float32):
+        raise TypeError(f"Unexpected dtype {input_dtype} for camera "
+            "noise augmentation")
+
+    # img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    img = img.astype(np.float32)/255.
+
+    # unprocess images
+    deg_img, metadata = unprocess(img, xyz_arr=xyz_arr)
+
+    # add noise
+    shot_noise, read_noise = random_noise_levels()
+    deg_img = add_noise(deg_img, shot_noise, read_noise)
+
+    # expand dims for fake batch dimension
+    deg_img = np.expand_dims(deg_img, 0)
+    metadata['red_gain'] = np.expand_dims(metadata['red_gain'], axis=0)
+    metadata['blue_gain'] = np.expand_dims(metadata['blue_gain'], axis=0)
+    metadata['cam2rgb'] = np.expand_dims(metadata['cam2rgb'], axis=0)
+
+    # process images
+    deg_img = process(deg_img, metadata['red_gain'],
+        metadata['blue_gain'], metadata['cam2rgb'], dmscfn=dmscfn)
+
+    # remove fake batch dimension and return to uint8
+    deg_img = np.squeeze(deg_img)
+    deg_img = np.clip((deg_img * 255 + 0.5), 0, 255).astype(np.uint8)
+    img = cv2.cvtColor(deg_img, cv2.COLOR_RGB2BGR)
+
+    if needs_float:
+        deg_img = to_float(deg_img, max_value=255)
+
+    return deg_img
+

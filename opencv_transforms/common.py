@@ -37,6 +37,18 @@ _cv2_str2interpolation = {'nearest':cv2.INTER_NEAREST,
                          'LANCZOS':cv2.INTER_LANCZOS4,}
 _cv2_interpolation2str={v:k for k,v in _cv2_str2interpolation.items()}
 
+#BORDERS
+_cv2_borders_dict = {
+    'constant': 0,  # BORDER_CONSTANT
+    'replicate': 1,  # BORDER_REPLICATE
+    'mirror': 2,
+    'reflect': 2,  # BORDER_REFLECT
+    'wrap': 3,  # BORDER_WRAP
+    'reflect101': 4,  # BORDER_REFLECT_101, BORDER_REFLECT101
+    'default': 4,  # BORDER_DEFAULT
+    'transparent': 5,  # BORDER_TRANSPARENT
+    'isolated': 16,  # BORDER_ISOLATED
+    }
 
 # much faster than iinfo and finfo
 MAX_VALUES_BY_DTYPE = {
@@ -293,7 +305,11 @@ def add_img_channels(img):
 
 
 @preserve_shape
-def convolve(img, kernel, per_channel=False):
+def convolve(img:np.ndarray, kernel:np.ndarray, per_channel:bool=False,
+    flip_k:bool=True, mode:str='default') -> np.ndarray:
+    border = _cv2_borders_dict[mode]
+    if flip_k:
+        kernel = cv2.flip(kernel, -1)
     if per_channel:
         def channel_conv(img, kernel):
             if len(img.shape) < 3:
@@ -301,12 +317,14 @@ def convolve(img, kernel, per_channel=False):
             output = []
             for channel_num in range(img.shape[2]):
                 output.append(
-                    cv2.filter2D(img[:,:,channel_num], ddepth=-1, kernel=kernel))
+                    cv2.filter2D(
+                        img[:,:,channel_num], ddepth=-1,
+                        kernel=kernel), borderType=border)
             return np.squeeze(np.stack(output,-1))
         return channel_conv(img, kernel)
     # else:
     conv_fn = _maybe_process_in_chunks(
-        cv2.filter2D, ddepth=-1, kernel=kernel)
+        cv2.filter2D, ddepth=-1, kernel=kernel, borderType=border)
     return conv_fn(img)
 
 

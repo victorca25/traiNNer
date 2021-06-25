@@ -42,7 +42,7 @@ __all__ = ["Compose", "ToTensor", "ToCVImage",
            "FilterColorBalance", "FilterUnsharp", "CLAHE",
            "FilterMaxRGB", "RandomQuantize", "RandomQuantizeSOM", "SimpleQuantize",
            "FilterCanny", "ApplyKernel", "RandomGamma", "Superpixels",
-           "RandomChromaticAberration",
+           "RandomChromaticAberration", "RandomCameraNoise",
            ]
 
 
@@ -2761,7 +2761,7 @@ class Superpixels(RandomBase):
 
 
 class RandomChromaticAberration(RandomBase):
-    r"""Apply chromatic aberration and lens blur to images.
+    """Apply chromatic aberration and lens blur to images.
     Args:
         img (numpy ndarray): image to be processed.
         radial_blur: enable radial blur.
@@ -2833,3 +2833,81 @@ class RandomChromaticAberration(RandomBase):
 
     def __repr__(self):
         return self.__class__.__name__ + '(p={})'.format(self.p)
+
+
+class RandomCameraNoise(RandomBase):
+    r"""Apply random camera noise to images.
+    Uses a pipeline to unprocess sRGB images to RAW, add camera
+    noise to this synthetic RAW image and convert back to sRGB.
+    The ISP pipeline consists of demosaicing, exposure compensation,
+    white balance, camera to RGB to XYZ color space conversion, XYZ
+    to linear RGB color space conversion, tone mapping and gamma
+    correction. For demosaicing, multiple methods are available,
+    including `malvar`, which is Matlab’s default and `pixelshuffle`.
+    References:
+        "Unprocessing Images for Learned Raw Denoising"
+            http://timothybrooks.com/tech/unprocessing
+    Args:
+        img (numpy ndarray): image to be processed.
+        dmscfn: select the demosaicing method to use, in:
+            'malvar', 'pixelshuffle','menon', 'bilinear'
+        xyz_arr: select the matrix to use for RGB to XYZ
+            conversion, in: 'D50', 'D65'
+        rg_range: red gain range for whitebalance.
+            Default: (1.2, 2.4), alternative: (1.9, 2.4)
+        bg_range: blue gain range for whitebalance.
+            Default: (1.2, 2.4), alternative: (1.5, 1.9)
+        random_params: initialize with random parameters if True.
+    Returns:
+        numpy ndarray: image with random camera noise applied.
+    """
+
+    def __init__(self, p=0.5, demosaic_fn='malvar',
+        xyz_arr='D50', rg_range:tuple=(1.2, 2.4),
+        bg_range:tuple=(1.2, 2.4), random_params:bool=False):
+        super(RandomCameraNoise, self).__init__(p=p)
+
+        if isinstance(demosaic_fn, str):
+            demosaic_fn = [demosaic_fn]
+        if isinstance(xyz_arr, str):
+            xyz_arr = [xyz_arr]
+
+        self.demosaic_fn = demosaic_fn
+        self.xyz_arr = xyz_arr
+        self.rg_range = rg_range
+        self.bg_range = bg_range
+        self.random_params = random_params
+        self.params = self.get_params()
+
+    def get_params(self) -> dict:
+        if self.random_params:
+            dmscfn = random.choice(['malvar', 'pixelshuffle', 'bilinear'])
+            xyz_arr = random.choice(['D50', 'D65'])
+        else:
+            dmscfn = random.choice(self.demosaic_fn)
+            xyz_arr = random.choice(self.xyz_arr)
+
+        return {"dmscfn": dmscfn,
+                "xyz_arr": xyz_arr,
+                "rg_range": self.rg_range,
+                "bg_range": self.bg_range,
+                }
+
+    def apply(self, img, **params):
+        return EF.camera_noise(img, **params)
+
+    def __call__(self, image):
+        """
+        Args:
+            image (np.ndarray): Image to add noise to.
+
+        Returns:
+            np.ndarray: Image with random noise.
+        """
+        if random.random() < self.p:
+            return self.apply(image, **self.params)
+        return image
+
+    def __repr__(self):
+        return self.__class__.__name__ + '(p={})'.format(self.p)
+
