@@ -12,8 +12,17 @@ import cv2
 #import collections
 #import warnings
 
-from .common import preserve_shape, preserve_type, preserve_channel_dim, _maybe_process_in_chunks, polar2z, norm_kernel
-from .common import _cv2_str2interpolation, _cv2_interpolation2str, MAX_VALUES_BY_DTYPE, from_float, to_float
+from .common import (preserve_shape, preserve_type, preserve_channel_dim,
+    _maybe_process_in_chunks, polar2z, norm_kernel, _cv2_str2interpolation,
+    _cv2_interpolation2str, MAX_VALUES_BY_DTYPE, from_float, to_float,
+    split_channels, merge_channels)
+from .functional import center_crop, crop
+
+if float(cv2.__version__[:3]) >= 3.4 and float(cv2.__version__[4:]) >= 2:
+    warppolar_available = True
+else:
+    warppolar_available = False
+
 
 ## Below are new augmentations not available in the original ~torchvision.transforms
 
@@ -457,6 +466,40 @@ def get_gaussian_kernel(kernel_size:int=5, sigma:float=3,
     return norm_kernel(kernel)
 
 
+def get_gaussian_1D(kernel_size:int=5, sigma=None):
+    """Interface for get_gaussian_kernel() for 1D kernels"""
+    if not sigma:
+        sigma = 0.3 * (kernel_size / 2 - 1) + 0.8
+    return get_gaussian_kernel(
+        kernel_size=kernel_size, sigma=sigma, dim=1)
+
+
+def vertical_gaussian(data:np.ndarray, n:int) -> np.ndarray:
+    """Peforms a 1D Gaussian blur in the vertical direction on <data>.
+    Args:
+        n: is the radius, where 1 pixel radius indicates no blur
+    Returns
+        the blurred image.
+    """
+    padding = n - 1
+    width = data.shape[1]
+    height = data.shape[0]
+    padded_data = np.zeros((height + padding * 2, width))
+    padded_data[padding: -padding, :] = data
+    ret = np.zeros((height, width))
+    kernel = None
+    old_radius = - 1
+    for i in range(height):
+        radius = round(i * padding / (height - 1)) + 1
+        # recreate kernel only if we have to
+        if (radius != old_radius):
+            old_radius = radius
+            kernel = np.tile((
+                get_gaussian_1D(1 + 2 * (radius - 1))),
+                (width, 1)).transpose()
+        ret[i, :] = np.sum(np.multiply(
+            padded_data[padding + i - radius + 1:padding + i + radius, :], kernel), axis=0)
+    return ret
 
 
 def apply_kmeans(Z, K=8):
@@ -725,9 +768,6 @@ def noise_dither_random_bw(img):
     return re_rand
 
 
-#translate_chan()
-#TBD
-
 
 def filter_max_rgb(img: np.ndarray):
     r"""The Max RGB filter is used to visualize which channel 
@@ -905,6 +945,7 @@ def simple_motion_kernel(kernel_size):
     # normalize kernel
     return norm_kernel(kernel)
 
+
 def complex_motion_kernel(SIZE, SIZEx2, DIAGONAL, 
             COMPLEXITY: float=0, eps: float=0.1):
     """
@@ -956,6 +997,7 @@ def complex_motion_kernel(SIZE, SIZEx2, DIAGONAL,
 
     # normalize kernel, so it suns up to 1
     return norm_kernel(kernel)
+
 
 def create_motion_path(DIAGONAL, SIZEx2, COMPLEXITY, eps):
     """
@@ -1085,3 +1127,132 @@ def clahe(img, clip_limit=2.0, tile_grid_size=(8, 8)):
 
     return img
 
+
+def add_fringes(im, pixels: int = 1):
+    """Adds a small pixel jitter offset to the Red and Blue channels
+    of <im>, resulting in a classic chromatic fringe effect.
+    Args:
+        pixels: how many pixels to offset the Red and Blue channels
+    """
+    if pixels == 0:
+        return im.copy()
+    channels = split_channels(im)
+    b, g, r = channels[0], channels[1], channels[2]
+
+    rheight, rwidth = r.shape[0:2]
+    bheight, bwidth = b.shape[0:2]
+
+    # b = np.pad(b, ((0, 0), (pixels, 0)), mode='constant',  constant_values=3)
+    # r = np.pad(r, ((0, 0), (0, pixels)), mode='constant',  constant_values=3)
+    b = np.pad(b, ((0, 0), (pixels, 0)), mode='reflect')
+    r = np.pad(r, ((0, 0), (0, pixels)), mode='reflect')
+
+    b = crop(b, 0, 0, bheight, bwidth)
+    r = crop(r, 0, pixels, rheight, rwidth + pixels)
+
+    return merge_channels([b, g, r])
+
+
+def blend_images(im, og_im, alpha:float=1, strength:float=.0):
+    """Blends original image <og_im> as an overlay over <im>, with
+    an alpha value of <alpha>. Resizes <og_im> with respect to
+    <strength>, before adding it as an overlay.
+    """
+    if alpha == 0.0:
+       return im.copy()
+    if alpha == 1.0:
+       return og_im.copy()
+
+    if strength > 0:
+        og_im = cv2.resize(
+            og_im,
+            (round((1 + 0.018 * strength) * og_im.shape[1]),
+             round((1 + 0.018 * strength) * og_im.shape[0])),
+            interpolation=cv2.INTER_CUBIC)
+
+    og_im = center_crop(og_im, im.shape[0:2])
+
+    beta = 1.0 - alpha
+    return cv2.addWeighted(og_im, alpha, im, beta, 0)
+
+
+def get_polar_dimensions(image):
+    h, w = image.shape[0:2]
+    center = (w//2, h//2)
+    radius = math.ceil(np.sqrt((h**2.0 + w**2.0)) / 2.0)  # halfdiag
+    perimeter = 2 * (w + h - 2)
+    # perimeter = int(2*radius*np.pi)
+    return {
+        "h": h,
+        "w": w,
+        "c": center,
+        "p": perimeter,
+        "d": radius,
+    }
+
+
+def add_chromatic(im, strength:float=1, radial_blur:bool=True):
+    """Splits <im> into red, green, and blue channels, then performs a
+    1D Vertical Gaussian blur through a polar representation to create
+    radial blur. Finally, it expands the green and blue channels slightly.
+    Args:
+        strength: determines the amount of expansion and blurring.
+        radial_blur: enable the radial blur if True
+    """
+
+    dims = get_polar_dimensions(im)
+    if radial_blur:
+        ima = im.astype(np.float64)
+
+        if warppolar_available:
+            flags = cv2.WARP_FILL_OUTLIERS + cv2.WARP_POLAR_LINEAR  # + cv2.INTER_CUBIC  # WARP_POLAR_LOG
+            poles = cv2.warpPolar(ima, (dims["d"], dims["p"]), dims["c"], dims["d"], flags)
+        else:
+            flags = cv2.WARP_FILL_OUTLIERS  # + cv2.INTER_CUBIC
+            poles = cv2.linearPolar(ima, dims["c"], dims["d"], flags)
+
+        poles = np.rot90(poles, k=-1, axes=(0, 1))
+        pchannels = split_channels(poles)
+        bpolar, gpolar, rpolar = pchannels[0], pchannels[1], pchannels[2]
+
+        bluramount = (dims["h"] + dims["w"] - 2) / 100 * strength
+        if round(bluramount) > 0:
+            rpolar = vertical_gaussian(rpolar, round(bluramount))
+            gpolar = vertical_gaussian(gpolar, round(bluramount * 1.2))
+            bpolar = vertical_gaussian(bpolar, round(bluramount * 1.4))
+
+        rgbpolar = merge_channels([bpolar, gpolar, rpolar])
+        rgbpolar = np.rot90(rgbpolar, k=1, axes=(0, 1))
+
+        if warppolar_available:
+            flags_inv = cv2.WARP_FILL_OUTLIERS + cv2.WARP_POLAR_LINEAR + cv2.WARP_INVERSE_MAP  # + cv2.INTER_CUBIC # WARP_POLAR_LOG
+            cartes = cv2.warpPolar(rgbpolar, (dims["w"], dims["h"]), dims["c"], dims["d"], flags_inv)
+        else:
+            flags_inv = cv2.WARP_INVERSE_MAP  # + cv2.INTER_CUBIC
+            cartes = cv2.linearPolar(rgbpolar, dims["c"], dims["d"], cv2.WARP_INVERSE_MAP)
+
+        cchannels = split_channels(cartes)
+        bfinal, gfinal, rfinal = np.uint8(cchannels[0]), np.uint8(cchannels[1]), np.uint8(cchannels[2])
+    else:
+        # channels remain unchanged
+        channels = split_channels(im)
+        bfinal, gfinal, rfinal = channels[0], channels[1], channels[2]
+
+    # enlarge the green and blue channels slightly, blue being the most enlarged
+    gfinal = cv2.resize(gfinal,
+        (round((1 + 0.018 * strength) * dims["w"]),
+         round((1 + 0.018 * strength) * dims["h"])),
+        interpolation=cv2.INTER_CUBIC)
+    bfinal = cv2.resize(
+        bfinal,
+        (round((1 + 0.044 * strength) * dims["w"]),
+         round((1 + 0.044 * strength) * dims["h"])),
+        interpolation=cv2.INTER_CUBIC)
+
+    # center and merge the channels
+    rfinal = center_crop(rfinal, bfinal.shape[0:2])
+    gfinal = center_crop(gfinal, bfinal.shape[0:2])
+    imfinal = merge_channels([bfinal, gfinal, rfinal])
+
+    # crop the image to the original image dimensions
+    return center_crop(imfinal, (dims["h"], dims["w"]))

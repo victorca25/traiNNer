@@ -20,7 +20,8 @@ from . import functional as F
 from . import extra_functional as EF
 from . import superpixels as SP
 from .minisom import MiniSom
-from .common import fetch_kernels, to_tuple, _cv2_interpolation2str, _cv2_str2interpolation, convolve
+from .common import (fetch_kernels, to_tuple, _cv2_interpolation2str,
+    _cv2_str2interpolation, convolve, MAX_VALUES_BY_DTYPE)
 
 
 __all__ = ["Compose", "ToTensor", "ToCVImage",
@@ -41,6 +42,7 @@ __all__ = ["Compose", "ToTensor", "ToCVImage",
            "FilterColorBalance", "FilterUnsharp", "CLAHE",
            "FilterMaxRGB", "RandomQuantize", "RandomQuantizeSOM", "SimpleQuantize",
            "FilterCanny", "ApplyKernel", "RandomGamma", "Superpixels",
+           "RandomChromaticAberration",
            ]
 
 
@@ -1730,7 +1732,7 @@ class RandomQuantize(RandomBase):
     Returns:
         numpy ndarray: quantized version of the image.
     """
-    def __init__(self, num_colors:int = 32, p:float = 0.5):
+    def __init__(self, num_colors:int=32, p:float=0.5):
         super(RandomQuantize, self).__init__(p=p)
         assert isinstance(num_colors, int) and num_colors >= 0, 'num_colors should be a positive integrer value'
         self.num_colors = num_colors
@@ -1742,8 +1744,7 @@ class RandomQuantize(RandomBase):
         return self.__class__.__name__ + '(p={})'.format(self.p)
 
 
-
-class RandomQuantizeSOM:
+class RandomQuantizeSOM(RandomBase):
     r"""Color quantization (using MiniSOM)
     Args:
         img (numpy ndarray): Image to be quantized.
@@ -1752,14 +1753,14 @@ class RandomQuantizeSOM:
         learning_rate (float): determines how much weights are adjusted
             during each SOM iteration
         neighborhood_function (str): the neighborhood function to use
-            with SOM
+            with SOM, in: 'bubble', 'gaussian', 'mexican_hat', 'triangle'
     Returns:
         numpy ndarray: quantized version of the image.
     """
 
-    def __init__(self, p = 0.5, num_colors=None, sigma=1.0, learning_rate=0.2, neighborhood_function='bubble'):
-        # assert isinstance(p, numbers.Number) and p >= 0, 'p should be a positive value'
-        self.p = p
+    def __init__(self, p:float=0.5, num_colors=None, sigma:float=1.0,
+        learning_rate:float=0.2, neighborhood_function:str='bubble'):
+        super(RandomQuantizeSOM, self).__init__(p=p)
 
         if not num_colors:
             N = int(np.random.uniform(2, 8))
@@ -1773,7 +1774,7 @@ class RandomQuantizeSOM:
         self.som = MiniSom(x=2, y=N, input_len=3, sigma=sigma,
                     learning_rate=0.2, neighborhood_function=neighborhood_function)
 
-    def __call__(self, img):
+    def apply(self, img, **params):
         """
         Args:
             img (np.ndarray): Image to be quantized.
@@ -1781,31 +1782,26 @@ class RandomQuantizeSOM:
         Returns:
             np.ndarray: Quantized image.
         """
-        if random.random() < self.p:
+        img_type = img.dtype
+        img_max = MAX_VALUES_BY_DTYPE.get(img_type, 255)
 
-            img_type = img.dtype
-            if np.issubdtype(img_type, np.integer):
-                img_max = np.iinfo(img_type).max
-            elif np.issubdtype(img_type, np.floating):
-                img_max = np.finfo(img_type).max
+        # reshape image as a 2D array
+        pixels = np.reshape(img, (img.shape[0]*img.shape[1], 3))
 
-            # reshape image as a 2D array
-            pixels = np.reshape(img, (img.shape[0]*img.shape[1], 3))
+        # initialize som
+        self.som.random_weights_init(pixels)
+        # save the starting weights (the image’s initial colors)
+        starting_weights = self.som.get_weights().copy()
+        self.som.train_random(pixels, 500, verbose=False)
+        #som.train_random(pixels, 100)
 
-            # initialize som
-            self.som.random_weights_init(pixels)
-            # save the starting weights (the image’s initial colors)
-            starting_weights = self.som.get_weights().copy()
-            self.som.train_random(pixels, 500, verbose=False)
-            #som.train_random(pixels, 100)
-
-            # Vector quantization: quantize each pixel of the image to reduce the number of colors
-            qnt = self.som.quantization(pixels)
-            clustered = np.zeros(img.shape)
-            for i, q in enumerate(qnt):
-                clustered[np.unravel_index(i, dims=(img.shape[0], img.shape[1]))] = q
-            img = np.clip(clustered, 0, img_max).astype(img_type)
-        return img
+        # vector quantization: quantize each pixel of the image
+        # to reduce the number of colors
+        qnt = self.som.quantization(pixels)
+        clustered = np.zeros(img.shape)
+        for i, q in enumerate(qnt):
+            clustered[np.unravel_index(i, dims=(img.shape[0], img.shape[1]))] = q
+        return np.clip(clustered, 0, img_max).astype(img_type)
 
     def __repr__(self):
         return self.__class__.__name__ + '(p={})'.format(self.p)
@@ -2762,3 +2758,78 @@ class Superpixels(RandomBase):
                 kind=params["kind"],
                 reduction=params["reduction"],)
         return image
+
+
+class RandomChromaticAberration(RandomBase):
+    r"""Apply chromatic aberration and lens blur to images.
+    Args:
+        img (numpy ndarray): image to be processed.
+        radial_blur: enable radial blur.
+        strength: set blur/aberration strength.
+        jitter: number of pixels for color channel offset.
+        alpha: alpha value to overlay original image.
+        random_params: initialize with random parameters if True.
+    Returns:
+        numpy ndarray: image with chromatic aberration.
+    """
+
+    def __init__(self, p=0.5, radial_blur:bool=True,
+        strength:float=1.0, jitter:int=0, alpha:float=0.0,
+        random_params:bool=False):
+        super(RandomChromaticAberration, self).__init__(p=p)
+
+        self.radial_blur = radial_blur
+        self.strength = strength
+        self.jitter = jitter
+        self.alpha = alpha
+        self.random_params = random_params
+
+        self.params = self.get_params()
+
+    def get_params(self) -> dict:
+        if self.random_params:
+            radial_blur = bool(random.getrandbits(1))  # random.choice([True, False])
+            strength = np.random.uniform(self.strength, 2.0)
+            jitter = random.choice(np.arange(self.jitter, 4, 1))
+            # alpha = np.random.uniform(0.0, 1.0)
+            alpha = np.abs(np.random.normal(loc=0.0, scale=0.5))
+        else:
+            radial_blur = self.radial_blur
+            strength = self.strength
+            jitter = self.jitter
+            alpha = self.alpha
+
+        return {"radial_blur": radial_blur,
+                "strength": strength,
+                "jitter": jitter,
+                "alpha": alpha,
+                }
+
+    def apply(self, img, **params):
+        # add chromatic aberration and radial blur
+        im_ca = EF.add_chromatic(
+            img, strength=params["strength"],
+            radial_blur=params["radial_blur"])
+        # add jitter effect
+        im_ca = EF.add_fringes(
+            im_ca, pixels=params["jitter"])
+        # blend result and original image
+        im_ca = EF.blend_images(
+            im_ca, img, alpha=params["alpha"],
+            strength=params["strength"])
+        return im_ca
+
+    def __call__(self, image):
+        """
+        Args:
+            image (np.ndarray): Image to be blurred.
+
+        Returns:
+            np.ndarray: Randomly blurred image.
+        """
+        if random.random() < self.p:
+            return self.apply(image, **self.params)
+        return image
+
+    def __repr__(self):
+        return self.__class__.__name__ + '(p={})'.format(self.p)

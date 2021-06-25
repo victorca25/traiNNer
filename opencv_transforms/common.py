@@ -309,13 +309,22 @@ def convolve(img, kernel, per_channel=False):
         cv2.filter2D, ddepth=-1, kernel=kernel)
     return conv_fn(img)
 
+
 def norm_kernel(kernel):
     if np.sum(kernel) == 0.0:
         # if kernel is empty, return identity kernel
-        kernel[kernel.shape[0]//2, kernel.shape[1]//2] = 1
+        if len(kernel.shape) == 3:
+            kernel[kernel.shape[0]//2,
+                   kernel.shape[1]//2,
+                   kernel.shape[2]//2] = 1
+        elif len(kernel.shape) == 2:
+            kernel[kernel.shape[0]//2, kernel.shape[1]//2] = 1
+        elif len(kernel.shape) == 1:
+            kernel[kernel.shape[0]//2] = 1
         return kernel
     # normalize kernel, so it sums up to 1
     return kernel.astype(np.float32) / np.sum(kernel)
+
 
 def fetch_kernels(kernels_path, pattern:str='', scale=None, kformat:str='npy'):
     if pattern == 'kernelgan':
@@ -330,6 +339,16 @@ def fetch_kernels(kernels_path, pattern:str='', scale=None, kformat:str='npy'):
     else:
         kernels = glob(pjoin(kernels_path, '*.{}'.format(kformat)))
     return kernels
+
+
+def split_channels(image: np.ndarray) -> list:
+    c = image.shape[2]
+    return [ image[...,ch] for ch in range(c) ]
+
+
+def merge_channels(channels: list, axis: int=-1) -> np.ndarray:
+    return np.stack(channels, axis=axis)
+
 
 def polar2z(r: np.ndarray, θ: np.ndarray) -> np.ndarray:
     """
