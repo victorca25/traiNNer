@@ -449,7 +449,7 @@ def bilateral_blur(img: np.ndarray, kernel_size: int = 3, sigmaColor: int = 5, s
 
 
 def get_gaussian_kernel(kernel_size:int=5, sigma:float=3,
-    dim:int=2, angle:float=0, noise=None):
+    dim:int=2, angle:float=0, noise=None, sf:int=1):
     """ Generate isotropic or anisotropic gaussian kernels
     for 1d, 2d or 3d images.
     Arguments:
@@ -463,6 +463,11 @@ def get_gaussian_kernel(kernel_size:int=5, sigma:float=3,
             Only available for 2D kernels.
         noise (Tuple[float, float]): range of multiplicative noise
             to add.
+        sf: scale factor, used to shift kernel in order to prevent
+            misalignment of 0.5×(sf − 1) pixels towards the upper-left
+            corner when downsampling an image (i.e. with nearest
+            neighbor). Convolve the image with a shifted kernel
+            before downsampling to produce aligned images.
     Returns:
         kernel: gaussian filter matrix coefficients.
     """
@@ -479,7 +484,9 @@ def get_gaussian_kernel(kernel_size:int=5, sigma:float=3,
 
     # calculate gaussian array
     for size, std, mgrid in zip(kernel_size, sigma, meshgrids):
-        mean = (size - 1) / 2.
+        # mean = (size - 1) / 2.  # original, no shift
+        # mean = size // 2  + 0.5 * (sf - size % 2)  # more energy to bottom-right
+        mean = size // 2 - 0.5 * (sf - 1)  # more energy to top-left
         kernel *= np.exp(-((mgrid - mean) / std) ** 2 / 2.)
         kernel = kernel / (std**2 * np.sqrt(2. * np.pi))
 

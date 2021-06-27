@@ -21,7 +21,7 @@ from . import extra_functional as EF
 from . import superpixels as SP
 from .minisom import MiniSom
 from .common import (fetch_kernels, to_tuple, _cv2_interpolation2str,
-    _cv2_str2interpolation, convolve, MAX_VALUES_BY_DTYPE)
+    _cv2_str2interpolation, convolve, sample, MAX_VALUES_BY_DTYPE)
 
 
 __all__ = ["Compose", "ToTensor", "ToCVImage",
@@ -36,7 +36,7 @@ __all__ = ["Compose", "ToTensor", "ToCVImage",
            "RandomSpeckleNoise", "RandomCompression",
            "RandomAverageBlur", "RandomBilateralBlur", "RandomBoxBlur",
            "RandomGaussianBlur", "RandomMedianBlur", "RandomMotionBlur",
-           "RandomComplexMotionBlur", "RandomAnIsoBlur",
+           "RandomComplexMotionBlur", "RandomAnIsoBlur", "AlignedDownsample",
            "BayerDitherNoise", "FSDitherNoise", "AverageBWDitherNoise", "BayerBWDitherNoise",
            "BinBWDitherNoise", "FSBWDitherNoise", "RandomBWDitherNoise",
            "FilterColorBalance", "FilterUnsharp", "CLAHE",
@@ -2395,9 +2395,10 @@ class SimpleQuantize(RandomBase):
 
 class ApplyKernel:
     r"""Apply supplied kernel(s) to images.
-        Example kernels are motion kernels (motion blur) or interpolation
-        kernels for scaling images. Can also be used to apply extracted 
-        realistic kernels to downscale images with.
+        Example kernels are motion kernels (motion blur) or
+        interpolation kernels for scaling images. Can also be
+        used to apply extracted realistic kernels to downscale
+        images with.
     Ref:
     http://www.wisdom.weizmann.ac.il/~vision/kernelgan/index.html
     https://openaccess.thecvf.com/content_ICCV_2019/papers/Zhou_Kernel_Modeling_Super-Resolution_on_Real_Low-Resolution_Images_ICCV_2019_paper.pdf
@@ -2414,7 +2415,7 @@ class ApplyKernel:
                  permute: bool = True,
                  center: bool = False):
 
-        self.scale = 1.0/scale
+        self.scale = scale
         self.center = center
         if size:
             pre_process = Compose([CenterCrop(size)])
@@ -2460,39 +2461,15 @@ class ApplyKernel:
             kernel = self.pre_process(kernel)
             # normalize to make cropped kernel sum 1 again
             kernel = EF.norm_kernel(kernel)
-            # print(kernel.shape)
 
         # First run a correlation (convolution with flipped kernel)
         # out_im = cv2.filter2D(img, -1, kernel)
         out_im = convolve(img, kernel)
 
-        if self.scale < 1:
-            input_shape = img.shape
-            # By default, if scale-factor is a scalar assume 2d resizing and duplicate it.
-            if isinstance(self.scale, (int, float)):
-                scale_factor = [self.scale, self.scale]
-            else:
-                scale_factor = self.scale
+        if self.scale > 1:
+            # downsample according to scale
+            out_im = sample(out_im, scale=self.scale, center=self.center)
 
-            # if needed extend the size of scale-factor list to the size of the input
-            # by assigning 1 to all the unspecified scales
-            if len(scale_factor) != len(input_shape):
-                scale_factor = list(scale_factor)
-                scale_factor.extend([1] * (len(input_shape) - len(scale_factor)))
-
-            # Dealing with missing output-shape. calculating according to scale-factor
-            output_shape = np.uint(np.ceil(np.array(input_shape) * np.array(scale_factor)))
-
-            #TODO: can select specific starting points to subsample
-            if self.center:
-                st = [(sf-1)//2 for sf in scale_factor]
-            else:
-                st = [0 for sf in scale_factor]
-
-            # then subsample and return
-            return out_im[np.round(np.linspace(st[0], out_im.shape[0] - 1 / scale_factor[0], output_shape[0])).astype(int)[:, None],
-                    np.round(np.linspace(st[1], out_im.shape[1] - 1 / scale_factor[1], output_shape[1])).astype(int), :]
-        # else:
         # return convolved image
         return out_im
 
@@ -2501,40 +2478,35 @@ class RandomAnIsoBlur(ApplyKernel):
     """Applying isotropic or anisotropic Gaussian blurring filter
         on the given CV Image randomly with a given probability.
     Args:
-        p (float): probability of applying the transform.
-            Default: 0.5
-        kernel_size (int): maximum kernel size
-        sigmaX (tuple): sigma parameter for X axis
-        sigmaY (tuple): sigma parameter for Y axis
-        angle (float): rotation angle for anisotropic filters
-        noise (float): multiplicative kernel noise. Default: None
-        scale (int): option to subsample image by a scale
+        p: probability of applying the transform. Default: 0.5.
+        min_kernel_size: minimum kernel size.
+        kernel_size: maximum kernel size.
+        sigmaX (tuple): sigma parameter for X axis.
+        sigmaY (tuple): sigma parameter for Y axis.
+        angle (float): rotation angle for anisotropic filters.
+        noise (float): multiplicative kernel noise. Default: None.
+        scale (int): option to subsample image by a scale.
     """
-    def __init__(self,
-                 p: float = 0.5,
-                 kernel_size: int = 3,
-                 sigmaX = None,
-                 sigmaY = None,
-                 angle=None,
-                 noise=None,
-                 scale=1):
+    def __init__(self, p:float=0.5, min_kernel_size:int=1,
+        kernel_size:int=3, sigmaX=None, sigmaY=None, angle=None,
+        noise=None, scale:int=1):
 
         if not isinstance(p, numbers.Number) or p < 0:
             raise ValueError('p should be a positive value')
         self.p = p
 
-        min_kernel_size = 0
         self.kernel_size = to_tuple(kernel_size, low=min_kernel_size)
 
         self.sigmaX = to_tuple(sigmaX if sigmaX is not None else 0, 0)
         self.sigmaY = to_tuple(sigmaY, 0) if sigmaY is not None else None
         self.angle = to_tuple(angle) if angle is not None else None
         self.noise = to_tuple(noise, 0) if noise is not None else None
+        self.scale = scale
 
         kernel = EF.get_gaussian_kernel(**self.get_params())
 
         super(RandomAnIsoBlur, self).__init__(
-            scale = scale,
+            scale = self.scale,
             kernel = kernel,
             size = None,
             center = False)
@@ -2543,10 +2515,10 @@ class RandomAnIsoBlur(ApplyKernel):
         """
         Get kernel size for blur filter in range (3, kernel_size).
             Validates that the kernel is larger than the image and
-            an odd integer
+            an odd integer.
 
         Returns:
-            kernel size to be passed to filter
+            kernel size to be passed to filter.
         """
         kernel_size = np.random.randint(
             self.kernel_size[0], self.kernel_size[1]+1)
@@ -2568,12 +2540,29 @@ class RandomAnIsoBlur(ApplyKernel):
             "sigma": sigma,
             "angle": random.uniform(*self.angle) if self.angle else 0,
             "noise": self.noise,
+            "sf": self.scale,
             }
 
         return params
 
     def __repr__(self):
         return self.__class__.__name__ + f'(p={self.p})'
+
+
+class AlignedDownsample(RandomAnIsoBlur):
+    """ Convenience transform interface to produce aligned
+    subsampled images downscaled by 'scale'. Uses an isotropic
+    gaussian kernel shifted by 0.5×(s − 1) to fix the upper-left
+    corner misalignment. Alternative nearest neighbor interpolation.
+    Note: the default kernel size is set to 21, but 17 works.
+    Args:
+        p: probability of applying the transform.
+        scale: scale factor to subsample image by.
+    """
+    def __init__(self, p:float=0.5, scale:int=1):
+        super(AlignedDownsample, self).__init__(p=p,
+            min_kernel_size=21, kernel_size=21,
+            sigmaX=(0.1, 0.1), scale=scale)
 
 
 class CLAHE(RandomBase):

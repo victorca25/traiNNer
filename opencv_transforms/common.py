@@ -356,6 +356,66 @@ def fetch_kernels(kernels_path, pattern:str='', scale=None, kformat:str='npy'):
     return kernels
 
 
+def sample(img:np.ndarray, scale=2, sampling:str='down',
+    center:bool=False, orig:bool=False) -> np.ndarray:
+    """S-fold sampler, both for upsampling and downsampling.
+    When used for downsample, equivalent to the simplest nearest
+    neighbor downsampling. Upsamples images spatial size by
+    filling the new pixels with zeros.
+    Args:
+        img: image to sample
+        scale (int or tuple): downsampling scale. If a tuple is
+            used, can sample each dimension at different scales.
+        sampling: type of sampling, either 'up' or 'down'.
+        center: select if the first pixel to sample from each distinct
+            scale x scale patch will be the upper left one or the center
+            one. The remaining pixels are discarded.
+        orig: flag to use as the original downsampling behavior with
+            linspace (expects scales =< 1 to downsample), else expects
+            scale values >= 1 for either direction.
+    """
+    input_shape = img.shape
+    # by default, if scale-factor is a scalar assume 2d resizing
+    # and duplicate it
+    if isinstance(scale, (int, float)):
+        scale_factor = [scale, scale]
+    else:
+        scale_factor = scale
+
+    if orig:
+        scale_factor = [1/factor for factor in scale_factor]
+
+    # if needed extend the size of scale-factor list to the size of
+    # the input by assigning 1 to all the unspecified scales
+    if len(scale_factor) != len(input_shape):
+        scale_factor = list(scale_factor)
+        scale_factor.extend([1] * (len(input_shape) - len(scale_factor)))
+
+    # dealing with missing output-shape. calculating according to scale-factor
+    output_shape = np.uint(np.ceil(np.array(input_shape) * np.array(scale_factor)))
+    if sampling == 'up':
+        img_out = np.zeros(
+            (output_shape[0], output_shape[1], input_shape[2]), dtype=img.dtype)
+
+    # can select specific starting points to subsample
+    if center:
+        st = [(sf-1)//2 for sf in scale_factor]
+    else:
+        st = [0 for sf in scale_factor]
+
+    if sampling == 'up':
+        # then upsample and return
+        img_out[st[0]::scale_factor[0], st[1]::scale_factor[1], ...] = img
+        return img_out
+
+    # then subsample and return
+    if orig:
+        return img[np.round(np.linspace(st[0], img.shape[0] - 1 / scale_factor[0], output_shape[0])).astype(int)[:, None],
+                np.round(np.linspace(st[1], img.shape[1] - 1 / scale_factor[1], output_shape[1])).astype(int), :]
+
+    return img[st[0]::scale_factor[0], st[1]::scale_factor[1], ...]
+
+
 def split_channels(image: np.ndarray) -> list:
     c = image.shape[2]
     return [ image[...,ch] for ch in range(c) ]
