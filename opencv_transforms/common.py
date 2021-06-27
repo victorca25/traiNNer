@@ -17,13 +17,21 @@ except ImportError:
 # except ImportError:
 #     cv2_available = False
 
-#PAD_MOD
-_cv2_str2pad = {'constant':cv2.BORDER_CONSTANT,
-                   'edge':cv2.BORDER_REPLICATE,
-                   'reflect':cv2.BORDER_REFLECT_101,
-                   'reflect1':cv2.BORDER_DEFAULT,
-                   'symmetric':cv2.BORDER_REFLECT
-                  }
+#BORDERS_MODE
+_cv2_str2pad = {'constant': 0,  # BORDER_CONSTANT
+                'edge': 1,  # BORDER_REPLICATE
+                'replicate': 1,  # BORDER_REPLICATE
+                'mirror': 2,  # BORDER_REFLECT
+                'symmetric': 2,  # BORDER_REFLECT
+                'wrap': 3,  # BORDER_WRAP
+                'reflect': 4,  # BORDER_REFLECT_101
+                'reflect101': 4,  # BORDER_REFLECT_101, BORDER_REFLECT101
+                'default': 4,  # BORDER_DEFAULT
+                'reflect1':4,  # BORDER_DEFAULT
+                'transparent': 5,  # BORDER_TRANSPARENT
+                'isolated': 16,  # BORDER_ISOLATED
+                }
+
 #INTER_MODE
 _cv2_str2interpolation = {'nearest':cv2.INTER_NEAREST,
                          'NEAREST':cv2.INTER_NEAREST, 
@@ -37,18 +45,7 @@ _cv2_str2interpolation = {'nearest':cv2.INTER_NEAREST,
                          'LANCZOS':cv2.INTER_LANCZOS4,}
 _cv2_interpolation2str={v:k for k,v in _cv2_str2interpolation.items()}
 
-#BORDERS
-_cv2_borders_dict = {
-    'constant': 0,  # BORDER_CONSTANT
-    'replicate': 1,  # BORDER_REPLICATE
-    'mirror': 2,
-    'reflect': 2,  # BORDER_REFLECT
-    'wrap': 3,  # BORDER_WRAP
-    'reflect101': 4,  # BORDER_REFLECT_101, BORDER_REFLECT101
-    'default': 4,  # BORDER_DEFAULT
-    'transparent': 5,  # BORDER_TRANSPARENT
-    'isolated': 16,  # BORDER_ISOLATED
-    }
+
 
 # much faster than iinfo and finfo
 MAX_VALUES_BY_DTYPE = {
@@ -307,7 +304,7 @@ def add_img_channels(img):
 @preserve_shape
 def convolve(img:np.ndarray, kernel:np.ndarray, per_channel:bool=False,
     flip_k:bool=True, mode:str='default') -> np.ndarray:
-    border = _cv2_borders_dict[mode]
+    border = _cv2_str2pad[mode]
     if flip_k:
         kernel = cv2.flip(kernel, -1)
     if per_channel:

@@ -1483,6 +1483,7 @@ class RandomBase:
     def __init__(self, p:float=0.5):
         assert isinstance(p, numbers.Number) and p >= 0, 'p should be a positive value'
         self.p = p
+        self.params = {}
 
     def apply(self, image, **params):
         """Dummy, use the appropriate function in each class"""
@@ -1497,238 +1498,231 @@ class RandomBase:
             np.ndarray: Randomly transformed image.
         """
         if random.random() < self.p:
-            return self.apply(image, **params)
+            return self.apply(image, **self.params)
         return image
 
     def __repr__(self):
         return self.__class__.__name__ + '(p={})'.format(self.p)
 
-class RandomGaussianNoise:
-    """Applying gaussian noise on the given CV Image randomly with a given probability.
 
-        Args:
-            p (float): probability of the image being noised. Default value is 0.5
-            mean (float): Mean (“centre”) of the Gaussian distribution. Default=0.0
-            std (float): Standard deviation (spread or “width”) sigma of the Gaussian distribution. Default=1.0
-            gtype ('str': ``color`` or ``bw``): Type of Gaussian noise to add, either colored or black and white. 
-                Default='color' (Note: can introduce color noise during training)
-            random_params (bool): if enabled, will randomly get the parameters for the noise function
-                on each iteration. It uses the "mean" and "std" parameters as the mean and variance range
-                to sample from. 
-        """
+class RandomGaussianNoise(RandomBase):
+    """Apply gaussian noise on the given image randomly with a
+    given probability.
+    Args:
+        p (float): probability of the image being noised.
+            Default value is 0.5
+        mean (float): Mean (“center”) of the Gaussian distribution.
+            Default=0.0
+        var_limit ((float, float) or float): variance range for noise.
+            If var_limit is a single float, the range will be
+            (0, var_limit). Should be in range [0, 255] if using
+            `sigma_calc='sig'` or squared values of that range if
+            `sigma_calc='var'`. Default: (10.0, 50.0).
+        prob_color: Probably for selecting the type of Gaussian noise
+            to add, either colored or grayscale (``color`` or ``gray``),
+            in range [0.0, 1.0], higher means more chance of `color`.
+            (Note: Color type can introduce color noise during training)
+        multi: select to randomly generate multichannel-AWGN (MC-AWGN)
+            in addition to regular AWGN.
+        mode: select between Gaussian or Speckle noise modes
+        sigma_calc: select if var_limit is to be considered as the
+            variance (final sigma will be ``sigma = var ** 0.5``) or
+            sigma range (var_limit will be used directly for sigma).
+            In: `var`, `sig`.
+    """
 
-    def __init__(self, p:float=0.5, mean=0, std:float=1.0, gtype='color', random_params = False):
-        assert isinstance(mean, numbers.Number) and mean >= 0, 'mean should be a positive value'
-        assert isinstance(std, numbers.Number) and std >= 0, 'std should be a positive value'
-        assert isinstance(p, numbers.Number) and p >= 0, 'p should be a positive value'
-        assert isinstance(gtype, str), 'gtype is a string'
-        self.p = p
-        self.gtype = gtype
+    def __init__(self, p:float=0.5, mean:float=0.0,
+        var_limit=(10.0, 50.0), prob_color:float=0.5,
+        multi:bool=True, mode:str='gauss', sigma_calc:str='sig'):
+        super(RandomGaussianNoise, self).__init__(p=p)
+
+        if not isinstance(mean, numbers.Number) or mean < 0:
+            raise ValueError('Mean should be a positive value')
+        if isinstance(var_limit, (tuple, list)):
+            if var_limit[0] < 0 or var_limit[1] < 0:
+                raise ValueError(
+                    f"var_limit values: {var_limit} should be non negative.")
+            self.var_limit = var_limit
+        elif isinstance(var_limit, (int, float)):
+            if var_limit < 0:
+                raise ValueError("var_limit should be non negative.")
+            self.var_limit = (0, var_limit)
+        else:
+            raise TypeError(
+                "Expected var_limit type to be one of (int, float, "
+                f"tuple, list), got {type(var_limit)}"
+            )
+
+        if not isinstance(prob_color, (int, float)):
+            raise ValueError('prob_color must be a number in [0, 1]')
+        self.prob_color = prob_color
         self.mean = mean
-        self.std = std
-        self.random_params = random_params
+        self.mode = mode
+        self.multi = multi
+        self.sigma_calc = sigma_calc
+        self.params = self.get_params()
 
-    @staticmethod
-    def get_params(mean, std):
+    def apply(self, img, **params):
+        return EF.noise_gaussian(img, **params)
+
+    def get_params(self):
         """Get parameters for gaussian noise
-
         Returns:
-            sequence: params to be passed to the affine transformation
+            dict: params to be passed to the affine transformation
         """
-        mean = np.random.uniform(-mean, mean) #= 0
-        std = np.random.uniform(0.1, std) #(4, 200)
+        # mean = random.uniform(-self.mean, self.mean) #= 0
 
-        return mean, std
+        gtype = 'color' if random.random() < self.prob_color else 'gray'
 
-    def __call__(self, img):
-        """
-        Args:
-            img (np.ndarray): Image to be noised.
+        multi = False
+        if self.multi and random.random() > 0.66 and gtype == 'color':
+            # will only apply MC-AWGN 33% of the time
+            multi = True
+        if multi:
+            lim = self.var_limit
+            sigma = [random.uniform(lim[0], lim[1]) for _ in range(3)]
+            if self.mode == "gauss":
+                sigma = [(v ** 0.5) for v in sigma]
+        else:
+            # ref wide range: (4, 200)
+            var = random.uniform(self.var_limit[0], self.var_limit[1])
 
-        Returns:
-            np.ndarray: Randomly noised image.
-        """
-        if random.random() < self.p:
-            if self.random_params:
-                mean, std = self.get_params(self.mean, self.std) 
-            else:
-                mean, std = self.mean, self.std
-            return EF.noise_gaussian(img, mean=mean, std=std, gtype=self.gtype)
-        return img
+            if self.mode == "gauss":
+                if self.sigma_calc == 'var':
+                    sigma = (var ** 0.5)
+                elif self.sigma_calc == 'sig':
+                    # no need to var/255 if image range in [0,255]
+                    sigma = var
+            elif self.mode == "speckle":
+                sigma = var
 
-    def __repr__(self):
-        return self.__class__.__name__ + '(p={})'.format(self.p)
+        return {"mean": self.mean,
+                "std": sigma,
+                "mode": self.mode,
+                "gtype": gtype,
+                "rounds": False,
+                "clip": True,
+            }
 
 
-class RandomPoissonNoise:
-    """Applying Poisson noise on the given CV Image randomly with a given probability.
-
-        Args:
-            p (float): probability of the image being noised. Default value is 0.5
-        """
+class RandomPoissonNoise(RandomBase):
+    """Apply Poisson noise on the given image randomly with
+    a given probability.
+    Args:
+        p: probability of the image being noised. Default value is 0.5
+    """
 
     def __init__(self, p:float=0.5):
-        assert isinstance(p, numbers.Number) and p >= 0, 'p should be a positive value'
-        self.p = p
+        super(RandomPoissonNoise, self).__init__(p=p)
 
-    def __call__(self, img):
-        """
-        Args:
-            img (np.ndarray): Image to be noised.
-
-        Returns:
-            np.ndarray: Randomly noised image.
-        """
-        if random.random() < self.p:
-            return EF.noise_poisson(img)
-        return img
-
-    def __repr__(self):
-        return self.__class__.__name__ + '(p={})'.format(self.p)
+    def apply(self, img, **params):
+        return EF.noise_poisson(img, **params)
 
 
-class RandomSPNoise:
-    """Applying salt and pepper noise on the given CV Image randomly with a given probability.
-
-        Args:
-            p (float): probability of the image being noised. Default value is 0.5
-            prob (float): probability (threshold) that controls level of S&P noise
-        """
+class RandomSPNoise(RandomBase):
+    """Apply salt and pepper noise on the given image randomly
+    with a given probability.
+    Args:
+        p: probability of the image being noised. Default value is 0.5
+        prob: probability (threshold) that controls level of S&P noise
+    """
 
     def __init__(self, p:float=0.5, prob:float=0.1):
-        assert isinstance(p, numbers.Number) and p >= 0, 'p should be a positive value'
-        assert isinstance(prob, numbers.Number) and prob >= 0, 'p should be a positive value'
-        self.p = p
+        super(RandomSPNoise, self).__init__(p=p)
+
+        if not isinstance(prob, numbers.Number) or prob < 0:
+            raise ValueError("prob should be a positive value."
+                             f"Got: {prob}")
         self.prob = prob
+        self.params = self.get_params()
 
-    def __call__(self, img):
+    def get_params(self):
+        """Get parameters for noise.
+        Returns: dict of parameters.
         """
-        Args:
-            img (np.ndarray): Image to be noised.
+        return {"prob": self.prob}
 
-        Returns:
-            np.ndarray: Randomly noised image.
-        """
-        if random.random() < self.p:
-            return EF.noise_salt_and_pepper(img, self.prob)
-        return img
-
-    def __repr__(self):
-        return self.__class__.__name__ + '(p={})'.format(self.p)
+    def apply(self, img, **params):
+        return EF.noise_salt_and_pepper(img, **params)
 
 
-class RandomSpeckleNoise:
-    """Applying speckle noise on the given CV Image randomly with a given probability.
+class RandomSpeckleNoise(RandomGaussianNoise):
+    """ Apply speckle noise on the given CV Image randomly with
+    a given probability. Note that it reuses RandomGaussianNoise
+    as a base, since the function is shared.
+    Args:
+        p: probability of the image being noised.
+            Default value is 0.5
+        mean: Mean (“center”) of the Gaussian distribution.
+            Default=0.0
+        var_limit ((float, float) or float): variance range for noise.
+            If var_limit is a single float, the range will be
+            (0, var_limit). Random range should be around (0.04, 0.2),
+            in range [0, 1.0]
+        prob_color: Probably for selecting the type of Gaussian noise
+            to add, either colored or grayscale (``color`` or ``gray``),
+            in range [0.0, 1.0], higher means more chance of `color`.
+            (Note: Color type can introduce color noise during training)
+    """
+    def __init__(self, p:float=0.5, mean:float=0.0,
+        var_limit=(0.04, 0.12), prob_color:float=0.5,
+        sigma_calc:str='var'):
 
-        Args:
-            p (float): probability of the image being noised. Default value is 0.5
-            std (float): Standard deviation (spread or “width”) sigma of the Gaussian distribution.
-                Default=0.12. Random range should be around (0.04, 0.2)
-            gtype ('str': ``color`` or ``bw``): Type of noise to add, either colored or black and white. 
-                Default='color' (Note: can introduce color noise during training)
-            random_params (bool): if enabled, will randomly get the parameters for the noise function
-                on each iteration. It uses the "std" parameter as the maximum variance to sample from. 
-        """
+        super(RandomSpeckleNoise, self).__init__(p=p, mean=mean,
+            var_limit=var_limit, prob_color=prob_color, multi=False,
+            mode='speckle', sigma_calc=sigma_calc)
 
-    def __init__(self, p:float=0.5, std:float=0.12, gtype='color', random_params = False):
-        assert isinstance(std, numbers.Number) and std >= 0, 'std should be a positive value'
-        assert isinstance(p, numbers.Number) and p >= 0, 'p should be a positive value'
-        assert isinstance(gtype, str), 'gtype is a string'
-        self.p = p
-        self.std = std
-        self.gtype = gtype
-        self.random_params = random_params
 
-    @staticmethod
-    def get_params(mean, std):
-        """Get parameters for speckle noise
+class RandomCompression(RandomBase):
+    """Apply compression to the given image randomly
+    with a given probability. Accepts JPEG and WEBP compression
+    types. For the compression quality, lower values represent
+    higher compression (lower quality).
+    Args:
+        p: probability of the image being noised. Default value is 0.5
+        quality (int: [0,100]):
+        min_quality: lower bound on the image quality. In [0, 100]
+            range for jpeg and [1, 100] for webp.
+        max_quality: upper bound on the image quality. In [0, 100]
+            range for jpeg and [1, 100] for webp.
+        compression_type: should be 'jpeg'/'jpg' or 'webp'.
+    """
 
-        Returns:
-            sequence: params to be passed to the affine transformation
-        """
-        #Variance of random distribution. variance = (standard deviation) ** 2. Default : 0.01
-        std = np.random.uniform(0.04, std) #(0.04, 0.2)
+    def __init__(self, p:float=0.5, min_quality:int=20,
+        max_quality:int=90, compression_type:str='.jpg'):
+        super(RandomCompression, self).__init__(p=p)
 
-        return std
+        self.compression_type = compression_type
+        low_q_thresh = 1 if compression_type == ".webp" else 0
+        if not  low_q_thresh <= min_quality <= 100:
+            raise ValueError(f"Invalid min_quality. Got: {min_quality}")
+        if not  low_q_thresh <= max_quality <= 100:
+            raise ValueError(f"Invalid max_quality. Got: {max_quality}")
 
-    def __call__(self, img):
-        """
-        Args:
-            img (np.ndarray): Image to be noised.
-
-        Returns:
-            np.ndarray: Randomly noised image.
-        """
-        if random.random() < self.p:
-            if self.random_params:
-                std = get_params(self.std)
-            else:
-                std = self.std
-            return EF.noise_speckle(img, mean=0.0, std=std, gtype=self.gtype)
-        return img
-
-    def __repr__(self):
-        return self.__class__.__name__ + '(p={})'.format(self.p)
-
-class RandomCompression:
-    """Applying JPEG compression on the given CV Image randomly with a given probability.
-
-        Args:
-            p (float): probability of the image being noised. Default value is 0.5
-            quality (int: [0,100]): Compression quality for the image. Lower values represent 
-                higher compression and lower quality. Default=20
-            random_params (bool): if enabled, will randomly get the parameters for the noise function
-                on each iteration. It uses the "quality" parameter as maximum quality to randomly 
-                sample with the minimum being 10% quality.
-        """
-
-    def __init__(self, p:float=0.5, min_quality=20, max_quality=90, image_type='.jpg', random_params = True):
-        assert isinstance(min_quality, numbers.Number) and min_quality >= 0, 'min_quality should be a positive value'
-        assert isinstance(max_quality, numbers.Number) and max_quality >= 0, 'max_quality should be a positive value'
-        assert isinstance(p, numbers.Number) and p >= 0, 'p should be a positive value'
-        self.p = p
         self.min_quality = min_quality
         self.max_quality = max_quality
-        self.image_type = image_type
-        self.random_params = random_params
+        self.params = self.get_params()
 
-    @staticmethod
-    def get_params(min_quality, max_quality):
-        """Get compression level for JPEG noise
-
+    def get_params(self):
+        """Get compression level for JPEG noise.
+            Randomize quality between min_quality and max_quality.
         Returns:
             quality level to be passed to compression
         """
-        quality = np.random.uniform(min_quality, max_quality) #randomize quality between min_quality and max_quality
-        return quality
+        return {"quality": random.randint(self.min_quality, self.max_quality),
+                "compression_type": self.compression_type
+                }
 
-    def __call__(self, img):
-        """
-        Args:
-            img (np.ndarray): Image to be noised.
-
-        Returns:
-            np.ndarray: Randomly noised image.
-        """
-        if random.random() < self.p:
-            if self.random_params:
-                quality = self.get_params(self.min_quality, self.max_quality)
-            else:
-                quality = self.max_quality
-            return EF.compression(img, quality=quality, image_type=self.image_type)
-        return img
-
-    def __repr__(self):
-        return self.__class__.__name__ + '(p={})'.format(self.p)
+    def apply(self, img, **params):
+        return EF.compression(img, **params)
 
 
 class RandomQuantize(RandomBase):
-    r"""Color quantization (using CV2 k-means)
+    r"""Color quantization (using CV2 k-means).
     Args:
         img (numpy ndarray): Image to be quantized.
-        num_colors (int): the target number of colors to quantize to
-        p (float): probability of the image being noised. 
-            Default value is 0.5
+        num_colors: the target number of colors to quantize to
+        p: probability of the image being noised. Default value is 0.5
     Returns:
         numpy ndarray: quantized version of the image.
     """
@@ -1745,15 +1739,16 @@ class RandomQuantize(RandomBase):
 
 
 class RandomQuantizeSOM(RandomBase):
-    r"""Color quantization (using MiniSOM)
+    r"""Color quantization (using MiniSOM).
     Args:
         img (numpy ndarray): Image to be quantized.
         num_colors (int): the target number of colors to quantize to
-        sigma (float): the radius of the different neighbors in the SOM
-        learning_rate (float): determines how much weights are adjusted
+        sigma: the radius of the different neighbors in the SOM
+        learning_rate: determines how much weights are adjusted
             during each SOM iteration
-        neighborhood_function (str): the neighborhood function to use
-            with SOM, in: 'bubble', 'gaussian', 'mexican_hat', 'triangle'
+        neighborhood_function: the neighborhood function to use
+            with SOM, in: 'bubble', 'gaussian', 'mexican_hat',
+            'triangle'
     Returns:
         numpy ndarray: quantized version of the image.
     """
@@ -1807,9 +1802,6 @@ class RandomQuantizeSOM(RandomBase):
         return self.__class__.__name__ + '(p={})'.format(self.p)
 
 
-
-
-
 class BlurBase:
     """Apply blur filter on the given input image using a random-sized
     kernel randomly with a given probability.
@@ -1820,7 +1812,6 @@ class BlurBase:
         kernel_size (int): maximum kernel size of the blur
             filter to use. Should be in range [3, inf).
             Default: 3.
-
         init_params (bool): select if parameters should be set
             on initialization.
     """
@@ -1920,9 +1911,11 @@ class RandomAverageBlur(BlurBase):
     Args:
         p (float): probability of applying the transform.
             Default: 0.5
-        max_kernel_size (int): maximum kernel size of the blur
+        kernel_size (int): maximum kernel size of the blur
             filter to use. Should be in range [3, inf).
             Default: 3.
+        init_params (bool): select if parameters should be set
+            on initialization.
     """
     def apply(self, image, **params):
         return EF.average_blur(image, **params)
@@ -1938,9 +1931,11 @@ class RandomBoxBlur(BlurBase):
     Args:
         p (float): probability of applying the transform.
             Default: 0.5
-        max_kernel_size (int): maximum kernel size of the blur
+        kernel_size (int): maximum kernel size of the blur
             filter to use. Should be in range [3, inf).
             Default: 3.
+        init_params (bool): select if parameters should be set
+            on initialization.
     """
     def apply(self, image, **params):
         return EF.box_blur(image, **params)
@@ -1960,6 +1955,8 @@ class RandomGaussianBlur(BlurBase):
             Default: 3.
         sigmaX (float): sigma parameter for X axis
         sigmaY (float): sigma parameter for Y axis
+        init_params (bool): select if parameters should be set
+            on initialization.
     """
     def apply(self, image, **params):
         return EF.gaussian_blur(image, **params)
@@ -1975,9 +1972,11 @@ class RandomMedianBlur(BlurBase):
     Args:
         p (float): probability of applying the transform.
             Default: 0.5
-        max_kernel_size (int): maximum kernel size of the blur
+        kernel_size (int): maximum kernel size of the blur
             filter to use. Should be in range [3, inf).
             Default: 3.
+        init_params (bool): select if parameters should be set
+            on initialization.
     """
     def apply(self, image, **params):
         return EF.median_blur(image, **params)
@@ -1994,12 +1993,14 @@ class RandomBilateralBlur(BlurBase):
     Args:
         p (float): probability of applying the transform.
             Default: 0.5
-        max_kernel_size (int): maximum kernel size of the blur
+        kernel_size (int): maximum kernel size of the blur
             filter to use.
         sigmaX (float): variable reused for Bilateral filter's
             `sigmaColor` (Filter sigma in the color space).
         sigmaY (float): variable reused for Bilateral filter's
             `sigmaSpace` (Filter sigma in the coordinate space).
+        init_params (bool): select if parameters should be set
+            on initialization.
     """
 
     def apply(self, image, **params):
@@ -2315,6 +2316,7 @@ class FilterColorBalance:
 
     def __repr__(self):
         return self.__class__.__name__ + '(p={})'.format(self.p)
+
 
 class FilterUnsharp:
     r"""Unsharp mask filter, used to sharpen images to make edges and interfaces look crisper.
@@ -2819,18 +2821,6 @@ class RandomChromaticAberration(RandomBase):
             strength=params["strength"])
         return im_ca
 
-    def __call__(self, image):
-        """
-        Args:
-            image (np.ndarray): Image to be blurred.
-
-        Returns:
-            np.ndarray: Randomly blurred image.
-        """
-        if random.random() < self.p:
-            return self.apply(image, **self.params)
-        return image
-
     def __repr__(self):
         return self.__class__.__name__ + '(p={})'.format(self.p)
 
@@ -2895,18 +2885,6 @@ class RandomCameraNoise(RandomBase):
 
     def apply(self, img, **params):
         return EF.camera_noise(img, **params)
-
-    def __call__(self, image):
-        """
-        Args:
-            image (np.ndarray): Image to add noise to.
-
-        Returns:
-            np.ndarray: Image with random noise.
-        """
-        if random.random() < self.p:
-            return self.apply(image, **self.params)
-        return image
 
     def __repr__(self):
         return self.__class__.__name__ + '(p={})'.format(self.p)
