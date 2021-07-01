@@ -15,7 +15,6 @@ import types
 import collections
 import warnings
 
-# import opencv_functional as F
 from . import functional as F
 from . import extra_functional as EF
 from . import superpixels as SP

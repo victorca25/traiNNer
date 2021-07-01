@@ -303,9 +303,10 @@ def add_img_channels(img):
 
 @preserve_shape
 def convolve(img:np.ndarray, kernel:np.ndarray, per_channel:bool=False,
-    flip_k:bool=True, mode:str='default') -> np.ndarray:
+    flip_k:bool=False, mode:str='default') -> np.ndarray:
     border = _cv2_str2pad[mode]
     if flip_k:
+        # cross-correlation to convolution
         kernel = cv2.flip(kernel, -1)
     if per_channel:
         def channel_conv(img, kernel):
