@@ -12,7 +12,7 @@ import dataops.common as util
 from dataops.augmentations import Scale, MLResize, NoisePatches, RandomNoisePatches, get_resize, get_blur, get_noise, get_pad
 from dataops.debug import tmp_vis, describe_numpy, describe_tensor
 
-import dataops.opencv_transforms.opencv_transforms as transforms
+import dataops.augmennt.augmennt as transforms
 
 
 

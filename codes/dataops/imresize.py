@@ -6,7 +6,7 @@ import cv2
 
 from dataops.colors import *
 from dataops.debug import tmp_vis, describe_numpy, describe_tensor
-from dataops.opencv_transforms.opencv_transforms.common import preserve_range_float
+from dataops.augmennt.augmennt.common import preserve_range_float
 
 
 # from dataops.debug import timefn, timefn_100

@@ -7,12 +7,10 @@ import glob
 import numpy as np
 import dataops.common as util
 from dataops.common import fix_img_channels, get_image_paths, read_img, np2tensor
-from dataops.minisom import MiniSom
 from dataops.debug import *
 from dataops.imresize import resize as imresize  # resize # imresize_np
 
-# import dataops.opencv_transforms.opencv_transforms as transforms
-from dataops.opencv_transforms.opencv_transforms.common import wrap_cv2_function, wrap_pil_function, _cv2_interpolation2str
+from dataops.augmennt.augmennt.common import wrap_cv2_function, wrap_pil_function, _cv2_interpolation2str
 from torch.utils.data.dataset import Dataset #TODO TMP, move NoisePatches to a separate dataloader
 
 
@@ -151,33 +149,43 @@ def get_blur(blur_types: list):
         if blur_type == 'average':
             # print('average')
             blur = transforms.RandomAverageBlur(
-                    max_kernel_size=11, random_params=True, p=1)
+                    kernel_size=11, init_params=True, p=1)
         elif blur_type == 'box':
             # print('box')
             blur = transforms.RandomBoxBlur(
-                    max_kernel_size=11, random_params=True, p=1)
+                    kernel_size=11, init_params=True, p=1)
         elif blur_type == 'gaussian':
             # print('gaussian')
             blur = transforms.RandomGaussianBlur(
-                    max_kernel_size=11, random_params=True, p=1)
+                    kernel_size=11, init_params=True,
+                    sigmaX=(0.1, 2.8), p=1)
         elif blur_type == 'median':
             # print('median')
             blur = transforms.RandomMedianBlur(
-                    max_kernel_size=11, random_params=True, p=1)
+                    kernel_size=11, init_params=True, p=1)
         elif blur_type == 'bilateral':
             # print('bilateral')
             blur = transforms.RandomBilateralBlur(
-                    sigmaSpace=200, sigmaColor=200,
-                    max_kernel_size=11, random_params=True, p=1)
+                    sigmaX=200, sigmaY=200,
+                    kernel_size=11, init_params=True, p=1)
         elif blur_type == 'motion':
             # print('motion')
             blur = transforms.RandomMotionBlur(
-                     max_kernel_size=7, random_params=True, p=1)
+                     kernel_size=7, init_params=True, p=1)
         elif blur_type == 'complexmotion':
             # print('complexmotion')
             blur = transforms.RandomComplexMotionBlur(
-                     max_kernel_size=7, random_params=True, p=1,
-                     size=100, complexity=1.0)        
+                     size=100, complexity=1.0, p=1)
+        elif blur_type == 'iso':
+            blur = transforms.RandomAnIsoBlur(
+                     min_kernel_size=7, kernel_size=21,
+                     sigmaX=(0.1, 2.8), # sigmaY=(0.1, 2.8),
+                     angle=0, noise=0.25, p=1)
+        elif blur_type == 'aniso':
+            blur = transforms.RandomAnIsoBlur(
+                     min_kernel_size=7, kernel_size=21,
+                     sigmaX=(0.5, 8), sigmaY=(0.5, 8),
+                     angle=(0, 180), noise=0.75, p=1)
         #elif blur_type == 'clean':
     return blur
 
@@ -221,19 +229,24 @@ def get_noise(noise_types: list, noise_patches=None, noise_amp: int=1):
             # the smaller the value, the closer to original colors
             noise = transforms.SimpleQuantize(p=1, rgb_range = 50) #30
             # print("simplequantize")
-        elif noise_type == 'quantize':
-            noise = RandomQuantize(p=1, num_colors=32)
+        elif noise_type in ('quantize', 'som_quantize'):
+            noise = transforms.RandomQuantizeSOM(p=1, num_colors=32)
             # print("quantize")
         elif noise_type == 'km_quantize':
             noise = transforms.RandomQuantize(p=1, num_colors=32)
         elif noise_type == 'gaussian':
-            noise = transforms.RandomGaussianNoise(p=1, random_params=True, gtype='bw')
+            noise = transforms.RandomGaussianNoise(p=1,
+                var_limit=(1.0, 25.0), prob_color=0.5)
             # print("gaussian")
         elif noise_type.lower() == 'jpeg':
-            noise = transforms.RandomCompression(p=1, random_params=True, image_type='.jpeg')
+            noise = transforms.RandomCompression(
+                p=1, min_quality=30, max_quality=95,
+                compression_type='.jpeg')
             # print("JPEG")
         elif noise_type.lower() == 'webp':
-            noise = transforms.RandomCompression(p=1, random_params=True, image_type='.webp')
+            noise = transforms.RandomCompression(
+                p=1, min_quality=20, max_quality=90,
+                compression_type='.webp')
         elif noise_type == 'poisson':
             noise = transforms.RandomPoissonNoise(p=1)
             # print("poisson")
@@ -241,7 +254,7 @@ def get_noise(noise_types: list, noise_patches=None, noise_amp: int=1):
             noise = transforms.RandomSPNoise(p=1)
             # print("s&p")
         elif noise_type == 'speckle':
-            noise = transforms.RandomSpeckleNoise(gtype='bw', p=1)
+            noise = transforms.RandomSpeckleNoise(prob_color=0.5, p=1)
             # print("speckle")
         elif noise_type == 'maxrgb':
             noise = transforms.FilterMaxRGB(p=1)
@@ -254,6 +267,12 @@ def get_noise(noise_types: list, noise_patches=None, noise_amp: int=1):
         #elif noise_type == 'clean':
         elif noise_type == 'clahe':
             noise = transforms.CLAHE(p=1)
+        elif noise_type == 'camera':
+            noise = transforms.RandomCameraNoise(
+                demosaic_fn='malvar', xyz_arr='D50', p=1)
+        elif noise_type == 'superpixels':
+            noise = transforms.Superpixels(p=1, n_segments=200,  # 32
+                p_replace=1.0, max_size=None)
 
     return noise
 
@@ -274,78 +293,6 @@ def get_pad(img, size: int, fill = 0, padding_mode: str ='constant'):
     pad = transforms.Pad(padding=(top, bottom, left, right), padding_mode=padding_mode, fill=fill) #reflect
 
     return pad, fill
-
-
-
-class RandomQuantize:
-    r"""Color quantization using MiniSOM
-    Args:
-        img (numpy ndarray): Image to be quantized.
-        num_colors (int): the target number of colors to quantize to
-        sigma (float): the radius of the different neighbors in the SOM
-        learning_rate (float): determines how much weights are adjusted 
-            during each SOM iteration
-        neighborhood_function (str): the neighborhood function to use 
-            with SOM
-    Returns:
-        numpy ndarray: quantized version of the image.
-    """
-
-    def __init__(self, p = 0.5, num_colors=None, sigma=1.0, learning_rate=0.2, neighborhood_function='bubble'):
-        # assert isinstance(p, numbers.Number) and p >= 0, 'p should be a positive value'
-        self.p = p
-
-        if not num_colors:
-            N = int(np.random.uniform(2, 8))
-        else:
-            N = int(num_colors/2)
-        # assert isinstance(N, numbers.Number) and N >= 0, 'N should be a positive value'
-        # input_len corresponds to the shape of the pixels array (H, W, C)
-        # x and y are the "palette" matrix shape. x=2, y=N means 2xN final colors, but 
-        # could reshape to something like x=3, y=3 too
-        # try sigma = 0.1 , 0.2, 1.0, etc
-        self.som = MiniSom(x=2, y=N, input_len=3, sigma=sigma,
-                    learning_rate=0.2, neighborhood_function=neighborhood_function)
-
-    def __call__(self, img):
-        """
-        Args:
-            img (np.ndarray): Image to be quantized.
-
-        Returns:
-            np.ndarray: Quantized image.
-        """
-        if random.random() < self.p:
-
-            img_type = img.dtype
-            if np.issubdtype(img_type, np.integer):
-                img_max = np.iinfo(img_type).max
-            elif np.issubdtype(img_type, np.floating):
-                img_max = np.finfo(img_type).max
-
-            # reshape image as a 2D array
-            pixels = np.reshape(img, (img.shape[0]*img.shape[1], 3))
-            # print(pixels.shape)
-            # print(pixels.min())
-            # print(pixels.max())
-
-            # initialize som
-            self.som.random_weights_init(pixels)
-            # save the starting weights (the image’s initial colors)
-            starting_weights = self.som.get_weights().copy() 
-            self.som.train_random(pixels, 500, verbose=False)
-            #som.train_random(pixels, 100)
-
-            # Vector quantization: quantize each pixel of the image to reduce the number of colors
-            qnt = self.som.quantization(pixels) 
-            clustered = np.zeros(img.shape)
-            for i, q in enumerate(qnt): 
-                clustered[np.unravel_index(i, dims=(img.shape[0], img.shape[1]))] = q
-            img = np.clip(clustered, 0, img_max).astype(img_type)
-        return img
-
-    def __repr__(self):
-        return self.__class__.__name__ + '(p={})'.format(self.p)
 
 
 class NoisePatches(Dataset):
@@ -1397,7 +1344,7 @@ def get_unpaired_params(opt):  #get_augparams
     # Note: this one does not have a transforms class
     lr_fringes = opt.get('lr_fringes', None)  # true | false
     if lr_fringes:
-        lr_augs['fringes'] = opt.get('lr_fringes_chance', 0.4)  # probability
+        lr_augs['fringes'] = opt.get('lr_fringes_chance', 0.6)  # probability
 
     # Add blur if blur AND blur types are provided
     lr_blur = opt.get('lr_blur', None)  # true | false
@@ -1478,9 +1425,8 @@ def get_augmentations(opt, params=None, noise_patches=None):
 
     # color fringes
     if 'fringes' in params:
-        if random.random() > (1.- params['fringes']):
-            transform_list.append(transforms.Lambda(
-                lambda img: translate_chan(img)))
+        transform_list.append(transforms.RandomChromaticAberration(
+            p=params['fringes'], random_params=True))
 
     # blur
     if 'blur' in params:
@@ -1596,10 +1542,9 @@ def custom_pipeline(custom_transforms, transforms_cfg, noise_patches=None):
                 p=transforms_cfg.get('unsharp_mask_p', 0.5)))
 
         # color fringes
-        elif transform == 'fringes':
-            if random.random() > (1.- transforms_cfg.get('fringes_p', 0.5)):
-                transform_list.append(transforms.Lambda(
-                    lambda img: translate_chan(img)))
+        if transform == 'fringes':
+            transform_list.append(transforms.RandomChromaticAberration(
+                p=transforms_cfg.get('fringes_p', 0.5), random_params=True))
 
         # blur
         elif 'blur' in transform:
@@ -1607,39 +1552,51 @@ def custom_pipeline(custom_transforms, transforms_cfg, noise_patches=None):
                 # print('average')
                 transform_list.append(transforms.RandomAverageBlur(
                     p=transforms_cfg.get('averageblur_p', 0.5),
-                    max_kernel_size=11, random_params=True))
+                    kernel_size=11, init_params=True))
             elif transform == 'boxblur':
                 # print('box')
                 transform_list.append(transforms.RandomBoxBlur(
                     p=transforms_cfg.get('boxblur_p', 0.5),
-                    max_kernel_size=11, random_params=True))
+                    kernel_size=11, init_params=True))
             elif transform == 'gaussianblur':
                 # print('gaussian')
                 transform_list.append(transforms.RandomGaussianBlur(
                     p=transforms_cfg.get('gaussianblur_p', 0.5),
-                    max_kernel_size=11, random_params=True))
+                    sigmaX=(0.1, 2.8), kernel_size=11,
+                    init_params=True))
             elif transform == 'medianblur':
                 # print('median')
                 transform_list.append(transforms.RandomMedianBlur(
                     p=transforms_cfg.get('medianblur_p', 0.5),
-                    max_kernel_size=11, random_params=True))
+                    kernel_size=11, init_params=True))
             elif transform == 'bilateralblur':
                 # print('bilateral')
                 transform_list.append(transforms.RandomBilateralBlur(
                     p=transforms_cfg.get('bilateralblur_p', 0.5),
-                    sigmaSpace=200, sigmaColor=200,
-                    max_kernel_size=11, random_params=True))
+                    sigmaX=200, sigmaY=200,
+                    kernel_size=11, init_params=True))
             elif transform == 'motionblur':
                 # print('motion')
                 transform_list.append(transforms.RandomMotionBlur(
                     p=transforms_cfg.get('motionblur_p', 0.5),
-                    max_kernel_size=7, random_params=True))
+                    kernel_size=7, init_params=True))
             elif transform == 'complexmotionblur':
                 # print('complexmotion')
                 transform_list.append(transforms.RandomComplexMotionBlur(
                     p=transforms_cfg.get('motionblur_p', 0.5),
-                    max_kernel_size=7, random_params=True,
                     size=100, complexity=1.0))
+            elif blur_type == 'iso':
+                transform_list.append(transforms.RandomAnIsoBlur(
+                    p=transforms_cfg.get('isoblur_p', 0.5),
+                    min_kernel_size=7, kernel_size=21, sigmaX=(0.1, 2.8),
+                    # sigmaY=(0.1, 2.8),
+                    angle=0, noise=0.25))
+            elif blur_type == 'aniso':
+                transform_list.append(transforms.RandomAnIsoBlur(
+                    p=transforms_cfg.get('anisoblur_p', 0.5),
+                    min_kernel_size=7, kernel_size=21,
+                    sigmaX=(0.5, 8), sigmaY=(0.5, 8),
+                    angle=(0, 180), noise=0.75))
 
         # noise
         elif 'dither' in transform:
@@ -1680,8 +1637,8 @@ def custom_pipeline(custom_transforms, transforms_cfg, noise_patches=None):
                 p=transforms_cfg.get('squantize_p', 0.5),
                 rgb_range = 50)) #30
             # print("simplequantize")
-        elif transform == 'quantize':
-            transform_list.append(RandomQuantize(
+        elif transform in ('quantize', 'som_quantize'):
+            transform_list.append(transforms.RandomQuantizeSOM(
                 p=transforms_cfg.get('quantize_p', 0.5), num_colors=32))
             # print("quantize")
         elif transform == 'km_quantize':
@@ -1690,17 +1647,19 @@ def custom_pipeline(custom_transforms, transforms_cfg, noise_patches=None):
         elif transform == 'gaussian':
             transform_list.append(transforms.RandomGaussianNoise(
                 p=transforms_cfg.get('gaussian_p', 0.5),
-                random_params=True, gtype='bw'))
+                var_limit=(1.0, 25.0), prob_color=0.5))
             # print("gaussian")
         elif transform.lower() == 'jpeg':
             transform_list.append(transforms.RandomCompression(
                 p=transforms_cfg.get('compression_p', 0.5),
-                random_params=True, image_type='.jpeg'))
+                min_quality=30, max_quality=95,
+                compression_type='.jpeg'))
             # print("JPEG")
         elif transform.lower() == 'webp':
             transform_list.append(transforms.RandomCompression(
                 p=transforms_cfg.get('compression_p', 0.5),
-                random_params=True, image_type='.webp'))
+                min_quality=20, max_quality=90,
+                compression_type='.webp'))
         elif transform == 'poisson':
             transform_list.append(transforms.RandomPoissonNoise(
                 p=transforms_cfg.get('poisson_p', 0.5)))
@@ -1711,7 +1670,7 @@ def custom_pipeline(custom_transforms, transforms_cfg, noise_patches=None):
             # print("s&p")
         elif transform == 'speckle':
             transform_list.append(transforms.RandomSpeckleNoise(
-                p=transforms_cfg.get('speckle_p', 0.5), gtype='bw'))
+                p=transforms_cfg.get('speckle_p', 0.5), prob_color=0.5))
             # print("speckle")
         elif transform == 'maxrgb':
             transform_list.append(transforms.FilterMaxRGB(
@@ -1732,12 +1691,15 @@ def custom_pipeline(custom_transforms, transforms_cfg, noise_patches=None):
                 transform_list.append(RandomNoisePatches(
                     noise_patches,
                     noise_amp=transforms_cfg.get('noise_amp', 1)))
+        elif noise_type == 'camera':
+            transform_list.append(transforms.RandomCameraNoise(
+                p=transforms_cfg.get('camera_p', 0.5),
+                demosaic_fn='malvar', xyz_arr='D50'))
         elif transform == 'superpixels':
             transform_list.append(transforms.Superpixels(
                 p=transforms_cfg.get('superpixels_p', 0.5),
-                n_segments=32,
-                p_replace=1.0,
-                max_size=None))
+                n_segments=200,  # 32
+                p_replace=1.0, max_size=None))
 
         # cutout
         elif transform == 'cutout':
@@ -1784,98 +1746,4 @@ def apply_transform_list(img_list: list, transform, wrapper=None, loader=None):
             tr_img = transform(img)
         img_list_out.append(tr_img)
     return img_list_out
-
-
-
-
-
-def random_pix(size):
-    # Amount of pixels to translate
-    # Higher probability for 0 shift
-    # Caution: It can be very relevant how many pixels are shifted. 
-    #"""
-    if size <= 64:
-        return random.choice([-1,0,0,1]) #pixels_translation
-    elif size > 64 and size <= 96:
-        return random.choice([-2,-1,0,0,1,2]) #pixels_translation
-    elif size > 96:
-        return random.choice([-3,-2,-1,0,0,1,2,3]) #pixels_translation
-    #"""
-    #return random.choice([-3,-2,-1,0,0,1,2,3]) #pixels_translation
-
-# Note: the translate_chan() has limited success in fixing chromatic aberrations,
-# because the patterns are very specific. The function works for the models to
-# learn how to align fringes, but in this function the displacements are random
-# and natural aberrations are more like purple fringing, axial (longitudinal), 
-# and transverse (lateral), which are specific cases of these displacements and
-# could be modeled here. 
-def translate_chan(img_or):
-    # Independently translate image channels to create color fringes
-    rows, cols, _ = img_or.shape
-    
-    # Split the image into its BGR components
-    (blue, green, red) = cv2.split(img_or)
-    
-    """ #V1: randomly displace each channel
-    new_channels = []
-    for values, channel in zip((blue, green, red), (0,1,2)):
-        M = np.float32([[1,0,random_pix(rows)],[0,1,random_pix(cols)]])
-        dst = cv2.warpAffine(values,M,(cols,rows))
-        new_channels.append(dst)
-    
-    b_channel = new_channels[0]
-    g_channel = new_channels[1]
-    r_channel = new_channels[2]
-    #"""
-    
-    #""" V2: only displace one channel at a time
-    M = np.float32([[1,0,random_pix(rows)],[0,1,random_pix(cols)]])
-    color = random.choice(["blue","green","red"])
-    if color == "blue":
-        b_channel = cv2.warpAffine(blue,M,(cols,rows))
-        g_channel = green 
-        r_channel = red
-    elif color == "green":
-        b_channel = blue
-        g_channel = cv2.warpAffine(green,M,(cols,rows)) 
-        r_channel = red
-    else: # color == red:
-        b_channel = blue
-        g_channel = green
-        r_channel = cv2.warpAffine(red,M,(cols,rows))
-    #"""
-    
-    """ V3: only displace a random crop of one channel at a time (INCOMPLETE)
-    # randomly crop
-    rnd_h = random.randint(0, max(0, rows - rows/2))
-    rnd_w = random.randint(0, max(0, cols - cols/2))
-    img_crop = img_or[rnd_h:rnd_h + rows/2, rnd_w:rnd_w + cols/2, :]
-    
-    (blue_c, green_c, red_c) = cv2.split(img_crop)
-    rows_c, cols_c, _ = img_crop.shape
-    
-    M = np.float32([[1,0,random_pix(rows_c)],[0,1,random_pix(cols_c)]])
-    color = random.choice(["blue","green","red"])
-    if color == "blue":
-        b_channel = cv2.warpAffine(blue_c,M,(cols_c,rows_c))
-        g_channel = green_c 
-        r_channel = red_c
-    elif color == "green":
-        b_channel = blue_c
-        g_channel = cv2.warpAffine(green_c,M,(cols_c,rows_c)) 
-        r_channel = red_c
-    else: # color == red:
-        b_channel = blue_c
-        g_channel = green_c
-        r_channel = cv2.warpAffine(red_c,M,(cols_c,rows_c))
-        
-    merged_crop = cv2.merge((b_channel, g_channel, r_channel))
-    
-    image[rnd_h:rnd_h + rows/2, rnd_w:rnd_w + cols/2, :] = merged_crop
-    return image
-    #"""
-    
-    # merge the channels back together and return the image
-    return cv2.merge((b_channel, g_channel, r_channel))
-
 

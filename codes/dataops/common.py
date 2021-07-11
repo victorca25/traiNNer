@@ -158,9 +158,9 @@ def read_img(env=None, path=None, out_nc=3, fix_channels=True, lmdb_env=None, lo
             img = (255*plt.imread(path)[:,:,:3]).astype('uint8')
         else: # else, if image can be read by cv2
             img = cv2.imread(path, cv2.IMREAD_UNCHANGED)
-    elif env is 'lmdb':
+    elif env == 'lmdb':
         img = _read_lmdb_img(path, lmdb_env)
-    elif env is 'buffer':
+    elif env == 'buffer':
         img = cv2.imdecode(path, cv2.IMREAD_UNCHANGED)
     else:
         raise NotImplementedError("Unsupported env: {}".format(env))

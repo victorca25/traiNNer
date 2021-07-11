@@ -23,7 +23,7 @@ def main():
         (path for key, path in opt['path'].items() if not key == 'pretrain_model_G'))
     opt = options.dict_to_nonedict(opt)
 
-    util.setup_logger(None, opt['path']['log'],
+    util.get_root_logger(None, opt['path']['log'],
                       'test.log', level=logging.INFO, screen=True)
     logger = logging.getLogger('base')
     logger.info(options.dict2str(opt))

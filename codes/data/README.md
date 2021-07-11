@@ -1,7 +1,7 @@
 
 # General notes for dataloaders
 
-- use OpenCV (`cv2`) to read and process images by default, but the main ones can also use Pillow (`PIL`) as an alternative. Some benchmarking comparisons between `cv2` and `PIL` can be found [here](https://github.com/victorca25/opencv_transforms/blob/master/opencv_transforms/)
+- use OpenCV (`cv2`) to read and process images by default, but the main ones can also use Pillow (`PIL`) as an alternative. Some benchmarking comparisons between `cv2` and `PIL` can be found [here](https://github.com/victorca25/augmennt/)
 
 - read from **image** files OR from **.lmdb** for faster speed. Refer to [`IO-speed`](https://github.com/victorca25/BasicSR/wiki/IO-speed) for some tips regarding data IO speed.
     - Note that when preparing the **.lmdb** database on Windows it is currently required to set `n_workers: 0` in the dataloader options, else there can be a `PermissionError` due to multiple processes accesing the image database.

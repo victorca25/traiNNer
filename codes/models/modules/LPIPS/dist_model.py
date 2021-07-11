@@ -16,7 +16,7 @@ from .base_model import BaseModel
 #import skimage.transform
 #from tqdm import tqdm
 
-from IPython import embed
+# from IPython import embed
 
 from . import networks_basic as networks
 
