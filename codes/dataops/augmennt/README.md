@@ -1,61 +1,80 @@
-# opencv_transforms
+# augmeNNt
 
-This is intended as a faster drop-in replacement of Pytorch's Torchvision augmentations "transforms" [package](https://github.com/pytorch/vision/tree/master/torchvision/transforms), based on NumPy and OpenCV (PIL-free) for computer vision pipelines. 
+This repository is intended first as a faster drop-in replacement of Pytorch's Torchvision default augmentations in the "transforms" [package](https://github.com/pytorch/vision/tree/master/torchvision/transforms), based on NumPy and OpenCV (PIL-free) for computer vision pipelines. Additionally, many useful functions and augmentations for image to image translation, super-resolution and restoration (deblur, denoise, etc) are also available.
 
-Most functions in Pytorch transforms are reimplemented, but there are some considerations:
+## Supported Augmentations
 
-1.  ToPILImage is not implemented, we use OpenCV instead (ToCVImage). However, the original ToPILImage in ~transforms can be used to save the tensor as a PIL image if required. Once transformed into tensor format, images have RGB channel order in both cases. 
-2.  OpenCV images are Numpy arrays. OpencV supports uint8, int8, uint16, int16, int32, float32, float64. Certain operations (like `cv.CvtColor()`) do require to convert the arrays to OpenCV type (with `cv.fromarray()`).
-3.  The affine transform in the original one only has 5 degrees of freedom, YU-Zhiyang implemented an Affine transform with 6 degress of freedom called `RandomAffine6` (can be found in [transforms.py](opencv_transforms/transforms.py)). The original method `RandomAffine` is also available and reimplemented with OpenCV.
+Most functions from the original Torchvision transforms are reimplemented, with some considerations:
+1.  ToPILImage is not implemented or needed, we use OpenCV instead (ToCVImage). However, the original ToPILImage in ~transforms can be used to save the tensor as a PIL image if required. Once transformed into tensor format, images have RGB channel order in both cases.
+2.  OpenCV images are Numpy arrays. OpenCV supports uint8, int8, uint16, int16, int32, float32, float64. Certain operations (like `cv.CvtColor()`) do require to convert the arrays to OpenCV type (with `cv.fromarray()`).
+3.  The affine transform in the original one only has 5 degrees of freedom, YU-Zhiyang implemented an Affine transform with 6 degress of freedom called `RandomAffine6` (can be found in [transforms.py](augmennt/transforms.py)). The original method `RandomAffine` is also available and reimplemented with OpenCV.
 4.  The rotate function is clockwise, however the original one is anticlockwise.
-5.  Some new augmentations have been added, in comparison to Torchvision's.
+5.  Some new augmentations have been added, in comparison to Torchvision's, refer to the list [below](#support).
 6.  **The outputs of the OpenCV versions are almost the same as the original one's (it's possible to test by running [test.py](/test.py)) directly with test images**.
 
-## Support
-
-From the original Torchvision transforms:
+These are the basic augmentations, equivalent to torchvision's:
 
 -   `Compose`, `ToTensor`, `ToCVImage`, `Normalize`,
 -   `Resize`, `CenterCrop`, `Pad`,
--   `Lambda` (may not work well in multiprocess in Windows, YMMV),
+-   `Lambda` (see [note](#attention)),
 -   `RandomApply`, `RandomOrder`, `RandomChoice`, `RandomCrop`,
 -   `RandomHorizontalFlip`, `RandomVerticalFlip`, `RandomResizedCrop`,
 -   `FiveCrop`, `TenCrop`, `LinearTransformation`, `ColorJitter`,
 -   `RandomRotation`, `RandomAffine`,
--   `Grayscale`, `RandomGrayscale`, `RandomErasing`
+-   `Grayscale`, `RandomGrayscale`, `RandomErasing`,
 
-New transforms:
-
+The additional transforms can be used to train models such as [Noise2Noise](https://arxiv.org/pdf/1803.04189.pdf), [BSRGAN](https://arxiv.org/pdf/2103.14006v1.pdf) [White-box Cartoonization](https://openaccess.thecvf.com/content_CVPR_2020/papers/Wang_Learning_to_Cartoonize_Using_White-Box_Cartoon_Representations_CVPR_2020_paper.pdf) and [EdgeConnect](https://openaccess.thecvf.com/content_ICCVW_2019/papers/AIM/Nazeri_EdgeConnect_Structure_Guided_Image_Inpainting_using_Edge_Prediction_ICCVW_2019_paper.pdf), among others. There are some general augmentations:
 -   `RandomAffine6`, `Cutout`, `RandomPerspective`,
+
+Noise augmentations, with options for artificial noises and realistic noise generation:
 -   `RandomGaussianNoise`, `RandomPoissonNoise`, `RandomSPNoise`,
--   `RandomSpeckleNoise`, `RandomCompression`, 
--   `RandomAverageBlur`, `RandomBilateralBlur`, `RandomBoxBlur`, `RandomGaussianBlur`,
--   `RandomMedianBlur`, `RandomMotionBlur`, `RandomComplexMotionBlur`
+-   `RandomSpeckleNoise`, `RandomCompression`,
 -   `BayerDitherNoise`, `FSDitherNoise`, `AverageBWDitherNoise`,`BayerBWDitherNoise`,
--   `BinBWDitherNoise`,`FSBWDitherNoise`,`RandomBWDitherNoise`,
--   `FilterMaxRGB`,`FilterColorBalance`,`FilterUnsharp`,`FilterCanny`,
--   `SimpleQuantize`, `RandomQuantize`, `CLAHE`, `ApplyKernel`
+-   `BinBWDitherNoise`, `FSBWDitherNoise`, `RandomBWDitherNoise`,
+-   `RandomCameraNoise`, `RandomChromaticAberration`
+
+Blurs and different kind of kernels generation and use, with standard blurs, isotropic and anisotropic Gaussian filters and simple and complex motion blur kernels:
+-   `RandomAverageBlur`, `RandomBilateralBlur`, `RandomBoxBlur`,
+-   `RandomGaussianBlur`, `RandomMedianBlur`,
+-   `RandomMotionBlur`, `RandomComplexMotionBlur`,
+-   `RandomAnIsoBlur`, `AlignedDownsample`, `ApplyKernel`,
+
+Filters to modify the images, including color quantization, superpixel segmentation and CLAHE:
+-   `FilterMaxRGB`, `FilterColorBalance`, `FilterUnsharp`,
+-   `SimpleQuantize`, `RandomQuantize`, `RandomQuantizeSOM`,
+-   `CLAHE`, `RandomGamma`, `Superpixels`
+
+Edge filters:
+-   `FilterCanny`,
 
 ## Requirements
 
--   python >=3.5.2
--   numpy >=1.10 ('@' operator may not be overloaded before this version)
--   pytorch>=0.4.1
--   (torchvision>=0.2.1)
--   A working installation of OpenCV. **Tested with OpenCV version 3.4.1, 4.1.0**
--   Tested on Windows 10 and Ubuntu 18.04. There is evidence that OpenCV doesn't work well with multithreading on Linux / MacOS, for example `num_workers >0` in a pytorch `DataLoader`. jbohnslav hasn't run into this issue yet. 
+-   python >= 3.5.2
+-   numpy >= 1.10 ('@' operator may not be overloaded before this version)
+-   pytorch >= 0.4.1
+-   A working installation of OpenCV. **Tested with OpenCV version 3.4.2, 4.1.0**
+-   Tested on Windows 10 and Ubuntu 18.04.
+
+## Optional requirements
+
+-   torchvision >= 0.2.1
+
+In order to use the additional Superpixel options (skimage SLIC and Felzenszwalb algorithms), as well as segment reduction algorithms (selective search and RAG merging) and the Menon demosaicing algorithm, there are additional requirements:
+-   scikit-image >= 0.17.2
+-   scipy >= 1.6.2
 
 ## Usage
 
-1.  git clone <https://github.com/victorca25/opencv_transforms_torchvision.git> .
-2.  Add `cvtorchvision` to your python path.
-3.  Add `from opencv_transforms import transforms` in your python file.
+1.  git clone <https://github.com/victorca25/augmeNNt.git> .
+2.  Add `augmennt` to your python path.
+3.  Add `from augmennt import augmennt as transforms` in your python file.
 4.  From here, almost everything should work exactly as the original `transforms`.
 
 ### Example: Image resizing
 
 ```python
 import numpy as np
+from augmennt import augmennt as transforms
 image = np.random.randint(low=0, high=255, size=(1024, 2048, 3))
 resize = transforms.Resize(size=(256,256))
 image = resize(image)
@@ -78,11 +97,11 @@ More examples can be found in the  official Pytorch [tutorials](https://pytorch.
 
 ## Attention
 
-As tested by YU-Zhiyang, the multiprocessing used in dataloader of Pytorch may have issues with lambda function in Windows as lambda function can't be pickled (<https://docs.python.org/3/library/pickle.html#what-can-be-pickled-and-unpickled>).
+The multiprocessing used in Pytorch's dataloader may have issues with lambda functions (using `Lambda` in [transforms.py](torchvision/transforms/transforms.py)) in Windows, as lambda functions can't be pickled (<https://docs.python.org/3/library/pickle.html#what-can-be-pickled-and-unpickled>). This issue also happens with Torchvision's `Lambda` function.
 
-So the Lambda in [transforms.py](torchvision/transforms/transforms.py) may not work properly in Windows.
+These issues happen when using, `num_workers > 0` in a Pytorch `DataLoader` class when the transformations are initialized in the class init. The issue can be prevented either by using proper functions (not lambda) when composing the transformations or by initializing it in the `DataLoader` call instead.
 
-### Performance
+## Performance
 
 The following are the performance tests as executed by jbohnslav. 
 
@@ -106,7 +125,7 @@ Additionally, the [Albumentations project](https://github.com/albumentations-tea
 
 But it can also be the case that Pillow-SIMD can be faster in some cases, as tested in this [article](https://python-pillow.org/pillow-perf/)
 
-### Alternatives
+## Alternatives
 
 There are multiple image augmentation and manipulation frameworks available, each with its own strengths and limitations. Some of these alternatives are:
 
@@ -117,6 +136,5 @@ There are multiple image augmentation and manipulation frameworks available, eac
 -   [TorchIO](https://github.com/fepegar/torchio): For 3D medical imaging
 
 ## Postscript
--   This repository is the result of merging [jbohnslav](https://github.com/jbohnslav/opencv_transforms) and [YU-Zhiyang](https://github.com/YU-Zhiyang/opencv_transforms_torchvision) repositories which had the same purpose, and my own OpenCV-based augmentations from [BasicSR](https://github.com/victorca25/BasicSR), in order to allow to refactor the project's data flow and streamline to use the Torchvision's API as a standard. This enables changing or combining different base frameworks (OpenCV, Pillow/Pillow-SIMD, etc) only by modifying the imported library and also to easily switch to other replacements like [Kornia](https://github.com/kornia/kornia), [Albumentations](https://github.com/albumentations-team/albumentations), or [Rising](https://github.com/PhoenixDL/rising), based on the user's needs.
--   Part of the intention of this merge between jbohnslav's and YU-Zhiyang's projects was to bugfix and allow the authors to more easily incorporate the changes back themselves if they are useful and also to allow to decouple the augmentations code from BasicSR, so it's easier to add more augmentations or even change the backend like in DinJerr's [fork](https://github.com/DinJerr/BasicSR), based on [wand](https://github.com/emcconville/wand)+[ImageMagick](https://imagemagick.org/).
+-   This repository originally merged [jbohnslav](https://github.com/jbohnslav/opencv_transforms) and [YU-Zhiyang](https://github.com/YU-Zhiyang/opencv_transforms_torchvision) repositories (which had the same purpose), and my own OpenCV-based augmentations from [BasicSR](https://github.com/victorca25/BasicSR), in order to allow to refactor the project's data flow and streamline to use the Torchvision's API as a standard. This enables changing or combining different base frameworks (OpenCV, Pillow/Pillow-SIMD, etc) to add more augmentations only by modifying the imported library and also to easily switch to other replacements like [Kornia](https://github.com/kornia/kornia), [Albumentations](https://github.com/albumentations-team/albumentations), or [Rising](https://github.com/PhoenixDL/rising), based on the user's needs. An example with a backend change is DinJerr's [fork](https://github.com/DinJerr/BasicSR), using [wand](https://github.com/emcconville/wand)+[ImageMagick](https://imagemagick.org/) for augmentations.
 -   Each backend has it's pros and cons, but important points to consider when choosing are: available augmentation types, performance, external dependencies, features (for example, Kornia's differentiable augmentations) and user preference (all previous points being equal).

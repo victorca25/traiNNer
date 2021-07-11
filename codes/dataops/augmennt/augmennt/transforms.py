@@ -15,10 +15,12 @@ import types
 import collections
 import warnings
 
-# import opencv_functional as F
 from . import functional as F
 from . import extra_functional as EF
-from .common import fetch_kernels, to_tuple, _cv2_interpolation2str, convolve
+from . import superpixels as SP
+from .minisom import MiniSom
+from .common import (fetch_kernels, to_tuple, _cv2_interpolation2str,
+    _cv2_str2interpolation, convolve, sample, MAX_VALUES_BY_DTYPE)
 
 
 __all__ = ["Compose", "ToTensor", "ToCVImage",
@@ -33,12 +35,13 @@ __all__ = ["Compose", "ToTensor", "ToCVImage",
            "RandomSpeckleNoise", "RandomCompression",
            "RandomAverageBlur", "RandomBilateralBlur", "RandomBoxBlur",
            "RandomGaussianBlur", "RandomMedianBlur", "RandomMotionBlur",
-           "RandomComplexMotionBlur",
+           "RandomComplexMotionBlur", "RandomAnIsoBlur", "AlignedDownsample",
            "BayerDitherNoise", "FSDitherNoise", "AverageBWDitherNoise", "BayerBWDitherNoise",
-           "BinBWDitherNoise", "FSBWDitherNoise", "RandomBWDitherNoise", 
+           "BinBWDitherNoise", "FSBWDitherNoise", "RandomBWDitherNoise",
            "FilterColorBalance", "FilterUnsharp", "CLAHE",
-           "FilterMaxRGB", "RandomQuantize", "SimpleQuantize", 
-           "FilterCanny", "ApplyKernel",
+           "FilterMaxRGB", "RandomQuantize", "RandomQuantizeSOM", "SimpleQuantize",
+           "FilterCanny", "ApplyKernel", "RandomGamma", "Superpixels",
+           "RandomChromaticAberration", "RandomCameraNoise",
            ]
 
 
@@ -168,7 +171,7 @@ class Resize:
         if isinstance(size, int):
             self.size = (size,size)
         elif isinstance(size, collections.Iterable) and len(size) == 2:
-            if type(size) == list:
+            if type(size) is list:
                 size = tuple(size)
             self.size = size
         else:
@@ -190,6 +193,7 @@ class Resize:
         interpolate_str = _cv2_interpolation2str[self.interpolation]
         #interpolate_str = self.interpolation        
         return self.__class__.__name__ + '(size={0}, interpolation={1})'.format(self.size, interpolate_str)
+
 
 class Scale(Resize):
     """
@@ -577,7 +581,7 @@ class RandomResizedCrop:
         return F.resized_crop(img, i, j, h, w, self.size, self.interpolation)
 
     def __repr__(self):
-        interpolate_str = _pil_interpolation_to_str[self.interpolation]
+        interpolate_str = _cv2_str2interpolation[self.interpolation]
         # interpolate_str = self.interpolation
         format_string = self.__class__.__name__ + '(size={0}'.format(self.size)
         format_string += ', scale={0}'.format(tuple(round(s, 4) for s in self.scale))
@@ -1012,7 +1016,7 @@ class RandomAffine:
             s += ', fillcolor={fillcolor}'
         s += ')'
         d = dict(self.__dict__)
-        d['resample'] = _pil_interpolation_to_str[d['resample']]
+        d['resample'] = _cv2_str2interpolation[d['resample']]
         # d['resample'] = d['resample']
         return s.format(name=self.__class__.__name__, **d)
 
@@ -1234,7 +1238,7 @@ class RandomErasing:
         Returns:
             tuple: params (i, j, h, w, v) to be passed to ``erase`` for random erasing.
         """
-        img_h, img_w, img_c = img.shape
+        img_h, img_w = img.shape[0:2]
         area = img_h * img_w
 
         erase_area = np.random.uniform(scale[0], scale[1]) * area
@@ -1330,14 +1334,11 @@ class Cutout:
         j = np.random.randint(0 - mask_size // 2, img_w - mask_size) #left = j
         h = i + mask_size
         w = j + mask_size
-        
-        if i < 0:
-            i = 0
-        if j < 0:
-            j = 0
+
+        i = max(i, 0)
+        j = max(j, 0)
 
         return i, j, h, w, mask_value
-
 
     def __call__(self, img):
         if random.uniform(0, 1) < self.p: #np.random.rand() > p:
@@ -1392,13 +1393,13 @@ class RandomPerspective:
 
         assert isinstance(translate, (tuple, list)) and len(translate) == 2, \
             "translate should be a list or tuple and it must be of length 2."
-        assert all([0.0 <= i <= 1.0 for i in translate]), "translation values should be between 0 and 1"
+        assert all(0.0 <= i <= 1.0 for i in translate), "translation values should be between 0 and 1"
         self.translate = translate
 
         if scale is not None:
             assert isinstance(scale, (tuple, list)) and len(scale) == 2, \
                 "scale should be a list or tuple and it must be of length 2."
-            assert all([s > 0 for s in scale]), "scale values should be positive"
+            assert all(s > 0 for s in scale), "scale values should be positive"
         self.scale = scale
 
         self.resample = resample
@@ -1460,17 +1461,17 @@ class RandomPerspective:
 #TBD
 #randomly apply noise types. Extend RandomOrder, must find a way to implement
 #random parameters for the noise types
-'''
-class RandomNoise(RandomTransforms):
-    """Apply a list of noise transformations in a random order
-    """
-    def __call__(self, img):
-        order = list(range(len(self.transforms)))
-        random.shuffle(order)
-        for i in order:
-            img = self.transforms[i](img)
-        return img
-'''
+# '''
+# class RandomNoise(RandomTransforms):
+#     """Apply a list of noise transformations in a random order
+#     """
+#     def __call__(self, img):
+#         order = list(range(len(self.transforms)))
+#         random.shuffle(order)
+#         for i in order:
+#             img = self.transforms[i](img)
+#         return img
+# '''
 
 class RandomBase:
     r"""Base class for randomly applying transform
@@ -1481,6 +1482,7 @@ class RandomBase:
     def __init__(self, p:float=0.5):
         assert isinstance(p, numbers.Number) and p >= 0, 'p should be a positive value'
         self.p = p
+        self.params = {}
 
     def apply(self, image, **params):
         """Dummy, use the appropriate function in each class"""
@@ -1495,242 +1497,235 @@ class RandomBase:
             np.ndarray: Randomly transformed image.
         """
         if random.random() < self.p:
-            return self.apply(image, **params)
+            return self.apply(image, **self.params)
         return image
 
     def __repr__(self):
         return self.__class__.__name__ + '(p={})'.format(self.p)
 
-class RandomGaussianNoise:
-    """Applying gaussian noise on the given CV Image randomly with a given probability.
 
-        Args:
-            p (float): probability of the image being noised. Default value is 0.5
-            mean (float): Mean (“centre”) of the Gaussian distribution. Default=0.0
-            std (float): Standard deviation (spread or “width”) sigma of the Gaussian distribution. Default=1.0
-            gtype ('str': ``color`` or ``bw``): Type of Gaussian noise to add, either colored or black and white. 
-                Default='color' (Note: can introduce color noise during training)
-            random_params (bool): if enabled, will randomly get the parameters for the noise function
-                on each iteration. It uses the "mean" and "std" parameters as the mean and variance range
-                to sample from. 
-        """
+class RandomGaussianNoise(RandomBase):
+    """Apply gaussian noise on the given image randomly with a
+    given probability.
+    Args:
+        p (float): probability of the image being noised.
+            Default value is 0.5
+        mean (float): Mean (“center”) of the Gaussian distribution.
+            Default=0.0
+        var_limit ((float, float) or float): variance range for noise.
+            If var_limit is a single float, the range will be
+            (0, var_limit). Should be in range [0, 255] if using
+            `sigma_calc='sig'` or squared values of that range if
+            `sigma_calc='var'`. Default: (10.0, 50.0).
+        prob_color: Probably for selecting the type of Gaussian noise
+            to add, either colored or grayscale (``color`` or ``gray``),
+            in range [0.0, 1.0], higher means more chance of `color`.
+            (Note: Color type can introduce color noise during training)
+        multi: select to randomly generate multichannel-AWGN (MC-AWGN)
+            in addition to regular AWGN.
+        mode: select between Gaussian or Speckle noise modes
+        sigma_calc: select if var_limit is to be considered as the
+            variance (final sigma will be ``sigma = var ** 0.5``) or
+            sigma range (var_limit will be used directly for sigma).
+            In: `var`, `sig`.
+    """
 
-    def __init__(self, p:float=0.5, mean=0, std:float=1.0, gtype='color', random_params = False):
-        assert isinstance(mean, numbers.Number) and mean >= 0, 'mean should be a positive value'
-        assert isinstance(std, numbers.Number) and std >= 0, 'std should be a positive value'
-        assert isinstance(p, numbers.Number) and p >= 0, 'p should be a positive value'
-        assert isinstance(gtype, str), 'gtype is a string'
-        self.p = p
-        self.gtype = gtype
+    def __init__(self, p:float=0.5, mean:float=0.0,
+        var_limit=(10.0, 50.0), prob_color:float=0.5,
+        multi:bool=True, mode:str='gauss', sigma_calc:str='sig'):
+        super(RandomGaussianNoise, self).__init__(p=p)
+
+        if not isinstance(mean, numbers.Number) or mean < 0:
+            raise ValueError('Mean should be a positive value')
+        if isinstance(var_limit, (tuple, list)):
+            if var_limit[0] < 0 or var_limit[1] < 0:
+                raise ValueError(
+                    f"var_limit values: {var_limit} should be non negative.")
+            self.var_limit = var_limit
+        elif isinstance(var_limit, (int, float)):
+            if var_limit < 0:
+                raise ValueError("var_limit should be non negative.")
+            self.var_limit = (0, var_limit)
+        else:
+            raise TypeError(
+                "Expected var_limit type to be one of (int, float, "
+                f"tuple, list), got {type(var_limit)}"
+            )
+
+        if not isinstance(prob_color, (int, float)):
+            raise ValueError('prob_color must be a number in [0, 1]')
+        self.prob_color = prob_color
         self.mean = mean
-        self.std = std
-        self.random_params = random_params
+        self.mode = mode
+        self.multi = multi
+        self.sigma_calc = sigma_calc
+        self.params = self.get_params()
 
-    @staticmethod
-    def get_params(mean, std):
+    def apply(self, img, **params):
+        return EF.noise_gaussian(img, **params)
+
+    def get_params(self):
         """Get parameters for gaussian noise
-
         Returns:
-            sequence: params to be passed to the affine transformation
+            dict: params to be passed to the affine transformation
         """
-        mean = np.random.uniform(-mean, mean) #= 0
-        std = np.random.uniform(0.1, std) #(4, 200)
+        # mean = random.uniform(-self.mean, self.mean) #= 0
 
-        return mean, std
+        gtype = 'color' if random.random() < self.prob_color else 'gray'
 
-    def __call__(self, img):
-        """
-        Args:
-            img (np.ndarray): Image to be noised.
+        multi = False
+        if self.multi and random.random() > 0.66 and gtype == 'color':
+            # will only apply MC-AWGN 33% of the time
+            multi = True
+        if multi:
+            lim = self.var_limit
+            sigma = [random.uniform(lim[0], lim[1]) for _ in range(3)]
+            if self.mode == "gauss":
+                sigma = [(v ** 0.5) for v in sigma]
+        else:
+            # ref wide range: (4, 200)
+            var = random.uniform(self.var_limit[0], self.var_limit[1])
 
-        Returns:
-            np.ndarray: Randomly noised image.
-        """
-        if random.random() < self.p:
-            if self.random_params:
-                mean, std = self.get_params(self.mean, self.std) 
-            else:
-                mean, std = self.mean, self.std
-            return EF.noise_gaussian(img, mean=mean, std=std, gtype=self.gtype)
-        return img
+            if self.mode == "gauss":
+                if self.sigma_calc == 'var':
+                    sigma = (var ** 0.5)
+                elif self.sigma_calc == 'sig':
+                    # no need to var/255 if image range in [0,255]
+                    sigma = var
+            elif self.mode == "speckle":
+                sigma = var
 
-    def __repr__(self):
-        return self.__class__.__name__ + '(p={})'.format(self.p)
+        return {"mean": self.mean,
+                "std": sigma,
+                "mode": self.mode,
+                "gtype": gtype,
+                "rounds": False,
+                "clip": True,
+            }
 
 
-class RandomPoissonNoise:
-    """Applying Poisson noise on the given CV Image randomly with a given probability.
-
-        Args:
-            p (float): probability of the image being noised. Default value is 0.5
-        """
+class RandomPoissonNoise(RandomBase):
+    """Apply Poisson noise on the given image randomly with
+    a given probability.
+    Args:
+        p: probability of the image being noised. Default value is 0.5
+    """
 
     def __init__(self, p:float=0.5):
-        assert isinstance(p, numbers.Number) and p >= 0, 'p should be a positive value'
-        self.p = p
+        super(RandomPoissonNoise, self).__init__(p=p)
 
-    def __call__(self, img):
-        """
-        Args:
-            img (np.ndarray): Image to be noised.
-
-        Returns:
-            np.ndarray: Randomly noised image.
-        """
-        if random.random() < self.p:
-            return EF.noise_poisson(img)
-        return img
-
-    def __repr__(self):
-        return self.__class__.__name__ + '(p={})'.format(self.p)
+    def apply(self, img, **params):
+        return EF.noise_poisson(img, **params)
 
 
-class RandomSPNoise:
-    """Applying salt and pepper noise on the given CV Image randomly with a given probability.
-
-        Args:
-            p (float): probability of the image being noised. Default value is 0.5
-            prob (float): probability (threshold) that controls level of S&P noise
-        """
+class RandomSPNoise(RandomBase):
+    """Apply salt and pepper noise on the given image randomly
+    with a given probability.
+    Args:
+        p: probability of the image being noised. Default value is 0.5
+        prob: probability (threshold) that controls level of S&P noise
+    """
 
     def __init__(self, p:float=0.5, prob:float=0.1):
-        assert isinstance(p, numbers.Number) and p >= 0, 'p should be a positive value'
-        assert isinstance(prob, numbers.Number) and prob >= 0, 'p should be a positive value'
-        self.p = p
+        super(RandomSPNoise, self).__init__(p=p)
+
+        if not isinstance(prob, numbers.Number) or prob < 0:
+            raise ValueError("prob should be a positive value."
+                             f"Got: {prob}")
         self.prob = prob
+        self.params = self.get_params()
 
-    def __call__(self, img):
+    def get_params(self):
+        """Get parameters for noise.
+        Returns: dict of parameters.
         """
-        Args:
-            img (np.ndarray): Image to be noised.
+        return {"prob": self.prob}
 
-        Returns:
-            np.ndarray: Randomly noised image.
-        """
-        if random.random() < self.p:
-            return EF.noise_salt_and_pepper(img, self.prob)
-        return img
-
-    def __repr__(self):
-        return self.__class__.__name__ + '(p={})'.format(self.p)
+    def apply(self, img, **params):
+        return EF.noise_salt_and_pepper(img, **params)
 
 
-class RandomSpeckleNoise:
-    """Applying speckle noise on the given CV Image randomly with a given probability.
+class RandomSpeckleNoise(RandomGaussianNoise):
+    """ Apply speckle noise on the given CV Image randomly with
+    a given probability. Note that it reuses RandomGaussianNoise
+    as a base, since the function is shared.
+    Args:
+        p: probability of the image being noised.
+            Default value is 0.5
+        mean: Mean (“center”) of the Gaussian distribution.
+            Default=0.0
+        var_limit ((float, float) or float): variance range for noise.
+            If var_limit is a single float, the range will be
+            (0, var_limit). Random range should be around (0.04, 0.2),
+            in range [0, 1.0]
+        prob_color: Probably for selecting the type of Gaussian noise
+            to add, either colored or grayscale (``color`` or ``gray``),
+            in range [0.0, 1.0], higher means more chance of `color`.
+            (Note: Color type can introduce color noise during training)
+    """
+    def __init__(self, p:float=0.5, mean:float=0.0,
+        var_limit=(0.04, 0.12), prob_color:float=0.5,
+        sigma_calc:str='var'):
 
-        Args:
-            p (float): probability of the image being noised. Default value is 0.5
-            std (float): Standard deviation (spread or “width”) sigma of the Gaussian distribution.
-                Default=0.12. Random range should be around (0.04, 0.2)
-            gtype ('str': ``color`` or ``bw``): Type of noise to add, either colored or black and white. 
-                Default='color' (Note: can introduce color noise during training)
-            random_params (bool): if enabled, will randomly get the parameters for the noise function
-                on each iteration. It uses the "std" parameter as the maximum variance to sample from. 
-        """
+        super(RandomSpeckleNoise, self).__init__(p=p, mean=mean,
+            var_limit=var_limit, prob_color=prob_color, multi=False,
+            mode='speckle', sigma_calc=sigma_calc)
 
-    def __init__(self, p:float=0.5, std:float=0.12, gtype='color', random_params = False):
-        assert isinstance(std, numbers.Number) and std >= 0, 'std should be a positive value'
-        assert isinstance(p, numbers.Number) and p >= 0, 'p should be a positive value'
-        assert isinstance(gtype, str), 'gtype is a string'
-        self.p = p
-        self.std = std
-        self.gtype = gtype
-        self.random_params = random_params
 
-    @staticmethod
-    def get_params(mean, std):
-        """Get parameters for gaussian noise
+class RandomCompression(RandomBase):
+    """Apply compression to the given image randomly
+    with a given probability. Accepts JPEG and WEBP compression
+    types. For the compression quality, lower values represent
+    higher compression (lower quality).
+    Args:
+        p: probability of the image being noised. Default value is 0.5
+        quality (int: [0,100]):
+        min_quality: lower bound on the image quality. In [0, 100]
+            range for jpeg and [1, 100] for webp.
+        max_quality: upper bound on the image quality. In [0, 100]
+            range for jpeg and [1, 100] for webp.
+        compression_type: should be 'jpeg'/'jpg' or 'webp'.
+    """
 
-        Returns:
-            sequence: params to be passed to the affine transformation
-        """
-        #Variance of random distribution. variance = (standard deviation) ** 2. Default : 0.01
-        std = np.random.uniform(0.04, std) #(0.04, 0.2)
+    def __init__(self, p:float=0.5, min_quality:int=20,
+        max_quality:int=90, compression_type:str='.jpg'):
+        super(RandomCompression, self).__init__(p=p)
 
-        return std
+        self.compression_type = compression_type
+        low_q_thresh = 1 if compression_type == ".webp" else 0
+        if not  low_q_thresh <= min_quality <= 100:
+            raise ValueError(f"Invalid min_quality. Got: {min_quality}")
+        if not  low_q_thresh <= max_quality <= 100:
+            raise ValueError(f"Invalid max_quality. Got: {max_quality}")
 
-    def __call__(self, img):
-        """
-        Args:
-            img (np.ndarray): Image to be noised.
-
-        Returns:
-            np.ndarray: Randomly noised image.
-        """
-        if random.random() < self.p:
-            if self.random_params:
-                std = get_params(self.std)
-            else:
-                std = self.std
-            return EF.noise_speckle(img, mean=0.0, std=std, gtype=self.gtype)
-        return img
-
-    def __repr__(self):
-        return self.__class__.__name__ + '(p={})'.format(self.p)
-
-class RandomCompression:
-    """Applying JPEG compression on the given CV Image randomly with a given probability.
-
-        Args:
-            p (float): probability of the image being noised. Default value is 0.5
-            quality (int: [0,100]): Compression quality for the image. Lower values represent 
-                higher compression and lower quality. Default=20
-            random_params (bool): if enabled, will randomly get the parameters for the noise function
-                on each iteration. It uses the "quality" parameter as maximum quality to randomly 
-                sample with the minimum being 10% quality.
-        """
-
-    def __init__(self, p:float=0.5, min_quality=20, max_quality=90, image_type='.jpg', random_params = True):
-        assert isinstance(min_quality, numbers.Number) and min_quality >= 0, 'min_quality should be a positive value'
-        assert isinstance(max_quality, numbers.Number) and max_quality >= 0, 'max_quality should be a positive value'
-        assert isinstance(p, numbers.Number) and p >= 0, 'p should be a positive value'
-        self.p = p
         self.min_quality = min_quality
         self.max_quality = max_quality
-        self.image_type = image_type
-        self.random_params = random_params
+        self.params = self.get_params()
 
-    @staticmethod
-    def get_params(min_quality, max_quality):
-        """Get compression level for JPEG noise
-
+    def get_params(self):
+        """Get compression level for JPEG noise.
+            Randomize quality between min_quality and max_quality.
         Returns:
             quality level to be passed to compression
         """
-        quality = np.random.uniform(min_quality, max_quality) #randomize quality between min_quality and max_quality
-        return quality
+        return {"quality": random.randint(self.min_quality, self.max_quality),
+                "compression_type": self.compression_type
+                }
 
-    def __call__(self, img):
-        """
-        Args:
-            img (np.ndarray): Image to be noised.
-
-        Returns:
-            np.ndarray: Randomly noised image.
-        """
-        if random.random() < self.p:
-            if self.random_params:
-                quality = self.get_params(self.min_quality, self.max_quality)
-            else:
-                quality = self.max_quality
-            return EF.compression(img, quality=quality, image_type=self.image_type)
-        return img
-
-    def __repr__(self):
-        return self.__class__.__name__ + '(p={})'.format(self.p)
+    def apply(self, img, **params):
+        return EF.compression(img, **params)
 
 
 class RandomQuantize(RandomBase):
-    r"""Color quantization (using k-means)
+    r"""Color quantization (using CV2 k-means).
     Args:
         img (numpy ndarray): Image to be quantized.
-        num_colors (int): the target number of colors to quantize to
-        p (float): probability of the image being noised. 
-            Default value is 0.5
+        num_colors: the target number of colors to quantize to
+        p: probability of the image being noised. Default value is 0.5
     Returns:
         numpy ndarray: quantized version of the image.
     """
-    def __init__(self, num_colors:int = 32, p:float = 0.5):
+    def __init__(self, num_colors:int=32, p:float=0.5):
         super(RandomQuantize, self).__init__(p=p)
         assert isinstance(num_colors, int) and num_colors >= 0, 'num_colors should be a positive integrer value'
         self.num_colors = num_colors
@@ -1738,54 +1733,152 @@ class RandomQuantize(RandomBase):
     def apply(self, image, **params):
         return EF.km_quantize(image, self.num_colors)
 
+    def __repr__(self):
+        return self.__class__.__name__ + '(p={})'.format(self.p)
+
+
+class RandomQuantizeSOM(RandomBase):
+    r"""Color quantization (using MiniSOM).
+    Args:
+        img (numpy ndarray): Image to be quantized.
+        num_colors (int): the target number of colors to quantize to
+        sigma: the radius of the different neighbors in the SOM
+        learning_rate: determines how much weights are adjusted
+            during each SOM iteration
+        neighborhood_function: the neighborhood function to use
+            with SOM, in: 'bubble', 'gaussian', 'mexican_hat',
+            'triangle'
+    Returns:
+        numpy ndarray: quantized version of the image.
+    """
+
+    def __init__(self, p:float=0.5, num_colors=None, sigma:float=1.0,
+        learning_rate:float=0.2, neighborhood_function:str='bubble'):
+        super(RandomQuantizeSOM, self).__init__(p=p)
+
+        if not num_colors:
+            N = int(np.random.uniform(2, 8))
+        else:
+            N = int(num_colors/2)
+        # assert isinstance(N, numbers.Number) and N >= 0, 'N should be a positive value'
+        # input_len corresponds to the shape of the pixels array (H, W, C)
+        # x and y are the "palette" matrix shape. x=2, y=N means 2xN final colors, but
+        # could reshape to something like x=3, y=3 too
+        # try sigma = 0.1 , 0.2, 1.0, etc
+        self.som = MiniSom(x=2, y=N, input_len=3, sigma=sigma,
+                    learning_rate=0.2, neighborhood_function=neighborhood_function)
+
+    def apply(self, img, **params):
+        """
+        Args:
+            img (np.ndarray): Image to be quantized.
+
+        Returns:
+            np.ndarray: Quantized image.
+        """
+        img_type = img.dtype
+        img_max = MAX_VALUES_BY_DTYPE.get(img_type, 255)
+
+        # reshape image as a 2D array
+        pixels = np.reshape(img, (img.shape[0]*img.shape[1], 3))
+
+        # initialize som
+        self.som.random_weights_init(pixels)
+        # save the starting weights (the image’s initial colors)
+        starting_weights = self.som.get_weights().copy()
+        self.som.train_random(pixels, 500, verbose=False)
+        #som.train_random(pixels, 100)
+
+        # vector quantization: quantize each pixel of the image
+        # to reduce the number of colors
+        qnt = self.som.quantization(pixels)
+        clustered = np.zeros(img.shape)
+        for i, q in enumerate(qnt):
+            clustered[np.unravel_index(i, dims=(img.shape[0], img.shape[1]))] = q
+        return np.clip(clustered, 0, img_max).astype(img_type)
+
+    def __repr__(self):
+        return self.__class__.__name__ + '(p={})'.format(self.p)
 
 
 class BlurBase:
-    """Apply blur filter on the given input image using a random-sized 
+    """Apply blur filter on the given input image using a random-sized
     kernel randomly with a given probability.
 
     Args:
         p (float): probability of applying the transform.
             Default: 0.5
-        max_kernel_size (int): maximum kernel size of the blur 
+        kernel_size (int): maximum kernel size of the blur
             filter to use. Should be in range [3, inf).
             Default: 3.
-        random_params (bool): if enabled, will randomly get 
-            a kernel size on each iteration. 
+        init_params (bool): select if parameters should be set
+            on initialization.
     """
+    def __init__(self,
+                 p: float = 0.5,
+                 kernel_size: int = 3,
+                 sigmaX = None,
+                 sigmaY = None,
+                 init_params: bool = False):
 
-    def __init__(self, 
-                 p: float = 0.5, 
-                 max_kernel_size: int = 3, 
-                 random_params: bool = False):
-        assert isinstance(max_kernel_size, int) and max_kernel_size >= 0, 'max_kernel_size should be a positive integer'
-        assert isinstance(p, numbers.Number) and p >= 0, 'p should be a positive value'
+        if not isinstance(p, numbers.Number) or p < 0:
+            raise ValueError('p should be a positive value')
         self.p = p
-        self.max_kernel_size = max_kernel_size
-        self.random_params = random_params
 
-    # @staticmethod
-    def get_params(self, imgdim):
+        self.kind = self.get_kind()
+        # cv2 gaussian can use kernel 0, others can't, low=3
+        min_kernel_size = 0 if self.kind == 'gaussian' else 3
+        self.kernel_size = to_tuple(kernel_size, low=min_kernel_size)
+
+        if self.kind == 'gaussian':
+            self.sigmaX = to_tuple(sigmaX if sigmaX is not None else 0, 0)
+            self.sigmaY = to_tuple(sigmaY, 0) if sigmaY is not None else None
+        elif self.kind == 'bilateral':
+            self.sigmaColor = to_tuple(sigmaX, 0) if sigmaX is not None else 5
+            self.sigmaSpace = to_tuple(sigmaY, 0) if sigmaY is not None else 5
+        self.params = self.get_params() if init_params else None
+
+    @staticmethod
+    def get_kind():
+        return None
+
+    def get_params(self, imgdim=None):
         """
-        Get kernel size for blur filter in range (3, max_kernel_size).
-            Validates that the kernel is larger than the image and 
-            an odd integer
+        Get kernel size for blur filter in range (3, kernel_size).
+            (Can validate that the kernel is larger than the image and
+            an odd integer)
 
         Returns:
             kernel size to be passed to filter
         """
-        kernel_size = int(np.random.uniform(3, self.max_kernel_size))
-        if kernel_size > imgdim:
-            kernel_size = int(np.random.uniform(3, imgdim/2))
-        
-        kernel_size = int(np.ceil(kernel_size))
-        if kernel_size % 2 == 0:
-            kernel_size+=1
 
-        return kernel_size
-        # return {"ksize": int(random.choice(np.arange(self.blur_limit[0], self.blur_limit[1] + 1, 2)))}
+        kernel_size = np.random.randint(
+            self.kernel_size[0], self.kernel_size[1]+1)
+
+        # TODO: check, duplicated if using valid_kernel()
+        # if imgdim and kernel_size > imgdim:
+        #     kernel_size = int(np.random.uniform(3, imgdim/2))
+
+        # TODO: check, duplicated if using valid_kernel()
+        # force odd kernel size
+        # kernel_size = int(np.ceil(kernel_size))
+        # if kernel_size != 0 and kernel_size % 2 == 0:
+        #     kernel_size+=1
+
+        params = {"kernel_size": kernel_size}
+
+        if self.kind == "gaussian":
+            params["sigmaX"] = random.uniform(*self.sigmaX)
+            if self.sigmaY:
+                params["sigmaY"] = random.uniform(*self.sigmaY)
+        elif self.kind == "bilateral":
+            if self.sigmaColor:
+                params["sigmaColor"] = random.uniform(*self.sigmaColor)
+            if self.sigmaSpace:
+                params["sigmaSpace"] = random.uniform(*self.sigmaSpace)
+        return params
     
-    def apply(self, image, kernel_size=3, **params):
+    def apply(self, image, **params):
         """Dummy, use the appropriate function in each class"""
         return image
 
@@ -1799,48 +1892,56 @@ class BlurBase:
         """
         h = min(image.shape[0], image.shape[1])
         if random.random() < self.p:
-            if self.random_params:
-                kernel_size = self.get_params(h)
+            if not self.params:
+                # TODO: can remove if using valid_kernel()
+                params = self.get_params(h)
             else:
-                kernel_size = self.max_kernel_size
-            return self.apply(image, kernel_size=kernel_size)
+                params = self.params
+            return self.apply(image, **params)
         return image
 
     def __repr__(self):
-        return self.__class__.__name__ + '(p={})'.format(self.p)
+        return self.__class__.__name__ + f'(kind={self.kind}, p={self.p})'
 
 
 class RandomAverageBlur(BlurBase):
-    """Applying Average blurring filter on the given CV Image 
+    """Applying Average blurring filter on the given CV Image
         randomly with a given probability.
     Args:
         p (float): probability of applying the transform.
             Default: 0.5
-        max_kernel_size (int): maximum kernel size of the blur 
+        kernel_size (int): maximum kernel size of the blur
             filter to use. Should be in range [3, inf).
             Default: 3.
-        random_params (bool): if enabled, will randomly get 
-            a kernel size on each iteration. 
+        init_params (bool): select if parameters should be set
+            on initialization.
     """
-    def apply(self, image, kernel_size=3, **params):
-        return EF.average_blur(image, kernel_size)
+    def apply(self, image, **params):
+        return EF.average_blur(image, **params)
+
+    @staticmethod
+    def get_kind():
+        return 'average'
 
 
 class RandomBoxBlur(BlurBase):
-    """Applying Box blurring filter on the given CV Image randomly 
+    """Applying Box blurring filter on the given CV Image randomly
         with a given probability.
     Args:
         p (float): probability of applying the transform.
             Default: 0.5
-        max_kernel_size (int): maximum kernel size of the blur 
+        kernel_size (int): maximum kernel size of the blur
             filter to use. Should be in range [3, inf).
             Default: 3.
-        random_params (bool): if enabled, will randomly get 
-            a kernel size on each iteration. 
+        init_params (bool): select if parameters should be set
+            on initialization.
     """
-    def apply(self, image, kernel_size=3, **params):
-        return EF.box_blur(image, kernel_size)
+    def apply(self, image, **params):
+        return EF.box_blur(image, **params)
 
+    @staticmethod
+    def get_kind():
+        return 'box'
 
 class RandomGaussianBlur(BlurBase):
     """Applying Gaussian blurring filter on the given CV Image 
@@ -1848,154 +1949,117 @@ class RandomGaussianBlur(BlurBase):
     Args:
         p (float): probability of applying the transform.
             Default: 0.5
-        max_kernel_size (int): maximum kernel size of the blur 
-            filter to use. Should be in range [3, inf).
+        kernel_size (int): maximum kernel size of the blur
+            filter to use. Should be in range [0, inf).
             Default: 3.
-        random_params (bool): if enabled, will randomly get 
-            a kernel size on each iteration. 
+        sigmaX (float): sigma parameter for X axis
+        sigmaY (float): sigma parameter for Y axis
+        init_params (bool): select if parameters should be set
+            on initialization.
     """
-    def apply(self, image, kernel_size=3, **params):
-        return EF.gaussian_blur(image, kernel_size)
+    def apply(self, image, **params):
+        return EF.gaussian_blur(image, **params)
+
+    @staticmethod
+    def get_kind():
+        return 'gaussian'
 
 
 class RandomMedianBlur(BlurBase):
-    """Applying Median blurring filter on the given CV Image 
+    """Applying Median blurring filter on the given CV Image
         randomly with a given probability.
     Args:
         p (float): probability of applying the transform.
             Default: 0.5
-        max_kernel_size (int): maximum kernel size of the blur 
+        kernel_size (int): maximum kernel size of the blur
             filter to use. Should be in range [3, inf).
             Default: 3.
-        random_params (bool): if enabled, will randomly get 
-            a kernel size on each iteration. 
+        init_params (bool): select if parameters should be set
+            on initialization.
     """
-    def apply(self, image, kernel_size=3, **params):
-        return EF.median_blur(image, kernel_size)
+    def apply(self, image, **params):
+        return EF.median_blur(image, **params)
+
+    @staticmethod
+    def get_kind():
+        return 'median'
 
 
-#The function needs some fixing
 class RandomBilateralBlur(BlurBase):
-    """Applying Bilateral blurring filter on the given CV Image 
+    """Applying Bilateral blurring filter on the given CV Image
         randomly with a given probability.
 
     Args:
         p (float): probability of applying the transform.
             Default: 0.5
-        max_kernel_size (int): maximum kernel size of the blur
-            filter to use. Large filters (d > 5) are very slow,
-            so it is recommended to use d=5 for real-time
-            applications, and perhaps d=9 for offline applications
-            that need heavy noise filtering. Default: 3.
-        Sigma values: For simplicity, you can set the 2 sigma values
-            to be the same. If they are small (< 10), the filter will
-            not have much effect, whereas if they are large (> 150),
-            they will have a very strong effect, making the image look
-            "cartoonish".
-        sigmaColor	Filter sigma in the color space. A larger value of
-            the parameter means that farther colors within the pixel
-            neighborhood (see sigmaSpace) will be mixed together,
-            resulting in larger areas of semi-equal color.
-        sigmaSpace	Filter sigma in the coordinate space. A larger
-            value of the parameter means that farther pixels will
-            influence each other as long as their colors are close
-            enough (see sigmaColor ). When d>0, it specifies the
-            neighborhood size regardless of sigmaSpace. Otherwise,
-            d is proportional to sigmaSpace.
-        random_params (bool): if enabled, will randomly get a kernel
-            size on each iteration, as well as sigmaSpace and
-            sigmaColor, using those params as maximums to sample.
+        kernel_size (int): maximum kernel size of the blur
+            filter to use.
+        sigmaX (float): variable reused for Bilateral filter's
+            `sigmaColor` (Filter sigma in the color space).
+        sigmaY (float): variable reused for Bilateral filter's
+            `sigmaSpace` (Filter sigma in the coordinate space).
+        init_params (bool): select if parameters should be set
+            on initialization.
     """
 
-    def __init__(self, p: float = 0.5, max_kernel_size: int = 3, sigmaColor: int = 5, sigmaSpace: int = 5, random_params: bool = False):
-        super(RandomBilateralBlur, self).__init__(p=p, max_kernel_size=max_kernel_size, random_params=random_params)
-        assert isinstance(sigmaColor, int) and sigmaColor >= 0, 'sigmaColor should be a positive integer'
-        assert isinstance(sigmaSpace, int) and sigmaSpace >= 0, 'sigmaColor should be a positive integer'
-        self.sigmaColor = sigmaColor
-        self.sigmaSpace = sigmaSpace
+    def apply(self, image, **params):
+        return EF.bilateral_blur(image, **params)
 
-    def get_params(self, imgdim, sigmaColor, sigmaSpace):
-        """
-        Get kernel size for bilateral filter in range (3, 9), 
-            sigmaColor and sigmaSpace
-            Validates that the kernel is larger than the image 
-            and an odd integer
-
-        Returns:
-            kernel size to be passed to filter
-        """
-
-        sigmaColor = int(np.random.uniform(20, sigmaColor))
-        sigmaSpace = int(np.random.uniform(20, sigmaSpace))
-        kernel_size = int(np.random.uniform(3, self.max_kernel_size))
-        if kernel_size > imgdim:
-            kernel_size = int(np.random.uniform(3, imgdim/2))
-        
-        kernel_size = int(np.ceil(kernel_size))
-        if kernel_size % 2 == 0:
-            kernel_size+=1 
-
-        return kernel_size, sigmaColor, sigmaSpace
-        # return {"ksize": int(random.choice(np.arange(self.blur_limit[0], self.blur_limit[1] + 1, 2)))}
-    
-    def apply(self, image, kernel_size=3, **params):
-        return EF.bilateral_blur(image, kernel_size=kernel_size, **params)
-
-    def __call__(self, image):
-        """
-        Args:
-            image (np.ndarray): Image to be blurred.
-
-        Returns:
-            np.ndarray: Randomly blurred image.
-        """
-        h = min(image.shape[0], image.shape[1])
-        if random.random() < self.p:
-            if self.random_params:
-                kernel_size, sigmaColor, sigmaSpace = self.get_params(h, self.sigmaColor, self.sigmaSpace)
-            else:
-                kernel_size = self.max_kernel_size
-                sigmaColor, sigmaSpace = self.sigmaColor, self.sigmaSpace
-            return self.apply(image, kernel_size=kernel_size, sigmaColor=sigmaColor, sigmaSpace=sigmaSpace)
-        return image
+    @staticmethod
+    def get_kind():
+        return 'bilateral'
 
 
-class RandomMotionBlur(BlurBase):
+class RandomMotionBlur:
     """Apply motion blur to the input image using a random-sized kernel.
     Args:
         p (float): probability of applying the transform.
             Default: 0.5
-        max_kernel_size (int): maximum kernel size of the blur 
+        kernel_size (int): maximum kernel size of the blur
             filter to use. Should be in range [3, inf).
             Default: 3.
-        per_channel (bool): select if the motion kernel convolution 
-            should be applied to all channels simultaneously or 
+        per_channel (bool): select if the motion kernel convolution
+            should be applied to all channels simultaneously or
             individually per channel. Default: False.
     """
     def __init__(self,
                  p: float = 0.5,
-                 max_kernel_size: int = 3,
-                 random_params: bool = True,
-                 per_channel: bool = False):
-        super(RandomMotionBlur, self).__init__(p=p, max_kernel_size=max_kernel_size, random_params=random_params)
-        self.per_channel = per_channel
+                 kernel_size: int = 3,
+                 per_channel: bool = False,
+                 init_params: bool = False):
 
-    def apply(self, img, kernel=None, **params):
-        return convolve(img, kernel=kernel, per_channel=self.per_channel, **params)
+        if not isinstance(p, numbers.Number) or p < 0:
+            raise ValueError('p should be a positive value')
+        self.p = p
+
+        min_kernel_size = 3
+        self.kernel_size = to_tuple(kernel_size, low=min_kernel_size)
+        self.per_channel = per_channel
+        self.params = self.get_params() if init_params else None
 
     def get_params(self, imgdim=None):
-        kernel_size = random.choice(np.arange(3, self.max_kernel_size + 1, 2))
-        if kernel_size <= 2:
-            raise ValueError("kernel_size must be > 2. Got: {}".format(kernel_size))
-        
-        if imgdim and kernel_size > imgdim:
-            kernel_size = int(np.random.uniform(3, imgdim/2))
+        """Get kernel size for motion blur filter"""
 
+        kernel_size = random.choice(
+            np.arange(self.kernel_size[0], self.kernel_size[1]+1, 2))
+
+        if kernel_size <= 2:
+            raise ValueError(
+                f"kernel_size must be > 2. Got: {kernel_size}")
+
+        if imgdim and kernel_size > imgdim:
+            kernel_size = int(
+                np.random.uniform(self.kernel_size[0], imgdim/2))
+
+        # force odd kernel size
         # kernel_size = int(np.ceil(kernel_size))
-        # if kernel_size % 2 == 0:
+        # if kernel_size != 0 and kernel_size % 2 == 0:
         #     kernel_size+=1
 
-        return EF.simple_motion_kernel(kernel_size)
+        return {"kernel": EF.simple_motion_kernel(kernel_size)}
+
+    def apply(self, img, **params):
+        return convolve(img, per_channel=self.per_channel, **params)
 
     def __call__(self, image):
         """
@@ -2007,24 +2071,21 @@ class RandomMotionBlur(BlurBase):
         """
         h = min(image.shape[0], image.shape[1])
         if random.random() < self.p:
-            return self.apply(image, kernel=self.get_params(h))
+            if not self.params:
+                params = self.get_params(h)
+            else:
+                params = self.params
+            return self.apply(image, **params)
         return image
 
 
-class RandomComplexMotionBlur(BlurBase):
-    
+class RandomComplexMotionBlur:
     """
-    Apply a complex motion blur kernel of a given complexity 
+    Apply a complex motion blur kernel of a given complexity
         to the input image.
     Args:
         p (float): probability of applying the transform.
             Default: 0.5
-        max_kernel_size (int): maximum kernel size of the blur 
-            filter to use. Should be in range [3, inf).
-            Default: 3.
-        per_channel (bool): select if the motion kernel convolution 
-            should be applied to all channels simultaneously or 
-            individually per channel. Default: False.
         size: Size of the kernel in px times px.
             Default: (100, 100)
         complexity (Float between 0 and 1.):
@@ -2035,29 +2096,28 @@ class RandomComplexMotionBlur(BlurBase):
     """
     def __init__(self,
                  p: float = 0.5,
-                 max_kernel_size: int = 3,
-                 random_params: bool = True,
-                #  per_channel: bool = False,
                  size: tuple = (100, 100), #new
                  complexity: float = 0,
                  eps: float = 0.1):
-        super(RandomComplexMotionBlur, self).__init__(p=p, max_kernel_size=max_kernel_size, random_params=random_params)
-        # self.per_channel = per_channel
-        
+
+        if not isinstance(p, numbers.Number) or p < 0:
+            raise ValueError('p should be a positive value')
+        self.p = p
+
         # checking if size is correctly given
         if isinstance(size, int):
             size = (size, size)
         if not isinstance(size, tuple):
             raise TypeError("Size must be TUPLE of 2 positive integers")
-        elif len(size) != 2 or type(size[0]) != type(size[1]) != int:
+        if len(size) != 2 or type(size[0]) != type(size[1]) != int:
             raise TypeError("Size must be tuple of 2 positive INTEGERS")
-        elif size[0] < 0 or size[1] < 0:
+        if size[0] < 0 or size[1] < 0:
             raise ValueError("Size must be tuple of 2 POSITIVE integers")
 
         # check if complexity is float (int) between 0 and 1
         if type(complexity) not in [int, float, np.float32, np.float64]:
             raise TypeError("Complexity must be a number between 0 and 1")
-        elif complexity < 0 or complexity > 1:
+        if complexity < 0 or complexity > 1:
             raise ValueError("Complexity must be a number between 0 and 1")
 
         # saving args
@@ -2075,12 +2135,7 @@ class RandomComplexMotionBlur(BlurBase):
         # DIAGONAL = (x**2 + y**2)**0.5
         self.DIAGONAL = (self.SIZEx2[0]**2 + self.SIZEx2[1]**2)**0.5
 
-    def apply(self, img, kernel=None, **params):
-        # with downscale
-        # return ApplyKernel(sf, kernel=kernel, size=mk_size)(img)
-
-        # without downscale
-        return ApplyKernel(kernel=kernel, size=self.SIZE)(img)
+        self.params = self.get_params()
 
     def get_params(self, imgdim=None):
 
@@ -2102,16 +2157,19 @@ class RandomComplexMotionBlur(BlurBase):
         # using the full kernel size produces a lot more movement/blur
         # with a smaller kernel, there's less motion.
         # kernel = resize(kernel, scale_factors=None, out_shape=(19,19),  #scale_factors=1/sf
-        #                             interpolation="gaussian", kernel_width=None, 
+        #                             interpolation="gaussian", kernel_width=None,
         #                             antialiasing=True)
-        # kernel = cv2.resize(kernel, 
+        # kernel = cv2.resize(kernel,
         #                 dsize=(19,19),
         #                 #fx=scale,
         #                 #fy=scale,
         #                 interpolation=cv2.INTER_CUBIC)
 
-        # return {"kernel": self.kernel}
-        return kernel
+        return {"kernel": kernel,
+                "scale": 1.0}
+
+    def apply(self, img, **params):
+        return ApplyKernel(size=self.SIZE, **params)(img)
 
     def __call__(self, image):
         """
@@ -2123,7 +2181,11 @@ class RandomComplexMotionBlur(BlurBase):
         """
         h = min(image.shape[0], image.shape[1])
         if random.random() < self.p:
-            return self.apply(image, kernel=self.get_params(h))
+            if not self.params:
+                params = self.get_params(h)
+            else:
+                params = self.params
+            return self.apply(image, **params)
         return image
 
 
@@ -2254,6 +2316,7 @@ class FilterColorBalance:
     def __repr__(self):
         return self.__class__.__name__ + '(p={})'.format(self.p)
 
+
 class FilterUnsharp:
     r"""Unsharp mask filter, used to sharpen images to make edges and interfaces look crisper.
         More infotmation on: 
@@ -2329,15 +2392,12 @@ class SimpleQuantize(RandomBase):
         return EF.simple_quantize(image, self.rgb_range)
 
 
-
-
-
-
 class ApplyKernel:
     r"""Apply supplied kernel(s) to images.
-        Example kernels are motion kernels (motion blur) or interpolation
-        kernels for scaling images. Can also be used to apply extracted 
-        realistic kernels to downscale images with.
+        Example kernels are motion kernels (motion blur) or
+        interpolation kernels for scaling images. Can also be
+        used to apply extracted realistic kernels to downscale
+        images with.
     Ref:
     http://www.wisdom.weizmann.ac.il/~vision/kernelgan/index.html
     https://openaccess.thecvf.com/content_ICCV_2019/papers/Zhou_Kernel_Modeling_Super-Resolution_on_Real_Low-Resolution_Images_ICCV_2019_paper.pdf
@@ -2353,31 +2413,33 @@ class ApplyKernel:
                  size: int = 13, 
                  permute: bool = True,
                  center: bool = False):
-        
-        self.scale = 1.0/scale
+
+        self.scale = scale
         self.center = center
-        pre_process = Compose([CenterCrop(size)])
+        if size:
+            pre_process = Compose([CenterCrop(size)])
 
         if kernels_path:
             self.kformat = kformat
             self.kernels_path = fetch_kernels(
                 kernels_path=kernels_path, pattern=pattern, scale=scale)
             assert self.kernels_path, "No kernels found for scale {} in path {}.".format(scale, kernels_path)
-        
+
             self.num_kernel = len(self.kernels_path)
-            # print('num_kernel: ', self.num_kernel)
 
             if permute:
                 np.random.shuffle(self.kernels_path)
 
-            # making sure the kernel size (receptive field) is 13x13 
+            # making sure the kernel size (receptive field) is 13x13
             # (https://arxiv.org/pdf/1909.06581.pdf)
             self.pre_process = pre_process
             self.single_kernel = False
         elif isinstance(kernel, np.ndarray):
-            kernel = pre_process(kernel)
-            # normalize to make cropped kernel sum 1 again
-            self.kernel = EF.norm_kernel(kernel)
+            if size:
+                kernel = pre_process(kernel)
+                # normalize to make cropped kernel sum 1 again
+                kernel = EF.norm_kernel(kernel)
+            self.kernel = kernel
             self.single_kernel = True
         else:
             raise Exception("Either a kernel or kernels_path required.")
@@ -2394,45 +2456,112 @@ class ApplyKernel:
             else:
                 raise TypeError(f"Unsupported kernel format: {self.kformat}")
 
-            # making sure the kernel size (receptive field) is 13x13 
+            # making sure the kernel size (receptive field) is 13x13
             kernel = self.pre_process(kernel)
             # normalize to make cropped kernel sum 1 again
             kernel = EF.norm_kernel(kernel)
-            # print(kernel.shape)
 
         # First run a correlation (convolution with flipped kernel)
         # out_im = cv2.filter2D(img, -1, kernel)
         out_im = convolve(img, kernel)
 
-        if self.scale < 1:
-            input_shape = img.shape
-            # By default, if scale-factor is a scalar assume 2d resizing and duplicate it.
-            if isinstance(self.scale, (int, float)):
-                scale_factor = [self.scale, self.scale]
-            else:
-                scale_factor = self.scale
+        if self.scale > 1:
+            # downsample according to scale
+            out_im = sample(out_im, scale=self.scale, center=self.center)
 
-            # if needed extend the size of scale-factor list to the size of the input 
-            # by assigning 1 to all the unspecified scales
-            if len(scale_factor) != len(input_shape):
-                scale_factor = list(scale_factor)
-                scale_factor.extend([1] * (len(input_shape) - len(scale_factor)))
+        # return convolved image
+        return out_im
 
-            # Dealing with missing output-shape. calculating according to scale-factor
-            output_shape = np.uint(np.ceil(np.array(input_shape) * np.array(scale_factor)))
 
-            #TODO: can select specific starting points to subsample
-            if self.center:
-                st = [(sf-1)//2 for sf in scale_factor]
-            else:
-                st = [0 for sf in scale_factor]
+class RandomAnIsoBlur(ApplyKernel):
+    """Applying isotropic or anisotropic Gaussian blurring filter
+        on the given CV Image randomly with a given probability.
+    Args:
+        p: probability of applying the transform. Default: 0.5.
+        min_kernel_size: minimum kernel size.
+        kernel_size: maximum kernel size.
+        sigmaX (tuple): sigma parameter for X axis.
+        sigmaY (tuple): sigma parameter for Y axis.
+        angle (float): rotation angle for anisotropic filters.
+        noise (float): multiplicative kernel noise. Default: None.
+        scale (int): option to subsample image by a scale.
+    """
+    def __init__(self, p:float=0.5, min_kernel_size:int=1,
+        kernel_size:int=3, sigmaX=None, sigmaY=None, angle=None,
+        noise=None, scale:int=1):
 
-            # then subsample and return
-            return out_im[np.round(np.linspace(st[0], out_im.shape[0] - 1 / scale_factor[0], output_shape[0])).astype(int)[:, None],
-                    np.round(np.linspace(st[1], out_im.shape[1] - 1 / scale_factor[1], output_shape[1])).astype(int), :]
-        else:
-            # return convolved image
-            return out_im
+        if not isinstance(p, numbers.Number) or p < 0:
+            raise ValueError('p should be a positive value')
+        self.p = p
+
+        self.kernel_size = to_tuple(kernel_size, low=min_kernel_size)
+
+        self.sigmaX = to_tuple(sigmaX if sigmaX is not None else 0, 0)
+        self.sigmaY = to_tuple(sigmaY, 0) if sigmaY is not None else None
+        self.angle = to_tuple(angle) if angle is not None else None
+        self.noise = to_tuple(noise, 0) if noise is not None else None
+        self.scale = scale
+
+        kernel = EF.get_gaussian_kernel(**self.get_params())
+
+        super(RandomAnIsoBlur, self).__init__(
+            scale = self.scale,
+            kernel = kernel,
+            size = None,
+            center = False)
+
+    def get_params(self, imgdim=None):
+        """
+        Get kernel size for blur filter in range (3, kernel_size).
+            Validates that the kernel is larger than the image and
+            an odd integer.
+
+        Returns:
+            kernel size to be passed to filter.
+        """
+        kernel_size = np.random.randint(
+            self.kernel_size[0], self.kernel_size[1]+1)
+
+        # if imgdim and kernel_size > imgdim:
+        #     kernel_size = int(np.random.uniform(3, imgdim/2))
+
+        # force odd kernel size
+        kernel_size = int(np.ceil(kernel_size))
+        if kernel_size != 0 and kernel_size % 2 == 0:
+            kernel_size+=1
+
+        sigmaX = random.uniform(*self.sigmaX)
+        sigmaY = random.uniform(*self.sigmaY) if self.sigmaY else sigmaX
+        sigma = (sigmaX, sigmaY)
+
+        params = {
+            "kernel_size": kernel_size,
+            "sigma": sigma,
+            "angle": random.uniform(*self.angle) if self.angle else 0,
+            "noise": self.noise,
+            "sf": self.scale,
+            }
+
+        return params
+
+    def __repr__(self):
+        return self.__class__.__name__ + f'(p={self.p})'
+
+
+class AlignedDownsample(RandomAnIsoBlur):
+    """ Convenience transform interface to produce aligned
+    subsampled images downscaled by 'scale'. Uses an isotropic
+    gaussian kernel shifted by 0.5×(s − 1) to fix the upper-left
+    corner misalignment. Alternative nearest neighbor interpolation.
+    Note: the default kernel size is set to 21, but 17 works.
+    Args:
+        p: probability of applying the transform.
+        scale: scale factor to subsample image by.
+    """
+    def __init__(self, p:float=0.5, scale:int=1):
+        super(AlignedDownsample, self).__init__(p=p,
+            min_kernel_size=21, kernel_size=21,
+            sigmaX=(0.1, 0.1), scale=scale)
 
 
 class CLAHE(RandomBase):
@@ -2463,3 +2592,288 @@ class CLAHE(RandomBase):
             return self.apply(
                 image, clip_limit=self.get_params()["clip_limit"])
         return image
+
+
+class RandomGamma(RandomBase):
+    """
+    Args:
+        gamma_range (float or (float, float)): Range of gamma values
+            to randomly select from. Use integer values, they will
+            be divided by 100 for the proper gamma values.
+            Default: (80, 120) -> will be (0.8, 1.2).
+        gain (int): the gain value, also known as 'A'. Default: 1
+        p (float): probability of applying the transform.
+    Targets:
+        image
+    Image types:
+        uint8, float32
+    """
+
+    def __init__(self, gamma_range=(80, 120), gain=1, p=0.5):
+        super(RandomGamma, self).__init__(p)
+        if isinstance(gamma_range, int):
+            self.gamma_range = (gamma_range, gamma_range)
+        else:
+            self.gamma_range = to_tuple(gamma_range)
+        self.gain = gain
+
+    def apply(self, img, gamma=1, **params):
+        return F.adjust_gamma(img, gamma=gamma, gain=self.gain)
+
+    def get_params(self) -> dict:
+        return {"gamma": random.randint(self.gamma_range[0], self.gamma_range[1]) / 100.0}
+
+    def __call__(self, image):
+        if random.random() < self.p:
+            params = self.get_params()
+            return self.apply(image, gamma=params["gamma"])
+        return image
+
+
+class Superpixels(RandomBase):
+    """Transform images parially/completely to their superpixel representation.
+    This implementation Can use either cv2 (default) or skimage
+    algorithms if available.
+    Args:
+        p_replace (float or tuple of float): Defines for any segment the
+            probability that the pixels within that segment are replaced
+            by their aggregate color (otherwise, the pixels are not changed).
+            Examples:
+                * A probability of ``0.0`` means that the pixels in no
+                  segment are replaced by their aggregate color (image is not
+                  changed at all).
+                * A probability of ``0.5`` means that around half of all
+                  segments are replaced by their aggregate color.
+                * A probability of ``1.0`` means that all segments are
+                  replaced by their aggregate color (resulting in a voronoi
+                  image).
+            Behaviour based on chosen data types for this parameter:
+                * If a ``float``, then that ``float`` will always be used.
+                * If ``tuple`` ``(a, b)``, then a random probability will be
+                  sampled from the interval ``[a, b]`` per image.
+        n_segments (int, or tuple of int): Rough target number of how many
+            superpixels to generate (the algorithm may deviate from this number).
+            Lower value will lead to coarser superpixels. Higher values are
+            computationally more intensive and will hence lead to a slowdown
+            * If a single ``int``, then that value will always be used as the
+              number of segments.
+            * If a ``tuple`` ``(a, b)``, then a value from the discrete
+              interval ``[a..b]`` will be sampled per image.
+        cs (str or None): Colorspace conversion to apply to images before superpixels
+            algorithms for better results. In: ``lab`` or ``hsv``, leave ``None`` for defaults.
+        algo (str): Selection of the superpixels algorithm. OpenCV and scikit-image algorithms
+            are suported. In: 'seeds', 'slic', 'slico', 'mslic', 'sk_slic', 'sk_felzenszwalb'.
+        n_iters (int): Number of iterations to perform (only for OpenCV algorithms and `sk_slic`).
+        kind (str): Kind of color aggregation to apply to segments. The original behavior
+            is to average all the colors in the segment ('avg'), but can also use 'median' or
+            a 'mix' of average and median values (adaptive).
+        reduction (str or None): Apply a post-process segment/color reduction step, for algorithms
+            that produce more segments than ``n_segments`` ('sk_felzenszwalb').
+            In: 'selective', 'cluster', 'rag'.
+        max_size (int or None): Maximum image size at which the augmentation is performed.
+            If the width or height of an image exceeds this value, it will be
+            downscaled before the augmentation so that the longest side matches `max_size`.
+            This is done to speed up the process. The final output image has the same
+            size as the input image. Note that in case `p_replace` is below ``1.0``,
+            the down-/upscaling will affect the not-replaced pixels too.
+            Use ``None`` to apply no down-/upscaling.
+        interpolation (OpenCV flag): flag that is used to specify the interpolation algorithm.
+            Should be one of: 'NEAREST', 'BILINEAR', 'AREA', 'BICUBIC', 'LANCZOS'. Default: 'BILINEAR'.
+        p (float): probability of applying the transform. Default: 0.5.
+    """
+
+    def __init__(
+        self,
+        p_replace=0.1,
+        n_segments=100,
+        cs=None,
+        algo='slic',
+        n_iters: int=10,
+        kind='mix',
+        reduction=None,
+        max_size=128,
+        interpolation: str='BILINEAR',
+        p: float=0.5,
+    ):
+        super(Superpixels, self).__init__(p)
+        self.p_replace = to_tuple(p_replace, p_replace)
+        self.n_segments = to_tuple(n_segments, n_segments)
+        self.max_size = max_size
+        self.interpolation = interpolation
+        self.cs = cs
+        self.n_iters = n_iters
+
+        if min(self.n_segments) < 1:
+            raise ValueError(f"n_segments must be >= 1. Got: {n_segments}")
+
+        if isinstance(algo, str):
+            algo = [algo]
+        self.algo = algo
+
+        if isinstance(kind, str):
+            kind = [kind]
+        self.kind = kind
+
+        if isinstance(reduction, str):
+            reduction = [reduction]
+        self.reduction = reduction
+
+    def get_params(self) -> dict:
+        n_segments = random.randint(*self.n_segments)
+        p = random.uniform(*self.p_replace)
+        algo = random.choice(self.algo)
+        kind = random.choice(self.kind)
+        reduction = random.choice(self.reduction) if self.reduction else None
+
+        return {"replace_samples": np.random.random(n_segments) < p,
+                "n_segments": n_segments,
+                "algo": algo,
+                "kind": kind,
+                "reduction": reduction,
+                }
+
+    def apply(self, img: np.ndarray, replace_samples=(False,), n_segments:int=1,
+        algo='slic', kind='mix', reduction=None, **kwargs):
+        return SP.superpixels(
+            img, n_segments, self.cs, self.n_iters, algo, kind, reduction,
+            replace_samples, self.max_size, self.interpolation)
+
+    def __call__(self, image):
+        if random.random() < self.p:
+            params = self.get_params()
+            return self.apply(
+                image, replace_samples=params["replace_samples"],
+                n_segments=params["n_segments"],
+                algo=params["algo"],
+                kind=params["kind"],
+                reduction=params["reduction"],)
+        return image
+
+
+class RandomChromaticAberration(RandomBase):
+    """Apply chromatic aberration and lens blur to images.
+    Args:
+        img (numpy ndarray): image to be processed.
+        radial_blur: enable radial blur.
+        strength: set blur/aberration strength.
+        jitter: number of pixels for color channel offset.
+        alpha: alpha value to overlay original image.
+        random_params: initialize with random parameters if True.
+    Returns:
+        numpy ndarray: image with chromatic aberration.
+    """
+
+    def __init__(self, p=0.5, radial_blur:bool=True,
+        strength:float=1.0, jitter:int=0, alpha:float=0.0,
+        random_params:bool=False):
+        super(RandomChromaticAberration, self).__init__(p=p)
+
+        self.radial_blur = radial_blur
+        self.strength = strength
+        self.jitter = jitter
+        self.alpha = alpha
+        self.random_params = random_params
+
+        self.params = self.get_params()
+
+    def get_params(self) -> dict:
+        if self.random_params:
+            radial_blur = bool(random.getrandbits(1))  # random.choice([True, False])
+            strength = np.random.uniform(self.strength, 2.0)
+            jitter = random.choice(np.arange(self.jitter, 4, 1))
+            # alpha = np.random.uniform(0.0, 1.0)
+            alpha = np.abs(np.random.normal(loc=0.0, scale=0.5))
+        else:
+            radial_blur = self.radial_blur
+            strength = self.strength
+            jitter = self.jitter
+            alpha = self.alpha
+
+        return {"radial_blur": radial_blur,
+                "strength": strength,
+                "jitter": jitter,
+                "alpha": alpha,
+                }
+
+    def apply(self, img, **params):
+        # add chromatic aberration and radial blur
+        im_ca = EF.add_chromatic(
+            img, strength=params["strength"],
+            radial_blur=params["radial_blur"])
+        # add jitter effect
+        im_ca = EF.add_fringes(
+            im_ca, pixels=params["jitter"])
+        # blend result and original image
+        im_ca = EF.blend_images(
+            im_ca, img, alpha=params["alpha"],
+            strength=params["strength"])
+        return im_ca
+
+    def __repr__(self):
+        return self.__class__.__name__ + '(p={})'.format(self.p)
+
+
+class RandomCameraNoise(RandomBase):
+    r"""Apply random camera noise to images.
+    Uses a pipeline to unprocess sRGB images to RAW, add camera
+    noise to this synthetic RAW image and convert back to sRGB.
+    The ISP pipeline consists of demosaicing, exposure compensation,
+    white balance, camera to RGB to XYZ color space conversion, XYZ
+    to linear RGB color space conversion, tone mapping and gamma
+    correction. For demosaicing, multiple methods are available,
+    including `malvar`, which is Matlab’s default and `pixelshuffle`.
+    References:
+        "Unprocessing Images for Learned Raw Denoising"
+            http://timothybrooks.com/tech/unprocessing
+    Args:
+        img (numpy ndarray): image to be processed.
+        dmscfn: select the demosaicing method to use, in:
+            'malvar', 'pixelshuffle','menon', 'bilinear'
+        xyz_arr: select the matrix to use for RGB to XYZ
+            conversion, in: 'D50', 'D65'
+        rg_range: red gain range for whitebalance.
+            Default: (1.2, 2.4), alternative: (1.9, 2.4)
+        bg_range: blue gain range for whitebalance.
+            Default: (1.2, 2.4), alternative: (1.5, 1.9)
+        random_params: initialize with random parameters if True.
+    Returns:
+        numpy ndarray: image with random camera noise applied.
+    """
+
+    def __init__(self, p=0.5, demosaic_fn='malvar',
+        xyz_arr='D50', rg_range:tuple=(1.2, 2.4),
+        bg_range:tuple=(1.2, 2.4), random_params:bool=False):
+        super(RandomCameraNoise, self).__init__(p=p)
+
+        if isinstance(demosaic_fn, str):
+            demosaic_fn = [demosaic_fn]
+        if isinstance(xyz_arr, str):
+            xyz_arr = [xyz_arr]
+
+        self.demosaic_fn = demosaic_fn
+        self.xyz_arr = xyz_arr
+        self.rg_range = rg_range
+        self.bg_range = bg_range
+        self.random_params = random_params
+        self.params = self.get_params()
+
+    def get_params(self) -> dict:
+        if self.random_params:
+            dmscfn = random.choice(['malvar', 'pixelshuffle', 'bilinear'])
+            xyz_arr = random.choice(['D50', 'D65'])
+        else:
+            dmscfn = random.choice(self.demosaic_fn)
+            xyz_arr = random.choice(self.xyz_arr)
+
+        return {"dmscfn": dmscfn,
+                "xyz_arr": xyz_arr,
+                "rg_range": self.rg_range,
+                "bg_range": self.bg_range,
+                }
+
+    def apply(self, img, **params):
+        return EF.camera_noise(img, **params)
+
+    def __repr__(self):
+        return self.__class__.__name__ + '(p={})'.format(self.p)
+
