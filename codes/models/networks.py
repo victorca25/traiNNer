@@ -166,6 +166,9 @@ def get_network(opt, step=0, selector=None):
         n_opt_pass['opt'] = opt
         n_opt_pass['step'] = step
         opt_net_pass = n_opt_pass
+    elif kind == 'wbcunet_net':
+        from models.modules.architectures import WBCNet_arch
+        net = WBCNet_arch.UnetGeneratorWBC
     elif kind == 'unet_net':
         from models.modules.architectures import UNet_arch
         net = UNet_arch.UnetGenerator
@@ -304,35 +307,59 @@ def define_D(opt, net_name='D'):
 
 
 
-def define_F(opt, use_bn=False):
-    """Create a feature extraction network for feature losses
+def define_F(opt):
+    """Create a feature extraction network for feature losses.
     """
     from models.modules.architectures import perceptual
 
-    feat_network = 'vgg' #opt['feat_network'] #can be configurable option 
-
     gpu_ids = opt['gpu_ids']
-    if opt['datasets']['train']['znorm']:
-        z_norm = opt['datasets']['train']['znorm']
-    else:
-        z_norm = False
-    device = torch.device('cuda' if gpu_ids else 'cpu')
-    # pytorch pretrained VGG19-54, before ReLU.
-    if use_bn:
-        feature_layer = 49
-    else:
-        feature_layer = 34
+    z_norm = opt['datasets']['train'].get('znorm', False)
 
-    if feat_network == 'resnet': #ResNet
-        netF = perceptual.ResNet101FeatureExtractor(use_input_norm=True, device=device)
-    else: #VGG network (default)
-        netF = perceptual.VGGFeatureExtractor(feature_layer=feature_layer, use_bn=use_bn, \
-            use_input_norm=True, device=device, z_norm=z_norm)
+    # TODO: move version validation to defaults.py
+    perc_opts = opt['train'].get("perceptual_opt")
+    if perc_opts:
+        net = perc_opts.get('feature_network', 'vgg19')
+        w_l_p = perc_opts.get('perceptual_layers', {'conv5_4': 1})
+        w_l_s = perc_opts.get('style_layers', {})
+        remove_pooling = perc_opts.get('remove_pooling', False)
+        use_input_norm = perc_opts.get('use_input_norm', True)
+        requires_grad = perc_opts.get('requires_grad', False)
+        change_padding = perc_opts.get('change_padding', False)
+        load_path = perc_opts.get('pretrained_path', None)
+    else:
+        net = opt['train'].get('feature_network', 'vgg19')
+        w_l_p = {'conv5_4': 1}
+        w_l_s = {}
+        remove_pooling = False
+        use_input_norm = True
+        requires_grad = False
+        change_padding = False
+        load_path = None
+
+    feature_weight = opt['train'].get('feature_weight', 0)
+    style_weight = opt['train'].get('style_weight', 0)
+
+    w_l = w_l_p.copy()
+    w_l.update(w_l_s)
+    listen_list = list(w_l.keys())
+
+    if 'resnet' in net:
+        # ResNet
+        netF = perceptual.ResNet101FeatureExtractor(
+            use_input_norm=use_input_norm, device=device, z_norm=z_norm)
+    else:
+        #VGG network (default)
+        netF = perceptual.FeatureExtractor(
+            listen_list=listen_list, net=net,
+            use_input_norm=use_input_norm, z_norm=z_norm,
+            requires_grad=requires_grad, remove_pooling=remove_pooling,
+            pooling_stride=2, change_padding=change_padding,
+            load_path=load_path)
 
     if gpu_ids:
         assert torch.cuda.is_available()
         netF = nn.DataParallel(netF)
-    netF.eval()  # No need to train
+
     return netF
 
 

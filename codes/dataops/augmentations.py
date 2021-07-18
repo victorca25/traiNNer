@@ -34,7 +34,7 @@ def set_transforms(loader_type=None):
         if loader_type == 'pil' and pil_available:
             import torchvision.transforms as transforms
         elif cv2_available:
-            import dataops.opencv_transforms.opencv_transforms as transforms
+            import dataops.augmennt.augmennt as transforms
         else:
             Exception("No suitable image loader available. Need either PIL or OpenCV.")
 
