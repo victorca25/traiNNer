@@ -88,7 +88,13 @@ def get_resume_state(opt):
             resume_state_path = util.sorted_nicely(resume_state_path)[-1]
         else:
             resume_state_path = opt['path']['resume_state']
-        resume_state = torch.load(resume_state_path)
+
+        if opt['gpu_ids']:
+            resume_state = torch.load(resume_state_path)
+        else:
+            resume_state = torch.load(resume_state_path,
+                            map_location=torch.device('cpu'))
+
         logger.info('Set [resume_state] to {}'.format(resume_state_path))
         logger.info('Resuming training from epoch: {}, iter: {}.'.format(
             resume_state['epoch'], resume_state['iter']))
@@ -136,13 +142,16 @@ def get_dataloaders(opt):
             batch_size = dataset_opt.get('batch_size', 4)
             virtual_batch_size = dataset_opt.get('virtual_batch_size', batch_size)
             virtual_batch_size = virtual_batch_size if virtual_batch_size > batch_size else batch_size
-            train_size = int(math.ceil(len(dataset) / batch_size))
-            logger.info('Number of train images: {:,d}, iters: {:,d}'.format(
-                len(dataset), train_size))
+            # train_size = int(math.ceil(len(dataset) / batch_size))
+            train_size = len(dataloaders[phase])
+            logger.info(
+                f'Number of train images: {len(dataset):,d}, '
+                f'epoch iters: {train_size:,d}')
             total_iters = int(opt['train']['niter'])
             total_epochs = int(math.ceil(total_iters / train_size))
-            logger.info('Total epochs needed: {:d} for iters {:,d}'.format(
-                total_epochs, total_iters))
+            logger.info(
+                f'Total epochs needed: {total_epochs:d} for '
+                f'iters {total_iters:,d}')
             data_params = {
                 "batch_size": batch_size, 
                 "virtual_batch_size": virtual_batch_size, 
