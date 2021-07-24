@@ -14,8 +14,8 @@ def main():
 
     # GT - Ground-truth;
     # Gen: Generated / Restored / Recovered images
-    folder_GT = '/mnt/SSD/xtwang/BasicSR_datasets/val_set5/Set5'
-    folder_Gen = '/home/xtwang/Projects/BasicSR/results/RRDB_PSNR_x4/set5'
+    folder_GT = '../datasets/val_set5/Set5'
+    folder_Gen = '../results/RRDB_PSNR_x4/set5'
 
     crop_border = 4
     suffix = ''  # suffix for Gen images

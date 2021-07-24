@@ -20,11 +20,11 @@ For example, once [train.py] is called (i.e. `python train.py -opt options/train
 Moreover, there are also [Utilities](#utils) and [Useful script](#scripts) available to use for various operations,
 like configuring your dataset.
 
-[train.py]: https://github.com/victorca25/BasicSR/blob/master/codes/train.py
+[train.py]: https://github.com/victorca25/traiNNer/blob/master/codes/train.py
 
-[/options/train/train_template.yml]: https://github.com/victorca25/BasicSR/blob/master/codes/options/train/train_template.yml
+[/options/train/train_template.yml]: https://github.com/victorca25/traiNNer/blob/master/codes/options/train/train_template.yml
 
-[/options]: https://github.com/victorca25/BasicSR/tree/master/codes/options
+[/options]: https://github.com/victorca25/traiNNer/tree/master/codes/options
 
 [Config]: #config
 
@@ -46,7 +46,7 @@ like configuring your dataset.
 -   Supports `debug` mode, i.e, if the model name contains `debug`, it will trigger debug mode.
 -   The configuration file and descriptions can be found in [/options].
 
-[/options/options.py]: https://github.com/victorca25/BasicSR/blob/master/codes/options/options.py
+[/options/options.py]: https://github.com/victorca25/traiNNer/blob/master/codes/options/options.py
 
 ## Data
 
@@ -65,13 +65,13 @@ like configuring your dataset.
 -   The standard tensor format used is NCHW, \[0,1], RGB, torch float tensor, but they can be normalized using the `znorm` 
     option if needed.
 
-[/data]: https://github.com/victorca25/BasicSR/tree/master/codes/data
+[/data]: https://github.com/victorca25/traiNNer/tree/master/codes/data
 
-[/data/\_\_init__.py]: https://github.com/victorca25/BasicSR/blob/master/codes/data/__init__.py
+[/data/\_\_init__.py]: https://github.com/victorca25/traiNNer/blob/master/codes/data/__init__.py
 
-[/dataops]: https://github.com/victorca25/BasicSR/tree/master/codes/dataops
+[/dataops]: https://github.com/victorca25/traiNNer/tree/master/codes/dataops
 
-[/dataops/common.py]: https://github.com/victorca25/BasicSR/blob/master/codes/dataops/common.py
+[/dataops/common.py]: https://github.com/victorca25/traiNNer/blob/master/codes/dataops/common.py
 
 [cv2]: https://github.com/skvark/opencv-python
 
@@ -92,19 +92,19 @@ like configuring your dataset.
 -   [SRRaGAN] is used to train super resolution models (ESRGAN, PAN, SRGAN, etc), but based on it, additional 
     models that require specific parameters optimization strategy or options can be defined, such as [PPON].
 
-[/models]: https://github.com/victorca25/BasicSR/tree/master/codes/models
+[/models]: https://github.com/victorca25/traiNNer/tree/master/codes/models
 
-[/models/\_\_init__.py]: https://github.com/victorca25/BasicSR/blob/master/codes/models/__init__.py
+[/models/\_\_init__.py]: https://github.com/victorca25/traiNNer/blob/master/codes/models/__init__.py
 
-[/models/base_model.py]: https://github.com/victorca25/BasicSR/blob/master/codes/models/base_model.py
+[/models/base_model.py]: https://github.com/victorca25/traiNNer/blob/master/codes/models/base_model.py
 
-[SRRaGAN]: https://github.com/victorca25/BasicSR/blob/master/codes/models/SRRaGAN_model.py
+[SRRaGAN]: https://github.com/victorca25/traiNNer/blob/master/codes/models/SRRaGAN_model.py
 
-[PPON]: https://github.com/victorca25/BasicSR/blob/master/codes/models/ppon_model.py
+[PPON]: https://github.com/victorca25/traiNNer/blob/master/codes/models/ppon_model.py
 
-[VSR]: https://github.com/victorca25/BasicSR/blob/master/codes/models/VSR_model.py
+[VSR]: https://github.com/victorca25/traiNNer/blob/master/codes/models/VSR_model.py
 
-[SFTGAN_ACD]: https://github.com/victorca25/BasicSR/blob/master/codes/models/SFTGAN_ACD_model.py
+[SFTGAN_ACD]: https://github.com/victorca25/traiNNer/blob/master/codes/models/SFTGAN_ACD_model.py
 
 ## Network
 
@@ -116,17 +116,17 @@ like configuring your dataset.
 -   You can also easily write your own network architecture in a separate file like [/models/modules/architectures/sft_arch.py]
     or [/models/modules/architectures/PAN_arch.py].
 
-[/models/modules]: https://github.com/victorca25/BasicSR/tree/master/codes/models/modules
+[/models/modules]: https://github.com/victorca25/traiNNer/tree/master/codes/models/modules
 
-[/models/modules/architectures]: https://github.com/victorca25/BasicSR/tree/master/codes/models/modules/architectures
+[/models/modules/architectures]: https://github.com/victorca25/traiNNer/tree/master/codes/models/modules/architectures
 
-[/models/modules/architectures/block.py]: https://github.com/victorca25/BasicSR/blob/master/codes/models/modules/architectures/block.py
+[/models/modules/architectures/block.py]: https://github.com/victorca25/traiNNer/blob/master/codes/models/modules/architectures/block.py
 
-[/models/modules/architectures/sft_arch.py]: https://github.com/victorca25/BasicSR/blob/master/codes/models/modules/architectures/sft_arch.py
+[/models/modules/architectures/sft_arch.py]: https://github.com/victorca25/traiNNer/blob/master/codes/models/modules/architectures/sft_arch.py
 
-[/models/modules/architectures/PAN_arch.py]: https://github.com/victorca25/BasicSR/blob/master/codes/models/modules/architectures/PAN_arch.py
+[/models/modules/architectures/PAN_arch.py]: https://github.com/victorca25/traiNNer/blob/master/codes/models/modules/architectures/PAN_arch.py
 
-[/models/network.py]: https://github.com/victorca25/BasicSR/blob/master/codes/models/networks.py
+[/models/network.py]: https://github.com/victorca25/traiNNer/blob/master/codes/models/networks.py
 
 ## Utils
 
@@ -136,14 +136,14 @@ like configuring your dataset.
 -   [/utils/progress_bar.py] provides a progress bar which can print the progress.
 -   Support to use [tensorboard] to visualize and compare training loss, validation PSNR, SSIM, LPIPS, e.t.c.
 
-[/utils]: https://github.com/victorca25/BasicSR/tree/master/codes/utils
+[/utils]: https://github.com/victorca25/traiNNer/tree/master/codes/utils
 
-[/utils/util.py]: https://github.com/victorca25/BasicSR/blob/master/codes/utils/util.py
+[/utils/util.py]: https://github.com/victorca25/traiNNer/blob/master/codes/utils/util.py
 
-[/utils/progress_bar.py]: https://github.com/victorca25/BasicSR/blob/master/codes/utils/progress_bar.py
+[/utils/progress_bar.py]: https://github.com/victorca25/traiNNer/blob/master/codes/utils/progress_bar.py
 
 [tensorboard]: https://tensorflow.org/programmers_guide/summaries_and_tensorboard
 
 ## Scripts
 
-### [/scripts](https://github.com/victorca25/BasicSR/tree/master/codes/scripts) Provides useful scripts
+### [/scripts](https://github.com/victorca25/traiNNer/tree/master/codes/scripts) Provides useful scripts

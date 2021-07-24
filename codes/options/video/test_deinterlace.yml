@@ -14,7 +14,7 @@ datasets:
     dataroot_in: '../datasets/train/in' # Interlaced (combed) frames. If commented out, will be created OTF.
 
 path:
-  root: 'D:/Code/GitHub/BasicSR'
+  root: '../'
   pretrain_model_G: '../experiments/pretrained_models/1x_deinterlace_test.pth'
 
 network_G:

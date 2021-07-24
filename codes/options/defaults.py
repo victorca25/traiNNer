@@ -277,7 +277,7 @@ def get_network_G_config(network_G, scale, crop_size):
 def get_network_D_config(network_D, scale, crop_size, model_G):
     
     # Note: in PPON they used 100 features in the linear classifier for
-    # VGG-like discriminator instead of 128 like in BasicSR. Not important, but can review.
+    # VGG-like discriminator instead of 128. Not important, but can review.
     if model_G == 'ppon':
         model_G = 'PPON'
     else:

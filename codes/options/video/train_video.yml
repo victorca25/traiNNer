@@ -48,7 +48,7 @@ datasets:
 
 path:
     strict: false # true | false 
-    root: 'D:/Code/GitHub/BasicSR'
+    root: '../'
     pretrain_model_G: '../experiments/pretrained_models/video_x4.pth'
     #resume_state: '../experiments/debug_002_video_x4_REDS/training_state/16.state'
 

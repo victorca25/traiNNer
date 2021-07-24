@@ -476,7 +476,7 @@ def np2tensor(img, bgr2rgb=True, data_range=1., normalize=False, change_range=Tr
     """
     if not isinstance(img, np.ndarray): #images expected to be uint8 -> 255
         raise TypeError("Got unexpected object type, expected np.ndarray")
-    #check how many channels the image has, then condition, like in my BasicSR. ie. RGB, RGBA, Gray
+    #check how many channels the image has, then condition. ie. RGB, RGBA, Gray
     #if bgr2rgb:
         #img = img[:, :, [2, 1, 0]] #BGR to RGB -> in numpy, if using OpenCV, else not needed. Only if image has colors.
     if change_range:

@@ -105,7 +105,7 @@ These initial models are the same as the ones in the original [`pix2pix and Cycl
   <tr>
     <th rowspan="6">pix2pix</th>
     <td>facades_label2photo.pth</td>
-     <td rowspan="6"><sub>models originally available in the pix2pix repo. These correspond to the Pix2pix <a href="https://github.com/victorca25/BasicSR/blob/master/docs/datasets.md#image-to-image-translation">datasets</a>.</sub></td>
+     <td rowspan="6"><sub>models originally available in the pix2pix repo. These correspond to the Pix2pix <a href="https://github.com/victorca25/traiNNer/blob/master/docs/datasets.md#image-to-image-translation">datasets</a>.</sub></td>
     <td rowspan="6"><a href="https://drive.google.com/drive/folders/1gYeEOM1QIO-o3CG3aywtvKcCNmREf0bB?usp=sharing">Google Drive</a></td>
   </tr>
   <tr>
@@ -127,7 +127,7 @@ These initial models are the same as the ones in the original [`pix2pix and Cycl
   <tr>
     <th rowspan="11">CycleGAN</th>
     <td>facades_label2photo.pth, facades_photo2label.pth</td>
-     <td rowspan="11"><sub>models originally available in the CycleGAN repo. These correspond to the CycleGAN <a href="https://github.com/victorca25/BasicSR/blob/master/docs/datasets.md#image-to-image-translation">datasets</a>. In some cases, only one generator of the cycle was provided, but the missing generator can be trained with the original dataset.</sub></td>
+     <td rowspan="11"><sub>models originally available in the CycleGAN repo. These correspond to the CycleGAN <a href="https://github.com/victorca25/traiNNer/blob/master/docs/datasets.md#image-to-image-translation">datasets</a>. In some cases, only one generator of the cycle was provided, but the missing generator can be trained with the original dataset.</sub></td>
     <td rowspan="11"><a href="https://drive.google.com/drive/folders/1MTE_uQmTcHI5ieXo3-p2h9HftCLB03-t?usp=sharing">Google Drive</a></td>
   </tr>
   <tr>

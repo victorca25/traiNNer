@@ -25,13 +25,13 @@ First, there's a general section of options used to configure the experiment tra
 ```yaml
 name: 001_template  # the name that defines the experiment and the directory that will be created in the experiments directory.
 # name: debug_001_template  # use the "debug" or "debug_nochkp" prefix in the name to run a test session and check everything is working. Does validation and state saving every 8 iterations. Remove "debug" to run the real training session.
-use_tb_logger: true  # wheter to enable Tensorboard logging or not. Output will be saved in: https://github.com/victorca25/BasicSR/tree/master/tb_logger
-model: srragan  # the model training strategy to be used. Depends on the type of model, from: https://github.com/victorca25/BasicSR/tree/master/codes/models
+use_tb_logger: true  # wheter to enable Tensorboard logging or not. Output will be saved in: traiNNer/tb_logger/
+model: srragan  # the model training strategy to be used. Depends on the type of model, from: https://github.com/victorca25/traiNNer/tree/master/codes/models
 scale: 4  # the scale factor that will be used for training for super-resolution cases. Default is "1".
 gpu_ids: [0]  # the list of `CUDA_VISIBLE_DEVICES` that will be used during training, ie. for two GPUs, use [0, 1]. The batch size should be a multiple of the number of 'gpu_ids', since images will be distributed from the batch to each GPU.
 use_amp: true  # select to use PyTorch's Automatic Mixed Precision package to train in low-precision FP16 mode (lowers VRAM requirements).
 # use_swa: false  # select to use Stochastic Weight Averaging
-# use_cem: false  # select to use CEM during training. https://github.com/victorca25/BasicSR/tree/master/codes/models/modules/architectures/CEM
+# use_cem: false  # select to use CEM during training. https://github.com/victorca25/traiNNer/tree/master/codes/models/modules/architectures/CEM
 ```
 
 [Back to index](#common)
@@ -46,7 +46,7 @@ For training a `train` dataset is required:
 datasets:  # configure the datasets
   train:  # the stage the dataset will be used for (training)
     name: DIV2K  # the name of your dataset (only informative)
-    mode: aligned  # dataset mode: https://github.com/victorca25/BasicSR/tree/master/codes/data
+    mode: aligned  # dataset mode: https://github.com/victorca25/traiNNer/tree/master/codes/data
     # here you provide the paths to the input (A) and target (B) datasets.
     # it can be a list of directories as follows:
     dataroot_B: [
@@ -186,7 +186,7 @@ path:
     #resume_state: '../experiments/debug_001_RRDB_ESRGAN_x4_DIV2K/training_state/latest.state'  # resume a previous training session
 ```
 
-Then, you configure the network options, for both generator and discriminator. If you are using the default network configurations, you can use the network name and the defaults will be used. Check [`defaults.py`](https://github.com/victorca25/BasicSR/blob/master/codes/options/defaults.py) for the details. For example:
+Then, you configure the network options, for both generator and discriminator. If you are using the default network configurations, you can use the network name and the defaults will be used. Check [`defaults.py`](https://github.com/victorca25/traiNNer/blob/master/codes/options/defaults.py) for the details. For example:
 
 ```yaml
 # Generator options:
@@ -197,7 +197,7 @@ is equivalent to:
 
 ```yaml
 network_G:  # configurations for the Generator network
-  which_model_G: RRDB_net  # check:  https://github.com/victorca25/BasicSR/tree/master/codes/models/modules/architectures
+  which_model_G: RRDB_net  # check:  https://github.com/victorca25/traiNNer/tree/master/codes/models/modules/architectures
     norm_type: null  # norm type, null | "batch"
     mode: CNA  # Convolution mode: CNA for Conv-Norm_Activation or NAC
     nf: 64  # number of features (filters) for each layer
@@ -240,13 +240,13 @@ Another additional option for both cases is the configuration of the network ini
 
 The next part of the options relates to the training strategy. This includes the `optimizers` used to update the model weights in search of the minima, the `schedulers` to modify the learning rate during training and the `loss` functions used to evaluate the results and calculate the errors that will be backpropagated.
 
-Multiple Pytorch standard and additional [`optimizers`](https://github.com/victorca25/BasicSR/blob/master/codes/models/optimizers.py), [`schedulers`](https://github.com/victorca25/BasicSR/blob/master/codes/models/schedulers.py) and [`losses`](https://github.com/victorca25/BasicSR/blob/master/codes/models/modules/loss.py) are available to select. The templates will use the default configuration for each case, based on the original papers, but you can experiment with other options that can help produce better results for your particular case.
+Multiple Pytorch standard and additional [`optimizers`](https://github.com/victorca25/traiNNer/blob/master/codes/models/optimizers.py), [`schedulers`](https://github.com/victorca25/traiNNer/blob/master/codes/models/schedulers.py) and [`losses`](https://github.com/victorca25/traiNNer/blob/master/codes/models/modules/loss.py) are available to select. The templates will use the default configuration for each case, based on the original papers, but you can experiment with other options that can help produce better results for your particular case.
 
 If using discriminators, then options for `optimizers` and `schedulers` must be provided.
 
-Also in this block the configurations for frequency separation, batch augmentations and differential augmentations are found. More information in the [augmentations](https://github.com/victorca25/BasicSR/blob/master/docs/augmentations.md) document.
+Also in this block the configurations for frequency separation, batch augmentations and differential augmentations are found. More information in the [augmentations](https://github.com/victorca25/traiNNer/blob/master/docs/augmentations.md) document.
 
-First, the optimizers options. Similar to the networs, if you want to use the default parameters (which are used in many other cases and are considered to be "safe values"), you can opt for selecting only the optimizer algorithm name (check the details in [`optimizers`](https://github.com/victorca25/BasicSR/blob/master/codes/models/optimizers.py)). For example, to use the default `adam` optimizer for both generator and discriminator, use:
+First, the optimizers options. Similar to the networs, if you want to use the default parameters (which are used in many other cases and are considered to be "safe values"), you can opt for selecting only the optimizer algorithm name (check the details in [`optimizers`](https://github.com/victorca25/traiNNer/blob/master/codes/models/optimizers.py)). For example, to use the default `adam` optimizer for both generator and discriminator, use:
 
 ```yaml
 train:

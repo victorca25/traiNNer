@@ -176,7 +176,7 @@ class VidTrainsetLoader(Dataset):
                 LR_img = util.bgr2ycbcr(LR_img, only_y=True)
 
             # crop patches randomly if using otf noise
-            #TODO: make a BasicSR composable random_crop
+            #TODO: make a composable random_crop
             #TODO: note the original crop should go here and crop after loading each image, but could also be much simpler
             # to crop after concatenating. Check the speed difference.
             if self.otf_noise and self.opt['phase'] == 'train':
@@ -248,7 +248,7 @@ class VidTrainsetLoader(Dataset):
                     # tmp_vis(HR_center, False)
 
             # data augmentation
-            #TODO: use BasicSR augmentations
+            #TODO: reuse augmentations
             #TODO: use variables from config
             LR, HR, LR_bicubic, HR_center = augmentation()([LR, HR, LR_bicubic, HR_center])
 

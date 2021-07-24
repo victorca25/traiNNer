@@ -36,7 +36,7 @@ datasets:
 
 path:
     strict: false # true | false 
-    root: 'D:/Code/GitHub/BasicSR'
+    root: '../'
     # pretrain_model_G: '../experiments/pretrained_models/1x_deint_test.pth'
     # resume_state: '../experiments/1x_deint_test/training_state/latest.state'
 

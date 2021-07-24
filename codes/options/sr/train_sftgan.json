@@ -29,7 +29,7 @@
   }
 
   , "path": {
-    "root": "/home/xtwang/Projects/BasicSR"
+    "root": "../"
     , "resume_state": null
     , "pretrain_model_G": "../experiments/pretrained_models/sft_net_ini.pth"
   }

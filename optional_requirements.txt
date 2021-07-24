@@ -1,3 +1,4 @@
 lmdb
 scipy
 Pillow
+joblib

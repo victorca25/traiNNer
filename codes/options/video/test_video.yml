@@ -27,7 +27,7 @@ datasets:
     # tensor_shape: CTHW # TCHW (SOFVSR), CTHW (EVSRGAN)
 
 path:
-  root: 'D:/Code/GitHub/BasicSR'
+  root: '../'
   pretrain_model_G: '../experiments/pretrained_models/video_x4.pth'
 
 network_G:

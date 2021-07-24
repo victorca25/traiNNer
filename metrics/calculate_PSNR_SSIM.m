@@ -1,8 +1,8 @@
 function calculate_PSNR_SSIM()
 
 % GT and SR folder
-folder_GT = '/mnt/SSD/xtwang/BasicSR_datasets/val_set5/Set5';
-folder_SR  = '/home/xtwang/Projects/BasicSR/results/RRDB_PSNR_x4/set5';
+folder_GT = '../datasets/val_set5/Set5';
+folder_SR  = '../results/RRDB_PSNR_x4/set5';
 scale = 4;
 suffix = '';  % suffix for SR images
 test_Y = 1;  % 1 for test Y channel only; 0 for test RGB channels

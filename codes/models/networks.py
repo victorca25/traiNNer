@@ -194,7 +194,7 @@ def get_network(opt, step=0, selector=None):
     elif kind == 'discriminator_vgg_128':
         from models.modules.architectures import discriminators
         net = discriminators.Discriminator_VGG_128
-    elif kind in ('discriminator_vgg_192', 'discriminator_192'): #vic in PPON its called Discriminator_192, instead of BasicSR's Discriminator_VGG_192
+    elif kind in ('discriminator_vgg_192', 'discriminator_192'):
         from models.modules.architectures import discriminators
         net = discriminators.Discriminator_VGG_192
     elif kind in ('discriminator_vgg_256', 'discriminator_256'):
