@@ -313,24 +313,30 @@ def check_resume(opt: dict, resume_iter = None):
             state_idx = os.path.basename(opt['path']['resume_state']).split('.')[0]
 
         if opt['model'] == 'cyclegan':
-            model_keys = ['_A', '_B']
+            model_keys_G = ['_A', '_B']
+            model_keys_D = ['_A', '_B']
+        elif opt['model'] == 'wbc':
+            model_keys_G = ['']
+            model_keys_D = ['_S', '_T']
         else:
-            model_keys = ['']
+            model_keys_G = ['']
+            model_keys_D = ['']
 
-        for mkey in model_keys:
+        for mkey in model_keys_G:
             pgkey = f"pretrain_model_G{mkey}"
             gpath = os.path.normpath(os.path.join(opt['path']['models'], f'{state_idx}_G{mkey}.pth'))
             opt['path'][pgkey] = gpath
             logger.info(f'Set [pretrain_model_G{mkey}] to {gpath}')
-
-            if 'gan' in opt['model']:
-                pdkey = f"pretrain_model_D{mkey}"
-                dpath = os.path.normpath(os.path.join(opt['path']['models'], f'{state_idx}_D{mkey}.pth'))
-                opt['path'][pdkey] = dpath
-                logger.info(f'Set [pretrain_model_D{mkey}] to {dpath}')
 
             if 'swa' in opt['model'] or opt['use_swa']:
                 sgkey = f"pretrain_model_swaG{mkey}"
                 spath = os.path.normpath(os.path.join(opt['path']['models'], f'{state_idx}_swaG{mkey}.pth'))
                 opt['path'][sgkey] = spath
                 logger.info(f'Set [pretrain_model_swaG{mkey}] to {spath}')
+
+        for mkey in model_keys_D:
+            if 'gan' in opt['model'] or 'pix2pix' in opt['model'] or 'wbc' in opt['model']:
+                pdkey = f"pretrain_model_D{mkey}"
+                dpath = os.path.normpath(os.path.join(opt['path']['models'], f'{state_idx}_D{mkey}.pth'))
+                opt['path'][pdkey] = dpath
+                logger.info(f'Set [pretrain_model_D{mkey}] to {dpath}')

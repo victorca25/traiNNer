@@ -347,13 +347,14 @@ class CycleGANModel(BaseModel):
 
         l_g_total = 0
         with self.cast():
-            # Identity loss (fp16)
-            if self.lambda_idt and self.lambda_idt > 0 and self.idtlosses.loss_list:
+            if self.lambda_idt and self.lambda_idt > 0:
+                self.idt_A = self.netG_A(self.real_B)
                 log_idt_dict_A = OrderedDict()
                 log_idt_dict_B = OrderedDict()
 
+            # Identity loss (fp16)
+            if self.lambda_idt and self.lambda_idt > 0 and self.idtlosses.loss_list:
                 # G_A should be identity if real_B is fed: ||G_A(B) - B||
-                self.idt_A = self.netG_A(self.real_B)
                 loss_idt_A, log_idt_dict_A = self.idtlosses(
                     self.idt_A, self.real_B, log_idt_dict_A, self.f_low)
                 l_g_total += sum(loss_idt_A) * self.lambda_idt / self.accumulations
@@ -488,7 +489,7 @@ class CycleGANModel(BaseModel):
                     self.requires_grad(self.netD_B, False, target_layer=loc, net_type='D')
 
             self.backward_D_A()  # calculate gradients for D_A
-            self.backward_D_B()  # calculate graidents for D_B
+            self.backward_D_B()  # calculate gradients for D_B
             # only step and clear gradient if virtual batch has completed
             if (step + 1) % self.accumulations == 0:
                 if self.amp:

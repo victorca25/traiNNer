@@ -56,8 +56,7 @@ class BaseModel:
         :param opt: stores all the experiment flags
         """
         self.opt = opt
-        # self.device = torch.device('cuda' if opt['gpu_ids'] is not None else 'cpu')
-        if opt['gpu_ids'] is not None:
+        if opt['gpu_ids']:
             torch.cuda.current_device()
             torch.cuda.empty_cache()
             self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -170,6 +169,8 @@ class BaseModel:
                     logger.info(f'Loading pretrained model for {name} [{load_path:s}]')
                     model_type = 'D' if 'D' in name else 'G'
                     strict = self.opt[f'network_{model_type}'].get('strict', None)
+                    if not strict:
+                        strict = self.opt[f'network_{name}'].get('strict', None)
                     self.load_network(load_path, net, strict, model_type=name, submodule=load_submodule)
 
     def load_swa(self):
@@ -328,8 +329,9 @@ class BaseModel:
         except:  # pre 1.4.0, normal torch.save
             torch.save(state_dict, save_path)
 
-    def load_network(self, load_path: str, network: nn.Module, strict: bool = True, submodule: str = None,
-                     model_type: str = None, param_key: str = None):
+    def load_network(self, load_path:str, network:nn.Module,
+            strict:bool=True, submodule:str=None,
+            model_type:str=None, param_key:str=None):
         """
         Load pretrained model into instantiated network.
         :param load_path: The path of model to be loaded into the network.

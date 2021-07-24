@@ -85,7 +85,7 @@ def get_network_G_config(network_G, scale, crop_size):
         full_network_G['nb'] = network_G.pop('nb', 16)  # number of RRDB blocks
         full_network_G['upscale'] = network_G.pop('scale', scale)
         full_network_G['norm_type'] = network_G.pop('norm_type', None)  # "instance" normalization, "batch" normalization or no norm
-        full_network_G['act_type'] = network_G.pop('net_act', None) or network_G.pop('act_type', "leakyrelu")  # swish | relu | leakyrelu
+        full_network_G['act_type'] = network_G.pop('net_act', None) or network_G.pop('act_type', "relu")  # swish | relu | leakyrelu
         full_network_G['mode'] = network_G.pop('mode', "CNA")  # CNA: conv->norm->act, NAC: norm->act->conv
         full_network_G['upsample_mode'] = network_G.pop('upsample_mode', "pixelshuffle") # the type of upsample to use
         full_network_G['convtype'] = network_G.pop('convtype', "Conv2D")  # Conv2D | PartialConv2D | DeformConv2D | Conv3D
@@ -154,8 +154,16 @@ def get_network_G_config(network_G, scale, crop_size):
                 "blocks": [ 1, 8, 15, 22 ],
                 "concat": True}
     # image to image translation
+    elif 'wbcunet' in kind_G:
+        # WBC
+        full_network_G['type'] = "wbcunet_net"
+        full_network_G['nf'] = network_G.pop('nf', 32)
+        if 'tf' in kind_G:
+            full_network_G['mode'] = 'tf'
+        else:
+            full_network_G['mode'] = network_G.pop('mode', 'pt')
     elif 'unet' in kind_G:
-        #UNET:
+        # UNET:
         full_network_G['type'] = "unet_net"
         full_network_G['input_nc'] = network_G.pop('in_nc', 3) # # of input image channels: 3 for RGB and 1 for grayscale
         full_network_G['output_nc'] = network_G.pop('out_nc', 3) # # of output image channels: 3 for RGB and 1 for grayscale
@@ -179,7 +187,7 @@ def get_network_G_config(network_G, scale, crop_size):
         # full_network_G['dropout_prob'] = network_G.pop('dropout_prob', 0.5) # the default dropout probability
         full_network_G['upsample_mode'] = network_G.pop('upsample_mode', "deconv") # deconv | upconv # the type of upsample to use, deconvolution or upsample+convolution
     elif 'resnet' in kind_G and kind_G != 'sr_resnet':
-        #RESNET:
+        # RESNET:
         full_network_G['type'] = "resnet_net"
         full_network_G['input_nc'] = network_G.pop('in_nc', 3) # # of input image channels: 3 for RGB and 1 for grayscale
         full_network_G['output_nc'] = network_G.pop('out_nc', 3) # # of output image channels: 3 for RGB and 1 for grayscale
