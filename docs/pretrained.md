@@ -92,7 +92,7 @@ In order to use these models, they can be downloaded and saved in any directory 
 
 ## Image to image translation
 
-These initial models are the same as the ones in the original [`pix2pix and CycleGAN`](https://github.com/junyanz/pytorch-CycleGAN-and-pix2pix) repo and use the default UNet and ResNet networks configuration respectively (ie. using `ConvTranspose2d` for upsample layers).
+These initial models are the same as the ones in the original [`pix2pix and CycleGAN`](https://github.com/junyanz/pytorch-CycleGAN-and-pix2pix) repo and use the default `UNet` and `ResNet` networks configuration respectively (ie. using `ConvTranspose2d` for upsample layers).
 
 <table>
   <tr>
@@ -160,6 +160,18 @@ These initial models are the same as the ones in the original [`pix2pix and Cycl
   <tr>
     <td>iphone2dslr_flower.pth</td>
   </tr>
+
+  <tr>
+    <th rowspan="2">WBC</th>
+    <td>wbc.pth</td>
+     <td rowspan="2"><sub>'wbc.pth' is the current pretrained model trained using this code (new versions will be made available with further training).
+     'wbc_tf_converted.pth' model was converted from the original TensorFlow model in the <a href="https://github.com/SystemErrorWang/White-box-Cartoonization">WBC repo</a> to PyTorch. To be able to interpolate models, other models used it as pretrained, but interpolations with the converted model won't work correctly because of differing padding and upscaling configurations.</sub></td>
+    <td rowspan="2"><a href="https://drive.google.com/drive/folders/1kcY0TPHdm9MHbktTv6L2yrkFopMdwhQB?usp=sharing">Google Drive</a></td>
+  </tr>
+  <tr>
+    <td>wbc_tf_converted.pth</td>
+  </tr>
+
 
 </table>
 

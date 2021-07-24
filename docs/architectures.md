@@ -35,7 +35,7 @@ Below are the network architectures and, in general, training strategies support
    <img height="220" src="https://user-images.githubusercontent.com/41912303/107157089-77b5cc00-6982-11eb-83f3-05773ff46610.png">
 </p>
 
-In addition, since they are based on `ESRGAN` and don't modify the general training strategy or the network architecture, but only the data used for training, both [Real-SR](https://openaccess.thecvf.com/content_CVPRW_2020/papers/w31/Ji_Real-World_Super-Resolution_via_Kernel_Estimation_and_Noise_Injection_CVPRW_2020_paper.pdf) (2020) and [BSRGAN](https://arxiv.org/pdf/2103.14006v1.pdf) (2021) are supported. `Real-SR` by means of the [realistic kernels](https://github.com/victorca25/BasicSR/blob/master/docs/kernels.md) and noise injection and `BSRGAN` through the on the fly augmentations pipeline (some augmentations pending). More information in the [augmentations](https://github.com/victorca25/BasicSR/blob/master/docs/augmentations.md) document. These strategies can be combined with **any** of the networks above.
+In addition, since they are based on `ESRGAN` and don't modify the general training strategy or the network architecture, but only the data used for training, [Real-SR](https://openaccess.thecvf.com/content_CVPRW_2020/papers/w31/Ji_Real-World_Super-Resolution_via_Kernel_Estimation_and_Noise_Injection_CVPRW_2020_paper.pdf) (2020), [BSRGAN](https://arxiv.org/pdf/2103.14006v1.pdf) (2021) and [Real-ESRGAN](https://arxiv.org/pdf/2107.10833) (2021) are supported. `Real-SR` by means of the [realistic kernels](https://github.com/victorca25/BasicSR/blob/master/docs/kernels.md) and noise injection and `BSRGAN` and `Real-ESRGAN` through the on the fly augmentations pipeline (some augmentations pending). More information in the [augmentations](https://github.com/victorca25/BasicSR/blob/master/docs/augmentations.md) document. These strategies can be combined with **any** of the networks above.
 
 
 ## Image to image translation
@@ -46,10 +46,20 @@ In addition, since they are based on `ESRGAN` and don't modify the general train
    <img height="220" src="https://camo.githubusercontent.com/c10e6bc28b817a8741c2611e685eec2f6e2634587227699290dece8dd7e13d0c/68747470733a2f2f7068696c6c6970692e6769746875622e696f2f706978327069782f696d616765732f7465617365725f76332e706e67">
 </p>
 
-2. [***CycleGAN***](https://arxiv.org/pdf/1703.10593.pdf) (2017) Unpaired Image-to-Image Translation using Cycle-Consistent Adversarial Networks. Different to previous approaches, CycleGAN was one of the first works to use an approach for learning to translate an image from a source domain A to a target domain B in the absence of paired examples. More information in [how to train](https://github.com/victorca25/BasicSR/blob/master/docs/howtotrain.md#image-to-image-translation), the [CycleGAN Pytorch repo](https://github.com/junyanz/pytorch-CycleGAN-and-pix2pix) and the [project page](https://junyanz.github.io/CycleGAN/).
+2. [***CycleGAN***](https://arxiv.org/pdf/1703.10593.pdf) (2017) Unpaired Image-to-Image Translation using Cycle-Consistent Adversarial Networks. Different to previous approaches, `CycleGAN` was one of the first works to use an approach for learning to translate an image from a source domain A to a target domain B in the absence of paired examples. More information in [how to train](https://github.com/victorca25/BasicSR/blob/master/docs/howtotrain.md#image-to-image-translation), the [CycleGAN Pytorch repo](https://github.com/junyanz/pytorch-CycleGAN-and-pix2pix) and the [project page](https://junyanz.github.io/CycleGAN/).
 
 <p align="center">
    <img height="220" src="https://camo.githubusercontent.com/16fa02525bf502bec1aac77a3eb5b96928b0f25d73f7d9dedcc041ba28c38751/68747470733a2f2f6a756e79616e7a2e6769746875622e696f2f4379636c6547414e2f696d616765732f7465617365725f686967685f7265732e6a7067">
+</p>
+
+3. [***WBC***](https://openaccess.thecvf.com/content_CVPR_2020/papers/Wang_Learning_to_Cartoonize_Using_White-Box_Cartoon_Representations_CVPR_2020_paper.pdf) (2020) Learning to Cartoonize Using White-box Cartoon Representations. Unlike the black-box strategies like `Pix2pix` and `CycleGAN` use, white-box cartoonization (`WBC`) is designed to use domain knowledge about how cartoons (anime) are made and decomposes the training task in image representations that correspond to the cartoon images workflow, each with different objectives. In general, the representations are: smooth surfaces (`surface`), sparse color blocks (`structure`) and contours and fine textures (`texture`). Like `CycleGAN`, it uses unpaired images and by tuning the scale of each representation, as well as the scale of the guided filter, different results can be obtained. More information in [how to train](https://github.com/victorca25/BasicSR/blob/master/docs/howtotrain.md#image-to-image-translation). You can build your own datasets, but for reference the ones used by `WBC` are:
+    * landscape photos: the photos for the style transfer `CycleGAN` [dataset](https://github.com/victorca25/BasicSR/blob/master/docs/datasets.md#image-to-image-translation) (`6227`).
+    * landscape cartoon: frames extracted and cropped from Miyazaki Hayao (`3617`), Hosoda Mamoru (`5107`) and Shinkai Makoto (`5891`) films.
+    * face photos: [FFHQ](https://github.com/NVlabs/ffhq-dataset) photos (`#00000-10000`).
+    * face cartoon: faces extracted from works by PA Works (`5000`) and Kyoto Animation (`5000`).
+
+<p align="center">
+   <img height="220" src="https://user-images.githubusercontent.com/41912303/126795194-17627f01-84dd-467c-9604-c02a3cc57585.png">
 </p>
 
 
@@ -99,7 +109,6 @@ In addition, since they are based on `ESRGAN` and don't modify the general train
         journal = {GitHub repository},
         howpublished = {\url{https://github.com/victorca25/BasicSR}}
     }
-
     @InProceedings{wang2018esrgan,
         author = {Wang, Xintao and Yu, Ke and Wu, Shixiang and Gu, Jinjin and Liu, Yihao and Dong, Chao and Qiao, Yu and Loy, Chen Change},
         title = {ESRGAN: Enhanced super-resolution generative adversarial networks},
@@ -140,22 +149,25 @@ In addition, since they are based on `ESRGAN` and don't modify the general train
         booktitle={ECCV},
         year={2020}
     }
-
     @inproceedings{CycleGAN2017,
         title={Unpaired Image-to-Image Translation using Cycle-Consistent Adversarial Networkss},
         author={Zhu, Jun-Yan and Park, Taesung and Isola, Phillip and Efros, Alexei A},
         booktitle={Computer Vision (ICCV), 2017 IEEE International Conference on},
         year={2017}
     }
-
-
     @inproceedings{isola2017image,
         title={Image-to-Image Translation with Conditional Adversarial Networks},
         author={Isola, Phillip and Zhu, Jun-Yan and Zhou, Tinghui and Efros, Alexei A},
         booktitle={Computer Vision and Pattern Recognition (CVPR), 2017 IEEE Conference on},
         year={2017}
     }
-
+    @InProceedings{Wang_2020_CVPR,
+        author = {Wang, Xinrui and Yu, Jinze},
+        title = {Learning to Cartoonize Using White-Box Cartoon Representations},
+        booktitle = {IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)},
+        month = {June},
+        year = {2020}
+    }
     @Article{Wang2020tip,
         author    = {Longguang Wang and Yulan Guo and Li Liu and Zaiping Lin and Xinpu Deng and Wei An},
         title     = {Deep Video Super-Resolution using {HR} Optical Flow Estimation},
@@ -181,5 +193,4 @@ In addition, since they are based on `ESRGAN` and don't modify the general train
         journal={arXiv preprint arXiv:2011.06294},
         year={2020}
     }
-
 

@@ -134,15 +134,19 @@ Both pix2pix and CycleGAN can work for rectangular images. To make them work, yo
 
 There are practical restrictions regarding image sizes for each generator architecture. For `unet256`, it only supports images whose width and height are divisible by **`256`**. For `unet128`, the width and height need to be divisible by **`128`**. For `resnet_6blocks` and `resnet_9blocks`, the width and height need to be divisible by **`4`**.
 
+WBC also uses a `UNet` architecture (`wbcunet`) and while it's different from `CycleGAN`'s, it also expects images of size `256x256`.
+
 ## About batch size
 
 For all experiments in the original pix2pix and CycleGAN papers, the batch size was set to be 1. If there is room for memory, you can use higher batch size with batch norm or instance norm. (Note that the default `batchnorm` does not work well with multi-GPU training. You may consider using [synchronized batchnorm](https://github.com/vacancy/Synchronized-BatchNorm-PyTorch) instead). But please be aware that it can impact the training. In particular, even with Instance Normalization, different batch sizes can lead to different results. Moreover, increasing `crop_size` may be a good alternative to increasing the `batch_size`.
 
-## Identity loss (CycleGAN)
+For WBC the batch size was set to 16 and some adjustments to the losses could be necessary if modified.
+
+## Identity loss (CycleGAN, WBC)
 
 The identity loss can regularize the generator to be close to an identity mapping when fed with real samples from the target domain. If something already looks like from the target domain, you should preserve the image without making additional changes. The generator trained with this loss will often be more conservative for unknown content, meaning that if you want to allow more liberty to the model to be able to change the images, the identity loss should be disabled.
 
-## Using resize-conv to reduce checkerboard artifacts
+## Using resize-conv to reduce checkerboard artifacts (pix2pix, CycleGAN)
 
 This Distill [blog](https://distill.pub/2016/deconv-checkerboard/) discussed one of the potential causes of the checkerboard artifacts. You can fix that issue by switching from `deconv` ("deconvolution") to an `upconv` (regular upsampling followed by regular convolution). Currently the network parameters for both pix2pix and CycleGAN allow to make this change (using the `upsample_mode` option), but here's an alternative reference implementation using `ReflectionPad2d`:
 
@@ -154,7 +158,41 @@ nn.Conv2d(ngf * mult, int(ngf * mult / 2), kernel_size=3, stride=1, padding=0),
 
 Sometimes the checkboard artifacts will go away if you train long enough. Maybe you can try training your model a bit longer.
 
+## MultiSampler Dataloader (WBC)
 
+The training process for White-box Cartoonization expects one input dataset (real photos) and one target dataset (cartoons/anime). In both cases, one directory containing `landscape` (or scenery) images and another with `faces` are used and, by default, the code will automatically sample landscape images with a probability of `4/5` and faces with a probability of `1/5` when using the `concat_unaligned` dataset mode. The distribution weights can be changed with the `sampler_weights` option and if only one diretory is to be used (for example, only landscape), then the regular `unaligned` dataset mode can be used instead.
+
+## Image representations (WBC)
+
+Besides the regular loss weights from other models, due to the multiple representations used in `WBC`, it is also possible to select which of the configured losses will be used for each representation and an independent scale that each representation will have in total during training. This allows for very fine-grained configuration flexibility for training custom models.
+
+Each representation uses different images pairs to calculate the respective losses, namely:
+*   Surface: the `edge-preserving filtered model output` vs. the `edge-preserving filtered target cartoon image`.
+*   Texture: the `random grayscale model output` vs. the `random grayscale target cartoon image`.
+*   Structure: the `model output` vs. the `superpixel segmented model output`
+*   Content: the `input photo image` vs. the `model output`.
+*   Regularization: if using only the TV regularization, then only the `model output`, but otherwise it will calculate losses between the `model output` and the `target cartoon images` (for use with losses that can operate with unaligned images, like `Contextual Loss`).
+
+The representation losses are configured in the options file with:
+*   surf_losses
+*   text_losses
+*   struct_losses
+*   cont_losses
+*   reg_losses
+*   idt_losses
+
+And similarly, the representation scales with:
+*   surface_scale
+*   texture_scale
+*   struct_scale
+*   content_scale
+*   reg_scale
+
+Depending on each case you may want to tweak the balance of the losses, weights and scales to achieve the desired results. Note that when starting training, even if a pretrained model is used, the cartoonization effect may not be apparent while the discriminators are being trained, so a safer strategy is to start training with the default configuration for about 5000 iterations before tweaking the balance, so the effects can be properly evaluated.
+
+Something important to keep in mind is that the `Structure` representation calculates the superpixel targets from the model outputs, so it can potentially create a feedback loop if the scale of this representation is too high in comparison to the `Content` representation (that maintains the semantic invariability), so they have to be balanced.
+
+A valid alternative to tweaking every representation is to train multiple models from the same pretrained model, each with a focus on each representation and then interpolate the resulting models to fine-tune the results. The guided filter during inference also provides additional control over the details that are preserved in the final results.
 
 # Video
 
