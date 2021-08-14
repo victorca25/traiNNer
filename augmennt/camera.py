@@ -84,14 +84,31 @@ def masks_CFA_Bayer(shape, pattern:str='RGGB') -> tuple:
     return tuple(channels[c].astype(bool) for c in 'RGB')
 
 
+def make_img_even(img:np.ndarray,
+    border=cv2.BORDER_REFLECT101) -> np.ndarray:
+    """ Extend image in order to make it even sized """
+
+    h, w = img.shape[0:2]
+    top = 0
+    bottom = (h % 2 == 1)
+    left = 0
+    right = (w % 2 == 1)
+
+    if bottom > 0 or right > 0:
+        return cv2.copyMakeBorder(img, top, bottom, left, right, border)
+    return img
+
+
 def mosaic(RGB:np.ndarray) -> np.ndarray:
     """ Extracts RGGB *Bayer* planes from an RGB image
         as an array with each plane on a separate channel.
         Args:
             RGB: *RGB* colorspace array.
         Note: only supports 'RGGB' arrangement and images
-            with even H and W dimensions at the moment.
+            with even H and W dimensions at the moment,
+            so images are forced to expected dimensions.
     """
+    RGB = make_img_even(RGB)
     shape = RGB.shape
     red = RGB[0::2, 0::2, 0]
     green_red = RGB[0::2, 1::2, 1]

@@ -16,7 +16,8 @@ from .common import (preserve_shape, preserve_type, preserve_channel_dim,
     _cv2_interpolation2str, MAX_VALUES_BY_DTYPE, from_float, to_float,
     split_channels, merge_channels, preserve_range_float)
 from .functional import center_crop, crop
-from .camera import unprocess, random_noise_levels, add_noise, process
+from .camera import (unprocess, random_noise_levels, add_noise, process,
+    make_img_even)
 
 
 if float(cv2.__version__[:3]) >= 3.4 and float(cv2.__version__[4:]) >= 2:
@@ -190,7 +191,8 @@ def noise_gaussian(img:np.ndarray, mean:float=0.0,
 
 
 @preserve_type
-def noise_poisson(img: np.ndarray) -> np.ndarray:
+def noise_poisson(img: np.ndarray, scale:float=1.0,
+    gtype:str='color') -> np.ndarray:
     r"""Add Poisson noise to the image to simulate camera sensor noise.
         Important: Poisson noise is not additive like Gaussian,
         it's dependant on the image values.
@@ -204,8 +206,15 @@ def noise_poisson(img: np.ndarray) -> np.ndarray:
 
     vals = len(np.unique(img))
     vals = 2 ** np.ceil(np.log2(vals))
-    noisy = 255 * np.clip(np.random.poisson(img * vals) / float(vals), 0, 1)
-    return noisy
+    noisy = np.clip(np.random.poisson(img * vals) / float(vals), 0, 1)
+    if scale != 1.0 or gtype != 'color':
+        noise = noisy - img
+        if gtype in ('bw', 'gray'):
+            noise = cv2.cvtColor(noise, cv2.COLOR_BGR2GRAY)
+            noise = np.repeat(noise[:, :, np.newaxis], 3, axis=2)
+        noisy = noise * scale
+
+    return 255 * noisy
 
 
 @preserve_type
@@ -1301,9 +1310,21 @@ def add_chromatic(im:np.ndarray, strength:float=1,
          round((1 + 0.044 * strength) * dims["h"])),
         interpolation=cv2.INTER_CUBIC)
 
+    # # center and merge the channels
+    # rfinal = center_crop(rfinal, bfinal.shape[0:2])
+    # gfinal = center_crop(gfinal, bfinal.shape[0:2])
+    # imfinal = merge_channels([bfinal, gfinal, rfinal])
+
+    #TODO: check
     # center and merge the channels
-    rfinal = center_crop(rfinal, bfinal.shape[0:2])
-    gfinal = center_crop(gfinal, bfinal.shape[0:2])
+    sb = bfinal.shape[0:2]
+    sg = gfinal.shape[0:2]
+    sr = rfinal.shape[0:2]
+    oh = min(sb[0], sg[0], sr[0])
+    ow = min(sb[1], sg[1], sr[1])
+    bfinal = center_crop(bfinal, (ow, oh))
+    gfinal = center_crop(gfinal, (ow, oh))
+    rfinal = center_crop(rfinal, (ow, oh))
     imfinal = merge_channels([bfinal, gfinal, rfinal])
 
     # crop the image to the original image dimensions
@@ -1318,6 +1339,8 @@ def camera_noise(img:np.ndarray, xyz_arr:str='D50',
     """
     input_dtype = img.dtype
     needs_float = False
+    h, w = img.shape[0:2]
+    img = make_img_even(img)
 
     if input_dtype == np.float32:
         warnings.warn(
@@ -1360,5 +1383,6 @@ def camera_noise(img:np.ndarray, xyz_arr:str='D50',
     if needs_float:
         deg_img = to_float(deg_img, max_value=255)
 
+    deg_img = deg_img[:h, :w, :]
     return deg_img
 
