@@ -1,0 +1,62 @@
+kind: Noise
+version: v1
+metadata:
+  name: noise-resrgan
+  description: Real-ESRGAN noise preset
+
+config:
+  # types and pipeline settings
+  pipeline:
+    # noise
+    lr_noise: true
+    lr_noise_types: [gaussian, poisson]
+    lr_noise2: true
+    lr_noise_types2: [gaussian, poisson]
+    compression: [jpeg]
+    final_compression: [jpeg]
+    shuffle_degradations: false
+    # hr_unsharp_mask: true
+    # hr_rand_unsharp: 1
+
+  # the first degradation process
+  gaussian:
+    p: 1.0
+    mean: 0.0
+    var_limit: [1, 30]
+    prob_color: 0.6
+    multi: true  # 0.66 chance of mc
+
+  poisson:
+    p: 1.0
+    prob_color: 0.6
+    scale_range: [0.05, 3]
+
+  jpeg:
+    p: 1.0
+    min_quality: 30
+    max_quality: 95
+
+  # the second degradation process
+  gaussian2:
+    p: 1.0
+    mean: 0.0
+    var_limit: [1, 25]
+    prob_color: 0.6
+    multi: true
+
+  poisson2:
+    p: 1.0
+    prob_color: 0.6
+    scale_range: [0.05, 2.5]
+
+  # final degradations
+  final_compression:
+    p: 1.0
+
+  # hr augmentations
+  # unsharp:
+  #   p: 1.0
+  #   blur_algo: median
+  #   kernel_size: 3
+  #   strength: 0.3
+  #   unsharp_algo: laplacian

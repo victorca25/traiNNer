@@ -2,48 +2,142 @@ kind: Noise
 version: v1
 metadata:
   name: noise-default
-  description: default noise preset
+  description: default base noise and misc augmentations preset
 
 config:
-  dither:
-    p: 0.5
-    samplingF: 1
+  # types and pipeline settings
+  pipeline:
+    # noise augmentations
+    # lr_noise: false
+    # lr_noise_types: {gaussian: 1, jpeg: 1, clean: 4}
+    # lr_noise2: false
+    # lr_noise_types2: {jpeg: 1, webp: 1, clean: 2}
+    # hr_noise: false
+    # hr_noise_types:  {gaussian: 1, clean: 4}
 
-  # simple_quantize:
-  #     p: 0.5
-  #     rgb_range: 40
+    # color augmentations
+    # lr_fringes: false
+    # lr_fringes_chance: 0.4
+    # lr_auto_levels: false
+    # lr_rand_auto_levels: 0.7
+    # hr_auto_levels: false
+    # hr_rand_auto_levels: 0.7
+    # lr_unsharp_mask: false
+    # lr_rand_unsharp: 1
+    # hr_unsharp_mask: false
+    # hr_rand_unsharp: 1
 
-  quantize:
-    p: 0.5
-    num_colors: 16
-    sigma: 1.0
-    learning_rate: 0.2
-    neighborhood_function: bubble #'bubble', 'gaussian', 'mexican_hat' or 'triangle'
+    # augmentations for classification or inpainting networks
+    # lr_cutout: false
+    # lr_erasing: false
+
+    # compressions
+    # compression: [jpeg]
+    # final_compression: [jpeg]
+    shuffle_degradations: false
 
   gaussian:
-    p: 0.5
-    mean: 0
-    std: 1.0
-    gtype: color # 'color' or 'bw'
-    random_params: false
+    p: 1.0
+    mean: 0.0
+    var_limit: [1.0, 25.0]
+    prob_color: 0.5
+    multi: true
 
   jpeg:
-    p: 0.5
+    p: 1.0
+    min_quality: 30
+    max_quality: 95
+
+  webp:
+    p: 1.0
     min_quality: 20
     max_quality: 90
 
   poisson:
-    p: 0.5
+    p: 1.0
+    prob_color: 0.5
+    scale_range: [0.5, 1.0]
 
-  sp:
-    p: 0.5
+  s&p:
+    p: 1.0
     prob: 0.1
 
   speckle:
-    p: 0.5
-    std: 0.12
-    gtype: color # 'color' or 'bw'
+    p: 1.0
+    mean: 0.0
+    var_limit: [0.04, 0.12]
+    prob_color: 0.5
+
+  camera:
+    p: 1.0
+    demosaic_fn: malvar
+    xyz_arr: D50
+    rg_range: [1.2, 2.4]
+    bg_range: [1.2, 2.4]
+  
+  patches:
+    p: 1.0
+    noise_amp: 1.0
+
+  simple_quantize:
+      p: 1.0
+      rgb_range: 50
+
+  som_quantize:
+    p: 1.0
+    num_colors: 32
+    sigma: 1.0
+    learning_rate: 0.2
+    neighborhood_function: bubble  # 'bubble', 'gaussian', 'mexican_hat' or 'triangle'
+
+  km_quantize:
+    p: 1.0
+    num_colors: 32
+
+  superpixels:
+    p: 1.0
+    n_segments: 200
+    p_replace: 1.0
+    max_size: null
+    interpolation: 'BILINEAR'
+    algo: slic
+    n_iters: 10
+    kind: mix
+    reduction: null
+
+  maxrgb:
+    p: 1.0
+
+  dither:
+    p: 1.0
+    samplingF: 1
+
+  # misc augmentations
+  auto_levels:
+    p: 1.0
+    percent: 10
     random_params: false
 
-  maxrgb: 
-    p: 0.5
+  unsharp:
+    p: 1.0
+    blur_algo: median
+    kernel_size: 3
+    strength: 0.3
+    unsharp_algo: laplacian
+
+  clahe:
+    p: 1.0
+    clip_limit: 4.0
+    tile_grid_size: [8, 8]
+
+  fringes:
+    p: 1.0
+    radial_blur: true
+    strength: 1.0
+    jitter: 0
+    alpha: 0.0
+    random_params: false
+
+  canny:
+    p: 1.0
+    sigma: 0.33

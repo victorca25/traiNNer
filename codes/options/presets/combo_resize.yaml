@@ -1,0 +1,33 @@
+kind: Resize
+version: v1
+metadata:
+  name: resize-combo
+  description: Combined traiNNer resize preset
+
+config:
+  # types and pipeline settings
+  pipeline:
+    # resize
+    resize_strat: in
+    lr_downscale: true
+    lr_downscale_types: [area, linear, bicubic, nearest_aligned, down_up, realistic]
+    # note: realistic needs 'dataroot_kernels' path
+    lr_downscale2: true
+    lr_downscale_types2: [area, linear, bicubic, nearest_aligned, down_up, realistic]
+    down_up_types: [linear, bicubic, mitchell]
+    final_scale: true
+    final_scale_types: [area, linear, bicubic, mitchell]
+
+  # the first degradation process
+  resize:
+    resize_prob: {up: 0.2, down: 0.7, keep: 0.1}
+    resize_range_up: [1, 1.5]
+    resize_range_down: [0.15, 1]
+    down_up_min: 0.5  # max = scale
+
+  # the second degradation process
+  resize2:
+    resize_prob: {up: 0.3, down: 0.4, keep: 0.3}
+    resize_range_up: [1, 1.2]
+    resize_range_down : [0.3, 1]
+    down_up_min: 0.5  # max = scale

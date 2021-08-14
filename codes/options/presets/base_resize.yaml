@@ -1,0 +1,35 @@
+kind: Resize
+version: v1
+metadata:
+  name: resize-default
+  description: default resize preset
+
+config:
+  # types and pipeline settings
+  pipeline:
+    # resize
+    resize_strat: pre
+    lr_downscale: true
+    lr_downscale_types: ["linear", "bicubic"]
+    # lr_downscale2: false
+    # lr_downscale_types2: ["linear", "bicubic"]
+    # down_up_types: ['linear', 'bicubic']
+    # final_scale: false
+    # final_scale_types: ["linear", "bicubic"]
+    # random downscaling of HR images (will fix LR pair to correct size)
+    # hr_downscale: false
+    # hr_downscale_amt: [2, 1.75, 1.5, 1]
+
+  # the first degradation process
+  resize:
+    resize_prob: {down: 1.0}
+    resize_range_up: [1, 1.5]
+    resize_range_down: [0.15, 1]
+    down_up_min: 0.5  # max = scale
+
+  # the second degradation process
+  resize2:
+    resize_prob: {down: 1.0}
+    resize_range_up: [1, 1.2]
+    resize_range_down : [0.3, 1]
+    down_up_min: 0.5  # max = scale

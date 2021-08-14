@@ -2,27 +2,79 @@ kind: Blur
 version: v1
 metadata:
   name: blur-default
-  description: default blur preset
+  description: default base blur preset
 
 config:
-  average:
-    p: 0.5
-    kernel_size: 3
-    random_params: false
-
-  box:
-    p: 0.5
-    kernel_size: 3
-    random_params: false
+  # types and pipeline settings
+  pipeline:
+    # blur
+    # lr_blur: false
+    # lr_blur_types: {gaussian: 1, clean: 3}
+    # blur_prob: 1.0
+    # lr_blur2: true
+    # lr_blur_types2: [sinc, iso, aniso]
+    # blur_prob2: 1.0
+    # final_blur: [sinc]
+    # final_blur_prob: 1.0
+    shuffle_degradations: false
 
   gaussian:
-    p: 0.5
-    kernel_size: 3
-    random_params: false
+    p: 1.0
+    kernel_size: 11
+    sigmaX: [0.1, 2.8]
+    sigmaY: null
+    init_params: true
+
+  iso:
+    p: 1.0
+    min_kernel_size: 7
+    kernel_size: 21
+    sigmaX: [0.1, 2.8]
+    noise: 0.25
+
+  aniso:
+    p: 1.0
+    min_kernel_size: 7
+    kernel_size: 21
+    sigmaX: [0.1, 2.8]
+    sigmaY: [0.1, 2.8]
+    angle: [0, 180]
+    noise: 0.5
+
+  sinc:
+    p: 1.0
+    min_kernel_size: 7
+    kernel_size: 21
+    min_cutoff: null
+
+  average:
+    p: 1.0
+    kernel_size: 11
+    init_params: true
+
+  box:
+    p: 1.0
+    kernel_size: 11
+    init_params: true
+
+  median:
+    p: 1.0
+    kernel_size: 11
+    init_params: true
 
   bilateral:
-    p: 0.5
-    kernel_size: 3
-    sigmaColor: 5
-    sigmaSpace: 5
-    random_params: false
+    p: 1.0
+    kernel_size: 11
+    sigmaX: 200  # sigmaColor
+    sigmaY: 200  # sigmaSpace
+    init_params: true
+
+  motion:
+    p: 1.0
+    kernel_size: 7
+    init_params: true
+
+  complexmotion:
+    p: 1.0
+    size: 100
+    complexity: 1.0

@@ -1,0 +1,68 @@
+kind: Blur
+version: v1
+metadata:
+  name: blur-resrgan
+  description: Real-ESRGAN blur preset
+
+config:
+  # types and pipeline settings
+  pipeline:
+    # blur
+    lr_blur: true
+    lr_blur_types: {sinc: 0.1, iso: 0.58, aniso: 0.32}
+    blur_prob: 1.0
+    lr_blur2: true
+    lr_blur_types2: {sinc: 0.1, iso: 0.58, aniso: 0.32}
+    blur_prob2: 0.8
+    shuffle_degradations: false
+    final_blur: [sinc]
+    final_blur_prob: 0.8
+
+  # the first degradation process
+  iso:
+    p: 1.0
+    min_kernel_size: 7
+    kernel_size: 21
+    sigmaX: [0.2, 3]
+    noise: null
+
+  aniso:
+    p: 1.0
+    min_kernel_size: 7
+    kernel_size: 21
+    sigmaX: [0.2, 3]
+    sigmaY: [0.2, 3]
+    angle: [-180, 180]
+    noise: null
+
+  sinc:
+    p: 1.0
+    min_kernel_size: 7
+    kernel_size: 21
+    min_cutoff: null
+
+  # the second degradation process
+  iso2:
+    p: 1.0
+    min_kernel_size: 7
+    kernel_size: 21
+    sigmaX: [0.2, 1.5]
+    noise: null
+
+  aniso2:
+    p: 1.0
+    min_kernel_size: 7
+    kernel_size: 21
+    sigmaX: [0.2, 1.5]
+    sigmaY: [0.2, 1.5]
+    angle: [-180, 180]
+    noise: null
+
+  sinc2:
+    p: 1.0
+    min_kernel_size: 7
+    kernel_size: 21
+    min_cutoff: null
+
+  # final degradations
+  

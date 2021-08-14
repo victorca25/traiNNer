@@ -1,0 +1,85 @@
+kind: Noise
+version: v1
+metadata:
+  name: noise-combo
+  description: Combined traiNNer noise preset
+
+config:
+  # types and pipeline settings
+  pipeline:
+    # noise
+    lr_noise: true
+    lr_noise_types: [gaussian, poisson, camera, patches]
+    # note: patches needs 'noise_data' path
+    lr_noise2: true
+    lr_noise_types2: [gaussian, poisson, camera, patches]
+    compression: {jpeg: 0.75, webp: 0.25}
+    final_compression: [jpeg]
+    shuffle_degradations: false
+    # hr_unsharp_mask: true
+    # hr_rand_unsharp: 1
+
+  # the first degradation process
+  gaussian:
+    p: 1.0
+    mean: 0.0
+    var_limit: [1, 30]
+    prob_color: 0.6
+    multi: true  # 0.66 chance of mc
+
+  poisson:
+    p: 1.0
+    prob_color: 0.6
+    scale_range: [0.05, 3]
+
+  camera:
+    p: 1.0
+    demosaic_fn: malvar
+    xyz_arr: D50
+    rg_range: [1.2, 2.4]
+    bg_range: [1.2, 2.4]
+
+  patches:
+    p: 1.0
+    noise_amp: 1.0
+
+  jpeg:
+    p: 1.0
+    min_quality: 30
+    max_quality: 95
+
+  # the second degradation process
+  gaussian2:
+    p: 1.0
+    mean: 0.0
+    var_limit: [1, 25]
+    prob_color: 0.6
+    multi: true
+
+  poisson2:
+    p: 1.0
+    prob_color: 0.6
+    scale_range: [0.05, 2.5]
+
+  camera2:
+    p: 1.0
+    demosaic_fn: malvar
+    xyz_arr: D50
+    rg_range: [1.2, 2.4]
+    bg_range: [1.2, 2.4]
+
+  patches2:
+    p: 1.0
+    noise_amp: 1.0
+
+  # final degradations
+  final_compression:
+    p: 1.0
+
+  # hr augmentations
+  # unsharp:
+  #   p: 1.0
+  #   blur_algo: median
+  #   kernel_size: 3
+  #   strength: 0.3
+  #   unsharp_algo: laplacian

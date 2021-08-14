@@ -1,0 +1,35 @@
+kind: Blur
+version: v1
+metadata:
+  name: blur-bsrgan
+  description: BSRGAN blur preset
+
+config:
+  # types and pipeline settings
+  pipeline:
+    # blur
+    lr_blur: true
+    lr_blur_types: [iso]
+    blur_prob: 1.0
+    lr_blur2: true
+    lr_blur_types2: [aniso]
+    blur_prob2: 1.0
+    shuffle_degradations: true
+
+  # the first degradation process
+  iso:
+    p: 1.0
+    min_kernel_size: 7
+    kernel_size: 21
+    sigmaX: [0.1, 2.8]  # [0.1, 2.4] 2x
+    noise: null
+
+  # the second degradation process
+  aniso2:
+    p: 1.0
+    min_kernel_size: 7
+    kernel_size: 21
+    sigmaX: [0.5, 8]
+    sigmaY: [0.5, 8]
+    angle: [0, 180]
+    noise: null

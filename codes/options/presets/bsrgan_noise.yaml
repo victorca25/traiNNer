@@ -1,0 +1,42 @@
+kind: Noise
+version: v1
+metadata:
+  name: noise-bsrgan
+  description: BSRGAN noise preset
+
+config:
+  # types and pipeline settings
+  pipeline:
+    # noise
+    lr_noise: true
+    lr_noise_types: [gaussian]
+    lr_noise2: true
+    lr_noise_types2: [camera]
+    compression: [jpeg]
+    final_compression: [jpeg]
+    shuffle_degradations: true
+
+  # the first degradation process
+  gaussian:
+    p: 1.0
+    mean: 0.0
+    var_limit: [1, 25]
+    prob_color: 0.6
+    multi: true  # 0.66 chance of mc
+
+  jpeg:
+    p: 0.75
+    min_quality: 30
+    max_quality: 95
+
+  # the second degradation process
+  camera2:
+    p: 0.25
+    demosaic_fn: malvar
+    xyz_arr: D50
+    rg_range: [1.2, 2.4]
+    bg_range: [1.2, 2.4]
+
+  # final degradations
+  final_compression:
+    p: 1.0

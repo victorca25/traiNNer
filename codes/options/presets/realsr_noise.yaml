@@ -1,0 +1,18 @@
+kind: Noise
+version: v1
+metadata:
+  name: noise-realsr
+  description: Real-SR noise preset
+
+config:
+  # types and pipeline settings
+  pipeline:
+    # noise
+    lr_noise: true
+    lr_noise_types: [patches]
+    # note: patches needs 'noise_data' path
+    shuffle_degradations: false
+
+  patches:
+    p: 1.0
+    noise_amp: 1.0

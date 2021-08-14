@@ -1,0 +1,14 @@
+kind: Resize
+version: v1
+metadata:
+  name: resize-realsr
+  description: Real-SR resize preset
+
+config:
+  # types and pipeline settings
+  pipeline:
+    # resize
+    resize_strat: pre
+    lr_downscale: true
+    lr_downscale_types: [realistic]
+    # note: realistic needs 'dataroot_kernels' path

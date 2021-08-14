@@ -1,0 +1,20 @@
+kind: Resize
+version: v1
+metadata:
+  name: resize-bsrgan
+  description: BSRGAN resize preset
+
+config:
+  # types and pipeline settings
+  pipeline:
+    # resize
+    resize_strat: in
+    lr_downscale: true
+    lr_downscale_types: [nearest_aligned, linear, cubic, down_up]
+    down_up_types: [linear, bicubic]
+    final_scale: true
+    final_scale_types: [linear, bicubic]
+
+  # the first degradation process
+  resize:
+    down_up_min: 0.5  # max = scale

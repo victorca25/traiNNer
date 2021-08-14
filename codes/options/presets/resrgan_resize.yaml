@@ -1,0 +1,29 @@
+kind: Resize
+version: v1
+metadata:
+  name: resize-resrgan
+  description: Real-ESRGAN resize preset
+
+config:
+  # types and pipeline settings
+  pipeline:
+    # resize
+    resize_strat: in
+    lr_downscale: true
+    lr_downscale_types: [area, linear, bicubic]
+    lr_downscale2: true
+    lr_downscale_types2: [area, linear, bicubic]
+    final_scale: true
+    final_scale_types: [area, linear, bicubic]
+
+  # the first degradation process
+  resize:
+    resize_prob: {up: 0.2, down: 0.7, keep: 0.1}
+    resize_range_up: [1, 1.5]
+    resize_range_down: [0.15, 1]
+
+  # the second degradation process
+  resize2:
+    resize_prob: {up: 0.3, down: 0.4, keep: 0.3}
+    resize_range_up: [1, 1.2]
+    resize_range_down : [0.3, 1]
