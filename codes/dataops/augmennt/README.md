@@ -9,10 +9,10 @@ Most functions from the original Torchvision transforms are reimplemented, with 
 2.  OpenCV images are Numpy arrays. OpenCV supports uint8, int8, uint16, int16, int32, float32, float64. Certain operations (like `cv.CvtColor()`) do require to convert the arrays to OpenCV type (with `cv.fromarray()`).
 3.  The affine transform in the original one only has 5 degrees of freedom, YU-Zhiyang implemented an Affine transform with 6 degress of freedom called `RandomAffine6` (can be found in [transforms.py](augmennt/transforms.py)). The original method `RandomAffine` is also available and reimplemented with OpenCV.
 4.  The rotate function is clockwise, however the original one is anticlockwise.
-5.  Some new augmentations have been added, in comparison to Torchvision's, refer to the list [below](#support).
+5.  Some new augmentations have been added, in comparison to Torchvision's, refer to the list below.
 6.  **The outputs of the OpenCV versions are almost the same as the original one's (it's possible to test by running [test.py](/test.py)) directly with test images**.
 
-These are the basic augmentations, equivalent to torchvision's:
+These are the basic transforms, equivalent to torchvision's:
 
 -   `Compose`, `ToTensor`, `ToCVImage`, `Normalize`,
 -   `Resize`, `CenterCrop`, `Pad`,
@@ -23,7 +23,7 @@ These are the basic augmentations, equivalent to torchvision's:
 -   `RandomRotation`, `RandomAffine`,
 -   `Grayscale`, `RandomGrayscale`, `RandomErasing`,
 
-The additional transforms can be used to train models such as [Noise2Noise](https://arxiv.org/pdf/1803.04189.pdf), [BSRGAN](https://arxiv.org/pdf/2103.14006v1.pdf) [White-box Cartoonization](https://openaccess.thecvf.com/content_CVPR_2020/papers/Wang_Learning_to_Cartoonize_Using_White-Box_Cartoon_Representations_CVPR_2020_paper.pdf) and [EdgeConnect](https://openaccess.thecvf.com/content_ICCVW_2019/papers/AIM/Nazeri_EdgeConnect_Structure_Guided_Image_Inpainting_using_Edge_Prediction_ICCVW_2019_paper.pdf), among others. There are some general augmentations:
+The additional transforms can be used to train models such as [Noise2Noise](https://arxiv.org/pdf/1803.04189.pdf), [BSRGAN](https://arxiv.org/pdf/2103.14006v1.pdf), [Real-ESRGAN](https://arxiv.org/pdf/2107.10833.pdf), [White-box Cartoonization](https://openaccess.thecvf.com/content_CVPR_2020/papers/Wang_Learning_to_Cartoonize_Using_White-Box_Cartoon_Representations_CVPR_2020_paper.pdf) and [EdgeConnect](https://openaccess.thecvf.com/content_ICCVW_2019/papers/AIM/Nazeri_EdgeConnect_Structure_Guided_Image_Inpainting_using_Edge_Prediction_ICCVW_2019_paper.pdf), among others. There are some general augmentations:
 -   `RandomAffine6`, `Cutout`, `RandomPerspective`,
 
 Noise augmentations, with options for artificial noises and realistic noise generation:
@@ -38,6 +38,7 @@ Blurs and different kind of kernels generation and use, with standard blurs, iso
 -   `RandomGaussianBlur`, `RandomMedianBlur`,
 -   `RandomMotionBlur`, `RandomComplexMotionBlur`,
 -   `RandomAnIsoBlur`, `AlignedDownsample`, `ApplyKernel`,
+-   `RandomSincBlur`
 
 Filters to modify the images, including color quantization, superpixel segmentation and CLAHE:
 -   `FilterMaxRGB`, `FilterColorBalance`, `FilterUnsharp`,
@@ -59,13 +60,13 @@ Edge filters:
 
 -   torchvision >= 0.2.1
 
-In order to use the additional Superpixel options (skimage SLIC and Felzenszwalb algorithms), as well as segment reduction algorithms (selective search and RAG merging) and the Menon demosaicing algorithm, there are additional requirements:
+In order to use the additional Superpixel options (skimage SLIC and Felzenszwalb algorithms), segments reduction algorithms (selective search and RAG merging), the Menon demosaicing algorithm and the sinc filter, there are additional requirements:
 -   scikit-image >= 0.17.2
 -   scipy >= 1.6.2
 
 ## Usage
 
-1.  git clone <https://github.com/victorca25/augmeNNt.git> .
+1.  git clone <https://github.com/victorca25/augmennt.git> .
 2.  Add `augmennt` to your python path.
 3.  Add `from augmennt import augmennt as transforms` in your python file.
 4.  From here, almost everything should work exactly as the original `transforms`.

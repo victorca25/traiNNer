@@ -4,13 +4,13 @@ with open('README.md', 'r') as fh:
     long_description = fh.read()
 
 setuptools.setup(
-    name='opencv_transforms_torchvision',
+    name='augmennt',
     version='0.1',
-    description='A drop-in replacement for Torchvision Transforms using OpenCV', 
+    description='Augmentations for super-resolution, restoration and image-to-image translation CNN models',
     keywords='pytorch image augmentations',
     long_description=long_description, 
     long_description_content_type='text/markdown', 
-    url='https://github.com/victorca25/opencv_transforms',
+    url='https://github.com/victorca25/augmennt',
     packages=setuptools.find_packages(),
     classifiers=[
         "Programming Language :: Python :: 3",

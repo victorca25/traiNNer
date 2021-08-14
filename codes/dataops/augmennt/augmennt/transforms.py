@@ -18,6 +18,7 @@ import warnings
 from . import functional as F
 from . import extra_functional as EF
 from . import superpixels as SP
+from . import spadd as SCIP
 from .minisom import MiniSom
 from .common import (fetch_kernels, to_tuple, _cv2_interpolation2str,
     _cv2_str2interpolation, convolve, sample, MAX_VALUES_BY_DTYPE)
@@ -36,6 +37,7 @@ __all__ = ["Compose", "ToTensor", "ToCVImage",
            "RandomAverageBlur", "RandomBilateralBlur", "RandomBoxBlur",
            "RandomGaussianBlur", "RandomMedianBlur", "RandomMotionBlur",
            "RandomComplexMotionBlur", "RandomAnIsoBlur", "AlignedDownsample",
+           "RandomSincBlur",
            "BayerDitherNoise", "FSDitherNoise", "AverageBWDitherNoise", "BayerBWDitherNoise",
            "BinBWDitherNoise", "FSBWDitherNoise", "RandomBWDitherNoise",
            "FilterColorBalance", "FilterUnsharp", "CLAHE",
@@ -1608,11 +1610,40 @@ class RandomPoissonNoise(RandomBase):
     """Apply Poisson noise on the given image randomly with
     a given probability.
     Args:
-        p: probability of the image being noised. Default value is 0.5
+        p: probability of the image being noised.
+        prob_color: Probably for selecting the type of Poisson noise
+            to add, either colored or grayscale (``color`` or ``gray``),
+            in range [0.0, 1.0], higher means more chance of `color`.
     """
 
-    def __init__(self, p:float=0.5):
+    def __init__(self, p:float=0.5, prob_color:float=0.5,
+        scale_range=(0.5, 1.0)):
         super(RandomPoissonNoise, self).__init__(p=p)
+        if not isinstance(prob_color, (int, float)):
+            raise ValueError('prob_color must be a number in [0, 1]')
+
+        if isinstance(scale_range, (tuple, list)):
+            if scale_range[0] < 0 or scale_range[1] < 0:
+                raise ValueError(
+                    f"scale_range values: {scale_range} should "
+                     "be non negative.")
+            self.scale_range = scale_range
+        elif isinstance(scale_range, (int, float)):
+            if scale_range < 0:
+                raise ValueError("scale_range should be non negative.")
+            self.scale_range = (scale_range)
+
+        self.prob_color = prob_color
+        self.scale_range = scale_range
+
+    def get_params(self):
+        """Get parameters for noise.
+        Returns: dict of parameters.
+        """
+        gtype = 'color' if random.random() < self.prob_color else 'gray'
+        scale = random.uniform(scale_range[0], scale_range[1])
+        return {"gtype": gtype,
+                "scale": scale}
 
     def apply(self, img, **params):
         return EF.noise_poisson(img, **params)
@@ -1844,12 +1875,13 @@ class BlurBase:
 
     def get_params(self, imgdim=None):
         """
-        Get kernel size for blur filter in range (3, kernel_size).
+        Get parameters for function.
+            kernel size for blur filter in range (3, kernel_size).
             (Can validate that the kernel is larger than the image and
             an odd integer)
 
         Returns:
-            kernel size to be passed to filter
+            parameters to be passed to filter.
         """
 
         kernel_size = np.random.randint(
@@ -2329,7 +2361,8 @@ class FilterUnsharp:
         p (float): probability of the image being noised. Default value is 0.5
     """
 
-    def __init__(self, blur_algo='median', kernel_size=None, strength:float=0.3, unsharp_algo='laplacian', p:float=0.5):
+    def __init__(self, blur_algo='median', kernel_size=None,
+        strength:float=0.3, unsharp_algo='laplacian', p:float=0.5):
         assert isinstance(p, numbers.Number) and p >= 0, 'p should be a positive value'
         self.blur_algo = blur_algo
         self.kernel_size = kernel_size
@@ -2358,14 +2391,14 @@ class FilterCanny(RandomBase):
     r"""Automatic Canny filter for edge detection
     Args:
         img (numpy ndarray): Image to be filtered.
-        sigma (float): standard deviation from the median to automatically calculate minimun 
-            values and maximum values thresholds. Default: 0.33.
-        p (float): probability of the image being noised. Default value is 0.5
+        sigma: standard deviation from the median to automatically
+            calculate minimun values and maximum values thresholds.
+        p: probability of the image being noised.
     Returns:
         numpy ndarray: version of the image after Canny filter.
     """
-    def __init__(self, sigma:float = 0.33, p:float = 0.5, 
-                    bin_thresh:bool = False, threshold:int = 127):
+    def __init__(self, sigma:float=0.33, p:float=0.5,
+        bin_thresh:bool=False, threshold:int=127):
         super(FilterCanny, self).__init__(p=p)
         self.sigma = sigma
 
@@ -2511,14 +2544,7 @@ class RandomAnIsoBlur(ApplyKernel):
             center = False)
 
     def get_params(self, imgdim=None):
-        """
-        Get kernel size for blur filter in range (3, kernel_size).
-            Validates that the kernel is larger than the image and
-            an odd integer.
-
-        Returns:
-            kernel size to be passed to filter.
-        """
+        """ Get function parameters. """
         kernel_size = np.random.randint(
             self.kernel_size[0], self.kernel_size[1]+1)
 
@@ -2562,6 +2588,58 @@ class AlignedDownsample(RandomAnIsoBlur):
         super(AlignedDownsample, self).__init__(p=p,
             min_kernel_size=21, kernel_size=21,
             sigmaX=(0.1, 0.1), scale=scale)
+
+
+class RandomSincBlur(ApplyKernel):
+    """Applying 2D sinc filter on the given image randomly
+    with a given probability.
+    Args:
+        p: probability of applying the transform.
+        min_kernel_size: minimum kernel size.
+        kernel_size: maximum kernel size.
+        min_cutoff: min omega cutoff frequency in radians (pi is max).
+    """
+    def __init__(self, p:float=0.5, min_kernel_size:int=7,
+        kernel_size:int=21, min_cutoff=None):
+
+        if not isinstance(p, numbers.Number) or p < 0:
+            raise ValueError('p should be a positive value')
+        self.p = p
+        self.kernel_size = to_tuple(kernel_size, low=min_kernel_size)
+        self.cutoff = min_cutoff
+        kernel = SCIP.get_sinc_kernel(**self.get_params())
+
+        super(RandomSincBlur, self).__init__(
+            scale = 1,
+            kernel = kernel,
+            size = None,
+            center = False)
+
+    def get_params(self, imgdim=None):
+        """ Get function parameters. """
+        kernel_size = np.random.randint(
+            self.kernel_size[0], self.kernel_size[1])
+
+        # force odd kernel size
+        kernel_size = int(np.ceil(kernel_size))
+        if kernel_size != 0 and kernel_size % 2 == 0:
+            kernel_size += 1
+
+        if self.cutoff:
+            cutoff = self.cutoff
+        else:
+            min_cutoff = np.pi / 3 if kernel_size < 13 else np.pi / 5
+            cutoff = random.uniform(*to_tuple(np.pi, low=min_cutoff))
+
+        params = {
+            "kernel_size": kernel_size,
+            "cutoff": cutoff,
+            }
+
+        return params
+
+    def __repr__(self):
+        return self.__class__.__name__ + f'(p={self.p})'
 
 
 class CLAHE(RandomBase):

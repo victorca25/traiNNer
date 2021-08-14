@@ -326,9 +326,10 @@ def convolve(img:np.ndarray, kernel:np.ndarray, per_channel:bool=False,
     return conv_fn(img)
 
 
-def norm_kernel(kernel):
+def norm_kernel(kernel:np.ndarray) -> np.ndarray:
+    """normalize kernel, so it sums up to 1."""
     if np.sum(kernel) == 0.0:
-        # if kernel is empty, return identity kernel
+        # if kernel is empty, return identity kernel (delta impulse)
         if len(kernel.shape) == 3:
             kernel[kernel.shape[0]//2,
                    kernel.shape[1]//2,
@@ -338,8 +339,16 @@ def norm_kernel(kernel):
         elif len(kernel.shape) == 1:
             kernel[kernel.shape[0]//2] = 1
         return kernel
-    # normalize kernel, so it sums up to 1
     return kernel.astype(np.float32) / np.sum(kernel)
+
+
+def pad_kernel(kernel:np.ndarray, kernel_size:int,
+    pad_to:int=0) -> np.ndarray:
+    """pad kernel size to desired size, "pad_to" must be odd or zero."""
+    if pad_to > kernel_size:
+        pad_size = (pad_to - kernel_size) // 2
+        kernel = np.pad(kernel, ((pad_size, pad_size), (pad_size, pad_size)))
+    return kernel
 
 
 def fetch_kernels(kernels_path, pattern:str='', scale=None, kformat:str='npy'):
