@@ -11,7 +11,7 @@ import torch
 from torch.utils.data.dataset import Dataset
 import dataops.common as util
 
-from dataops.augmentations import Scale, MLResize, NoisePatches, RandomNoisePatches, get_resize, get_blur, get_noise
+from dataops.augmentations import Scale, NoisePatches, RandomNoisePatches, get_blur, get_noise
 from dataops.debug import tmp_vis, describe_numpy, describe_tensor
 
 import dataops.augmennt.augmennt as transforms

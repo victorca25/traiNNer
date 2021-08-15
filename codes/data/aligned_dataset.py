@@ -63,7 +63,7 @@ class AlignedDataset(BaseDataset):
         """
         scale = self.opt.get('scale')
 
-        ######## Read the images ########
+        # Read the images
         if self.AB_paths:
             img_A, img_B, A_path, B_path = read_split_single_dataset(
                 self.opt, index, self.AB_paths, self.AB_env)
@@ -71,7 +71,7 @@ class AlignedDataset(BaseDataset):
             img_A, img_B, A_path, B_path = read_imgs_from_path(
                 self.opt, index, self.A_paths, self.B_paths, self.A_env, self.B_env)
 
-        ######## Modify the images ########
+        # Modify the images
 
         # for the validation / test phases
         if self.opt['phase'] != 'train':
@@ -94,37 +94,43 @@ class AlignedDataset(BaseDataset):
         if color_A:
             img_A = channel_convert(image_channels(img_A), color_A, [img_A])[0]
 
-        ######## Augmentations ########
-
-        #Augmentations during training
+        # augmentations during training
         if self.opt['phase'] == 'train':
-
-            default_int_method = get_default_imethod(image_type(img_A))
-
-            # random HR downscale
-            img_A, img_B = random_downscale_B(img_A=img_A, img_B=img_B,
-                                opt=self.opt)
 
             # validate there's an img_A, if not, use img_B
             if img_A is None:
                 img_A = img_B
                 print(f"Image A: {A_path} was not loaded correctly, using B pair to downscale on the fly.")
 
+            pre_scale = scale
+            if ('pre' not in self.opt.get('resize_strat') and
+                image_size(img_A) == image_size(img_B)):
+                pre_scale = 1
+
+            default_int_method = get_default_imethod(image_type(img_A))
+
+            # random HR downscale
+            img_A, img_B = random_downscale_B(img_A=img_A, img_B=img_B,
+                                opt=self.opt, scale=pre_scale)
+
             # validate proper dimensions between paired images, generate A if needed
             img_A, img_B = paired_imgs_check(
-                img_A, img_B, opt=self.opt, ds_kernels=self.ds_kernels)
+                img_A, img_B, opt=self.opt,
+                ds_kernels=self.ds_kernels, scale=pre_scale)
+
+            img_A_size = image_size(img_A)
 
             # get and apply the paired transformations below
             transform_params = get_params(
-                scale_opt(self.opt, scale), image_size(img_A))
+                scale_opt(self.opt, pre_scale), img_A_size)
             A_transform = get_transform(
-                scale_opt(self.opt, scale),
+                scale_opt(self.opt, pre_scale),
                 transform_params,
                 # grayscale=(input_nc == 1),
                 method=default_int_method)
             B_transform = get_transform(
                 self.opt,
-                scale_params(transform_params, scale),
+                scale_params(transform_params, pre_scale),
                 # grayscale=(output_nc == 1),
                 method=default_int_method)
             img_A = A_transform(img_A)
@@ -139,6 +145,8 @@ class AlignedDataset(BaseDataset):
                 self.opt, 
                 params=a_aug_params,
                 noise_patches=self.noise_patches,
+                ds_kernels=self.ds_kernels,
+                img_size=img_A_size,
                 )
             b_augmentations = get_augmentations(
                 self.opt, 
@@ -154,8 +162,7 @@ class AlignedDataset(BaseDataset):
         # if color_A:
         #     img_A = channel_convert(image_channels(img_A), color_A, [img_A])[0]
 
-        ######## Convert images to PyTorch Tensors ########
-
+        # convert images to PyTorch Tensors
         tensor_transform = get_totensor(
             self.opt, params=self.totensor_params, toTensor=True, grayscale=False)
         img_A = tensor_transform(img_A)

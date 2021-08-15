@@ -168,9 +168,11 @@ class BaseModel:
                 if load_path is not None:
                     logger.info(f'Loading pretrained model for {name} [{load_path:s}]')
                     model_type = 'D' if 'D' in name else 'G'
-                    strict = self.opt[f'network_{model_type}'].get('strict', None)
-                    if not strict:
+                    strict = True
+                    if f'network_{name}' in self.opt:
                         strict = self.opt[f'network_{name}'].get('strict', None)
+                    elif f'network_{model_type}' in self.opt:
+                        strict = self.opt[f'network_{model_type}'].get('strict', None)
                     self.load_network(load_path, net, strict, model_type=name, submodule=load_submodule)
 
     def load_swa(self):

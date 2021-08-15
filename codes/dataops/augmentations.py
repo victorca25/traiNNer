@@ -1,7 +1,6 @@
 import random
 
-import os
-# import os.path
+from os import path as osp
 import glob
 
 import numpy as np
@@ -11,7 +10,7 @@ from dataops.debug import *
 from dataops.imresize import resize as imresize  # resize # imresize_np
 
 from dataops.augmennt.augmennt.common import wrap_cv2_function, wrap_pil_function, _cv2_interpolation2str
-from torch.utils.data.dataset import Dataset #TODO TMP, move NoisePatches to a separate dataloader
+from torch.utils.data.dataset import Dataset  # TODO TMP, move NoisePatches to a separate dataloader
 
 
 
@@ -44,10 +43,7 @@ transforms = None
 set_transforms()
 
 
-custom_ktypes = [794, 793, 792, 791, 790, 789, 788, 787, 786, 785, 784,
-                783, 782, 781, 780, 779, 778, 777, 776, 775, 774, 773,]
-
-_n_interpolation_to_str = {
+custom_ktypes = {
     794:'blackman5', 793:'blackman4', 792:'blackman3',
     791:'blackman2', 790:'sinc5', 789:'sinc4', 788:'sinc3',
     787:'sinc2', 786:'gaussian', 785:'hamming', 784:'hanning',
@@ -55,226 +51,308 @@ _n_interpolation_to_str = {
     779:'hermite', 778:'mitchell', 777:'cubic', 776:'lanczos3',
     775:'lanczos2', 774:'box', 773:'linear',}
 
-def Scale(img=None, scale: int = None, algo=None, 
+
+
+
+
+def adj_scale_config(scale=None, resize_type:int=None,
+    res_config:dict=None):
+
+    or_scale = False
+    if res_config.get('ada_scale'):
+        or_scale = scale
+
+        if resize_type == 999:
+            ds_algo = [777, 773, cv2.INTER_AREA]
+            resize_type = get_weighted_choice(ds_algo)[0]
+            scale = -(-scale//2)
+            or_scale = False
+        elif resize_type in [0, 774, 997]:
+            scale = -(-scale//2)
+            or_scale = False
+
+    if resize_type == 998:
+        # down_up
+        scale = random.uniform(-(-scale//2), scale)
+        du_algos = res_config['down_up_types']
+        du_min = res_config['down_up_min']
+        resize_type = get_weighted_choice(du_algos)[0]
+        a_scale = random.uniform(du_min, scale)
+        scale = scale / a_scale
+    elif resize_type in [0, 774, 997]:
+        # nearest
+        scale = random.choice([-(-scale//2), scale])
+    elif resize_type != 999:
+        prob = res_config.get('resize_prob')
+        # sc_dir = None
+        # if prob:
+        #     sc_dir = get_weighted_choice(prob)[0]
+        sc_dir = get_weighted_choice(prob)[0] if prob else 'down'
+        if sc_dir:
+            sc_range = None
+            if sc_dir == 'up':
+                sc_range = res_config.get('resize_range_up')
+            elif sc_dir == 'down':
+                # sc_range = res_config.get('resize_range_down')
+                sc_range = res_config.get(
+                    'resize_range_down', [1/scale, 2/scale])
+            else:
+                scale = 1
+
+            if sc_range:
+                sc_fact = random.uniform(*sc_range)
+                scale = 1 / sc_fact
+
+    if or_scale and scale > 1:
+        # scale /= or_scale
+        scale = max(1, scale/or_scale)
+
+    return scale, resize_type
+
+
+class Scale_class:
+    def __init__(self, size=None, scale=None,
+        algo=None, ds_kernel=None, resize_type=None,
+        img_type=None, res_config=None):
+
+        if res_config:  # and scale !=1:
+            algo = None
+            scale, resize_type = adj_scale_config(
+                scale, resize_type, res_config)
+
+        if ((isinstance(algo, list) and 998 in algo) or
+            (isinstance(algo, int) and algo == 998)) and not res_config:
+            algo = [777, 773, cv2.INTER_AREA]
+
+        self.scale = scale
+        self.size = size
+
+        self.resize_fn, self.resize_type = get_resize(
+            size=size, scale=scale, ds_algo=algo, ds_kernel=ds_kernel,
+            resize_type=resize_type, img_type=img_type)
+
+    def get_resize_type(self):
+        return self.resize_type
+
+    def __call__(self, img):
+        return self.resize_fn(img)
+
+    def get_scale(self):
+        return self.scale
+
+    def get_size(self):
+        return self.size
+
+    def __repr__(self):
+        return (self.__class__.__name__ +
+                f'(type={self.resize_type}, '
+                f'scale={self.scale}, '
+                f'size={self.size})')
+
+
+def Scale(img=None, scale=None, algo=None,
     ds_kernel=None, resize_type=None, img_type=None):
+    """ Simple temporary interface to maintain existing functionality
+        using the new Scale_class. Will be deprecated in the future.
+    """
 
-    if img_type == 'pil':
-        # for now using scale_() as interface for pil images
-        #TODO: pil images will only use default method, not 'algo' yet
-        def_pil = get_default_imethod('pil')
-        return scale_(img, scale, method=def_pil), def_pil
-    
-    ow, oh = image_size(img)
-    ## original rounds down:
-    # h = int(oh/scale)
-    # w = int(ow/scale)
-    ## rounded_up = -(-numerator // denominator)     # math.ceil(scale_factor * in_sz)
-    h = int(-(-oh//scale))
-    w = int(-(-ow//scale))
+    sc = Scale_class(scale=scale, algo=algo, ds_kernel=ds_kernel,
+            resize_type=resize_type, img_type=img_type)
 
-    if (h == oh) and (w == ow):
-        return img, None
-
-    resize_fn, resize_type = get_resize(size=(h, w), scale=scale, ds_algo=algo, ds_kernel=ds_kernel, resize_type=resize_type)
-    return resize_fn(np.copy(img)), resize_type
+    return sc(img), sc.get_resize_type()
 
 
 class MLResize:
-    """Resize the input numpy ndarray to the given size using the Matlab-like
-    algorithm (warning: an order of magnitude slower than OpenCV).
+    """Abstraction interface for resizing images to the given scale
+    using the transforms backend or the Matlab-like imresize algorithms.
+    (warning: the latter is ~an order of magnitude slower than OpenCV).
 
     Args:
-        scale (sequence or int): Desired amount to scale the image. 
-        interpolation (int, optional): Desired interpolation. Default is
-            ``cubic`` interpolation, other options are: "lanczos2", 
-            "lanczos3", "box", "linear"
+        scale: Desired amount to scale the image. (>1 is downscale)
+        size: To use if setting a specific size to resize to.
+        antialiasing: Whether to apply an antialiasing (only on 'ml').
+        interpolation: Desired interpolation. Default is
+            "cubic" interpolation, other options are: "lanczos2",
+            "lanczos3", "box", "linear", "mitchell", etc.
+        kind: use the 'transforms' backend or 'ml' matlab-like imresize.
     """
 
-    def __init__(self, scale, antialiasing=True, interpolation='cubic'):
-
-        self.scale = 1/scale
+    def __init__(self, scale, size=None, antialiasing:bool=True,
+        interpolation:str='cubic', kind:str='ml'):
+        self.scale = scale
+        self.out_shape = size  # (h, w)
         self.interpolation = interpolation
         self.antialiasing = antialiasing
+        self.kind = kind
 
-    def __call__(self, img):
+    def __call__(self, img:np.ndarray) -> np.ndarray:
         """
         Args:
-            img (numpy ndarray): Image to be scaled.
+            img: Image to be scaled.
         Returns:
-            numpy ndarray: Rescaled image.
-            
+            Rescaled image.
         """
-        # return util.imresize_np(img=img, scale=self.scale, antialiasing=self.antialiasing, interpolation=self.interpolation)
-        return imresize(img, self.scale, antialiasing=self.antialiasing, interpolation=self.interpolation)
+        if self.scale == 1:
+            return img
+
+        if self.out_shape:
+            ow, oh = image_size(img)
+            if ow == self.out_shape[1] and oh == self.out_shape[0]:
+                return img
+            if len(self.out_shape) < 3:
+                self.out_shape = self.out_shape + (image_channels(img),)
+
+        if self.kind == 'transforms':
+            if self.out_shape:
+                return resize(
+                    np.copy(img),
+                    w=self.out_shape[1], h=self.out_shape[0],
+                    method=self.interpolation)
+            return scale_(
+                np.copy(img), self.scale, method=self.interpolation)
+        scale = None if self.out_shape else 1/self.scale
+        # return imresize_np(
+        #       np.copy(img), scale=scale, antialiasing=self.antialiasing, interpolation=self.interpolation)
+        return imresize(
+            np.copy(img), scale, out_shape=self.out_shape,
+            antialiasing=self.antialiasing, interpolation=self.interpolation)
 
 
-def get_resize(size, scale=None, ds_algo=None, ds_kernel=None, resize_type=None):
-
-    if ds_algo is None:
-        #scaling interpolation options
-        ds_algo = [cv2.INTER_NEAREST, cv2.INTER_LINEAR, cv2.INTER_CUBIC, cv2.INTER_AREA, cv2.INTER_LANCZOS4, cv2.INTER_LINEAR_EXACT]
-    elif isinstance(ds_algo, int):
-        ds_algo = [ds_algo]
-    #elif(!isinstance(resize_types, list)):
-        #Error, unexpected type
-
+def get_resize(size=None, scale=None, ds_algo=None,
+    ds_kernel=None, resize_type=None, img_type=None):
     resize_fn = None
-    if resize_type == 0:
-        pass
-    elif not resize_type:
-        resize_type = random.choice(ds_algo)
 
-    # print(resize_type)
-    if resize_type in custom_ktypes:
-        # print('matlab')
-        resize_fn = MLResize(scale=scale, interpolation=_n_interpolation_to_str[resize_type]) #(np.copy(img_LR))
-    elif resize_type == 999: # use realistic downscale kernels
-        # print('kernelgan')
+    if not resize_type:
+        if not ds_algo:
+            # scaling interpolation options
+            # ds_algo = [cv2.INTER_NEAREST, cv2.INTER_LINEAR, cv2.INTER_CUBIC,
+            #            cv2.INTER_AREA, cv2.INTER_LANCZOS4, cv2.INTER_LINEAR_EXACT]
+            ds_algo = [777, 773, cv2.INTER_AREA]
+
+        if isinstance(ds_algo, int):
+            resize_type = ds_algo
+        else:
+            # resize_type = random.choice(ds_algo)
+            resize_type = get_weighted_choice(ds_algo)[0]
+        # else(!isinstance(resize_types, list)):
+            # Error, unexpected type
+
+    if img_type == 'pil':
+        # override
+        # TODO: pil images will only use default method, not 'algo' yet
+        resize_type = -1
+
+    if resize_type in set(custom_ktypes.keys()):
+        # use custom scaling methods
+        resize_fn = MLResize(
+            size=size, scale=scale,
+            interpolation=custom_ktypes[resize_type])
+    elif resize_type == 997:
+        # use nearest_aligned downscale
+        resize_fn = transforms.AlignedDownsample(p=1, scale=scale)
+    elif resize_type == 999:
+        # use realistic downscale kernels
         if ds_kernel:
             resize_fn = ds_kernel
-    else: # use the provided OpenCV2 algorithms
-        resize_fn = transforms.Resize(size, 
-                interpolation=_cv2_interpolation2str.get(resize_type, 'BICUBIC'))
-        # print('cv2')
+    else:
+        # use the provided OpenCV2 or default PIL methods
+        if img_type == 'pil':
+            interpolation = get_default_imethod('pil')
+        else:
+            interpolation=_cv2_interpolation2str.get(resize_type, 'BICUBIC')
+        resize_fn = MLResize(
+            size=size, scale=scale,
+            interpolation=interpolation, kind='transforms')
 
     return resize_fn, resize_type
 
 
-#TODO: use options to set the blur types parameters if configured, else random_params=True
-def get_blur(blur_types: list):
-
+def get_blur(blur_types, blur_config):
     blur = None
-    if(isinstance(blur_types, list)):
-        blur_type = random.choice(blur_types)
+    blur_type = get_weighted_choice(blur_types)[0]
+
+    if blur_type:
         if blur_type == 'average':
-            # print('average')
-            blur = transforms.RandomAverageBlur(
-                    kernel_size=11, init_params=True, p=1)
+            blur = transforms.RandomAverageBlur(**blur_config)
         elif blur_type == 'box':
-            # print('box')
-            blur = transforms.RandomBoxBlur(
-                    kernel_size=11, init_params=True, p=1)
+            blur = transforms.RandomBoxBlur(**blur_config)
         elif blur_type == 'gaussian':
-            # print('gaussian')
-            blur = transforms.RandomGaussianBlur(
-                    kernel_size=11, init_params=True,
-                    sigmaX=(0.1, 2.8), p=1)
+            blur = transforms.RandomGaussianBlur(**blur_config)
         elif blur_type == 'median':
-            # print('median')
-            blur = transforms.RandomMedianBlur(
-                    kernel_size=11, init_params=True, p=1)
+            blur = transforms.RandomMedianBlur(**blur_config)
         elif blur_type == 'bilateral':
-            # print('bilateral')
-            blur = transforms.RandomBilateralBlur(
-                    sigmaX=200, sigmaY=200,
-                    kernel_size=11, init_params=True, p=1)
+            blur = transforms.RandomBilateralBlur(**blur_config)
         elif blur_type == 'motion':
-            # print('motion')
-            blur = transforms.RandomMotionBlur(
-                     kernel_size=7, init_params=True, p=1)
+            blur = transforms.RandomMotionBlur(**blur_config)
         elif blur_type == 'complexmotion':
-            # print('complexmotion')
-            blur = transforms.RandomComplexMotionBlur(
-                     size=100, complexity=1.0, p=1)
+            blur = transforms.RandomComplexMotionBlur(**blur_config)
         elif blur_type == 'iso':
-            blur = transforms.RandomAnIsoBlur(
-                     min_kernel_size=7, kernel_size=21,
-                     sigmaX=(0.1, 2.8), # sigmaY=(0.1, 2.8),
-                     angle=0, noise=0.25, p=1)
+            blur = transforms.RandomAnIsoBlur(**blur_config)
         elif blur_type == 'aniso':
-            blur = transforms.RandomAnIsoBlur(
-                     min_kernel_size=7, kernel_size=21,
-                     sigmaX=(0.5, 8), sigmaY=(0.5, 8),
-                     angle=(0, 180), noise=0.75, p=1)
-        #elif blur_type == 'clean':
+            blur = transforms.RandomAnIsoBlur(**blur_config)
+        elif blur_type == 'sinc':
+            blur = transforms.RandomSincBlur(**blur_config)
+        # elif blur_type == 'clean':
     return blur
 
 
-#TODO: use options to set the noise types parameters if configured, else random_params=True
-def get_noise(noise_types: list, noise_patches=None, noise_amp: int=1):
+def get_noise(noise_types: list, noise_patches=None, noise_config=None):
 
     noise = None
     if noise_types:
-        noise_type = random.choice(noise_types)
+        noise_type = get_weighted_choice(noise_types)[0]
 
-        # if noise_type == 'dither':
         if 'dither' in noise_type:
-            # print(noise_type)
-            #TODO: need a dither type selector, there are multiple options including b&w dithers
-            # dither = 'fs'
-            # if dither == 'fs':
             if ('fs' in noise_type and 'bw' not in noise_type) or noise_type == 'dither':
-                noise = transforms.FSDitherNoise(p=1)
-            # elif dither == 'bayer':
+                noise = transforms.FSDitherNoise(**noise_config)
             elif 'bayer' in noise_type and 'bw' not in noise_type:
-                noise = transforms.BayerDitherNoise(p=1)
-            # elif dither == 'fs_bw':
+                noise = transforms.BayerDitherNoise(**noise_config)
             elif 'fs_bw' in noise_type:
-                noise = transforms.FSBWDitherNoise(p=1)
-            # elif dither == 'avg_bw':
+                noise = transforms.FSBWDitherNoise(**noise_config)
             elif 'avg_bw' in noise_type:
-                noise = transforms.AverageBWDitherNoise(p=1)
-            # elif dither == 'bayer_bw':
+                noise = transforms.AverageBWDitherNoise(**noise_config)
             elif 'bayer_bw' in noise_type:
-                noise = transforms.BayerBWDitherNoise(p=1)
-            # elif dither == 'bin_bw':
+                noise = transforms.BayerBWDitherNoise(**noise_config)
             elif 'bin_bw' in noise_type:
-                noise = transforms.BinBWDitherNoise(p=1)
-            # elif dither == 'rnd_bw':
+                noise = transforms.BinBWDitherNoise(**noise_config)
             elif 'rnd_bw' in noise_type:
-                noise = transforms.RandomBWDitherNoise(p=1)
-            # print("dither")
-        elif noise_type == 'simplequantize':
-            #TODO: find a useful rgb_range for SimpleQuantize in [0,255]
-            # the smaller the value, the closer to original colors
-            noise = transforms.SimpleQuantize(p=1, rgb_range = 50) #30
-            # print("simplequantize")
+                noise = transforms.RandomBWDitherNoise(**noise_config)
+        elif noise_type in ('simplequantize', 'simple_quantize'):
+            noise = transforms.SimpleQuantize(**noise_config)
         elif noise_type in ('quantize', 'som_quantize'):
-            noise = transforms.RandomQuantizeSOM(p=1, num_colors=32)
-            # print("quantize")
+            noise = transforms.RandomQuantizeSOM(**noise_config)
         elif noise_type == 'km_quantize':
-            noise = transforms.RandomQuantize(p=1, num_colors=32)
+            noise = transforms.RandomQuantize(**noise_config)
         elif noise_type == 'gaussian':
-            noise = transforms.RandomGaussianNoise(p=1,
-                var_limit=(1.0, 25.0), prob_color=0.5)
-            # print("gaussian")
+            noise = transforms.RandomGaussianNoise(**noise_config)
         elif noise_type.lower() == 'jpeg':
             noise = transforms.RandomCompression(
-                p=1, min_quality=30, max_quality=95,
-                compression_type='.jpeg')
-            # print("JPEG")
+                **noise_config, compression_type='.jpeg')
         elif noise_type.lower() == 'webp':
             noise = transforms.RandomCompression(
-                p=1, min_quality=20, max_quality=90,
-                compression_type='.webp')
+                **noise_config, compression_type='.webp')
         elif noise_type == 'poisson':
-            noise = transforms.RandomPoissonNoise(p=1)
-            # print("poisson")
+            noise = transforms.RandomPoissonNoise(**noise_config)
         elif noise_type == 's&p':
-            noise = transforms.RandomSPNoise(p=1)
-            # print("s&p")
+            noise = transforms.RandomSPNoise(**noise_config)
         elif noise_type == 'speckle':
-            noise = transforms.RandomSpeckleNoise(prob_color=0.5, p=1)
-            # print("speckle")
+            noise = transforms.RandomSpeckleNoise(**noise_config)
         elif noise_type == 'maxrgb':
-            noise = transforms.FilterMaxRGB(p=1)
-            # print("maxrgb")
+            noise = transforms.FilterMaxRGB(**noise_config)
         # elif noise_type == 'canny':
-        #     noise = transforms.FilterCanny(p=1)
+        #     noise = transforms.FilterCanny(**noise_config)
         elif noise_type == 'patches' and noise_patches:
-            noise = RandomNoisePatches(noise_patches, noise_amp)
-            # print("patches")
-        #elif noise_type == 'clean':
+            noise = RandomNoisePatches(noise_patches, **noise_config)
         elif noise_type == 'clahe':
-            noise = transforms.CLAHE(p=1)
+            noise = transforms.CLAHE(**noise_config)
         elif noise_type == 'camera':
-            noise = transforms.RandomCameraNoise(
-                demosaic_fn='malvar', xyz_arr='D50', p=1)
+            noise = transforms.RandomCameraNoise(**noise_config)
         elif noise_type == 'superpixels':
-            noise = transforms.Superpixels(p=1, n_segments=200,  # 32
-                p_replace=1.0, max_size=None)
+            noise = transforms.Superpixels(**noise_config)
+        # elif noise_type == 'clean':
 
     return noise
+
 
 def get_pad(img, size: int, fill = 0, padding_mode: str ='constant'):
     w, h = image_size(img)
@@ -296,17 +374,16 @@ def get_pad(img, size: int, fill = 0, padding_mode: str ='constant'):
 
 
 class NoisePatches(Dataset):
-    '''
-    Load the previously noise patches from real images to apply to the LR images
+    """
+    Load the patches previously extracted from real images
+    to apply noise to the LR images.
     Ref:
     https://openaccess.thecvf.com/content_cvpr_2018/papers/Chen_Image_Blind_Denoising_CVPR_2018_paper.pdf
     https://openaccess.thecvf.com/content_ICCV_2019/papers/Zhou_Kernel_Modeling_Super-Resolution_on_Real_Low-Resolution_Images_ICCV_2019_paper.pdf
-
-    '''
+    """
     def __init__(self, dataset=None, size=32, permute=True, grayscale=False):
-        # size = opt['GT_size']/opt['scale']
         super(NoisePatches, self).__init__()
-        assert os.path.exists(dataset)
+        assert osp.exists(dataset)
 
         self.grayscale = grayscale
         self.noise_imgs = sorted(glob.glob(dataset + '*.png'))
@@ -328,21 +405,24 @@ class NoisePatches(Dataset):
         # describe_numpy(np.mean(noise, axis=(0, 1), keepdims=True), all=True)
         # describe_numpy(norm_noise, all=True)
 
-        #TODO: test adding noise to single channel images 
+        # TODO: test adding noise to single channel images
         if self.grayscale:
             norm_noise = util.bgr2ycbcr(norm_noise, only_y=True)
-        return norm_noise #.astype('uint8')
+        return norm_noise  # .astype('uint8')
 
     def __len__(self):
         return len(self.noise_imgs)
 
 
 class RandomNoisePatches():
-    def __init__(self, noise_patches, noise_amp=1):
+    def __init__(self, noise_patches, noise_amp:float=1.0, p:float=1.0):
         self.noise_patches = noise_patches
         self.noise_amp = noise_amp
+        self.p = p
 
     def __call__(self, img):
+        if random.random() > self.p:
+            return img
         # add noise from patches 
         noise = self.noise_patches[np.random.randint(0, len(self.noise_patches))]
         # tmp_vis(noise, False)
@@ -355,7 +435,7 @@ class RandomNoisePatches():
             # pad noise patch to image size if smaller
             i = random.randint(0, h - n_h)
             j = random.randint(0, w - n_w)
-            #top, bottom, left, right borders
+            # top, bottom, left, right borders
             noise = transforms.Pad(
                 padding=(i, h-(i+n_h), j, w-(j+n_w)), padding_mode='reflect')(noise)
         elif n_h > h or n_w > w:
@@ -367,11 +447,13 @@ class RandomNoisePatches():
         ## tmp_vis(img, False)
         return img
 
+    def __repr__(self):
+        return self.__class__.__name__ + '(p={})'.format(self.p)
 
 
 
 ############# transformations
-#TODO: adapt for video dataloaders, apply same transform to multiple frames
+# TODO: adapt for video dataloaders, apply same transform to multiple frames
 
 def get_params(opt, size):
     w, h = size
@@ -384,11 +466,9 @@ def get_params(opt, size):
     center_crop_size = opt.get('center_crop_size')
     preprocess_mode = opt.get('preprocess', 'none')
 
-    # if preprocess_mode == 'resize_and_crop':
     if 'resize_and_crop' in preprocess_mode:
         # assert load_size, "load_size not defined"
         new_h = new_w = load_size
-    # elif preprocess_mode == 'scale_width_and_crop':
     elif 'scale_width_and_crop' in preprocess_mode:
         # assert load_size, "load_size not defined"
         new_w = load_size
@@ -397,7 +477,6 @@ def get_params(opt, size):
         # assert load_size, "load_size not defined"
         new_w = load_size * w // h
         new_h = load_size
-    # elif preprocess_mode == 'scale_shortside_and_crop':
     elif 'scale_shortside_and_crop' in preprocess_mode:
         # assert load_size, "load_size not defined"
         ss, ls = min(w, h), max(w, h)  # shortside and longside
@@ -460,14 +539,14 @@ def get_transform(opt, params=None, grayscale=False, method=None,
         Note: Vertical flip and transpose are used for rotation implementation.
     """
     transform_list = []
-    load_size = params['load_size'] if params else opt.get('load_size', None)
+    load_size = params['load_size'] if params else opt.get('load_size')
     crop_size = opt.get('crop_size')
-    center_crop_size = opt.get('center_crop_size', None)
+    center_crop_size = opt.get('center_crop_size')
     default_none = opt.get('default_none', 'power2')
     img_type = opt.get('img_loader', 'cv2')
 
     if not method:
-        #TODO: important: if the method does not matches the image type, the error is not
+        # TODO: important: if the method does not matches the image type, the error is not
         # helpful to debug, get the image type from opt dict and assert it's not None
         method = get_default_imethod(img_type)
 
@@ -537,7 +616,7 @@ def get_transform(opt, params=None, grayscale=False, method=None,
                 lambda img: padbase(img, base=base, img_type=img_type)))
 
     # paired augmentations
-    if opt.get('use_flip', None):
+    if opt.get('use_flip'):
         if params is None:
             transform_list.append(transforms.RandomHorizontalFlip())
         elif params['flip']:
@@ -545,7 +624,7 @@ def get_transform(opt, params=None, grayscale=False, method=None,
                 lambda img: flip(img, params['flip'], img_type=img_type)))
 
     # hrrot and regular rotation are mutually exclusive
-    if opt.get('use_hrrot', None) and params.get('hrrot', None):
+    if opt.get('use_hrrot') and params.get('hrrot'):
         if params['angle']:
             if preprocess_mode == 'crop' or 'and_crop' in preprocess_mode:
                 cs = crop_size
@@ -556,7 +635,7 @@ def get_transform(opt, params=None, grayscale=False, method=None,
                     img, crop_size=cs, rescale=1/4,
                     angle=params['angle'], img_type=img_type,
                     method=method)))
-    elif opt.get('use_rot', None):
+    elif opt.get('use_rot'):
         if params is None:
             if random.random() < 0.5:
                 transform_list.append(
@@ -570,9 +649,8 @@ def get_transform(opt, params=None, grayscale=False, method=None,
 
 
 def resize(img, w, h, method=None):
-    img_type = image_type(img)
     if not method:
-        method = get_default_imethod(img_type)
+        method = get_default_imethod(image_type(img))
 
     return transforms.Resize((h,w), interpolation=method)(img)
 
@@ -664,7 +742,7 @@ def padbase(img, base, img_type=None):
         # Note: with PIL if crop sizes > sizes, it adds black padding
         return img.crop((0, 0, pw, ph))
     else:
-        #TODO: test if correct-> # padding = (0, pw - ow, 0, ph - oh)
+        # TODO: test if correct-> # padding = (0, pw - ow, 0, ph - oh)
         return transforms.Pad(padding=(0, ph-oh, 0, pw-ow))(img)
 
 
@@ -731,7 +809,7 @@ def flip(img, flip, img_type=None):
         if img_type == 'pil':
             return img.transpose(Image.FLIP_LEFT_RIGHT)
         else:
-            return np.flip(img, axis=1) #img[:, ::-1, :]
+            return np.flip(img, axis=1)  # img[:, ::-1, :]
     return img
 
 
@@ -740,15 +818,15 @@ def rotate90(img, rotate, vflip=None, img_type=None):
         img_type = image_type(img)
 
     if rotate:
-        if vflip: #-90 degrees, else 90 degrees
+        if vflip:  # -90 degrees, else 90 degrees
             if img_type == 'pil':
                 img = img.transpose(Image.FLIP_TOP_BOTTOM)
             else:
-                img = np.flip(img, axis=0) #img[::-1, :, :]
+                img = np.flip(img, axis=0)  # img[::-1, :, :]
         if img_type == 'pil':
             return img.transpose(Image.ROTATE_90)
         else:
-            return np.rot90(img, 1) #img.transpose(1, 0, 2)
+            return np.rot90(img, 1)  # img.transpose(1, 0, 2)
 
     return img
 
@@ -781,14 +859,14 @@ def rotateHR(img, crop_size=None, rescale=1/4, angle=None, center=0,
         else:
             return img
 
-    #TODO: add @preserve_shape wrapper to cv2 RandomRotation's function
+    # TODO: add @preserve_shape wrapper to cv2 RandomRotation's function
     rrot = transforms.RandomRotation(
         degrees=(angle,angle), expand=crop, resample=method)
 
     if rescale < 1:
         wr, hr = image_size(img)
         # TODO: 'pil' images will use default method, adjust algo to take in method
-        img, _ = Scale(img=img, scale=rescale, algo=cv2.INTER_CUBIC, img_type=img_type) #INTER_AREA #  cv2.INTER_LANCZOS4?
+        img, _ = Scale(img=img, scale=rescale, algo=cv2.INTER_CUBIC, img_type=img_type)  # INTER_AREA #  cv2.INTER_LANCZOS4?
 
     w, h = image_size(img)
     img = rrot(img)
@@ -808,7 +886,7 @@ def rotateHR(img, crop_size=None, rescale=1/4, angle=None, center=0,
         if img_type == 'pil':
             img = img.crop((x1, y1, x2, y2))
         else:
-            #image = image[top:bottom, left:right, ...]
+            # image = image[top:bottom, left:right, ...]
             img = img[y1:y2, x1:x2, ...]
 
     if rescale < 1:
@@ -821,6 +899,7 @@ def rotateHR(img, crop_size=None, rescale=1/4, angle=None, center=0,
             size, interpolation=method)(img)
 
     return img
+
 
 def get_crop_pos_rot(h, w, angle):
     """
@@ -879,7 +958,7 @@ def split_paired_image(AB, loader):
     return img_A, img_B
 
 
-#TODO: using hasattr here, but there can be cases where I
+# TODO: using hasattr here, but there can be cases where I
 # would like to check the image type anyways
 def image_type(img):
     if not hasattr(image_type, 'img_type'):
@@ -931,7 +1010,7 @@ def cv2pil(open_cv_image):
     return Image.fromarray(open_cv_image)
 
 
-#TODO: move to debug
+# TODO: move to debug
 def tmp_vis_pil(image):
     from dataops.debug import tmp_vis
     if isinstance(image, Image.Image):
@@ -946,7 +1025,7 @@ def scale_params(params, scale):
     x, y = scaled_params['crop_pos']
     x_scaled, y_scaled = int(x * scale), int(y * scale)
     scaled_params['crop_pos'] = (x_scaled, y_scaled)
-    if scaled_params.get('load_size', None):
+    if scaled_params.get('load_size'):
         scaled_params['load_size'] = scale * scaled_params['load_size']
     return scaled_params
 
@@ -959,8 +1038,8 @@ def scale_opt(opt, scale):
         return opt
     scale = 1 / scale
     scaled_opt = opt.copy()
-    scaled_opt['center_crop_size'] = scaled_opt.get('center_crop_size', None)
-    scaled_opt['load_size'] = scaled_opt.get('load_size', None)
+    scaled_opt['center_crop_size'] = scaled_opt.get('center_crop_size')
+    scaled_opt['load_size'] = scaled_opt.get('load_size')
     
     scaled_opt['center_crop_size'] = int(scale * scaled_opt['center_crop_size']) if scaled_opt['center_crop_size'] else None
     scaled_opt['load_size'] = int(scale * scaled_opt['load_size']) if scaled_opt['load_size'] else None
@@ -968,14 +1047,15 @@ def scale_opt(opt, scale):
     return scaled_opt
 
 
-def random_downscale_B(img_A, img_B, opt):
+def random_downscale_B(img_A, img_B, opt, scale=None):
     crop_size = opt.get('crop_size')
-    scale = opt.get('scale')
+    if not scale:
+        scale = opt.get('scale')
     img_type = image_type(img_B)
     default_int_method = get_default_imethod(img_type)
 
     # HR downscale
-    if opt.get('hr_downscale', None): # and random.random() > 0.5:
+    if opt.get('hr_downscale'):  # and random.random() > 0.5:
         ds_algo  = opt.get('hr_downscale_types', 777)
         hr_downscale_amt  = opt.get('hr_downscale_amt', 2)
         if isinstance(hr_downscale_amt, list):
@@ -996,7 +1076,7 @@ def random_downscale_B(img_A, img_B, opt):
 
         # will ignore if 1 or if result is smaller than crop size
         if hr_downscale_amt > 1 and h//hr_downscale_amt >= crop_size and w//hr_downscale_amt >= crop_size:
-            #TODO: pil images will only use default method, not 'algo' yet
+            # TODO: pil images will only use default method, not 'algo' yet
             img_B, _ = Scale(img=img_B, scale=hr_downscale_amt,
                             algo=ds_algo, img_type=img_type)
             img_B = make_power_2(img_B, base=4*scale)
@@ -1004,7 +1084,7 @@ def random_downscale_B(img_A, img_B, opt):
             # Downscales LR to match new size of HR if scale does not match after
             w, h = image_size(img_B)
             if img_A is not None:  # and (h // scale != h_A or w // scale != w_A):
-                #TODO: pil images will only use default method, not 'algo' yet
+                # TODO: pil images will only use default method, not 'algo' yet
                 img_A, _ = Scale(img=img_A, scale=hr_downscale_amt,
                                 algo=ds_algo, img_type=img_type)
                 img_A = make_power_2(img_A, base=4*scale)
@@ -1020,12 +1100,11 @@ def random_downscale_B(img_A, img_B, opt):
 def shape_change_fn(img_A, img_B, opt, scale, default_int_method):
     """Fix the images shapes in respect to each other
     """
-    #TODO: test to be removed
+    # TODO: test to be removed
     # w, h = image_size(img_B)
     # img_A = transforms.Resize((int(h/(2*scale)), int(w/(scale))), interpolation=default_int_method)(img_A)
 
     # Check that HR and LR have the same dimensions ratio, else use an option to process
-    #TODO: add 'shape_change' options variable
     w, h = image_size(img_B)
     w_A, h_A = image_size(img_A)
     if h//h_A != w//w_A:
@@ -1063,7 +1142,7 @@ def dim_change_fn(img_A, img_B, opt, scale, default_int_method,
         crop_size, A_crop_size, ds_kernels):
     """Fix the images dimensions if smaller than crop sizes
     """
-    #TODO: test to be removed
+    # TODO: test to be removed
     # w, h = image_size(img_B)
     # w_A, h_A = image_size(img_A)
     # img_B = transforms.Resize((crop_size-10,w), interpolation=default_int_method)(img_B)
@@ -1073,7 +1152,7 @@ def dim_change_fn(img_A, img_B, opt, scale, default_int_method,
     w, h = image_size(img_B)
     w_A, h_A = image_size(img_A)
     # Or if the images are too small, pad images or Resize B to the crop_size size and fit A pair to A_crop_size
-    #TODO: add 'dim_change' options variable
+    # TODO: add 'dim_change' options variable
     dim_change = opt.get('dim_change', 'pad')
     if h < crop_size or w < crop_size:
         if dim_change == "resize":
@@ -1084,10 +1163,10 @@ def dim_change_fn(img_A, img_B, opt, scale, default_int_method,
         elif dim_change == "pad":
             # if img_A is img_B, padding will be wrong, downscaling LR before padding
             if scale != 1 and h_A == h and w_A == w:
-                ds_algo = 777 # default to matlab-like bicubic downscale
-                if opt.get('lr_downscale', None): # if manually set and scale algorithms are provided, then:
+                ds_algo = 777  # default to matlab-like bicubic downscale
+                if opt.get('lr_downscale'):  # if manually set and scale algorithms are provided, then:
                     ds_algo  = opt.get('lr_downscale_types', 777)
-                if opt.get('lr_downscale', None) and opt.get('dataroot_kernels', None) and 999 in opt["lr_downscale_types"]:
+                if opt.get('lr_downscale') and opt.get('dataroot_kernels') and 999 in opt["lr_downscale_types"]:
                     ds_kernel = ds_kernels
                 else:
                     ds_kernel = None
@@ -1155,7 +1234,7 @@ def generate_A_fn(img_A, img_B, opt, scale, default_int_method,
         - dataset A is not in the correct scale
         - Also to check if A is not at the correct scale already (ie. if img_A was changed to img_B)
     """
-    #TODO: test to be removed
+    # TODO: test to be removed
     # img_A = img_B
 
     w, h = image_size(img_B)
@@ -1185,20 +1264,20 @@ def generate_A_fn(img_A, img_B, opt, scale, default_int_method,
 
         w, h = image_size(img_B)
         ds_algo = 777  # default to matlab-like bicubic downscale
-        if opt.get('lr_downscale', None): # if manually set and scale algorithms are provided, then:
+        if opt.get('lr_downscale'):  # if manually set and scale algorithms are provided, then:
             ds_algo  = opt.get('lr_downscale_types', 777)
-        else: # else, if for some reason img_A is too large, default to matlab-like bicubic downscale
-            #if not opt['aug_downscale']: #only print the warning if not being forced to use HR images instead of LR dataset (which is a known case)
+        else:  # else, if for some reason img_A is too large, default to matlab-like bicubic downscale
+            # if not opt['aug_downscale']: #only print the warning if not being forced to use HR images instead of LR dataset (which is a known case)
             # print("LR image is too large, auto generating new LR for: ", LR_path)
             print("LR image is too large, auto generating new LR")
 
-        if opt.get('lr_downscale', None) and opt.get('dataroot_kernels', None) and 999 in opt["lr_downscale_types"]:
+        if opt.get('lr_downscale') and opt.get('dataroot_kernels') and 999 in opt["lr_downscale_types"]:
             ds_kernel = ds_kernels
         else:
             ds_kernel = None
 
         if same_s:
-            #TODO: pil images will only use default method, not 'algo' yet
+            # TODO: pil images will only use default method, not 'algo' yet
             img_A, _ = Scale(img=img_A, scale=scale, algo=ds_algo, ds_kernel=ds_kernel, img_type=img_type)
         else:
             img_A = transforms.Resize(
@@ -1245,10 +1324,28 @@ def get_ds_kernels(opt):
         https://openaccess.thecvf.com/content_ICCV_2019/papers/Zhou_Kernel_Modeling_Super-Resolution_on_Real_Low-Resolution_Images_ICCV_2019_paper.pdf
         https://openaccess.thecvf.com/content_CVPRW_2020/papers/w31/Ji_Real-World_Super-Resolution_via_Kernel_Estimation_and_Noise_Injection_CVPRW_2020_paper.pdf
     """
-    if opt.get('dataroot_kernels', None) and 999 in opt["lr_downscale_types"]:
-        #TODO: could make this class into a pytorch dataloader, as an iterator can load all the kernels in init
-        ds_kernels = transforms.ApplyKernel(
-            scale=opt.get('scale', 4), kernels_path=opt['dataroot_kernels'], pattern='kernelgan')
+    kernels_path = opt.get('dataroot_kernels')
+    lr_downscale_types = opt.get('lr_downscale_types', [])
+    lr_downscale_types2 = opt.get('lr_downscale_types2', [])
+    types = (999 in lr_downscale_types) or (999 in lr_downscale_types2)
+
+    if 'realk_scale' in opt:
+        scale = opt['realk_scale']
+    else:
+        if 'resize_strat' in opt and 'in' in opt['resize_strat']:
+            scale = 4  # or 2 TODO: test
+        else:
+            scale=opt.get('scale', 4)
+
+    if types:
+        # TODO: could make this class into a pytorch dataloader,
+        # as an iterator can load all the kernels in init
+        if kernels_path:
+            ds_kernels = transforms.ApplyKernel(
+                scale=scale, kernels_path=kernels_path, pattern='kernelgan')
+        else:
+            raise RuntimeError('Pre-extracted kernels are required '
+                           'for realistic downscaling type')
     else:
         ds_kernels = None
 
@@ -1265,9 +1362,10 @@ def get_noise_patches(opt):
 
     return noise_patches
 
-def paired_imgs_check(img_A, img_B, opt, ds_kernels=None):
+def paired_imgs_check(img_A, img_B, opt, ds_kernels=None, scale=None):
     crop_size = opt.get('crop_size')
-    scale = opt.get('scale')
+    if not scale:
+        scale = opt.get('scale')
     A_crop_size = crop_size//scale
     img_type = image_type(img_A)
     default_int_method = get_default_imethod(img_type)
@@ -1307,76 +1405,203 @@ def paired_imgs_check(img_A, img_B, opt, ds_kernels=None):
 
     return img_A, img_B
 
-def get_unpaired_params(opt):  #get_augparams
-    # below are the On The Fly augmentations
+
+def get_weighted_choice(types):
+    if isinstance(types, list):
+        choice = [random.choice(types)]
+    elif isinstance(types, dict):
+        pop = list(types.keys())
+        w = list(types.values())
+        # for Python > 3.6
+        choice = random.choices(pop, weights=w)
+
+        # for Python < 3.6
+        # norm_w = np.divide(w, sum(w))
+        # choice = np.random.choice(pop, p=norm_w)
+    elif isinstance(types, (str, int)):
+        choice = [types]
+    else:
+        choice = []
+
+    return choice
+
+
+def get_aug_confs(opt:dict, aug_name:str=None,
+    prob_name:str=None, config_name:str=None,
+    param_name:str=None, types:str=None):
+
+    out_dict = {}
+    if opt.get(aug_name):
+        prob = opt.get(prob_name) if prob_name else 1.0  # probability
+        prob = 1.0 if not prob else prob
+
+        if random.random() < prob:
+            config_name = config_name if config_name else aug_name
+            name = param_name if param_name else aug_name[3:]
+
+            in_aug_configs = False
+            if 'aug_configs' in opt and config_name in opt['aug_configs']:
+                in_aug_configs = True
+
+            if types:
+                sel_types = opt.get(types)  # selected types
+                choice = get_weighted_choice(sel_types)
+                if in_aug_configs and choice:
+                    choice = choice[0].lower()
+                    type_conf = {
+                        choice: opt['aug_configs'][config_name][choice]
+                        }
+                    out_dict[name] = type_conf
+                # elif choice:
+                #     out_dict[name] = choice[0]
+            elif in_aug_configs:
+                aug_conf = opt['aug_configs'][config_name]
+                out_dict[name] = aug_conf[name]
+
+    return out_dict
+
+
+def get_res_confs(opt:dict, aug_name:str=None,
+    prob_name:str=None, config_name:str=None,
+    param_name:str=None, types:str=None):
+
+    out_dict = {}
+    if opt.get(aug_name):
+        prob = opt.get(prob_name) if prob_name else 1.0  # probability
+        if random.random() < prob and types:
+            config_name = config_name if config_name else aug_name
+            name = param_name if param_name else aug_name[3:]
+
+            in_aug_configs = False
+            if 'aug_configs' in opt and config_name in opt['aug_configs']:
+                in_aug_configs = True
+
+            sel_types = opt.get(types)  # selected types
+            choice = get_weighted_choice(sel_types)
+
+            if in_aug_configs and choice:
+                type_conf = {
+                    'algo': choice,
+                    'add_conf': opt['aug_configs'][config_name][param_name]
+                    }
+
+                if 998 in choice:
+                    # down_up option
+                    if 'down_up_types' in opt:
+                        type_conf['add_conf'].update({
+                            'down_up_types': opt['down_up_types']
+                        })
+
+                out_dict[name] = type_conf
+            elif choice:
+                out_dict[name] = choice
+
+    return out_dict
+
+
+def get_unpaired_params(opt:dict):
     lr_augs = {}
     hr_augs = {}
 
-    # Apply "auto levels" to images
-    auto_levels = opt.get('auto_levels', None)  # LR, HR or both
-    if auto_levels:
-        rand_levels = opt.get('rand_auto_levels', None)  # probability
-        if rand_levels:
-            if auto_levels.lower() == 'lr':
-                lr_augs['auto_levels'] = rand_levels
-            elif auto_levels.lower() == 'hr':
-                hr_augs['auto_levels'] = rand_levels
-            elif auto_levels.lower() == 'both':
-                lr_augs['auto_levels'] = rand_levels
-                hr_augs['auto_levels'] = rand_levels
+    # apply "auto levels" to images
+    hr_augs.update(
+        get_aug_confs(opt, aug_name='hr_auto_levels',
+            prob_name='hr_rand_auto_levels', config_name=None,
+            param_name=None))
 
-    # Apply unsharpening mask to images
-    hr_unsharp_mask = opt.get('hr_unsharp_mask', None)  # true | false
-    if hr_unsharp_mask:
-        hr_rand_unsharp = opt.get('hr_rand_unsharp', None)  # probability
-        if hr_rand_unsharp:
-            hr_augs['unsharp_mask'] = hr_rand_unsharp
+    lr_augs.update(
+        get_aug_confs(opt, aug_name='lr_auto_levels',
+            prob_name='lr_rand_auto_levels', config_name=None,
+            param_name=None))
 
-    lr_unsharp_mask = opt.get('lr_unsharp_mask', None)  # true | false
-    if lr_unsharp_mask:
-        lr_rand_unsharp = opt.get('lr_rand_unsharp', None)  # probability
-        if lr_rand_unsharp:
-            lr_augs['unsharp_mask'] = lr_rand_unsharp
+    # apply unsharpening mask to images
+    hr_augs.update(
+        get_aug_confs(opt, aug_name='hr_unsharp_mask',
+            prob_name='hr_rand_unsharp', config_name=None,
+            param_name='unsharp'))
 
-    # Create color fringes
-    # Caution: Can easily destabilize a model
-    # Only applied to a small % of the images. Around 20% and 50% appears to be stable.
-    # Note: this one does not have a transforms class
-    lr_fringes = opt.get('lr_fringes', None)  # true | false
-    if lr_fringes:
-        lr_augs['fringes'] = opt.get('lr_fringes_chance', 0.6)  # probability
+    lr_augs.update(
+        get_aug_confs(opt, aug_name='lr_unsharp_mask',
+            prob_name='lr_rand_unsharp', config_name=None,
+            param_name='unsharp'))
 
-    # Add blur if blur AND blur types are provided
-    lr_blur = opt.get('lr_blur', None)  # true | false
-    if lr_blur:
-        blur_types = opt.get('lr_blur_types', None)  # blur types
-        if isinstance(blur_types, list):
-            lr_augs['blur'] = [random.choice(blur_types)]
+    # create color fringes
+    lr_augs.update(
+        get_aug_confs(opt, aug_name='lr_fringes',
+            prob_name='lr_fringes_chance', config_name=None,
+            param_name=None))
 
-    # Add HR noise if enabled AND noise types are provided (for noise2noise and similar models)
-    hr_noise = opt.get('hr_noise', None)  # true | false
-    if hr_noise:
-        noise_types = opt.get('hr_noise_types', None)  # noise types
-        if isinstance(noise_types, list):
-            hr_augs['noise'] = [random.choice(noise_types)]
+    # add blur if blur AND blur types are provided
+    lr_augs.update(
+        get_aug_confs(opt, aug_name='lr_blur',
+            prob_name='blur_prob', config_name='lr_blur_types',
+            param_name='blur', types='lr_blur_types'))
 
-    # LR primary noise: Add noise to LR if enabled AND noise types are provided
-    lr_noise = opt.get('lr_noise', None)  # true | false
-    if lr_noise:
-        noise_types = opt.get('lr_noise_types', None)  # noise types
-        if isinstance(noise_types, list):
-            lr_augs['noise'] = [random.choice(noise_types)]
+    # add secondary blur if blur AND blur types are provided
+    lr_augs.update(
+        get_aug_confs(opt, aug_name='lr_blur2',
+            prob_name='blur_prob2', config_name='lr_blur_types2',
+            param_name='blur2', types='lr_blur_types2'))
 
-    # LR secondary noise: Add additional noise to LR if enabled AND noise types are provided, else will skip
-    lr_noise2 = opt.get('lr_noise2', None)  # true | false
-    if lr_noise2:
-        noise_types = opt.get('lr_noise_types2', None)  # noise types
-        if isinstance(noise_types, list):
-            lr_augs['noise2'] = [random.choice(noise_types)]
+    # add final blur (sinc)
+    lr_augs.update(
+        get_aug_confs(opt, aug_name='final_blur',
+            prob_name='final_blur_prob', config_name='final_blur',
+            param_name='final_blur', types='final_blur'))
 
-    #v LR cutout / LR random erasing (for inpainting/classification tests)
-    lr_cutout = opt.get('lr_cutout', None)
-    lr_erasing = opt.get('lr_erasing', None)
+    if 'in' in opt.get('resize_strat'):
+        # add resize if provided
+        lr_augs.update(
+            get_res_confs(opt, aug_name='lr_downscale',
+                prob_name=None, config_name='lr_downscale_types',
+                param_name='resize', types='lr_downscale_types'))
+
+        # add secondary resize if provided
+        lr_augs.update(
+            get_res_confs(opt, aug_name='lr_downscale2',
+                prob_name=None, config_name='lr_downscale_types2',
+                param_name='resize2', types='lr_downscale_types2'))
+
+        # add final resize
+        lr_augs.update(
+            get_res_confs(opt, aug_name='final_scale',
+                prob_name=None, config_name='final_scale_types',
+                param_name='final_scale', types='final_scale_types'))
+
+    # add HR noise if enabled AND noise types are provided (for noise2noise, etc)
+    hr_augs.update(
+        get_aug_confs(opt, aug_name='hr_noise',
+            prob_name=None, config_name='hr_noise_types',
+            param_name='noise', types='hr_noise_types'))
+
+    # add LR primary noise if enabled AND noise types are provided
+    lr_augs.update(
+        get_aug_confs(opt, aug_name='lr_noise',
+            prob_name=None, config_name='lr_noise_types',
+            param_name='noise', types='lr_noise_types'))
+
+    # add LR secondary noise if enabled AND noise types are provided
+    lr_augs.update(
+        get_aug_confs(opt, aug_name='lr_noise2',
+            prob_name=None, config_name='lr_noise_types2',
+            param_name='noise2', types='lr_noise_types2'))
+
+    # add compression types
+    lr_augs.update(
+        get_aug_confs(opt, aug_name='compression',
+            prob_name=None, config_name='compression',
+            param_name='compression', types='compression'))
+
+    # add final compression
+    lr_augs.update(
+        get_aug_confs(opt, aug_name='final_compression',
+            prob_name=None, config_name='final_compression',
+            param_name='final_compression', types='final_compression'))
+
+    # TODO: update and test
+    # LR cutout / LR random erasing (for inpainting/classification tests)
+    lr_cutout = opt.get('lr_cutout')
+    lr_erasing = opt.get('lr_erasing')
 
     if lr_cutout and not lr_erasing:
         lr_augs['cutout'] = opt.get('lr_cutout_p', 1)
@@ -1389,6 +1614,10 @@ def get_unpaired_params(opt):  #get_augparams
         else:
             lr_augs['erasing'] = opt.get('lr_erasing_p', 1)
 
+    # set random shuffle
+    if opt.get('shuffle_degradations'):
+        lr_augs['random_shuffle'] = opt['shuffle_degradations']
+
     # label the augmentation lists
     if lr_augs:
         lr_augs['kind'] = 'lr'
@@ -1398,7 +1627,9 @@ def get_unpaired_params(opt):  #get_augparams
 
     return lr_augs, hr_augs
 
-def get_augmentations(opt, params=None, noise_patches=None):
+
+def get_augmentations(opt:dict, params:dict=None,
+    noise_patches=None, ds_kernels=None, img_size:int=None):
     """ unpaired augmentations
     Note: This a good point to convert PIL images to CV2
         for the augmentations, can make an equivalent for
@@ -1407,45 +1638,146 @@ def get_augmentations(opt, params=None, noise_patches=None):
 
     loader = set_transforms.loader_type
     set_transforms(loader_type='cv2')
-
-    transform_list = []
+    scale = opt.get('scale', 1)
     crop_size = opt.get('crop_size')
     if params and params['kind'] == 'lr':
-        crop_size = crop_size // opt.get('scale', 1)
+        crop_size = crop_size // scale
+    ada_scale = False
+    if (img_size and -4 < (min(img_size) - crop_size) <= 4
+        and scale > 1):
+        ada_scale = True
 
-    # "auto levels"
+    transform_list = aug_pipeline(
+        params=params, noise_patches=noise_patches,
+        scale=scale, ds_kernels=ds_kernels,
+        crop_size=crop_size, ada_scale=ada_scale)
+
+    return transforms.Compose(transform_list)
+
+
+def aug_pipeline(params:dict=None, noise_patches=None,
+    scale=None, ds_kernels=None, crop_size:int=None,
+    ada_scale:bool=False):
+
+    transform_list = []
+    # blur1
+    if 'blur' in params:
+        aug = list(params['blur'].keys())
+        conf = list(params['blur'].values())[0]
+        blur_func = get_blur(aug, conf)
+        if blur_func:
+            transform_list.append(blur_func)
+
+    # resize1
+    if 'resize' in params:
+        algo = params['resize']['algo'][0]
+        conf = params['resize'].get('add_conf').copy()
+        if ada_scale:
+            conf['ada_scale'] = ada_scale
+        res_func = Scale_class(scale=scale, ds_kernel=ds_kernels,
+                resize_type=algo, img_type='cv2', res_config=conf)
+        if res_func:
+            transform_list.append(res_func)
+
+    # noise1
+    if 'noise' in params:
+        aug = list(params['noise'].keys())
+        conf = list(params['noise'].values())[0]
+        noise_func = get_noise(aug, noise_patches, conf)
+        if noise_func:
+            transform_list.append(noise_func)
+
+    # compression: jpeg + webp
+    if 'compression' in params:
+        aug = list(params['compression'].keys())
+        conf = list(params['compression'].values())[0]
+        noise_func = get_noise(aug, noise_patches, conf)
+        if noise_func:
+            transform_list.append(noise_func)
+
+    # auto levels / color balance
     if 'auto_levels' in params:
         transform_list.append(transforms.FilterColorBalance(
-            p=params['auto_levels'], percent=10, random_params=True))
+            **params['auto_levels']))
 
     # unsharpening mask
-    if 'unsharp_mask' in params:
+    if 'unsharp' in params:
         transform_list.append(transforms.FilterUnsharp(
-            p=params['unsharp_mask']))
+            **params['unsharp']))
 
     # color fringes
     if 'fringes' in params:
         transform_list.append(transforms.RandomChromaticAberration(
-            p=params['fringes'], random_params=True))
+            **params['fringes']))
 
-    # blur
-    if 'blur' in params:
-        blur_func = get_blur(params['blur'])
+    # blur2
+    if 'blur2' in params:
+        aug = list(params['blur2'].keys())
+        conf = list(params['blur2'].values())[0]
+        blur_func = get_blur(aug, conf)
         if blur_func:
             transform_list.append(blur_func)
 
-    # primary noise
-    if 'noise' in params:
-        noise_func = get_noise(params['noise'], noise_patches)
-        if noise_func:
-            transform_list.append(noise_func)
+    # resize2
+    if 'resize2' in params:
+        algo = params['resize2']['algo'][0]
+        conf = params['resize2'].get('add_conf').copy()
+        if ada_scale:
+            conf['ada_scale'] = ada_scale
+        res_func = Scale_class(scale=scale, ds_kernel=ds_kernels,
+                resize_type=algo, img_type='cv2', res_config=conf)
+        if res_func:
+            transform_list.append(res_func)
 
-    # secondary noise
+    # noise2
     if 'noise2' in params:
-        noise_func = get_noise(params['noise2'], noise_patches)
+        aug = list(params['noise2'].keys())
+        conf = list(params['noise2'].values())[0]
+        noise_func = get_noise(aug, noise_patches, conf)
         if noise_func:
             transform_list.append(noise_func)
 
+    if "random_shuffle" in params:
+        random.shuffle(transform_list)
+
+    # final transforms
+    final_compression_transform = []
+    # final_compression: jpeg/webp
+    if 'final_compression' in params:
+        aug = list(params['final_compression'].keys())
+        conf = list(params['final_compression'].values())[0]
+        noise_func = get_noise(aug, noise_patches, conf)
+        if noise_func:
+            final_compression_transform.append(noise_func)
+
+    # final resize
+    final_resize_transform = []
+    if 'final_scale' in params:
+        algo = params['final_scale'][0]
+        res_func = Scale_class(
+            # size=(crop_size, crop_size, 3), resize_type=algo,
+            size=(crop_size, crop_size), resize_type=algo,
+            img_type='cv2')
+        if res_func:
+            final_resize_transform.append(res_func)
+
+        # final blur (sinc)
+        if 'final_blur' in params:
+            aug = list(params['final_blur'].keys())
+            conf = list(params['final_blur'].values())[0]
+            blur_func = get_blur(aug, conf)
+            if blur_func:
+                final_resize_transform.append(blur_func)
+
+    if final_compression_transform:
+        if random.random() < 0.5:
+            transform_list += final_compression_transform + final_resize_transform
+        else:
+            transform_list += final_resize_transform + final_compression_transform
+    else:
+        transform_list += final_resize_transform
+
+    # TODO: update and test cutout and erasing
     # cutout
     if 'cutout' in params:
         transform_list.append(transforms.Cutout(
@@ -1458,11 +1790,11 @@ def get_augmentations(opt, params=None, noise_patches=None):
                 lambda img: transforms.RandomErasing(
                     p=params['erasing'])(img, mode=[3])))
 
-    set_transforms(loader_type=loader)
-    return transforms.Compose(transform_list)
+    return transform_list
 
 
-# Note: these don't change, can be fixed from the dataloader init
+
+# TODO: these don't change, can be fixed from the dataloader init
 def get_totensor_params(opt):
     params = {}
 
@@ -1474,19 +1806,19 @@ def get_totensor_params(opt):
         method = opt.get('toTensor_method', 'transforms')
     else:
         # for CV2 the default is np2tensor
-        method = opt.get('toTensor_method', None)
+        method = opt.get('toTensor_method')
     params['method'] = method
 
     # only required for 'transforms' normalization
-    mean = opt.get('normalization_mean', None)
+    mean = opt.get('normalization_mean')
     if mean:
         params['mean'] = mean
 
-    std = opt.get('normalization_std', None)
+    std = opt.get('normalization_std')
     if std:
         params['std'] = std
 
-    params['normalize_first'] = opt.get('normalize_first', None)
+    params['normalize_first'] = opt.get('normalize_first')
 
     return params
 
@@ -1522,11 +1854,6 @@ def get_totensor(opt, params=None, toTensor=True, grayscale=False, normalize=Fal
 
 
 def custom_pipeline(custom_transforms, transforms_cfg, noise_patches=None):
-    #TODO: here I can add the get_noise() and get_blur() functions as
-    # options to get random noise and blur added. It's a serial pipeline,
-    # but can add those as parallel randomization too. And those could
-    # also be used multiple times to have multiple parallel randomizations
-    # (ie noise types or simple/complex/real motion blur kernels)
 
     transform_list = []
     for transform in custom_transforms:
@@ -1549,39 +1876,32 @@ def custom_pipeline(custom_transforms, transforms_cfg, noise_patches=None):
         # blur
         elif 'blur' in transform:
             if transform == 'averageblur':
-                # print('average')
                 transform_list.append(transforms.RandomAverageBlur(
                     p=transforms_cfg.get('averageblur_p', 0.5),
                     kernel_size=11, init_params=True))
             elif transform == 'boxblur':
-                # print('box')
                 transform_list.append(transforms.RandomBoxBlur(
                     p=transforms_cfg.get('boxblur_p', 0.5),
                     kernel_size=11, init_params=True))
             elif transform == 'gaussianblur':
-                # print('gaussian')
                 transform_list.append(transforms.RandomGaussianBlur(
                     p=transforms_cfg.get('gaussianblur_p', 0.5),
                     sigmaX=(0.1, 2.8), kernel_size=11,
                     init_params=True))
             elif transform == 'medianblur':
-                # print('median')
                 transform_list.append(transforms.RandomMedianBlur(
                     p=transforms_cfg.get('medianblur_p', 0.5),
                     kernel_size=11, init_params=True))
             elif transform == 'bilateralblur':
-                # print('bilateral')
                 transform_list.append(transforms.RandomBilateralBlur(
                     p=transforms_cfg.get('bilateralblur_p', 0.5),
                     sigmaX=200, sigmaY=200,
                     kernel_size=11, init_params=True))
             elif transform == 'motionblur':
-                # print('motion')
                 transform_list.append(transforms.RandomMotionBlur(
                     p=transforms_cfg.get('motionblur_p', 0.5),
                     kernel_size=7, init_params=True))
             elif transform == 'complexmotionblur':
-                # print('complexmotion')
                 transform_list.append(transforms.RandomComplexMotionBlur(
                     p=transforms_cfg.get('motionblur_p', 0.5),
                     size=100, complexity=1.0))
@@ -1597,50 +1917,42 @@ def custom_pipeline(custom_transforms, transforms_cfg, noise_patches=None):
                     min_kernel_size=7, kernel_size=21,
                     sigmaX=(0.5, 8), sigmaY=(0.5, 8),
                     angle=(0, 180), noise=0.75))
+            elif blur_type == 'sinc':
+                transform_list.append(transforms.RandomSincBlur(
+                    p=transforms_cfg.get('sincblur_p', 0.5),
+                    min_kernel_size=7, kernel_size=21,
+                    min_cutoff=None))
 
         # noise
         elif 'dither' in transform:
-            #TODO: need a dither type selector, there are multiple options including b&w dithers
-            # if dither == 'fs':
             if ('fs' in transform and 'bw' not in transform) or transform == 'dither':
                 transform_list.append(transforms.FSDitherNoise(
                     p=transforms_cfg.get('dither_p', 0.5)))
-            # elif dither == 'bayer':
             elif 'bayer' in transform and 'bw' not in transform:
                 transform_list.append(transforms.BayerDitherNoise(
                     p=transforms_cfg.get('dither_p', 0.5)))
-            # elif dither == 'fs_bw':
             elif 'fs_bw' in transform:
                 transform_list.append(transforms.FSBWDitherNoise(
                     p=transforms_cfg.get('dither_p', 0.5)))
-            # elif dither == 'avg_bw':
             elif 'avg_bw' in transform:
                 transform_list.append(transforms.AverageBWDitherNoise(
                     p=transforms_cfg.get('dither_p', 0.5)))
-            # elif dither == 'bayer_bw':
             elif 'bayer_bw' in transform:
                 transform_list.append(transforms.BayerBWDitherNoise(
                     p=transforms_cfg.get('dither_p', 0.5)))
-            # elif dither == 'bin_bw':
             elif 'bin_bw' in transform:
                 transform_list.append(transforms.BinBWDitherNoise(
                     p=transforms_cfg.get('dither_p', 0.5)))
-            # elif dither == 'rnd_bw':
             elif 'rnd_bw' in transform:
                 transform_list.append(transforms.RandomBWDitherNoise(
                     p=transforms_cfg.get('dither_p', 0.5)))
-            # print("dither")
-        elif transform == 'simplequantize':
-            #TODO: find a useful rgb_range for SimpleQuantize in [0,255]
-            # the smaller the value, the closer to original colors
+        elif transform in ('simplequantize', 'simple_quantize'):
             transform_list.append(transforms.SimpleQuantize(
                 p=transforms_cfg.get('squantize_p', 0.5),
-                rgb_range = 50)) #30
-            # print("simplequantize")
+                rgb_range = 50))
         elif transform in ('quantize', 'som_quantize'):
             transform_list.append(transforms.RandomQuantizeSOM(
                 p=transforms_cfg.get('quantize_p', 0.5), num_colors=32))
-            # print("quantize")
         elif transform == 'km_quantize':
             transform_list.append(transforms.RandomQuantize(
                 p=transforms_cfg.get('km_quantize_p', 0.5), num_colors=32))
@@ -1648,13 +1960,11 @@ def custom_pipeline(custom_transforms, transforms_cfg, noise_patches=None):
             transform_list.append(transforms.RandomGaussianNoise(
                 p=transforms_cfg.get('gaussian_p', 0.5),
                 var_limit=(1.0, 25.0), prob_color=0.5))
-            # print("gaussian")
         elif transform.lower() == 'jpeg':
             transform_list.append(transforms.RandomCompression(
                 p=transforms_cfg.get('compression_p', 0.5),
                 min_quality=30, max_quality=95,
                 compression_type='.jpeg'))
-            # print("JPEG")
         elif transform.lower() == 'webp':
             transform_list.append(transforms.RandomCompression(
                 p=transforms_cfg.get('compression_p', 0.5),
@@ -1663,19 +1973,15 @@ def custom_pipeline(custom_transforms, transforms_cfg, noise_patches=None):
         elif transform == 'poisson':
             transform_list.append(transforms.RandomPoissonNoise(
                 p=transforms_cfg.get('poisson_p', 0.5)))
-            # print("poisson")
         elif transform == 's&p':
             transform_list.append(transforms.RandomSPNoise(
                 p=transforms_cfg.get('s&p_p', 0.5)))
-            # print("s&p")
         elif transform == 'speckle':
             transform_list.append(transforms.RandomSpeckleNoise(
                 p=transforms_cfg.get('speckle_p', 0.5), prob_color=0.5))
-            # print("speckle")
         elif transform == 'maxrgb':
             transform_list.append(transforms.FilterMaxRGB(
                 p=transforms_cfg.get('maxrgb_p', 0.5)))
-            # print("maxrgb")
         elif transform == 'canny':
             transform_list.append(transforms.FilterCanny(
                 p=transforms_cfg.get('canny_p', 0.5),
@@ -1685,12 +1991,12 @@ def custom_pipeline(custom_transforms, transforms_cfg, noise_patches=None):
         elif transform == 'clahe':
             transform_list.append(transforms.CLAHE(
                 p=transforms_cfg.get('clahe_p', 0.5)))
-        #TODO: needs transforms function
+        # TODO: needs transforms function
         elif transform == 'patches' and noise_patches:
-            if random.random() > (1.- transforms_cfg.get('patches_p', 0.5)):
-                transform_list.append(RandomNoisePatches(
-                    noise_patches,
-                    noise_amp=transforms_cfg.get('noise_amp', 1)))
+            transform_list.append(RandomNoisePatches(
+                p=transforms_cfg.get('patches_p', 0.5),
+                noise_patches=noise_patches,
+                noise_amp=transforms_cfg.get('noise_amp', 1)))
         elif noise_type == 'camera':
             transform_list.append(transforms.RandomCameraNoise(
                 p=transforms_cfg.get('camera_p', 0.5),

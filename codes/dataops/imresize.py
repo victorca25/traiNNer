@@ -143,7 +143,7 @@ def blackman(x, a=2):
     xp = math.pi * x
     # TODO: check if need to multiply by sinc(x) * => (fw.sin(xp + eps) / xp + eps) *
     return (( 
-             (0.42 + 0.5*fw.cos((xp/a)) + 0.08*fw.cos(2*(xp/a)))) * 
+             (0.42 - 0.5*fw.cos((xp/a)) + 0.08*fw.cos(2*(xp/a)))) *
              to_dtype(fw.abs(x) <= a) + 
              (1.0) * to_dtype(fw.abs(x) == 0)
              )
@@ -307,6 +307,7 @@ def get_imresize_kernel(interpolation=None):
         return cubic
 
 
+'''
 def calculate_weights_indices(in_length, out_length, scale, kernel, kernel_width, antialiasing):
     """Calculate weights and indices, used for imresize function.
     Args:
@@ -374,7 +375,7 @@ def calculate_weights_indices(in_length, out_length, scale, kernel, kernel_width
     indices = indices + sym_len_s - 1
     return weights, indices, int(sym_len_s), int(sym_len_e)
 
-'''
+
 # @torch.no_grad()
 @preserve_range_float
 def imresize(img, scale, antialiasing=True, interpolation=None, 
@@ -508,7 +509,7 @@ def resize(img, scale_factors=None, out_shape=None,
             - not specified - then it will be calculated using output_size.
         out_shape (list or tuple): if shorter than input.shape then only 
             the first/last (depending np/torch) dims are resized. If not 
-            specified, can be calcualated from scale_factor.
+            specified, can be calculated from scale_factor.
         interpolation: the interpolation method to use for resizing. The
             following methods are available: "cubic", "box", "linear", 
             "lanczos2", "lanczos3", "lanczos4", "lanczos5", "hermite",
