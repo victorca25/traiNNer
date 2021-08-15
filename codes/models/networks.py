@@ -224,6 +224,9 @@ def get_network(opt, step=0, selector=None):
     elif kind == 'multiscale':
         from models.modules.architectures import discriminators
         net = discriminators.MultiscaleDiscriminator
+    elif kind == 'unet':
+        from models.modules.architectures import discriminators
+        net = discriminators.UNetDiscriminator
     else:
         raise NotImplementedError('Model [{:s}] not recognized'.format(kind))
     """

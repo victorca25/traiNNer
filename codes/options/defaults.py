@@ -345,6 +345,11 @@ def get_network_D_config(network_D, scale, crop_size, model_G):
             full_network_D['use_spectral_norm'] = network_D.pop('spectral_norm', None) or network_D.pop('use_spectral_norm', False)
         if kind_D == 'multiscale':
             full_network_D['num_D'] = network_D.pop('num_D', 3)  # number of discriminators (scales)
+    elif 'unet' in kind_D:
+        full_network_D['type'] = 'unet'
+        full_network_D['input_nc'] = network_D.pop('in_nc', 3)
+        full_network_D['nf'] = network_D.pop('nf', 64)
+        full_network_D['skip_connection'] = network_D.pop('skip_connection', True)
     else:
         raise NotImplementedError(f'Discriminator model [{kind_D:s}] not recognized')
 

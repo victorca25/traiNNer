@@ -1,9 +1,9 @@
 import math
 import torch
 import torch.nn as nn
+from torch.nn import functional as F
 import torchvision
 from . import block as B
-# from . import spectral_norm as SN
 from torch.nn.utils import spectral_norm as SN
 
 
@@ -109,25 +109,25 @@ class Discriminator_VGG_128_SN(nn.Module):
         # 128, 64
         self.lrelu = nn.LeakyReLU(0.2, True)
 
-        self.conv0 = SN.spectral_norm(nn.Conv2d(3, 64, 3, 1, 1))
-        self.conv1 = SN.spectral_norm(nn.Conv2d(64, 64, 4, 2, 1))
+        self.conv0 = SN(nn.Conv2d(3, 64, 3, 1, 1))
+        self.conv1 = SN(nn.Conv2d(64, 64, 4, 2, 1))
         # 64, 64
-        self.conv2 = SN.spectral_norm(nn.Conv2d(64, 128, 3, 1, 1))
-        self.conv3 = SN.spectral_norm(nn.Conv2d(128, 128, 4, 2, 1))
+        self.conv2 = SN(nn.Conv2d(64, 128, 3, 1, 1))
+        self.conv3 = SN(nn.Conv2d(128, 128, 4, 2, 1))
         # 32, 128
-        self.conv4 = SN.spectral_norm(nn.Conv2d(128, 256, 3, 1, 1))
-        self.conv5 = SN.spectral_norm(nn.Conv2d(256, 256, 4, 2, 1))
+        self.conv4 = SN(nn.Conv2d(128, 256, 3, 1, 1))
+        self.conv5 = SN(nn.Conv2d(256, 256, 4, 2, 1))
         # 16, 256
-        self.conv6 = SN.spectral_norm(nn.Conv2d(256, 512, 3, 1, 1))
-        self.conv7 = SN.spectral_norm(nn.Conv2d(512, 512, 4, 2, 1))
+        self.conv6 = SN(nn.Conv2d(256, 512, 3, 1, 1))
+        self.conv7 = SN(nn.Conv2d(512, 512, 4, 2, 1))
         # 8, 512
-        self.conv8 = SN.spectral_norm(nn.Conv2d(512, 512, 3, 1, 1))
-        self.conv9 = SN.spectral_norm(nn.Conv2d(512, 512, 4, 2, 1))
+        self.conv8 = SN(nn.Conv2d(512, 512, 3, 1, 1))
+        self.conv9 = SN(nn.Conv2d(512, 512, 4, 2, 1))
         # 4, 512
 
         # classifier
-        self.linear0 = SN.spectral_norm(nn.Linear(512 * 4 * 4, 100))
-        self.linear1 = SN.spectral_norm(nn.Linear(100, 1))
+        self.linear0 = SN(nn.Linear(512 * 4 * 4, 100))
+        self.linear1 = SN(nn.Linear(100, 1))
 
     def forward(self, x):
         x = self.lrelu(self.conv0(x))
@@ -519,7 +519,7 @@ class NLayerDiscriminator(nn.Module):
             nf_mult = min(2 ** n, 8)
             sequence += [
                 B.add_spectral_norm(
-                    nn.Conv2d(ndf * nf_mult_prev, ndf * nf_mult, kernel_size=kw, stride=2, padding=padw, bias=use_bias), 
+                    nn.Conv2d(ndf * nf_mult_prev, ndf * nf_mult, kernel_size=kw, stride=2, padding=padw, bias=use_bias),
                     use_spectral_norm),
                 norm_layer(ndf * nf_mult),
                 nn.LeakyReLU(0.2, True)
@@ -529,7 +529,7 @@ class NLayerDiscriminator(nn.Module):
         nf_mult = min(2 ** n_layers, 8)
         sequence += [
             B.add_spectral_norm(
-                nn.Conv2d(ndf * nf_mult_prev, ndf * nf_mult, kernel_size=kw, stride=1, padding=padw, bias=use_bias), 
+                nn.Conv2d(ndf * nf_mult_prev, ndf * nf_mult, kernel_size=kw, stride=1, padding=padw, bias=use_bias),
                 use_spectral_norm),
             norm_layer(ndf * nf_mult),
             nn.LeakyReLU(0.2, True)
@@ -538,7 +538,7 @@ class NLayerDiscriminator(nn.Module):
         if patch:
             # output patches as results
             sequence += [B.add_spectral_norm(
-                nn.Conv2d(ndf * nf_mult, 1, kernel_size=kw, stride=1, padding=padw), 
+                nn.Conv2d(ndf * nf_mult, 1, kernel_size=kw, stride=1, padding=padw),
                 use_spectral_norm)]  # output 1 channel prediction map
         else:
             # linear vector classification output
@@ -644,4 +644,99 @@ class PixelDiscriminator(nn.Module):
         """Standard forward."""
         return self.net(input)
 
+
+class UNetDiscriminator(nn.Module):
+    """ Constructs a U-Net discriminator
+    Args:
+        input_nc: the number of channels in input images
+        nf (int): the number of discriminator features
+        skip_connection: define if skip connections are used in the UNet
+        spectral_norm: Select if Spectral Norm will be used
+    """
+
+    def __init__(self, input_nc:int, nf:int=64,
+        skip_connection:bool=True, spectral_norm:bool=False):
+        super(UNetDiscriminator, self).__init__()
+        self.skip_connection = skip_connection
+
+        # initial features
+        self.conv0 = B.add_spectral_norm(
+            nn.Conv2d(input_nc, nf, kernel_size=3, stride=1, padding=1),
+            spectral_norm)
+
+        # downsample
+        self.conv1 = B.add_spectral_norm(
+            nn.Conv2d(nf, nf * 2, 4, 2, 1, bias=False),
+            spectral_norm)
+        self.conv2 = B.add_spectral_norm(
+            nn.Conv2d(nf * 2, nf * 4, 4, 2, 1, bias=False),
+            spectral_norm)
+        self.conv3 = B.add_spectral_norm(
+            nn.Conv2d(nf * 4, nf * 8, 4, 2, 1, bias=False),
+            spectral_norm)
+
+        # upsample
+        self.conv4 = B.add_spectral_norm(
+            nn.Conv2d(nf * 8, nf * 4, 3, 1, 1, bias=False),
+            spectral_norm)
+        self.conv5 = B.add_spectral_norm(
+            nn.Conv2d(nf * 4, nf * 2, 3, 1, 1, bias=False),
+            spectral_norm)
+        self.conv6 = B.add_spectral_norm(
+            nn.Conv2d(nf * 2, nf, 3, 1, 1, bias=False),
+            spectral_norm)
+
+        # final extra features
+        self.conv7 = B.add_spectral_norm(
+            nn.Conv2d(nf, nf, 3, 1, 1, bias=False),
+            spectral_norm)
+        self.conv8 = B.add_spectral_norm(
+            nn.Conv2d(nf, nf, 3, 1, 1, bias=False),
+            spectral_norm)
+
+        self.conv9 = nn.Conv2d(nf, 1, 3, 1, 1)
+
+    def forward(self, x):
+        x0 = F.leaky_relu(
+            self.conv0(x), negative_slope=0.2, inplace=True)
+
+        # downsample
+        x1 = F.leaky_relu(
+            self.conv1(x0), negative_slope=0.2, inplace=True)
+        x2 = F.leaky_relu(
+            self.conv2(x1), negative_slope=0.2, inplace=True)
+        x3 = F.leaky_relu(
+            self.conv3(x2), negative_slope=0.2, inplace=True)
+
+        # upsample
+        x3 = F.interpolate(
+            x3, scale_factor=2, mode='bilinear', align_corners=False)
+        x4 = F.leaky_relu(
+            self.conv4(x3), negative_slope=0.2, inplace=True)
+
+        if self.skip_connection:
+            x4 = x4 + x2
+        x4 = F.interpolate(
+            x4, scale_factor=2, mode='bilinear', align_corners=False)
+        x5 = F.leaky_relu(
+            self.conv5(x4), negative_slope=0.2, inplace=True)
+
+        if self.skip_connection:
+            x5 = x5 + x1
+        x5 = F.interpolate(
+            x5, scale_factor=2, mode='bilinear', align_corners=False)
+        x6 = F.leaky_relu(
+            self.conv6(x5), negative_slope=0.2, inplace=True)
+
+        if self.skip_connection:
+            x6 = x6 + x0
+
+        # extra
+        out = F.leaky_relu(
+            self.conv7(x6), negative_slope=0.2, inplace=True)
+        out = F.leaky_relu(
+            self.conv8(out), negative_slope=0.2, inplace=True)
+        out = self.conv9(out)
+
+        return out
 
