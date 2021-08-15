@@ -38,49 +38,22 @@
       // , "color_LR": "y"
       // , "color_HR": "y"
       
-      // LR and HR modifiers.
-      // , "aug_downscale": 0.2
-      // , "shape_change": "reshape_lr"
-      
-      // Enable random downscaling of HR images (will fix LR pair to correct size)
-      // , "hr_downscale": true
-      // , "hr_downscale_amt": [2, 1.75, 1.5, 1]
-      // // , "pre_crop": true
-      
-      // On the fly generation of LR:
-      // , "dataroot_kernels": "../training/kernels/results/"
-      , "lr_downscale": true
-      , "lr_downscale_types": ["linear", "cubic"]
-
       // Rotations augmentations:
       , "use_flip": true
       , "use_rot": true
       , "use_hrrot": false
       
-      // Noise and blur augmentations:
-      , "lr_blur": false
-      , "lr_blur_types":  {"gaussian":1, "clean":3}
+      // Presets and on the fly (OTF) augmentations
+      // , "augs_strategy": "combo"
+      // , "aug_downscale": 0.2
+      // , "resize_strat": "pre"
+      
+      // , "dataroot_kernels": "../training/kernels/results/"
       // , "noise_data": "../noise_patches/normal/"
-      , "lr_noise": false
-      , "lr_noise_types": {"gaussian":1, "jpeg":1, "clean":4}
-      , "lr_noise2": false
-      , "lr_noise_types2": {"jpeg":1, "webp":1, "clean":2}
-      , "hr_noise": false
-      , "hr_noise_types": {"gaussian":1, "clean":4}
-      
-      // Color augmentations
-      // , "lr_fringes": true
-      // , "lr_fringes_chance": 0.4
-      // , "auto_levels": "HR"
-      // , "rand_auto_levels": 0.7
-      // , "lr_unsharp_mask": true
-      // , "lr_rand_unsharp": 1
-      // , "hr_unsharp_mask": true
-      // , "hr_rand_unsharp": 1
-      
-      // Augmentations for classification or (maybe) inpainting networks:
-      // , "lr_cutout": false
-      // , "lr_erasing": false
+      // , "pre_crop": true
+      // , "hr_downscale": true
+      // , "hr_downscale_amt": [2, 1.75, 1.5, 1]
+      // , "shape_change": "reshape_lr"
     }
     , "val": {
       "name": "val_set14_part"
