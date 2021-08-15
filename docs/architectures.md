@@ -35,7 +35,7 @@ Below are the network architectures and, in general, training strategies support
    <img height="220" src="https://user-images.githubusercontent.com/41912303/107157089-77b5cc00-6982-11eb-83f3-05773ff46610.png">
 </p>
 
-In addition, since they are based on `ESRGAN` and don't modify the general training strategy or the network architecture, but only the data used for training, [Real-SR](https://openaccess.thecvf.com/content_CVPRW_2020/papers/w31/Ji_Real-World_Super-Resolution_via_Kernel_Estimation_and_Noise_Injection_CVPRW_2020_paper.pdf) (2020), [BSRGAN](https://arxiv.org/pdf/2103.14006v1.pdf) (2021) and [Real-ESRGAN](https://arxiv.org/pdf/2107.10833) (2021) are supported. `Real-SR` by means of the [realistic kernels](https://github.com/victorca25/traiNNer/blob/master/docs/kernels.md) and noise injection and `BSRGAN` and `Real-ESRGAN` through the on the fly augmentations pipeline (some augmentations pending). More information in the [augmentations](https://github.com/victorca25/traiNNer/blob/master/docs/augmentations.md) document. These strategies can be combined with **any** of the networks above.
+In addition, since they are based on `ESRGAN` and don't modify the general training strategy or the network architecture, but only the data used for training, [Real-SR](https://openaccess.thecvf.com/content_CVPRW_2020/papers/w31/Ji_Real-World_Super-Resolution_via_Kernel_Estimation_and_Noise_Injection_CVPRW_2020_paper.pdf) (2020), [BSRGAN](https://arxiv.org/pdf/2103.14006v1.pdf) (2021) and [Real-ESRGAN](https://arxiv.org/pdf/2107.10833) (2021) are supported. `Real-SR` by means of the [realistic kernels](https://github.com/victorca25/traiNNer/blob/master/docs/kernels.md) and noise injection from image patches and `BSRGAN` and `Real-ESRGAN` through the on the fly augmentations pipeline. More information in the [augmentations](https://github.com/victorca25/traiNNer/blob/master/docs/augmentations.md) document. These strategies can be combined with **any** of the networks above.
 
 
 ## Image to image translation
@@ -148,6 +148,18 @@ In addition, since they are based on `ESRGAN` and don't modify the general train
         author={Lugmayr, Andreas and Danelljan, Martin and Van Gool, Luc and Timofte, Radu},
         booktitle={ECCV},
         year={2020}
+    }
+    @inproceedings{zhang2021designing,
+        title={Designing a Practical Degradation Model for Deep Blind Image Super-Resolution},
+        author={Zhang, Kai and Liang, Jingyun and Van Gool, Luc and Timofte, Radu},
+        booktitle={arxiv},
+        year={2021}
+    }
+    @Article{wang2021realesrgan,
+        title={Real-ESRGAN: Training Real-World Blind Super-Resolution with Pure Synthetic Data},
+        author={Xintao Wang and Liangbin Xie and Chao Dong and Ying Shan},
+        journal={arXiv:2107.10833},
+        year={2021}
     }
     @inproceedings{CycleGAN2017,
         title={Unpaired Image-to-Image Translation using Cycle-Consistent Adversarial Networkss},

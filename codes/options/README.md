@@ -89,64 +89,17 @@ datasets:  # configure the datasets
     crop_size: 128  # target image patch size. Default: 128. (Needs to be coordinated with the patch size of the networks)
     image_channels: 3 # number of channels to load images in
 
-    # Color space conversion: 'color' for both LR and HR, 'color_LR' for LR independently, 'color_HR' for HR independently. Default: no conversion (RGB), Options: 'y' for Y in YCbCr | 'gray' to convert RGB to grayscale | 'RGB' to convert gray to RGB
-    # color: 'y'
-    # color_LR: 'y'
-    # color_HR: 'y'
-    
-    # LR and HR modifiers. Random flip LR and HR or ignore provided LRs and generate new ones on the fly with defined probability:
-    # rand_flip_LR_HR: false  # true # flip LR and HR during training.
-    # flip_chance: 0.05  # Example: 0.05 = 5% chance of LR and HR flipping during training.
-    # aug_downscale: 0.2  # Example: 0.6 = 60% chance of generating LR on the fly, even if LR dataset is provided.
-
-    # Configure random downscaling of HR target image (will match LR input to correct size)
-    # hr_downscale: true
-    # hr_downscale_amt: [2, 1.75, 1.5, 1]  # the random scales to downscale to
-    # #pre_crop: true  # enable to crop the images before scaling for speed improvement (relevant when using hr_downscale or generating LRs on the fly)
-
-    # Fix LR size if it doesn't match the scale of HR. Options: `reshape_lr` to modify only LR to HR/scale or reshape_hr to modify both LR and HR in respect to each other.
-    # shape_change: reshape_lr
-    
-    # Configure on the fly generation of LR: (else, it will automatically default to Matlab-like antialiased downscale algorithm when/if required
-    lr_downscale: true  # true | false
-    # dataroot_kernels: '../training/kernels/results/'  # location of the image kernels extracted with KernelGAN, for use with the `realistic` downscale type below
-    lr_downscale_types: ["linear", "bicubic"]  # scaling interpolation options. select from ['cv2_nearest', 'cv2_linear', 'cv2_area', 'cv2_cubic', 'cv2_lanczos4', 'cv2_linear_exact', 'linear', 'box' ,'lanczos2', 'lanczos3', 'bicubic', 'mitchell', 'hermite', 'lanczos4', 'lanczos5', 'bell', 'catrom', 'hanning', 'hamming', 'gaussian', 'sinc2', 'sinc3', 'sinc4', 'sinc5', 'blackman2', 'blackman3', 'blackman4', 'blackman5', 'realistic']
-
     # Rotations augmentations:
     use_flip: true  # whether use horizontal and vertical flips
     use_rot: true  # whether use rotations: 90, 190, 270 degrees
     use_hrrot: false # rotate images in free-range random degress between -45 and 45
+
+    # Presets and augmentations pipeline:
+    # augs_strategy: combo
     
-    # Noise and blur augmentations:
-    # In both cases, the options will consist of a dictionary, for example: {gaussian: 1, clean: 3} where the probability of an option being applied depends on the number set. In this example, there 1/4 (25%) chance of `gaussian` being applied, while `clean` will happen 3/4 (75%) of the time.
-    
-    # The blur options are: "average", "box", "gaussian", "bilateral", "median", "motion", "complexmotion" or "clean"
-    # lr_blur: false # true | false
-    # lr_blur_types: {gaussian: 1, clean: 3}
-    
-    # The noise options are: "gaussian", "poisson", "dither", "s&p", "speckle", "jpeg", "webp", "quantize", "km_quantize", "simplequantize", "clahe", "patches" or "clean"
-    # noise_data: ../noise_patches/normal/ # location of the noise patches extracted from real images to use for noise injection with noise option "patches"
-    # lr_noise: false # true | false
-    # lr_noise_types: {gaussian: 1, jpeg: 1, clean: 4}
-    # lr_noise2: false # true | false
-    # lr_noise_types2: {dither: 2, clean: 2}
-    # hr_noise: false # true | false
-    # hr_noise_types:  {gaussian: 1, clean: 4}
-    
-    # Color augmentations
-    # lr_fringes: true # true | false
-    # lr_fringes_chance: 0.4
-    # auto_levels: HR # "HR" | "LR" | "Both" #add auto levels to the images to expand dynamic range. Can use with SPL loss or (MS)-SSIM.
-    # rand_auto_levels: 0.7 # Example: 0.4 = 40% chance of adding auto levels to images on the fly
-    # lr_unsharp_mask: true # add a unsharpening mask to LR images.
-    # lr_rand_unsharp: 1 # Example: 0.5 = 50% chance of adding unsharpening mask to LR images on the fly
-    # hr_unsharp_mask: true # add a unsharpening mask to HR images. Can work well together with the HFEN loss function.
-    # hr_rand_unsharp: 1 # Example: 0.5 = 50% chance of adding unsharpening mask to HR images on the fly
-    
-    # Augmentations for classification or (maybe) inpainting networks:
-    # lr_cutout: false # true | false
-    # lr_erasing: false # true | false
 ```
+
+Note that while the original behavior of the options file still remains, with the introduction of the [presets](https://github.com/victorca25/traiNNer/tree/master/codes/options/presets) files, the bluk of the configuration of the augmentations is delegated to the presets. The on-the-fly augmentations can still be configured from the options file as before and will [override](https://github.com/victorca25/traiNNer/tree/master/codes/options/presets/README.md#overriding) any preset, as it takes precedence over them.
 
 If needed, a `validation` dataset can also be included to evaluate progress during training. This is needed in order to calculate training metrics (`psnr`, `ssim` or `lpips`) and those metrics are required in the case that the ReduceLROnPlateau optimizer is used (Note: SRFlow can use `nll` as the metric instead). The options are a subset of training dataset options.
 
