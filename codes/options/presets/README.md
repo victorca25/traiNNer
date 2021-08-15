@@ -11,7 +11,7 @@ Below are more details regarding the presets and configuring the augmentation pi
 
 ## General
 
-Each set of preset has three elements, corresponding to the mathematical model of low resolution images **`'y'`** in relation to the high resolution images **`'x'`**:
+Each set of presets has three elements, corresponding to the mathematical model of low resolution images **`'y'`** in relation to the high resolution images **`'x'`**:
 
 ```y = (x ⊗ k) ↓s + n```
 
@@ -22,7 +22,7 @@ The presets are applied in overlays, where the `base` presets are the default co
 Four sample presets configurations are included:
 - [Real-SR](https://openaccess.thecvf.com/content_CVPRW_2020/papers/w31/Ji_Real-World_Super-Resolution_via_Kernel_Estimation_and_Noise_Injection_CVPRW_2020_paper.pdf) (`realsr`): uses realistic kernels for downscaling (pre-pipeline) and real images patches to inject noise. Note that these have to be extracted offline beforehand by following the instructions in [DLIP](https://github.com/victorca25/DLIP/) and the paths to the kernels and image patches must be provided in `dataroot_kernels` and `noise_data`.
 - [BSRGAN](https://arxiv.org/pdf/2103.14006v1.pdf) (`bsrgan`): which notably applies two blur operations (`iso` and `aniso`), two noise operations (`gaussian` and `camera` noise) and random in-pipeline scaling. These augmentations are shuffled and followed by `jpeg` compression.
-- [`Real-ESRGAN`](https://arxiv.org/pdf/2107.10833.pdf) (`resrgan`): very similar to BSRGAN, but adds `sinc` filter to the two blur operations, replaces the realistic `camera` noise for a simpler `poisson` noise augmentation and adds a second in-pipeline scaling operation. Instead of randomly shuffling the degradations, repeats the pipeline twice in the original form (blur -> scaling -> noise), with a `jpeg` compression between each and finishing with a random order of an additional `sinc` filter or `scaling`+`jpeg`. Note that additionally, the paper presents an optional use of an `unsharp` filter applied to `HR` images to increase sharpness of the result, which is a strategy that was already demostrated to work in this repository a couple of years back, and can be enabled by uncommenting the two lines in the `resrgan_noise.yaml` file.
+- [Real-ESRGAN](https://arxiv.org/pdf/2107.10833.pdf) (`resrgan`): very similar to BSRGAN, but adds `sinc` filter to the two blur operations, replaces the realistic `camera` noise for a simpler `poisson` noise augmentation and adds a second in-pipeline scaling operation. Instead of randomly shuffling the degradations, repeats the pipeline twice in the original form (blur -> scaling -> noise), with a `jpeg` compression between each and finishing with a random order of an additional `sinc` filter or `scaling`+`jpeg`. Note that additionally, the paper presents an optional use of an `unsharp` filter applied to `HR` images to increase sharpness of the result, which is a strategy that was already demostrated to work in this repository a couple of years back, and can be enabled by uncommenting the two lines in the `resrgan_noise.yaml` file.
 - Combination (`combo`): is an example preset that combines the previous three. Note that, unless disabled, it also requires the `dataroot_kernels` and `noise_data` to be provided.
 
 There are many more augmentations available than those shown in the sample presets and can be used to better match the desired outcome of the model in training. For more details, refer to the three base preset files that contain the default configuration for all augmentations.
@@ -68,6 +68,8 @@ base_resize_preset: base2_resize
 base_noise_preset: base2_noise
 ```
 
+[Back to index](#presets-files)
+
 ## Resizing
 
 There are multiple things to consider regarding the pipeline image resizing.
@@ -86,6 +88,8 @@ On the other hand, if a portion or all `LR`/`LQ` images are provided, `aug_downs
 
 If set to `true`, the `pre_crop` option can be convenient to crop the image pairs to the `crop_size` before entering the paired and unpaired augmentations, which may help accelerate processing times.
 
+[Back to index](#presets-files)
+
 ## Augmentations types
 
 Multiple augmentation options need a secondary variable where `types` of the augmentation are defined. For example, `lr_blur_types` can be `gaussian`, `iso` (isotropic), `aniso` (anisotropic) and others.
@@ -93,6 +97,8 @@ Multiple augmentation options need a secondary variable where `types` of the aug
 These types options can be defined either as lists like: [`gaussian`, `poisson`, `camera`, `patches`] (noise types) and represent a uniform distribution (same probability for each type), meaning that the probability of any of them being applied is the same (25% in this example).
 
 Alternatively, dictionaries can be used like: {`sinc`: `0.1`, `iso`: `0.58`, `aniso`: `0.32`} (blur types) in which case the numbers represent the probabilities for each case to be applied. In this example the probabilities sum up to 1, but it doesn't have to be the case. Another option is to use something like: {`gaussian`: `1`, `jpeg`: `1`, `clean`: `4`} where the probability also increases with the values assigned to each type, and in this case, `clean` (no augmentation) will happen 4 out of every 6 (1+1+4) times.
+
+[Back to index](#presets-files)
 
 ## Overriding
 
@@ -190,3 +196,6 @@ datasets:  # configure the datasets
 ```
 
 Any option in the `pipeline` section of any of the presets can also be added the `train` dataset and override the preset.
+
+[Back to index](#presets-files)
+

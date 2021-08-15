@@ -199,7 +199,7 @@ If using discriminators, then options for `optimizers` and `schedulers` must be 
 
 Also in this block the configurations for frequency separation, batch augmentations and differential augmentations are found. More information in the [augmentations](https://github.com/victorca25/traiNNer/blob/master/docs/augmentations.md) document.
 
-First, the optimizers options. Similar to the networs, if you want to use the default parameters (which are used in many other cases and are considered to be "safe values"), you can opt for selecting only the optimizer algorithm name (check the details in [`optimizers`](https://github.com/victorca25/traiNNer/blob/master/codes/models/optimizers.py)). For example, to use the default `adam` optimizer for both generator and discriminator, use:
+First, the optimizers options. Similar to the networks, if you want to use the default parameters (which are used in many other cases and are considered to be "safe values"), you can opt for selecting only the optimizer algorithm name (check the details in [`optimizers`](https://github.com/victorca25/traiNNer/blob/master/codes/models/optimizers.py)). For example, to use the default `adam` optimizer for both generator and discriminator, use:
 
 ```yaml
 train:
