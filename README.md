@@ -1,7 +1,5 @@
 # traiNNer
 
-
-
 [![Python Version](https://img.shields.io/badge/python-3-informational?style=flat)](https://python.org)
 [![License](https://img.shields.io/github/license/victorca25/traiNNer?style=flat)](https://github.com/victorca25/traiNNer/blob/master/LICENSE)
 [![DeepSource](https://deepsource.io/gh/victorca25/traiNNer.svg/?label=active+issues&show_trend=true)](https://deepsource.io/gh/victorca25/traiNNer/?ref=repository-badge)
@@ -64,6 +62,8 @@ In order to train your own models, you will need to create a [dataset](#datasets
 [**Pretrained models**](#pretrained-models) that can be used for fine-tuning are available.
 
 Detailed instructions on [how to train](https://github.com/victorca25/traiNNer/blob/master/docs/howtotrain.md) are also available.
+
+Augmentations strategies for training real-world models (blind SR) like [Real-SR](https://openaccess.thecvf.com/content_CVPRW_2020/papers/w31/Ji_Real-World_Super-Resolution_via_Kernel_Estimation_and_Noise_Injection_CVPRW_2020_paper.pdf), [BSRGAN](https://arxiv.org/pdf/2103.14006v1.pdf) and [Real-ESRGAN](https://arxiv.org/pdf/2107.10833.pdf) are provided via [presets](https://github.com/victorca25/traiNNer/tree/master/codes/options/presets) that define the blur, resizing and noise configurations, but many more [augmentations](https://github.com/victorca25/traiNNer/blob/master/docs/augmentations.md) are available to define custom training strategies.
 
 ### How to Test
 

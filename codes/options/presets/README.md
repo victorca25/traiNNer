@@ -130,6 +130,7 @@ datasets:  # configure the datasets
     # Configure random downscaling of HR target image (will match LR input to correct size)
     hr_downscale: true
     hr_downscale_amt: [2, 1.75, 1.5, 1]  # the random scales to downscale to
+    hr_downscale_types: [linear, bicubic]  # hr interpolation options. Same options as LR scaling, except 'down_up' and 'realistic'
     pre_crop: true  # enable to crop the images before scaling for speed improvement (relevant when using hr_downscale or generating LRs on the fly)
 
     # Fix LR size if it doesn't match the scale of HR. Options: `reshape_lr` to modify only LR to HR/scale or reshape_hr to modify both LR and HR in respect to each other.

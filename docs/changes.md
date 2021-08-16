@@ -73,7 +73,7 @@ This is a general and non-exhaustive changelog of the mayor changes at certain m
 -   Experimental Spatial Profile Loss ([SPL](https://arxiv.org/abs/1908.00274)).
 -   Partial Convolution based Padding ([PartialConv2D](https://github.com/NVIDIA/partialconv)). It should help prevent edge padding issues. Zero padding is the default and typically has best performance, PartialConv2D has better performance and converges faster for segmentation and classification (https://arxiv.org/pdf/1811.11718.pdf). Code has been added, but the switch makes pretained models using Conv2D incompatible. Test for inpainting and denoising.
 -   Initial implementation of the `PPON` training, based on the original published [paper](https://arxiv.org/abs/1907.10399). Including Multiscale L1 loss in phase 2.
--   Update `ESRGAN` training model (`SRRAGAN`)
+-   Update `ESRGAN` training model (`SRRAGAN`, now `sr` for super-resolution and restoration)
 -   Implement extraction of features from the discriminator to be used as a feature loss, as an alternative to classification networks like `VGG` (similar to `SRPGAN`).
 
 # Pre-v1.0

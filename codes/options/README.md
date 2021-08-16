@@ -26,7 +26,7 @@ First, there's a general section of options used to configure the experiment tra
 name: 001_template  # the name that defines the experiment and the directory that will be created in the experiments directory.
 # name: debug_001_template  # use the "debug" or "debug_nochkp" prefix in the name to run a test session and check everything is working. Does validation and state saving every 8 iterations. Remove "debug" to run the real training session.
 use_tb_logger: true  # wheter to enable Tensorboard logging or not. Output will be saved in: traiNNer/tb_logger/
-model: srragan  # the model training strategy to be used. Depends on the type of model, from: https://github.com/victorca25/traiNNer/tree/master/codes/models
+model: sr  # the model training strategy to be used. Depends on the type of model, from: https://github.com/victorca25/traiNNer/tree/master/codes/models
 scale: 4  # the scale factor that will be used for training for super-resolution cases. Default is "1".
 gpu_ids: [0]  # the list of `CUDA_VISIBLE_DEVICES` that will be used during training, ie. for two GPUs, use [0, 1]. The batch size should be a multiple of the number of 'gpu_ids', since images will be distributed from the batch to each GPU.
 use_amp: true  # select to use PyTorch's Automatic Mixed Precision package to train in low-precision FP16 mode (lowers VRAM requirements).
@@ -99,7 +99,7 @@ datasets:  # configure the datasets
     
 ```
 
-Note that while the original behavior of the options file still remains, with the introduction of the [presets](https://github.com/victorca25/traiNNer/tree/master/codes/options/presets) files, the bluk of the configuration of the augmentations is delegated to the presets. The on-the-fly augmentations can still be configured from the options file as before and will [override](https://github.com/victorca25/traiNNer/tree/master/codes/options/presets/README.md#overriding) any preset, as it takes precedence over them.
+Note that while the original behavior of the options file still remains, with the introduction of the [presets](https://github.com/victorca25/traiNNer/tree/master/codes/options/presets) files, the bulk of the configuration of the augmentations is delegated to the presets. The on-the-fly augmentations can still be configured from the options file as before and will [override](https://github.com/victorca25/traiNNer/tree/master/codes/options/presets/README.md#overriding) any preset, as it takes precedence over them.
 
 If needed, a `validation` dataset can also be included to evaluate progress during training. This is needed in order to calculate training metrics (`psnr`, `ssim` or `lpips`) and those metrics are required in the case that the ReduceLROnPlateau optimizer is used (Note: SRFlow can use `nll` as the metric instead). The options are a subset of training dataset options.
 
@@ -171,7 +171,7 @@ If you want to override only some of the defaults, you can do so like this examp
 ```yaml
 network_G:
   which_model_G: esrgan
-    plus: true  # enable ESRGAN+ changes
+  plus: true  # enable ESRGAN+ changes
 ```
 
 Similarly, to use a patchGAN discriminator, you can use

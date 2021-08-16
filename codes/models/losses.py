@@ -104,6 +104,7 @@ def get_loss_fn(loss_type=None,
     elif loss_type == 'cpl':
         # SPL losses: Color Profile Loss
         # TODO: pass function options from opt_train
+        z_norm = opt['datasets']['train'].get('znorm', False)
         loss_function = CPLoss(
             rgb=True, yuv=True, yuvgrad=True,
             spl_denorm=z_norm, yuv_denorm=z_norm)

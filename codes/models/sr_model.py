@@ -30,9 +30,9 @@ else:
     logger.info('AMP library not available')
 
 
-class SRRaGANModel(BaseModel):
+class SRModel(BaseModel):
     def __init__(self, opt, step=0):
-        super(SRRaGANModel, self).__init__(opt)
+        super(SRModel, self).__init__(opt)
         train_opt = opt['train']
 
         # set if data should be normalized (-1,1) or not (0,1)

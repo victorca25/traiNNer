@@ -6,11 +6,11 @@ from utils.util import scandir
 
 
 def find_model(model_name):
-    """Automatically scan and import the model from module 
-    "models/[model_name]_model.py".
+    """ Automatically scan and import the model from module:
+        'models/[model_name]_model.py'.
     """
 
-    # scan all the files under the 'models' folder and collect 
+    # scan all the files under the 'models' folder and collect
     # files ending with '_model.py'
     model_folder = osp.dirname(osp.abspath(__file__))
     model_filenames = [
@@ -20,7 +20,7 @@ def find_model(model_name):
 
     lc_filenames = [x.lower() for x in model_filenames]
     model_filename = "{}_model".format(model_name)
-    
+
     if model_filename in lc_filenames:
         model_filename = "models.{}".format(
             model_filenames[lc_filenames.index(model_filename)])
@@ -29,10 +29,10 @@ def find_model(model_name):
     modellib = importlib.import_module(f'{model_filename}')
     model = None
     target_model_name = '{}model'.format(model_name.replace('_', ''))
-    
+
     # dynamic instantiation
     for name, cls in modellib.__dict__.items():
-        if name.lower() == target_model_name.lower(): # and issubclass(cls, BaseModel):
+        if name.lower() == target_model_name.lower():  # and issubclass(cls, BaseModel):
             model = cls
 
     if model is None:
@@ -55,55 +55,22 @@ def create_model(opt, step=0, verbose=True):
     """
 
     model = opt['model']
-    #TODO: temporary fix to match names when needed. Should be deprecated.
-    if model in ('srgan', 'sr'):
-        model = 'srragan'
+    # TODO: temporary fix to match names when needed. Should be deprecated.
+    if model in ('srgan', 'srragan'):
+        model = 'sr'
     elif model == 'vsrgan':
         model = 'vsr'
     elif model == 'sftgan':
         model = 'SFTGAN_ACD'
-    
+
     M = find_model(model)
-    if model == 'srflow': # TODO: can standardize to make consistent in all cases
+    if model == 'srflow':  # TODO: can standardize to make consistent in all cases
         instance = M(opt, step)
     else:
         instance = M(opt)
-    
+
     if verbose:
         # print("model [%s] was created" % type(instance).__name__)
-        logger.info('Model [{:s}] is created.'.format(instance.__class__.__name__))
+        logger.info(f'Model [{instance.__class__.__name__:s}] created.')
     return instance
 
-
-
-# def create_model(opt, step=0):
-#     model = opt['model']
-
-#     if model == 'sr':
-#         from .SR_model import SRModel as M
-#     elif model == 'srgan' or model == 'srragan' or model == 'srragan_hfen' or model == 'lpips':
-#         from .SRRaGAN_model import SRRaGANModel as M
-#     elif model == 'sftgan':
-#         from .SFTGAN_ACD_model import SFTGAN_ACD_Model as M
-#     elif model == 'ppon':
-#         from .ppon_model import PPONModel as M
-#     elif model == 'asrragan':
-#         from .ASRRaGAN_model import ASRRaGANModel as M
-#     elif model == 'vsrgan':
-#         from .VSR_model import VSRModel as M
-#     elif model == 'pbr':
-#         from .PBR_model import PBRModel as M
-#     elif model == 'dvd':
-#         from .DVD_model import DVDModel as M
-#     elif model == 'srflow':
-#         from .SRFlow_model import SRFlowModel as M
-#     elif model == 'pix2pix':
-#         from .pix2pix_model import Pix2PixModel as M
-#     else:
-#         raise NotImplementedError('Model [{:s}] not recognized.'.format(model))
-#     if model == 'srflow': # TODO: can standardize to make consistent in all cases
-#         m = M(opt, step)
-#     else:
-#         m = M(opt)
-#     logger.info('Model [{:s}] is created.'.format(m.__class__.__name__))
-#     return m
