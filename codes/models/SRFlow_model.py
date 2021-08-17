@@ -3,7 +3,7 @@ from collections import OrderedDict
 
 import torch
 
-from .SRRaGAN_model import SRRaGANModel
+from .sr_model import SRModel
 from .base_model import nullcast
 logger = logging.getLogger('base')
 
@@ -14,7 +14,7 @@ from dataops.batchaug import BatchAug
 from options.options import opt_get
 
 
-class SRFlowModel(SRRaGANModel):
+class SRFlowModel(SRModel):
     def __init__(self, opt, step):
         super(SRFlowModel, self).__init__(opt, step)
         train_opt = opt['train']

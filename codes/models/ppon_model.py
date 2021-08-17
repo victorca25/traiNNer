@@ -2,21 +2,21 @@ import logging
 
 import torch
 
-from .SRRaGAN_model import SRRaGANModel
+from .sr_model import SRModel
 from .base_model import nullcast
 logger = logging.getLogger('base')
 
 from dataops.batchaug import BatchAug
 
 
-class PPONModel(SRRaGANModel):
+class PPONModel(SRModel):
     def __init__(self, opt):
         super(PPONModel, self).__init__(opt)
 
         if self.is_train:
             # Generator losses:
             # Note: self.generatorlosses and self.precisegeneratorlosses already 
-            # defined in SRRaGANModel, only need to select which losses will be
+            # defined in SRModel, only need to select which losses will be
             # used in each phase. Discriminator by default only on phase 3. 
             # Content
             self.p1_losses = opt['train'].get('p1_losses', ['pix'])
