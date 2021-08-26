@@ -15,6 +15,7 @@ This is a general and non-exhaustive changelog of the mayor changes at certain m
 -   Added special scaling cases: `down_up` to randomize scales when resizing in-pipeline and `nearest_aligned` that prevents the misalignment of 0.5 × (s − 1) pixels when using regular nearest neighbor downscaling. Additionally, when used in-pipeline, random `up`/`down`/`keep` probabilities and scale ranges can be defined, with adaptive scale in case images are already in the final target scale.
 -   Added option to select what kernel scale to use for realistic option.
 -   Updated the `imresize` function with a new version adapted from [ResizeRight](https://github.com/assafshocher/ResizeRight) to solve the incorrectness issues from standard frameworks (OpenCV, PIL, Torch, TensorFlow, others).
+-   Added the Adaptive Target Generator (ATG) and strategy from [AdaTarget](https://openaccess.thecvf.com/content/CVPR2021/papers/Jo_Tackling_the_Ill-Posedness_of_Super-Resolution_Through_Adaptive_Target_Generation_CVPR_2021_paper.pdf) to spatially match the network outputs to target images. More information in [AdaTarget](https://github.com/victorca25/traiNNer/tree/master/codes/models/modules/adatarget/README.md). Option: `use_atg`.
 -   Included a flag to select the image pre-processing option that is more adequate for the model training task (necessary for image to image translation options). Besides the default `crop` to crop patches for super-resolution, denoising and deblurring, now there are also `resize`, `scale_width`, `scale_height`, `scale_shortside` and `fixed` for image to image translation and other cases. Can also be combined using `_and_` as a connector (for example: `resize_and_crop`). Can also use `center_crop` to first extract a center crop. (option: `preprocess`, must coordinate with `load_size`, `center_crop_size`, `aspect_ratio`).
 -   Better logic to automatically save and load an arbitrary number of networks during training by defining them in the `model_names` object in the initialization of model files.
 -   Added [AdamP](https://arxiv.org/abs/2006.08217), [SGDP](https://arxiv.org/abs/2006.08217), [MADGRAD](https://arxiv.org/abs/2101.11075) and [Ranger](https://github.com/lessw2020/Ranger-Deep-Learning-Optimizer) optimizers as alternative to the ones included in PyTorch (Adam, SGD, RMSprop).
@@ -31,6 +32,7 @@ This is a general and non-exhaustive changelog of the mayor changes at certain m
 -   Added `Frobenius` norm loss, mainly for feature loss, but can be used as a regular content/pixel loss (`fro`).
 -   Updated the `TV` regularization for better logic and configurable output normalization to match different implementations. (configuration via options file TBD)
 -   Added option to use standard `GAN` formulation (besides relativistic `GAN` formulation), configurable with `gan_opt` in the options file.
+-   Added a `unet` discriminator alternative, with optional spectral normalization option.
 -   Renamed project to `traiNNer` for simpler understandability of the repository function, similar to `iNNfer` for inference and `augmeNNt` for the augmentations.
 
 ## v2.0:

@@ -6,9 +6,9 @@ The overall code framework is shown in the following figure. It mainly consists 
    <img src="https://user-images.githubusercontent.com/41912303/121567451-dff2e800-ca1e-11eb-9e46-a6b45a72a9ff.png" height="450">
 </p>
 
-For example, once [train.py] is called (i.e. `python train.py -opt options/train/train_template.yml`), a sequence of actions will follow this command:
+For example, once [train.py] is called (i.e. `python train.py -opt options/sr/train_sr.yml`), a sequence of actions will follow this command:
 
-1.  [Config] - Reads the configuration from [/options/train/train_template.yml] which is a [YAML] file. Then passes the configuration values from it down through the following steps.
+1.  [Config] - Reads the configuration from [/options/sr/train_sr.yml] which is a [YAML] file. Then passes the configuration values from it down through the following steps.
 2.  [Data] - Creates the train and validation dataloaders.
 3.  [DataOps] - Contains most of the data operations, specially related to the different augmentation options and functions used in the dataloaders, losses and other components.
 4.  [Model] - Creates the chosen model.
@@ -19,7 +19,7 @@ Moreover, there are also [Utilities](#utils) and [Useful script](#scripts) avail
 
 [train.py]: https://github.com/victorca25/traiNNer/blob/master/codes/train.py
 
-[/options/train/train_template.yml]: https://github.com/victorca25/traiNNer/blob/master/codes/options/train/train_template.yml
+[/options/sr/train_sr.yml]: https://github.com/victorca25/traiNNer/blob/master/codes/options/sr/train_sr.yml
 
 [/options]: https://github.com/victorca25/traiNNer/tree/master/codes/options
 
@@ -59,10 +59,6 @@ Moreover, there are also [Utilities](#utils) and [Useful script](#scripts) avail
 
 [/data/\_\_init__.py]: https://github.com/victorca25/traiNNer/blob/master/codes/data/__init__.py
 
-[/dataops]: https://github.com/victorca25/traiNNer/tree/master/codes/dataops
-
-[/dataops/common.py]: https://github.com/victorca25/traiNNer/blob/master/codes/dataops/common.py
-
 [cv2]: https://github.com/skvark/opencv-python
 
 [lmdb]: https://en.wikipedia.org/wiki/Lightning_Memory-Mapped_Database
@@ -76,6 +72,11 @@ Moreover, there are also [Utilities](#utils) and [Useful script](#scripts) avail
 -   [/dataops/imresize.py] contains a resizing algorithm that supports antialiasing and solves the incorrectness issues from resizing with standard frameworks (OpenCV, PIL, [PyTorch](https://twitter.com/jaakkolehtinen/status/1258102168176951299), [TensorFlow](https://hackernoon.com/how-tensorflows-tf-image-resize-stole-60-days-of-my-life-aba5eb093f35), others) and a vast array of interpolation methods.
 -   The directory also contains the [augmennt](https://github.com/victorca25/augmennt) subtree for all the image transforms used in the dataloader pipelines.
 
+[/dataops]: https://github.com/victorca25/traiNNer/tree/master/codes/dataops
+
+[/dataops/common.py]: https://github.com/victorca25/traiNNer/blob/master/codes/dataops/common.py
+
+[/dataops/imresize.py]: https://github.com/victorca25/traiNNer/blob/master/codes/dataops/imresize.py
 
 ## Model
 

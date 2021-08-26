@@ -275,6 +275,7 @@ def define_G(opt, step=0, net_name='G'):
     """
     return define_network(opt=opt, step=step, net_name=net_name)
 
+
 # Discriminator
 def define_D(opt, net_name='D'):
     """Create a discriminator
@@ -307,7 +308,6 @@ def define_D(opt, net_name='D'):
     changes, will not be needed later
     """
     return define_network(opt=opt, net_name=net_name)
-
 
 
 def define_F(opt):
@@ -364,6 +364,30 @@ def define_F(opt):
         netF = nn.DataParallel(netF)
 
     return netF
+
+
+# Additional auxiliary networks
+def define_ext(opt, net_name=None):
+    """Create additional auxiliary networks."""
+
+    if net_name == 'locnet':
+        from models.modules.adatarget.atg import LocNet
+        if "network_Loc" in opt:
+            p_size = opt["network_Loc"]["p_size"]
+            s_size = opt["network_Loc"]["s_size"]
+        else:
+            p_size = 7
+            s_size = 9
+        net_ext = LocNet(p_size=p_size, s_size=s_size)
+        init_type = 'kaiming'
+        init_scale = 1
+        # Note: original inits BN with: m.weight.data.normal_(1.0, 0.02)
+
+    if opt['is_train']:
+        init_weights(
+            net_ext, init_type=init_type, scale=init_scale)
+
+    return net_ext
 
 
 ####################

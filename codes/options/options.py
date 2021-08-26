@@ -5,6 +5,8 @@ import cv2
 
 from .defaults import get_network_defaults
 
+logger = logging.getLogger('base')
+
 # PAD_MOD
 _cv2_str2pad = {'constant':cv2.BORDER_CONSTANT,
                 'edge':cv2.BORDER_REPLICATE,
@@ -617,6 +619,9 @@ def parse(opt_path:str, is_train:bool=True) -> NoneDict:
         if 'swa_start_iter_rel' in opt['train']:
             opt['train']['swa_start_iter'] = int(opt['train']['swa_start_iter_rel'] * niter)
             opt['train'].pop('swa_start_iter_rel')
+        if 'atg_start_iter_rel' in opt['train']:
+            opt['train']['atg_start_iter'] = int(opt['train']['atg_start_iter_rel'] * niter)
+            opt['train'].pop('atg_start_iter_rel')
 
     # export CUDA_VISIBLE_DEVICES
     gpu_list = ','.join(str(x) for x in opt['gpu_ids'])
@@ -653,20 +658,20 @@ def opt_get(opt=None, keys=None, default=None):
     return ret
 
 
-def check_resume(opt: dict, resume_iter = None):
-    '''Check resume states and pretrain_model paths'''
-    logger = logging.getLogger('base')
-    if opt['path']['resume_state']:
-        opt['path']['resume_state'] = os.path.normpath(opt['path']['resume_state'])
-        if (opt['path']['pretrain_model_G'] or opt['path']['pretrain_model_D']
-            or opt['path']['pretrain_model_G_A'] or opt['path']['pretrain_model_D_A']
-            or opt['path']['pretrain_model_G_B'] or opt['path']['pretrain_model_D_B']):
-            logger.warning('pretrain_model paths will be ignored when resuming training from a .state file.')
+def add_resume_models(opt, state_idx, ptype, mkey):
+    pkey = f"pretrain_model{ptype}{mkey}"
+    path = os.path.normpath(
+        os.path.join(
+            opt['path']['models'], f'{state_idx}{ptype}{mkey}.pth'))
+    opt['path'][pkey] = path
+    logger.info(f'Set [pretrain_model{ptype}{mkey}] to {path}')
 
-        if resume_iter:
-            state_idx = resume_iter
-        else:
-            state_idx = os.path.basename(opt['path']['resume_state']).split('.')[0]
+
+def check_resume(opt: dict, resume_iter = None):
+    """Check resume states and pretrain_model paths"""
+    if opt['path']['resume_state']:
+        opt['path']['resume_state'] = os.path.normpath(
+            opt['path']['resume_state'])
 
         if opt['model'] == 'cyclegan':
             model_keys_G = ['_A', '_B']
@@ -678,21 +683,32 @@ def check_resume(opt: dict, resume_iter = None):
             model_keys_G = ['']
             model_keys_D = ['']
 
+        for ptype in ['_G', '_D', '_Loc']:
+            for sufx in set([''] + model_keys_G + model_keys_D):
+                if 'pretrain_model' + ptype + sufx in opt['path']:
+                    logger.warning(
+                        f"pretrain_model{ptype}{sufx} path ignored, "
+                        "resuming training from a .state file.")
+
+        if resume_iter:
+            state_idx = resume_iter
+        else:
+            state_idx = os.path.basename(
+                opt['path']['resume_state']).split('.')[0]
+
         for mkey in model_keys_G:
-            pgkey = f"pretrain_model_G{mkey}"
-            gpath = os.path.normpath(os.path.join(opt['path']['models'], f'{state_idx}_G{mkey}.pth'))
-            opt['path'][pgkey] = gpath
-            logger.info(f'Set [pretrain_model_G{mkey}] to {gpath}')
+            add_resume_models(opt, state_idx, '_G', mkey)
 
             if 'swa' in opt['model'] or opt['use_swa']:
-                sgkey = f"pretrain_model_swaG{mkey}"
-                spath = os.path.normpath(os.path.join(opt['path']['models'], f'{state_idx}_swaG{mkey}.pth'))
-                opt['path'][sgkey] = spath
-                logger.info(f'Set [pretrain_model_swaG{mkey}] to {spath}')
+                add_resume_models(opt, state_idx, '_swaG', mkey)
 
-        for mkey in model_keys_D:
-            if 'gan' in opt['model'] or 'pix2pix' in opt['model'] or 'wbc' in opt['model']:
-                pdkey = f"pretrain_model_D{mkey}"
-                dpath = os.path.normpath(os.path.join(opt['path']['models'], f'{state_idx}_D{mkey}.pth'))
-                opt['path'][pdkey] = dpath
-                logger.info(f'Set [pretrain_model_D{mkey}] to {dpath}')
+            if opt['use_ema']:
+                add_resume_models(opt, state_idx, '_emaG', mkey)
+
+            if opt['use_atg']:
+                add_resume_models(opt, state_idx, '_Loc', mkey)
+
+        # if 'gan' in opt['model'] or 'pix2pix' in opt['model'] or 'wbc' in opt['model']:
+        if opt['train']['gan_weight']:
+            for mkey in model_keys_D:
+                add_resume_models(opt, state_idx, '_D', mkey)

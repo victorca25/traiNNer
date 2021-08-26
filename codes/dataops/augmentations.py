@@ -297,7 +297,6 @@ def get_blur(blur_types, blur_config):
 
 
 def get_noise(noise_types: list, noise_patches=None, noise_config=None):
-
     noise = None
     if noise_types:
         noise_type = get_weighted_choice(noise_types)[0]
@@ -975,6 +974,7 @@ def image_type(img):
     else:
         return image_type.img_type
 
+
 def image_size(img, img_type=None):
     if not img_type:
         img_type = image_type(img)
@@ -984,6 +984,7 @@ def image_size(img, img_type=None):
         return (img.shape[1], img.shape[0])
     else:
         raise Exception("Unrecognized image type")
+
 
 def image_channels(img, img_type=None):
     if not img_type:
@@ -998,12 +999,14 @@ def image_channels(img, img_type=None):
     else:
         raise Exception("Unrecognized image type")
 
+
 def pil2cv(pil_image):
     open_cv_image = np.array(pil_image)
     # Convert RGB to BGR
     if len(open_cv_image.shape) == 2:
         open_cv_image = fix_img_channels(open_cv_image, 1)
     return open_cv_image[:, :, ::-1].copy()
+
 
 def cv2pil(open_cv_image):
     open_cv_image = cv2.cvtColor(open_cv_image, cv2.COLOR_BGR2RGB)
@@ -1017,6 +1020,7 @@ def tmp_vis_pil(image):
         tmp_vis(pil2cv(image), to_np=False, rgb2bgr=False)
     else:
         tmp_vis(image, to_np=False, rgb2bgr=False)
+
 
 def scale_params(params, scale):
     if scale == 1 or not params:
@@ -1097,6 +1101,7 @@ def random_downscale_B(img_A, img_B, opt, scale=None):
 
     return img_A, img_B
 
+
 def shape_change_fn(img_A, img_B, opt, scale, default_int_method):
     """Fix the images shapes in respect to each other
     """
@@ -1137,6 +1142,7 @@ def shape_change_fn(img_A, img_B, opt, scale, default_int_method):
                         interpolation=default_int_method)(img_A)
 
     return img_A, img_B
+
 
 def dim_change_fn(img_A, img_B, opt, scale, default_int_method,
         crop_size, A_crop_size, ds_kernels):
@@ -1181,6 +1187,7 @@ def dim_change_fn(img_A, img_B, opt, scale, default_int_method,
             img_A = LR_pad(img_A)
 
     return img_A, img_B
+
 
 # TODO: could use in paired_imgs_check() instead of inside the functions?
 class PreCrop:
@@ -1285,6 +1292,7 @@ def generate_A_fn(img_A, img_B, opt, scale, default_int_method,
 
     return img_A, img_B
 
+
 def final_shapes_check(img_A, img_B, opt, scale, default_int_method,
         crop_size, A_crop_size, ds_kernels):
     """
@@ -1313,7 +1321,6 @@ def final_shapes_check(img_A, img_B, opt, scale, default_int_method,
                 algo=ds_algo, ds_kernel=ds_kernels, img_type=img_type)
     
     return img_A, img_B
-    
 
 
 def get_ds_kernels(opt):
@@ -1361,6 +1368,7 @@ def get_noise_patches(opt):
         noise_patches = None
 
     return noise_patches
+
 
 def paired_imgs_check(img_A, img_B, opt, ds_kernels=None, scale=None):
     crop_size = opt.get('crop_size')
@@ -1793,7 +1801,6 @@ def aug_pipeline(params:dict=None, noise_patches=None,
     return transform_list
 
 
-
 # TODO: these don't change, can be fixed from the dataloader init
 def get_totensor_params(opt):
     params = {}
@@ -1821,6 +1828,7 @@ def get_totensor_params(opt):
     params['normalize_first'] = opt.get('normalize_first')
 
     return params
+
 
 # TODO: use better name for the function, normalize can be used with np images too
 # Note: Alt normalization: transforms.Normalize(mean=[0.485, 0.456, 0.406],std=[0.229, 0.224, 0.225])
@@ -2033,6 +2041,7 @@ def apply_wrapped_cv2transform(img, transform):
     set_transforms(loader_type=loader)
     return img
 
+
 @wrap_pil_function
 def apply_wrapped_piltransform(img, transform):
     loader = set_transforms.loader_type
@@ -2040,6 +2049,7 @@ def apply_wrapped_piltransform(img, transform):
     img = transform(img)
     set_transforms(loader_type=loader)
     return img
+
 
 def apply_transform_list(img_list: list, transform, wrapper=None, loader=None):
     img_list_out = []

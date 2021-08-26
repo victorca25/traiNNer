@@ -518,9 +518,8 @@ def tensor2np(img, rgb2bgr=True, remove_batch=True, data_range=255,
     n_dim = img.dim()
 
     #TODO: Check: could denormalize here in tensor form instead, but end result is the same
-    
-    img = img.float().cpu()  
-    
+    img = img.float().cpu()
+
     if n_dim in (4, 3):
         #if n_dim == 4, has to convert to 3 dimensions, either removing batch or by creating a grid
         if n_dim == 4 and remove_batch:
@@ -539,7 +538,7 @@ def tensor2np(img, rgb2bgr=True, remove_batch=True, data_range=255,
             # convert images in batch (BCHW) to a grid of all images (C B*H B*W)
             n_img = len(img)
             img = make_grid(img, nrow=int(math.sqrt(n_img)), normalize=False)
-        
+
         if img.shape[0] == 3 and rgb2bgr: #RGB
             #RGB to BGR -> in tensor, if using OpenCV, else not needed. Only if image has colors.
             img_np = rgb_to_bgr(img).numpy()
