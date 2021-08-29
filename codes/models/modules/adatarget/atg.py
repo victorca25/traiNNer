@@ -91,11 +91,11 @@ def ATG(output, target, loc_model, p_size:int=7, s_size:int=9):
     grid = F.affine_grid(
         loc_param,
         torch.Size((B * N, 3, p_size, p_size)),
-        align_corners=None).type(output.dtype)
+        align_corners=False).type(output.dtype)
 
     transformed_output = F.grid_sample(
         unfold_output.reshape(-1, 3, p_size, p_size),
-        grid, padding_mode='border', align_corners=None)
+        grid, padding_mode='border', align_corners=False)
     
     transformed_output = transformed_output.reshape(B, N, -1).permute(0, 2, 1)
     transformed_output = F.fold(

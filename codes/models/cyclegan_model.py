@@ -3,31 +3,17 @@ from __future__ import absolute_import
 import os
 import logging
 from collections import OrderedDict
-import itertools
-
 import torch
 import torch.nn as nn
 
 import models.networks as networks
-from .base_model import BaseModel, nullcast
-
+from .base_model import BaseModel
 from . import losses
-from . import optimizers
-from . import schedulers
-from . import swa
-
 from dataops.batchaug import BatchAug
-from dataops.filters import FilterHigh, FilterLow  # , FilterX
+from dataops.filters import FilterHigh, FilterLow
 from utils.image_pool import ImagePool
 
 logger = logging.getLogger('base')
-
-load_amp = (hasattr(torch.cuda, "amp") and hasattr(torch.cuda.amp, "autocast"))
-if load_amp:
-    from torch.cuda.amp import autocast, GradScaler
-    logger.info('AMP library available')
-else:
-    logger.info('AMP library not available')
 
 
 class CycleGANModel(BaseModel):
@@ -69,7 +55,7 @@ class CycleGANModel(BaseModel):
     def __init__(self, opt):
         """Initialize the CycleGAN class.
         Parameters:
-            opt (Option dictionary): stores all the experiment flags
+            opt (Option dictionary): stores all the experiment flags.
         """
         super(CycleGANModel, self).__init__(opt)
         train_opt = opt['train']
@@ -77,11 +63,12 @@ class CycleGANModel(BaseModel):
         # fetch lambda_idt if provided for identity loss
         self.lambda_idt = train_opt['lambda_identity']
 
-        # specify the images you want to save/display. The training/test scripts will call <BaseModel.get_current_visuals>
+        # specify the images you want to save/display.
+        # The training/test scripts will call <BaseModel.get_current_visuals>
         visual_names_A = ['real_A', 'fake_B', 'rec_A']
         visual_names_B = ['real_B', 'fake_A', 'rec_B']
         if self.is_train and self.lambda_idt and self.lambda_idt > 0.0:
-            # if identity loss is used, we also visualize idt_B=G_A(B) ad idt_A=G_A(B)
+            # if identity loss is used, also visualize idt_B=G_A(B) ad idt_A=G_A(B)
             visual_names_A.append('idt_B')
             visual_names_B.append('idt_A')
 
@@ -89,7 +76,8 @@ class CycleGANModel(BaseModel):
         self.visual_names = visual_names_A + visual_names_B
 
         # specify the models you want to load/save to the disk.
-        # The training/test scripts will call <BaseModel.save_networks> and <BaseModel.load_networks>
+        # The training/test scripts will call <BaseModel.save_networks>
+        # and <BaseModel.load_networks>
         # for training and testing, a generator 'G' is needed
         self.model_names = ['G_A']
 
@@ -97,14 +85,14 @@ class CycleGANModel(BaseModel):
         # *The naming is different from those used in the paper.
         #   Code (vs. paper): G_A (G), G_B (F), D_A (D_Y), D_B (D_X)
         self.netG_A = networks.define_G(opt).to(self.device)  # G_A
-
         if self.is_train:
             # for training 2 generators are needed, add to list and define
             self.model_names.append('G_B')
             self.netG_B = networks.define_G(opt).to(self.device)  # G_B
-
             self.netG_A.train()
             self.netG_B.train()
+            opt_G_nets = [self.netG_A, self.netG_B]
+            opt_D_nets = []
             if train_opt['gan_weight']:
                 # add discriminators to the network list
                 self.model_names.append('D_A')
@@ -113,47 +101,32 @@ class CycleGANModel(BaseModel):
                 self.netD_B = networks.define_D(opt).to(self.device)  # D_B
                 self.netD_A.train()
                 self.netD_B.train()
+                opt_D_nets.extend([self.netD_A, self.netD_B])
+
+            # configure AdaTarget
+            self.setup_atg()
+            if self.atg:
+                opt_G_nets.append(self.netLoc)
         self.load()  # load 'G_A', 'G_B', 'D_A' and 'D_B' if needed
 
         if self.is_train:
             if self.lambda_idt and self.lambda_idt > 0.0:
-                # only works when input and output images have the same number of channels
+                # only works when input and output images have the same
+                # number of channels
                 assert opt['input_nc'] == opt['output_nc']
 
             # create image buffers to store previously generated images
             self.fake_A_pool = ImagePool(opt['pool_size'])
             self.fake_B_pool = ImagePool(opt['pool_size'])
 
-            """
-            Setup batch augmentations
-            #TODO: test
-            """
-            self.mixup = train_opt.get('mixup', None)
-            if self.mixup:
-                self.mixopts = train_opt.get('mixopts', ["blend", "rgb", "mixup", "cutmix", "cutmixup"])  # , "cutout", "cutblur"]
-                self.mixprob = train_opt.get('mixprob', [1.0, 1.0, 1.0, 1.0, 1.0])  # , 1.0, 1.0]
-                self.mixalpha = train_opt.get('mixalpha', [0.6, 1.0, 1.2, 0.7, 0.7])  # , 0.001, 0.7]
-                self.aux_mixprob = train_opt.get('aux_mixprob', 1.0)
-                self.aux_mixalpha = train_opt.get('aux_mixalpha', 1.2)
-                self.mix_p = train_opt.get('mix_p', None)
+            # setup batch augmentations
+            self.setup_batchaug()
 
-            """
-            Setup frequency separation
-            """
-            self.fs = train_opt.get('fs', None)
-            self.f_low = None
-            self.f_high = None
-            if self.fs:
-                lpf_type = train_opt.get('lpf_type', "average")
-                hpf_type = train_opt.get('hpf_type', "average")
-                self.f_low = FilterLow(filter_type=lpf_type).to(self.device)
-                self.f_high = FilterHigh(filter_type=hpf_type).to(self.device)
+            # setup frequency separation
+            self.setup_fs()
 
-            """
-            Initialize losses
-            """
-            # Initialize the losses with the opt parameters
-            # Generator losses:
+            # initialize losses
+            # generator losses:
             # for the losses that don't require high precision (can use half precision)
             self.cyclelosses = losses.GeneratorLoss(opt, self.device)
             # for losses that need high precision (use out of the AMP context)
@@ -163,120 +136,49 @@ class CycleGANModel(BaseModel):
 
             # add identity loss if configured
             if self.is_train and self.lambda_idt and self.lambda_idt > 0.0:
-                # TODO: using the same losses as cycle/generator, could be different
+                # TODO: using the same losses as cycle/generator, could be
+                #   different. Use filters like in WBC.
                 # self.idtlosses = losses.GeneratorLoss(opt, self.device)
                 self.idtlosses = self.cyclelosses
                 # self.preciseidtlosses = losses.PreciseGeneratorLoss(opt, self.device)
                 self.preciseidtlosses = self.precisecyclelosses
 
-            # Discriminator loss:
-            if train_opt['gan_type'] and train_opt['gan_weight']:
-                # TODO:
-                # self.criterionGAN = GANLoss(train_opt['gan_type'], 1.0, 0.0).to(self.device)
-                self.cri_gan = True
-                diffaug = train_opt.get('diffaug', None)
-                dapolicy = None
-                if diffaug:  # TODO: this if should not be necessary
-                    dapolicy = train_opt.get('dapolicy', 'color,translation,cutout')  # original
-                self.adversarial = losses.Adversarial(train_opt=train_opt, device=self.device,
-                                                      diffaug=diffaug, dapolicy=dapolicy,
-                                                      conditional=False)
-                # TODO:
-                # D_update_ratio and D_init_iters are for WGAN
-                # self.D_update_ratio = train_opt.get('D_update_ratio', 1)
-                # self.D_init_iters = train_opt.get('D_init_iters', 0)
-            else:
-                self.cri_gan = False
+            # discriminator loss:
+            self.setup_gan()
 
-            """
-            Initialize optimizers
-            """
-            self.optGstep = False
-            self.optDstep = False
+            # configure FreezeD
             if self.cri_gan:
-                self.optimizers, self.optimizer_G, self.optimizer_D = optimizers.get_optimizers(
-                    cri_gan=self.cri_gan,
-                    optim_paramsD=itertools.chain(self.netD_A.parameters(), self.netD_B.parameters()),
-                    optim_paramsG=itertools.chain(self.netG_A.parameters(), self.netG_B.parameters()),
-                    train_opt=train_opt, logger=logger, optimizers=self.optimizers)
-            else:
-                self.optimizers, self.optimizer_G = optimizers.get_optimizers(
-                    None, None,
-                    optim_paramsG=itertools.chain(self.netG_A.parameters(), self.netG_B.parameters()),
-                    train_opt=train_opt, logger=logger, optimizers=self.optimizers)
-                self.optDstep = True
+                self.setup_freezeD()
 
-            """
-            Prepare schedulers
-            """
-            self.schedulers = schedulers.get_schedulers(
-                optimizers=self.optimizers, schedulers=self.schedulers, train_opt=train_opt)
+            # prepare optimizers
+            self.setup_optimizers(opt_G_nets, opt_D_nets, init_setup=True)
 
-            """
-            Configure SWA
-            """
-            # TODO: configure SWA for two Generators
-            self.swa = False
-            # self.swa = opt.get('use_swa', False)
-            # if self.swa:
-            #     self.swa_start_iter = train_opt.get('swa_start_iter', 0)
-            #     # self.swa_start_epoch = train_opt.get('swa_start_epoch', None)
-            #     swa_lr = train_opt.get('swa_lr', 0.0001)
-            #     swa_anneal_epochs = train_opt.get('swa_anneal_epochs', 10)
-            #     swa_anneal_strategy = train_opt.get('swa_anneal_strategy', 'cos')
-            #     #TODO: Note: This could be done in resume_training() instead, to prevent creating
-            #     # the swa scheduler and model before they are needed
-            #     self.swa_scheduler, self.swa_model_A = swa.get_swa(
-            #             self.optimizer_G, itertools.chain(self.netG_A.parameters(), self.netG_B.parameters()),
-            #             swa_lr, swa_anneal_epochs, swa_anneal_strategy)
-            #     self.load_swa() #load swa from resume state
-            #     logger.info('SWA enabled. Starting on iter: {}, lr: {}'.format(self.swa_start_iter, swa_lr))
+            # prepare schedulers
+            self.setup_schedulers()
 
-            """
-            If using virtual batch
-            """
-            batch_size = opt["datasets"]["train"]["batch_size"]
-            virtual_batch = opt["datasets"]["train"].get('virtual_batch_size', None)
-            self.virtual_batch = virtual_batch if virtual_batch \
-                >= batch_size else batch_size
-            self.accumulations = self.virtual_batch // batch_size
+            # set gradients to zero
             self.optimizer_G.zero_grad()
             if self.cri_gan:
                 self.optimizer_D.zero_grad()
 
-            """
-            Configure AMP
-            """
-            self.amp = load_amp and opt.get('use_amp', False)
-            if self.amp:
-                self.cast = autocast
-                self.amp_scaler = GradScaler()
-                logger.info('AMP enabled')
-            else:
-                self.cast = nullcast
-
-            """
-            Configure FreezeD
-            """
-            if self.cri_gan:
-                self.feature_loc = None
-                loc = train_opt.get('freeze_loc', False)
-                if loc:
-                    disc = opt["network_D"].get('which_model_D', False)
-                    if "discriminator_vgg" in disc and "fea" not in disc:
-                        loc = (loc*3)-2
-                    elif "patchgan" in disc:
-                        loc = (loc*3)-1
-                    # TODO: TMP, for now only tested with the vgg-like or patchgan discriminators
-                    if "discriminator_vgg" in disc or "patchgan" in disc:
-                        self.feature_loc = loc
-                        logger.info('FreezeD enabled')
-
+            # init loss log
             self.log_dict = OrderedDict()
             self.log_dict_A = OrderedDict()
             self.log_dict_B = OrderedDict()
 
-        self.print_network(verbose=False)  # TODO: pass verbose flag from config file
+            # configure SWA
+            # TODO: configure SWA for two Generators
+            # self.setup_swa()
+
+            # configure virtual batch
+            self.setup_virtual_batch()
+
+            # configure AMP
+            self.setup_amp()
+
+        # print network
+        # TODO: pass verbose flag from config file
+        self.print_network(verbose=False)
 
     def feed_data(self, data):
         """Unpack input data from the dataloader and perform necessary pre-processing steps.
@@ -300,51 +202,20 @@ class CycleGANModel(BaseModel):
         self.fake_A = self.netG_B(self.real_B)  # G_B(B)
         self.rec_B = self.netG_A(self.fake_A)   # G_A(G_B(B))
 
-    def backward_D_basic(self, netD, real, fake, log_dict):
-        """Calculate GAN loss for the discriminator
-        Parameters:
-            netD (network): the discriminator D
-            real (tensor array): real images
-            fake (tensor array): images generated by a generator
-        Return the discriminator loss.
-        Also calls l_d_total.backward() to calculate the gradients.
-        """
-
-        l_d_total = 0
-        with self.cast():
-            l_d_total, gan_logs = self.adversarial(
-                fake, real, netD=netD,
-                stage='discriminator', fsfilter=self.f_high)
-
-            for g_log in gan_logs:
-                log_dict[g_log] = gan_logs[g_log]
-
-            l_d_total /= self.accumulations
-
-        # calculate gradients
-        if self.amp:
-            # call backward() on scaled loss to create scaled gradients.
-            self.amp_scaler.scale(l_d_total).backward()
-        else:
-            l_d_total.backward()
-        # return l_d_total
-        return log_dict
-
     def backward_D_A(self):
-        """Calculate GAN loss for discriminator D_A"""
+        """Calculate GAN loss for discriminator D_A."""
         fake_B = self.fake_B_pool.query(self.fake_B)
-        self.log_dict_A = self.backward_D_basic(
+        self.log_dict_A = self.backward_D_Basic(
             self.netD_A, self.real_B, fake_B, self.log_dict_A)
 
     def backward_D_B(self):
-        """Calculate GAN loss for discriminator D_B"""
+        """Calculate GAN loss for discriminator D_B."""
         fake_A = self.fake_A_pool.query(self.fake_A)
-        self.log_dict_B = self.backward_D_basic(
+        self.log_dict_B = self.backward_D_Basic(
             self.netD_B, self.real_A, fake_A, self.log_dict_B)
 
     def backward_G(self):
-        """Calculate the loss for generators G_A and G_B"""
-
+        """Calculate the loss for generators G_A and G_B."""
         l_g_total = 0
         with self.cast():
             if self.lambda_idt and self.lambda_idt > 0:
@@ -427,12 +298,8 @@ class CycleGANModel(BaseModel):
                     self.rec_B, self.real_B, self.log_dict_B, self.f_low)
             l_g_total += sum(precise_loss_results) / self.accumulations
 
-        # calculate gradients
-        if self.amp:
-            # call backward() on scaled loss to create scaled gradients.
-            self.amp_scaler.scale(l_g_total).backward()
-        else:
-            l_g_total.backward()
+        # calculate G gradients
+        self.calc_gradients(l_g_total)
 
         # aggregate both cycles logs to global logger
         for kls_A, vls_A in self.log_dict_A.items():
@@ -441,7 +308,17 @@ class CycleGANModel(BaseModel):
             self.log_dict[f'{kls_B}_B'] = vls_B
 
     def optimize_parameters(self, step):
-        """Calculate losses, gradients, and update network weights; called in every training iteration"""
+        """Calculate losses, gradients, and update network weights;
+        called in every training iteration."""
+        eff_step = step/self.accumulations
+
+        # switch ATG to train
+        if self.atg:
+            if eff_step > self.atg_start_iter:
+                self.switch_atg(True)
+            else:
+                self.switch_atg(False)
+
         # batch (mixup) augmentations
         aug = None
         if self.mixup:
@@ -458,8 +335,14 @@ class CycleGANModel(BaseModel):
         # batch (mixup) augmentations
         # cutout-ed pixels are discarded when calculating loss by masking removed pixels
         if aug == "cutout":
-            self.fake_B, self.real_B = self.fake_B*mask, self.real_B*mask
-            self.fake_A, self.real_A = self.fake_A*mask, self.real_A*mask
+            self.fake_B, self.real_B = self.fake_B * mask, self.real_B * mask
+            self.fake_A, self.real_A = self.fake_A * mask, self.real_A * mask
+
+        # adatarget
+        if self.atg:
+            self.fake_H = self.ada_out(
+                output=self.fake_H, target=self.real_H,
+                loc_model=self.netLoc)
 
         # update G_A and G_B
         if self.cri_gan:
@@ -467,16 +350,13 @@ class CycleGANModel(BaseModel):
             self.requires_grad(self.netD_A, flag=False, net_type='D')
             self.requires_grad(self.netD_B, flag=False, net_type='D')
 
-        self.backward_G()  # calculate gradients for G_A and G_B
-        # only step and clear gradient if virtual batch has completed
-        if (step + 1) % self.accumulations == 0:
-            if self.amp:
-                self.amp_scaler.step(self.optimizer_G)
-                self.amp_scaler.update()
-            else:
-                self.optimizer_G.step()  # update G_A and G_B's weights
-            self.optimizer_G.zero_grad()  # set G_A and G_B's gradients to zero
-            self.optGstep = True
+        if (self.cri_gan is not True) or (eff_step % self.D_update_ratio == 0
+            and eff_step > self.D_init_iters):
+            # calculate gradients for G_A and G_B
+            self.backward_G()
+
+            # step G_A and G_B optimizer and update weights
+            self.optimizer_step(step, self.optimizer_G, "G")
 
         if self.cri_gan:
             # update D_A and D_B
@@ -485,20 +365,16 @@ class CycleGANModel(BaseModel):
             if isinstance(self.feature_loc, int):
                 # freeze up to the selected layers
                 for loc in range(self.feature_loc):
-                    self.requires_grad(self.netD_A, False, target_layer=loc, net_type='D')
-                    self.requires_grad(self.netD_B, False, target_layer=loc, net_type='D')
+                    self.requires_grad(
+                        self.netD_A, False, target_layer=loc, net_type='D')
+                    self.requires_grad(
+                        self.netD_B, False, target_layer=loc, net_type='D')
 
             self.backward_D_A()  # calculate gradients for D_A
             self.backward_D_B()  # calculate gradients for D_B
-            # only step and clear gradient if virtual batch has completed
-            if (step + 1) % self.accumulations == 0:
-                if self.amp:
-                    self.amp_scaler.step(self.optimizer_D)
-                    self.amp_scaler.update()
-                else:
-                    self.optimizer_D.step()  # update D_A and D_B's weights
-                self.optimizer_D.zero_grad()  # set D_A and D_B's gradients to zero
-                self.optDstep = True
+
+            # step D_A and D_B optimizer and update weights
+            self.optimizer_step(step, self.optimizer_D, "D")
 
     def get_current_log(self, direction=None):
         """Return traning losses / errors. train.py will print out these on the

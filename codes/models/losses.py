@@ -369,7 +369,7 @@ class Adversarial(nn.Module):
             self.random_pt = torch.Tensor(1, 1, 1, 1).to(self.device)
             # gradient penalty loss
             self.cri_gp = GradientPenaltyLoss(device=self.device).to(self.device)
-            self.l_gp_w = train_opt['gp_weigth']
+            self.l_gp_w = train_opt['gp_weight']
 
 
     def forward(self, fake, real=None, condition=None, netD=None,
@@ -669,11 +669,11 @@ class GeneratorLoss(nn.Module):
             self.loss_list.append(cri_lpips)
 
         if  cpl_weight > 0 and cpl_type:
-            cri_cpl = get_loss_fn(cpl_type, cpl_weight, device=device)
+            cri_cpl = get_loss_fn(cpl_type, cpl_weight, opt=opt, device=device)
             self.loss_list.append(cri_cpl)
 
         if  gpl_weight > 0 and gpl_type:
-            cri_gpl = get_loss_fn(gpl_type, gpl_weight, device=device)
+            cri_gpl = get_loss_fn(gpl_type, gpl_weight, opt=opt, device=device)
             self.loss_list.append(cri_gpl)
 
         # if fft_weight > 0 and fft_type:

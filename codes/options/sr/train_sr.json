@@ -7,6 +7,7 @@
   , "use_amp": true
   , "use_swa": false
   , "use_cem": false
+  , "use_atg": false
 
   // Dataset options:
   , "datasets": {
@@ -77,6 +78,7 @@
     "root": "../"
     , "pretrain_model_G": "../experiments/pretrained_models/RRDB_PSNR_x4.pth"
     // , "pretrain_model_D": "../experiments/pretrained_models/patchgan.pth"
+    // , "pretrain_model_Loc": "../experiments/pretrained_models/locnet.pth"
     // , "resume_state": "../experiments/debug_002_RRDB_ESRGAN_x4_DIV2K/training_state/16.state"
   }
 
@@ -101,6 +103,9 @@
     , "swa_lr": 1e-4
     , "swa_anneal_epochs": 10
     , "swa_anneal_strategy": "cos"
+
+    // For AdaTarget
+    , "atg_start_iter_rel": 0.83
     
     // Losses:
     , "pixel_criterion": "l1" // pixel (content) loss
@@ -147,7 +152,7 @@
     // for wgan-gp
     // , "D_update_ratio": 1
     // , "D_init_iters": 0
-    // , "gp_weigth": 10
+    // , "gp_weight": 10
     // Feature matching (if using the discriminator_vgg_128_fea or discriminator_vgg_fea):
     // , "gan_featmaps": true
     // , "dis_feature_criterion": "cb" // discriminator feature loss

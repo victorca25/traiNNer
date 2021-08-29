@@ -215,7 +215,7 @@ train:
     # for wgan-gp
     # D_update_ratio: 1
     # D_init_iters: 0
-    # gp_weigth: 10
+    # gp_weight: 10
     # if using the discriminator_vgg_128_fea feature maps to calculate feature loss
     # gan_featmaps: true # true | false
     # dis_feature_criterion: cb # "l1" | "l2" | "cb" | "elastic" #discriminator feature loss

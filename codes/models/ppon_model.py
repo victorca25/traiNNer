@@ -1,12 +1,10 @@
 import logging
-
 import torch
 
 from .sr_model import SRModel
-from .base_model import nullcast
-logger = logging.getLogger('base')
-
 from dataops.batchaug import BatchAug
+
+logger = logging.getLogger('base')
 
 
 class PPONModel(SRModel):
@@ -15,9 +13,9 @@ class PPONModel(SRModel):
 
         if self.is_train:
             # Generator losses:
-            # Note: self.generatorlosses and self.precisegeneratorlosses already 
+            # Note: self.generatorlosses and self.precisegeneratorlosses already
             # defined in SRModel, only need to select which losses will be
-            # used in each phase. Discriminator by default only on phase 3. 
+            # used in each phase. Discriminator by default only on phase 3.
             # Content
             self.p1_losses = opt['train'].get('p1_losses', ['pix'])
 
@@ -39,17 +37,18 @@ class PPONModel(SRModel):
         phase = 1
 
         current_phase = self.phase
-        
+
         for i, s in enumerate(self.stages_m):
             if current_step >= s:
                 phase = i + 2
                 self.log_dict = {}  # Clear the loss logs
-        
-        phase = 'p{}'.format(phase)
+
+        phase = f"p{phase}"
         if phase != current_phase:
             self.phase = phase
             self.set_optim_params()
-            logger.info('Switching to phase: {}, step: {}'.format(phase, current_step))
+            logger.info(
+                f"Switching to phase: {phase}, step: {current_step}")
 
     def set_optim_params(self):
         """ Freeze layers according to the current phase.
@@ -58,7 +57,7 @@ class PPONModel(SRModel):
             p3: Only training the the Perceptual Layers: PFEM and PRM
         """
         # phase 1
-        if self.phase == 'p1': # content
+        if self.phase == 'p1':  # content
             for param in self.netG.module.CFEM.parameters():
                 param.requires_grad = True
             for param in self.netG.module.CRM.parameters():
@@ -73,7 +72,7 @@ class PPONModel(SRModel):
                 param.requires_grad = False
 
         # phase 2
-        if self.phase == 'p2': # structure
+        if self.phase == 'p2':  # structure
             for param in self.netG.module.CFEM.parameters():
                 param.requires_grad = False
             for param in self.netG.module.CRM.parameters():
@@ -88,7 +87,7 @@ class PPONModel(SRModel):
                 param.requires_grad = False
 
         # phase 3
-        if self.phase == 'p3': # perceptual
+        if self.phase == 'p3':  # perceptual
             for param in self.netG.module.CFEM.parameters():
                 param.requires_grad = False
             for param in self.netG.module.CRM.parameters():
@@ -101,7 +100,7 @@ class PPONModel(SRModel):
                 param.requires_grad = True
             for param in self.netG.module.PRM.parameters():
                 param.requires_grad = True
-        
+
         # optim_params = []
         # for k, v in self.netG.named_parameters():
         #     if v.requires_grad:
@@ -110,8 +109,11 @@ class PPONModel(SRModel):
         #         print('Warning: params [{:s}] will not be optimized.'.format(k))
 
     # override
-    def forward(self, data=None):
-        """Run forward pass; called by <optimize_parameters> and <test> functions."""
+    def forward(self, data=None, CEM_net=None):
+        """
+        Run forward pass; called by <optimize_parameters> and <test> functions.
+        Can be used either with 'data' passed directly or loaded 'self.var_L'.
+        """
         if isinstance(data, torch.Tensor):
             PPON_out = self.netG(data)  # G(LR)
             if self.phase == 'p1':
@@ -120,7 +122,7 @@ class PPONModel(SRModel):
                 return PPON_out[1]
             else:  # 'p3'
                 return PPON_out[2]
-        
+
         PPON_out = self.netG(self.var_L)  # G(LR)
         if self.phase == 'p1':
             self.fake_H = PPON_out[0]
@@ -131,18 +133,27 @@ class PPONModel(SRModel):
 
     # override
     def optimize_parameters(self, step):
-        self.update_stage(step)
+        eff_step = step/self.accumulations
+
+        self.update_stage(eff_step)
         if self.phase == 'p3':
             losses_selector = self.p3_losses
         elif self.phase == 'p2':
             losses_selector = self.p2_losses
-        else: # 'p1'
+        else:  # 'p1'
             losses_selector = self.p1_losses
 
         # G
         # freeze discriminator while generator is trained to prevent BP
         if self.cri_gan:
             self.requires_grad(self.netD, flag=False, net_type='D')
+
+        # switch ATG to train
+        if self.atg:
+            if eff_step > self.atg_start_iter:
+                self.switch_atg(True)
+            else:
+                self.switch_atg(False)
 
         # batch (mixup) augmentations
         aug = None
@@ -152,107 +163,71 @@ class PPONModel(SRModel):
                 self.mixopts, self.mixprob, self.mixalpha,
                 self.aux_mixprob, self.aux_mixalpha, self.mix_p
                 )
-        
-        ### Network forward, generate SR
+
+        # network forward, generate SR
         with self.cast():
             self.forward()
-        #/with self.cast():
 
         # batch (mixup) augmentations
         # cutout-ed pixels are discarded when calculating loss by masking removed pixels
         if aug == "cutout":
-            self.fake_H, self.real_H = self.fake_H*mask, self.real_H*mask
-        
-        l_g_total = 0
-        """
-        Calculate and log losses
-        """
+            self.fake_H, self.real_H = self.fake_H * mask, self.real_H * mask
+
+        # adatarget
+        if self.atg:
+            self.fake_H = self.ada_out(
+                output=self.fake_H, target=self.real_H,
+                loc_model=self.netLoc)
+
+        # calculate and log losses
         loss_results = []
         # training generator and discriminator
-        # update generator (on its own if only training generator or alternatively if training GAN)
-        if (self.cri_gan is not True) or (step % self.D_update_ratio == 0 and step > self.D_init_iters):
-            with self.cast(): # Casts operations to mixed precision if enabled, else nullcontext
+        # update generator (on its own if only training generator
+        # or alternatively if training GAN)
+        l_g_total = 0
+        if (self.cri_gan is not True) or (eff_step % self.D_update_ratio == 0
+            and eff_step > self.D_init_iters):
+            with self.cast():
+                # casts operations to mixed precision if enabled, else nullcontext
                 # regular losses
-                loss_results, self.log_dict = self.generatorlosses(self.fake_H, self.real_H, self.log_dict,
-                                                                   self.f_low, selector=losses_selector)
+                loss_results, self.log_dict = self.generatorlosses(
+                    self.fake_H, self.real_H, self.log_dict, self.f_low,
+                    selector=losses_selector)
                 l_g_total += sum(loss_results) / self.accumulations
 
                 if self.cri_gan and self.phase == 'p3':
                     # adversarial loss
                     l_g_gan = self.adversarial(
-                        self.fake_H, self.var_ref, netD=self.netD, 
-                        stage='generator', fsfilter = self.f_high) # (sr, hr)
+                        self.fake_H, self.var_ref, netD=self.netD,
+                        stage='generator', fsfilter=self.f_high)  # (sr, hr)
                     self.log_dict['l_g_gan'] = l_g_gan.item()
                     l_g_total += l_g_gan / self.accumulations
 
-            #/with self.cast():
             # high precision generator losses (can be affected by AMP half precision)
             if self.precisegeneratorlosses.loss_list:
                 precise_loss_results, self.log_dict = self.precisegeneratorlosses(
-                        self.fake_H, self.real_H, self.log_dict, self.f_low, selector=losses_selector)
+                    self.fake_H, self.real_H, self.log_dict, self.f_low,
+                    selector=losses_selector)
                 l_g_total += sum(precise_loss_results) / self.accumulations
-            
-            if self.amp:
-                # call backward() on scaled loss to create scaled gradients.
-                self.amp_scaler.scale(l_g_total).backward()
-            else:
-                l_g_total.backward()
 
-            # only step and clear gradient if virtual batch has completed
-            if (step + 1) % self.accumulations == 0:
-                if self.amp:
-                    # unscale gradients of the optimizer's params, call 
-                    # optimizer.step() if no infs/NaNs in gradients, else, skipped
-                    self.amp_scaler.step(self.optimizer_G)
-                    # Update GradScaler scale for next iteration.
-                    self.amp_scaler.update() 
-                    #TODO: remove. for debugging AMP
-                    #print("AMP Scaler state dict: ", self.amp_scaler.state_dict())
-                else:
-                    self.optimizer_G.step()
-                self.optimizer_G.zero_grad()
-                self.optGstep = True
+            # calculate G gradients
+            self.calc_gradients(l_g_total)
+
+            # step G optimizer
+            self.optimizer_step(step, self.optimizer_G, "G")
 
         if self.cri_gan and self.phase == 'p3':
             # update discriminator
+            self.requires_grad(self.netD, flag=True)  # unfreeze all D
             if isinstance(self.feature_loc, int):
-                # unfreeze all D
-                self.requires_grad(self.netD, flag=True)
                 # then freeze up to the selected layers
                 for loc in range(self.feature_loc):
-                    self.requires_grad(self.netD, False, target_layer=loc, net_type='D')
-            else:
-                # unfreeze discriminator
-                self.requires_grad(self.netD, flag=True)
-            
-            l_d_total = 0
-            
-            with self.cast(): # Casts operations to mixed precision if enabled, else nullcontext
-                l_d_total, gan_logs = self.adversarial(
-                    self.fake_H, self.var_ref, netD=self.netD, 
-                    stage='discriminator', fsfilter = self.f_high) # (sr, hr)
+                    self.requires_grad(
+                        self.netD, False, target_layer=loc, net_type='D')
 
-                for g_log in gan_logs:
-                    self.log_dict[g_log] = gan_logs[g_log]
+            # calculate D backward step and gradients
+            self.log_dict = self.backward_D_Basic(
+                self.netD, self.var_ref, self.fake_H, self.log_dict)
 
-                l_d_total /= self.accumulations
-            #/with autocast():
-            
-            if self.amp:
-                # call backward() on scaled loss to create scaled gradients.
-                self.amp_scaler.scale(l_d_total).backward()
-            else:
-                l_d_total.backward()
-
-            # only step and clear gradient if virtual batch has completed
-            if (step + 1) % self.accumulations == 0:
-                if self.amp:
-                    # unscale gradients of the optimizer's params, call 
-                    # optimizer.step() if no infs/NaNs in gradients, else, skipped
-                    self.amp_scaler.step(self.optimizer_D)
-                    # Update GradScaler scale for next iteration.
-                    self.amp_scaler.update()
-                else:
-                    self.optimizer_D.step()
-                self.optimizer_D.zero_grad()
-                self.optDstep = True
+            # step D optimizer
+            self.optimizer_step(step, self.optimizer_D, "D")

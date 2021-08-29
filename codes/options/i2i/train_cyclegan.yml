@@ -122,7 +122,7 @@ train:
     # For wgan-gp:
     # D_update_ratio: 1
     # D_init_iters: 0
-    # gp_weigth: 10
+    # gp_weight: 10
     # Feature matching (if using the discriminator_vgg_128_fea or discriminator_vgg_fea):
     # gan_featmaps: true
     # dis_feature_criterion: cb  # discriminator feature loss

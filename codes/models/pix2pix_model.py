@@ -3,29 +3,16 @@ from __future__ import absolute_import
 import os
 import logging
 from collections import OrderedDict
-
 import torch
 import torch.nn as nn
 
 import models.networks as networks
-from .base_model import BaseModel, nullcast
-
+from .base_model import BaseModel
 from . import losses
-from . import optimizers
-from . import schedulers
-from . import swa
-
 from dataops.batchaug import BatchAug
-from dataops.filters import FilterHigh, FilterLow  # , FilterX
+from dataops.filters import FilterHigh, FilterLow
 
 logger = logging.getLogger('base')
-
-load_amp = (hasattr(torch.cuda, "amp") and hasattr(torch.cuda.amp, "autocast"))
-if load_amp:
-    from torch.cuda.amp import autocast, GradScaler
-    logger.info('AMP library available')
-else:
-    logger.info('AMP library not available')
 
 
 class Pix2PixModel(BaseModel):
@@ -57,58 +44,46 @@ class Pix2PixModel(BaseModel):
         super(Pix2PixModel, self).__init__(opt)
         train_opt = opt['train']
 
-        # specify the images you want to save/display. The training/test scripts will call <BaseModel.get_current_visuals>
+        # specify the images you want to save/display.
+        # The training/test scripts will call <BaseModel.get_current_visuals>
         self.visual_names = ['real_A', 'fake_B', 'real_B']
 
         # specify the models you want to load/save to the disk.
-        # The training/test scripts will call <BaseModel.save_networks> and <BaseModel.load_networks>
-        # For training and testing, a generator 'G' is needed
+        # The training/test scripts will call <BaseModel.save_networks>
+        # and <BaseModel.load_networks>
+        # for training and testing, a generator 'G' is needed
         self.model_names = ['G']
 
         # define networks (both generator and discriminator) and load pretrained models
         self.netG = networks.define_G(opt).to(self.device)  # G
-
         if self.is_train:
             self.netG.train()
+            opt_G_nets = [self.netG]
+            opt_D_nets = []
             if train_opt['gan_weight']:
                 self.model_names.append('D')  # add discriminator to the network list
                 # define a discriminator; conditional GANs need to take both input and output images;
                 # Therefore, input channels for D must be input_nc + output_nc
                 self.netD = networks.define_D(opt).to(self.device)  # D
                 self.netD.train()
-        self.load()  # load G and D if needed
+                opt_D_nets.append(self.netD)
 
+            # configure AdaTarget
+            self.setup_atg()
+            if self.atg:
+                opt_G_nets.append(self.netLoc)
+        self.load()  # load G, D and other networks if needed
+
+        # define losses, optimizer, scheduler and other components
         if self.is_train:
-            """
-            Setup batch augmentations
-            #TODO: test
-            """
-            self.mixup = train_opt.get('mixup', None)
-            if self.mixup:
-                self.mixopts = train_opt.get('mixopts', ["blend", "rgb", "mixup", "cutmix", "cutmixup"])  # , "cutout", "cutblur"]
-                self.mixprob = train_opt.get('mixprob', [1.0, 1.0, 1.0, 1.0, 1.0])  # , 1.0, 1.0]
-                self.mixalpha = train_opt.get('mixalpha', [0.6, 1.0, 1.2, 0.7, 0.7])  # , 0.001, 0.7]
-                self.aux_mixprob = train_opt.get('aux_mixprob', 1.0)
-                self.aux_mixalpha = train_opt.get('aux_mixalpha', 1.2)
-                self.mix_p = train_opt.get('mix_p', None)
+            # setup batch augmentations
+            self.setup_batchaug()
 
-            """
-            Setup frequency separation
-            """
-            self.fs = train_opt.get('fs', None)
-            self.f_low = None
-            self.f_high = None
-            if self.fs:
-                lpf_type = train_opt.get('lpf_type', "average")
-                hpf_type = train_opt.get('hpf_type', "average")
-                self.f_low = FilterLow(filter_type=lpf_type).to(self.device)
-                self.f_high = FilterHigh(filter_type=hpf_type).to(self.device)
+            # setup frequency separation
+            self.setup_fs()
 
-            """
-            Initialize losses
-            """
-            # Initialize the losses with the opt parameters
-            # Generator losses:
+            # initialize losses
+            # generator losses:
             # for the losses that don't require high precision (can use half precision)
             self.generatorlosses = losses.GeneratorLoss(opt, self.device)
             # for losses that need high precision (use out of the AMP context)
@@ -116,103 +91,39 @@ class Pix2PixModel(BaseModel):
             # TODO: show the configured losses names in logger
             # print(self.generatorlosses.loss_list)
 
-            # Discriminator loss:
-            if train_opt['gan_type'] and train_opt['gan_weight']:
-                self.cri_gan = True
-                diffaug = train_opt.get('diffaug', None)
-                dapolicy = None
-                if diffaug:  # TODO: this if should not be necessary
-                    dapolicy = train_opt.get('dapolicy', 'color,translation,cutout')  # original
-                self.adversarial = losses.Adversarial(train_opt=train_opt, device=self.device,
-                                                      diffaug=diffaug, dapolicy=dapolicy,
-                                                      conditional=True)
-                # TODO:
-                # D_update_ratio and D_init_iters are for WGAN
-                # self.D_update_ratio = train_opt.get('D_update_ratio', 1)
-                # self.D_init_iters = train_opt.get('D_init_iters', 0)
-            else:
-                self.cri_gan = False
+            # discriminator loss:
+            self.setup_gan(conditional=True)
 
-            """
-            Initialize optimizers
-            """
-            self.optGstep = False
-            self.optDstep = False
+            # configure FreezeD
             if self.cri_gan:
-                self.optimizers, self.optimizer_G, self.optimizer_D = optimizers.get_optimizers(
-                    self.cri_gan, self.netD, self.netG, train_opt, logger, self.optimizers)
-            else:
-                self.optimizers, self.optimizer_G = optimizers.get_optimizers(
-                    None, None, self.netG, train_opt, logger, self.optimizers)
-                self.optDstep = True
+                self.setup_freezeD()
 
-            """
-            Prepare schedulers
-            """
-            self.schedulers = schedulers.get_schedulers(
-                optimizers=self.optimizers, schedulers=self.schedulers, train_opt=train_opt)
+            # prepare optimizers
+            self.setup_optimizers(opt_G_nets, opt_D_nets, init_setup=True)
 
-            """
-            Configure SWA
-            #TODO: test
-            """
-            self.swa = opt.get('use_swa', False)
-            if self.swa:
-                self.swa_start_iter = train_opt.get('swa_start_iter', 0)
-                # self.swa_start_epoch = train_opt.get('swa_start_epoch', None)
-                swa_lr = train_opt.get('swa_lr', 0.0001)
-                swa_anneal_epochs = train_opt.get('swa_anneal_epochs', 10)
-                swa_anneal_strategy = train_opt.get('swa_anneal_strategy', 'cos')
-                # TODO: Note: This could be done in resume_training() instead, to prevent creating
-                # the swa scheduler and model before they are needed
-                self.swa_scheduler, self.swa_model = swa.get_swa(
-                        self.optimizer_G, self.netG, swa_lr, swa_anneal_epochs, swa_anneal_strategy)
-                self.load_swa()  # load swa from resume state
-                logger.info('SWA enabled. Starting on iter: {}, lr: {}'.format(self.swa_start_iter, swa_lr))
+            # prepare schedulers
+            self.setup_schedulers()
 
-            """
-            If using virtual batch
-            """
-            batch_size = opt["datasets"]["train"]["batch_size"]
-            virtual_batch = opt["datasets"]["train"].get('virtual_batch_size', None)
-            self.virtual_batch = virtual_batch if virtual_batch \
-                >= batch_size else batch_size
-            self.accumulations = self.virtual_batch // batch_size
+            # set gradients to zero
             self.optimizer_G.zero_grad()
             if self.cri_gan:
                 self.optimizer_D.zero_grad()
 
-            """
-            Configure AMP
-            """
-            self.amp = load_amp and opt.get('use_amp', False)
-            if self.amp:
-                self.cast = autocast
-                self.amp_scaler = GradScaler()
-                logger.info('AMP enabled')
-            else:
-                self.cast = nullcast
-
-            """
-            Configure FreezeD
-            """
-            if self.cri_gan:
-                self.feature_loc = None
-                loc = train_opt.get('freeze_loc', False)
-                if loc:
-                    disc = opt["network_D"].get('which_model_D', False)
-                    if "discriminator_vgg" in disc and "fea" not in disc:
-                        loc = (loc*3)-2
-                    elif "patchgan" in disc:
-                        loc = (loc*3)-1
-                    # TODO: TMP, for now only tested with the vgg-like or patchgan discriminators
-                    if "discriminator_vgg" in disc or "patchgan" in disc:
-                        self.feature_loc = loc
-                        logger.info('FreezeD enabled')
-
+            # init loss log
             self.log_dict = OrderedDict()
 
-        self.print_network(verbose=False)  # TODO: pass verbose flag from config file
+            # configure SWA
+            self.setup_swa()
+
+            # configure virtual batch
+            self.setup_virtual_batch()
+
+            # configure AMP
+            self.setup_amp()
+
+        # print network
+        # TODO: pass verbose flag from config file
+        self.print_network(verbose=False)
 
     def feed_data(self, data):
         """Unpack input data from the dataloader and perform necessary pre-processing steps.
@@ -234,29 +145,13 @@ class Pix2PixModel(BaseModel):
         self.fake_B = self.netG(self.real_A)  # G(A)
 
     def backward_D(self):
-        """Calculate GAN loss for the discriminator"""
-
-        l_d_total = 0
-        with self.cast():
-            l_d_total, gan_logs = self.adversarial(
-                self.fake_B, self.real_B, self.real_A, netD=self.netD,
-                stage='discriminator', fsfilter=self.f_high)
-
-            for g_log in gan_logs:
-                self.log_dict[g_log] = gan_logs[g_log]
-
-            l_d_total /= self.accumulations
-
-        # calculate gradients
-        if self.amp:
-            # call backward() on scaled loss to create scaled gradients.
-            self.amp_scaler.scale(l_d_total).backward()
-        else:
-            l_d_total.backward()
+        """Calculate GAN loss for the discriminator."""
+        self.log_dict = self.backward_D_Basic(
+            self.netD, self.real_B, self.fake_B, self.log_dict,
+            self.real_A)
 
     def backward_G(self):
-        """Calculate GAN and reconstruction losses for the generator"""
-
+        """Calculate GAN and reconstruction losses for the generator."""
         l_g_total = 0
         with self.cast():
             if self.cri_gan:
@@ -280,14 +175,21 @@ class Pix2PixModel(BaseModel):
                     self.fake_B, self.real_B, self.log_dict, self.f_low)
             l_g_total += sum(precise_loss_results) / self.accumulations
 
-        # calculate gradients
-        if self.amp:
-            # call backward() on scaled loss to create scaled gradients.
-            self.amp_scaler.scale(l_g_total).backward()
-        else:
-            l_g_total.backward()
+        # calculate G gradients
+        self.calc_gradients(l_g_total)
 
     def optimize_parameters(self, step):
+        """Calculate losses, gradients, and update network weights;
+        called in every training iteration."""
+        eff_step = step/self.accumulations
+
+        # switch ATG to train
+        if self.atg:
+            if eff_step > self.atg_start_iter:
+                self.switch_atg(True)
+            else:
+                self.switch_atg(False)
+
         # batch (mixup) augmentations
         aug = None
         if self.mixup:
@@ -304,50 +206,49 @@ class Pix2PixModel(BaseModel):
         # batch (mixup) augmentations
         # cutout-ed pixels are discarded when calculating loss by masking removed pixels
         if aug == "cutout":
-            self.fake_B, self.real_B = self.fake_B*mask, self.real_B*mask
+            self.fake_B, self.real_B = self.fake_B * mask, self.real_B * mask
+
+        # adatarget
+        if self.atg:
+            self.fake_H = self.ada_out(
+                output=self.fake_H, target=self.real_H,
+                loc_model=self.netLoc)
 
         if self.cri_gan:
             # update D
-            self.requires_grad(self.netD, True)  # enable backprop for D
+            self.requires_grad(self.netD, flag=True)  # enable backprop for D
             if isinstance(self.feature_loc, int):
                 # freeze up to the selected layers
                 for loc in range(self.feature_loc):
-                    self.requires_grad(self.netD, False, target_layer=loc, net_type='D')
+                    self.requires_grad(
+                        self.netD, False, target_layer=loc, net_type='D')
 
-            self.backward_D()  # calculate gradients for D
-            # only step and clear gradient if virtual batch has completed
-            if (step + 1) % self.accumulations == 0:
-                if self.amp:
-                    self.amp_scaler.step(self.optimizer_D)
-                    self.amp_scaler.update()
-                else:
-                    self.optimizer_D.step()  # update D's weights
-                self.optimizer_D.zero_grad()  # set D's gradients to zero
-                self.optDstep = True
+            # calculate D backward step and gradients
+            self.backward_D()
 
-        # update G
-        if self.cri_gan:
-            # D requires no gradients when optimizing G
-            self.requires_grad(self.netD, flag=False, net_type='D')
+            # step D optimizer
+            self.optimizer_step(step, self.optimizer_D, "D")
 
-        self.backward_G()  # calculate graidents for G
-        # only step and clear gradient if virtual batch has completed
-        if (step + 1) % self.accumulations == 0:
-            if self.amp:
-                self.amp_scaler.step(self.optimizer_G)
-                self.amp_scaler.update()
-            else:
-                self.optimizer_G.step()  # udpdate G's weights
-            self.optimizer_G.zero_grad()  # set G's gradients to zero
-            self.optGstep = True
+        if (self.cri_gan is not True) or (eff_step % self.D_update_ratio == 0
+            and eff_step > self.D_init_iters):
+            # update G
+            if self.cri_gan:
+                # D requires no gradients when optimizing G
+                self.requires_grad(self.netD, flag=False, net_type='D')
+
+            # calculate G backward step and gradients
+            self.backward_G()
+
+            # step G optimizer
+            self.optimizer_step(step, self.optimizer_G, "G")
 
     def get_current_log(self):
-        """Return traning losses / errors. train.py will print out these on the
-            console, and save them to a file"""
+        """Return traning losses / errors. train.py will print out
+        these on the console, and save them to a file."""
         return self.log_dict
 
     def get_current_visuals(self):
-        """Return visualization images. train.py will display and/or save these images"""
+        """Return visualization images. train.py will display and/or save these images."""
         out_dict = OrderedDict()
         for name in self.visual_names:
             if isinstance(name, str):
