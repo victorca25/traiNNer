@@ -9,7 +9,6 @@ import torch.nn as nn
 import models.networks as networks
 from .base_model import BaseModel
 from . import losses
-from dataops.batchaug import BatchAug
 from dataops.filters import FilterHigh, FilterLow
 from utils.image_pool import ImagePool
 
@@ -320,23 +319,17 @@ class CycleGANModel(BaseModel):
                 self.switch_atg(False)
 
         # batch (mixup) augmentations
-        aug = None
         if self.mixup:
-            self.real_B, self.real_A, mask, aug = BatchAug(
-                self.real_B, self.real_A,
-                self.mixopts, self.mixprob, self.mixalpha,
-                self.aux_mixprob, self.aux_mixalpha, self.mix_p
-                )
+            self.real_B, self.real_A = self.batchaugment(self.real_B, self.real_A)
 
         # run G_A(A), G_B(G_A(A)), G_B(B), G_A(G_B(B))
         with self.cast():  # Casts operations to mixed precision if enabled, else nullcontext
             self.forward()  # compute fake images and reconstruction images.
 
-        # batch (mixup) augmentations
-        # cutout-ed pixels are discarded when calculating loss by masking removed pixels
-        if aug == "cutout":
-            self.fake_B, self.real_B = self.fake_B * mask, self.real_B * mask
-            self.fake_A, self.real_A = self.fake_A * mask, self.real_A * mask
+        # apply mask if batchaug == "cutout"
+        if self.mixup:
+            self.fake_B, self.real_B = self.batchaugment.apply_mask(self.fake_B, self.real_B)
+            self.fake_A, self.real_A = self.batchaugment.apply_mask(self.fake_A, self.real_A)
 
         # adatarget
         if self.atg:

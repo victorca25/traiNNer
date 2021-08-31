@@ -4,7 +4,6 @@ import torch
 
 from .sr_model import SRModel
 from . import optimizers
-from dataops.batchaug import BatchAug
 from options.options import opt_get
 
 logger = logging.getLogger('base')
@@ -136,13 +135,8 @@ class SRFlowModel(SRModel):
                     self.switch_atg(False)
 
             # batch (mixup) augmentations
-            aug = None
             if self.mixup:
-                self.real_H, self.var_L, mask, aug = BatchAug(
-                    self.real_H, self.var_L,
-                    self.mixopts, self.mixprob, self.mixalpha,
-                    self.aux_mixprob, self.aux_mixalpha, self.mix_p
-                    )
+                self.real_H, self.var_L = self.batchaugment(self.real_H, self.var_L)
 
             with self.cast():
                 z = self.get_z(
@@ -152,10 +146,9 @@ class SRFlowModel(SRModel):
                     lr=self.var_L, z=z, eps_std=0, reverse=True,
                     reverse_with_grad=True)
 
-            # batch (mixup) augmentations
-            # cutout-ed pixels are discarded when calculating loss by masking removed pixels
-            if aug == "cutout":
-                self.fake_H, self.real_H = self.fake_H * mask, self.real_H * mask
+            # apply mask if batchaug == "cutout"
+            if self.mixup:
+                self.fake_H, self.real_H = self.batchaugment.apply_mask(self.fake_H, self.real_H)
 
             # TODO: CEM is WIP
             # unpad images if using CEM

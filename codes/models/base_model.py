@@ -15,6 +15,7 @@ from .losses import Adversarial
 from models.networks import model_val, cem2normal, define_ext
 from models.modules.architectures.CEM import CEMnet
 from models.modules.adatarget.atg import AdaTarget
+from dataops.batchaug import BatchAugment
 from dataops.filters import FilterHigh, FilterLow
 
 logger = logging.getLogger('base')
@@ -85,6 +86,7 @@ class BaseModel:
         self.swa = None
         self.swa_start_iter = None
         self.metric = 0  # used for learning rate policy 'plateau'
+        self.batchaugment = None
 
     def feed_data(self, data: dict):
         """Unpack input data from the dataloader and perform necessary
@@ -598,13 +600,8 @@ class BaseModel:
         train_opt = self.opt['train']
         self.mixup = train_opt.get('mixup')
         if self.mixup:
-            # TODO: cutblur and cutout need model to be modified so LR and HR have the same dimensions (1x)
-            self.mixopts = train_opt.get('mixopts', ["blend", "rgb", "mixup", "cutmix", "cutmixup"])  # , "cutout", "cutblur"]
-            self.mixprob = train_opt.get('mixprob', [1.0, 1.0, 1.0, 1.0, 1.0])  # , 1.0, 1.0]
-            self.mixalpha = train_opt.get('mixalpha', [0.6, 1.0, 1.2, 0.7, 0.7])  # , 0.001, 0.7]
-            self.aux_mixprob = train_opt.get('aux_mixprob', 1.0)
-            self.aux_mixalpha = train_opt.get('aux_mixalpha', 1.2)
-            self.mix_p = train_opt.get('mix_p', None)
+            # TODO: cutblur needs model to be modified so LR and HR have the same dimensions (1x)
+            self.batchaugment = BatchAugment(train_opt)
             logger.info("Batch augmentations enabled")
 
     def setup_fs(self):

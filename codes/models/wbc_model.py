@@ -10,7 +10,6 @@ from joblib import Parallel, delayed, parallel_backend
 import models.networks as networks
 from .base_model import BaseModel, nullcast
 from . import losses
-from dataops.batchaug import BatchAug
 from dataops.filters import FilterHigh, FilterLow, GuidedFilter
 from dataops.colors import ColorShift
 from dataops.augmennt.augmennt import transforms
@@ -362,22 +361,16 @@ class WBCModel(BaseModel):
                 self.switch_atg(False)
 
         # batch (mixup) augmentations
-        aug = None
         if self.mixup:
-            self.real_B, self.real_A, mask, aug = BatchAug(
-                self.real_B, self.real_A,
-                self.mixopts, self.mixprob, self.mixalpha,
-                self.aux_mixprob, self.aux_mixalpha, self.mix_p
-                )
+            self.real_B, self.real_A = self.batchaugment(self.real_B, self.real_A)
 
         # run G(A)
         with self.cast():  # casts operations to mixed precision if enabled, else nullcontext
             self.forward()  # compute fake images: G(A)
 
-        # batch (mixup) augmentations
-        # cutout-ed pixels are discarded when calculating loss by masking removed pixels
-        if aug == "cutout":
-            self.fake_B, self.real_B = self.fake_B * mask, self.real_B * mask
+        # apply mask if batchaug == "cutout"
+        if self.mixup:
+            self.fake_B, self.real_B = self.batchaugment.apply_mask(self.fake_B, self.real_B)
 
         # adatarget
         if self.atg:

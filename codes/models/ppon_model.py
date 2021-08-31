@@ -2,7 +2,6 @@ import logging
 import torch
 
 from .sr_model import SRModel
-from dataops.batchaug import BatchAug
 
 logger = logging.getLogger('base')
 
@@ -156,22 +155,16 @@ class PPONModel(SRModel):
                 self.switch_atg(False)
 
         # batch (mixup) augmentations
-        aug = None
         if self.mixup:
-            self.real_H, self.var_L, mask, aug = BatchAug(
-                self.real_H, self.var_L,
-                self.mixopts, self.mixprob, self.mixalpha,
-                self.aux_mixprob, self.aux_mixalpha, self.mix_p
-                )
+            self.real_H, self.var_L = self.batchaugment(self.real_H, self.var_L)
 
         # network forward, generate SR
         with self.cast():
             self.forward()
 
-        # batch (mixup) augmentations
-        # cutout-ed pixels are discarded when calculating loss by masking removed pixels
-        if aug == "cutout":
-            self.fake_H, self.real_H = self.fake_H * mask, self.real_H * mask
+        # apply mask if batchaug == "cutout"
+        if self.mixup:
+            self.fake_H, self.real_H = self.batchaugment.apply_mask(self.fake_H, self.real_H)
 
         # adatarget
         if self.atg:
