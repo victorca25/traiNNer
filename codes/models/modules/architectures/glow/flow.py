@@ -4,8 +4,8 @@ import torch.nn.functional as F
 import numpy as np
 
 from models.modules.architectures.glow.ActNorms import ActNorm2d
+from models.modules.architectures.block import space_to_depth, depth_to_space
 from . import thops
-
 
 class Conv2d(nn.Conv2d):
     pad_dict = {
@@ -106,51 +106,18 @@ class GaussianDiag:
                            std=torch.ones(shape) * eps_std)
         return eps
 
-# TODO: move to basic blocks, combine with SpaceToDepth/pixel shuffle
-def squeeze2d(input, factor=2):
-    assert factor >= 1 and isinstance(factor, int)
-    if factor == 1:
-        return input
-    size = input.size()
-    B = size[0]
-    C = size[1]
-    H = size[2]
-    W = size[3]
-    assert H % factor == 0 and W % factor == 0, "{}".format((H, W, factor))
-    x = input.view(B, C, H // factor, factor, W // factor, factor)
-    x = x.permute(0, 1, 3, 5, 2, 4).contiguous()
-    x = x.view(B, C * factor * factor, H // factor, W // factor)
-    return x
-
-# TODO: move to basic blocks, combine with DepthToSpace/pixel unshuffle
-def unsqueeze2d(input, factor=2):
-    assert factor >= 1 and isinstance(factor, int)
-    factor2 = factor ** 2
-    if factor == 1:
-        return input
-    size = input.size()
-    B = size[0]
-    C = size[1]
-    H = size[2]
-    W = size[3]
-    assert C % (factor2) == 0, "{}".format(C)
-    x = input.view(B, C // factor2, factor, factor, H, W)
-    x = x.permute(0, 1, 4, 2, 5, 3).contiguous()
-    x = x.view(B, C // (factor2), H * factor, W * factor)
-    return x
-
-# TODO: move to basic blocks
 class SqueezeLayer(nn.Module):
     def __init__(self, factor):
         super().__init__()
         self.factor = factor
 
-    def forward(self, input, logdet=None, reverse=False):
+    def forward(self, x, logdet=None, reverse=False):
         if not reverse:
-            output = squeeze2d(input, self.factor)  # Squeeze in forward
+            # Squeeze in forward
+            output = space_to_depth(x, self.factor)
             return output, logdet
         else:
-            output = unsqueeze2d(input, self.factor)
+            output = depth_to_space(x, self.factor)
             return output, logdet
 
 

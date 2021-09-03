@@ -18,16 +18,16 @@ def swish_func(x, beta=1.0, inplace=False):
     Searching for Activation Functions (https://arxiv.org/abs/1710.05941)
 
     If beta=1 applies the Sigmoid Linear Unit (SiLU) function element-wise
-    If beta=0, Swish becomes the scaled linear function (identity 
+    If beta=0, Swish becomes the scaled linear function (identity
       activation) f(x) = x/2
     As beta -> ∞, the sigmoid component converges to approach a 0-1 function
-      (unit step), and multiplying that by x gives us f(x)=2max(0,x), which 
-      is the ReLU multiplied by a constant factor of 2, so Swish becomes like 
+      (unit step), and multiplying that by x gives us f(x)=2max(0,x), which
+      is the ReLU multiplied by a constant factor of 2, so Swish becomes like
       the ReLU function.
 
-    Including beta, Swish can be loosely viewed as a smooth function that 
+    Including beta, Swish can be loosely viewed as a smooth function that
       nonlinearly interpolate between identity (linear) and ReLU function.
-      The degree of interpolation can be controlled by the model if beta is 
+      The degree of interpolation can be controlled by the model if beta is
       set as a trainable parameter.
 
     Alt: 1.78718727865 * (x * sigmoid(x) - 0.20662096414)
@@ -41,12 +41,12 @@ def swish_func(x, beta=1.0, inplace=False):
         return x
     # Normal out-of-place implementation:
     return x * torch.sigmoid(beta * x)
-    
+
 # Swish module
 class Swish(nn.Module):
-    
+
     __constants__ = ['beta', 'slope', 'inplace']
-    
+
     def __init__(self, beta=1.0, slope=1.67653251702, inplace=False):
         """
         Shape:
@@ -65,7 +65,7 @@ class Swish(nn.Module):
         # self.slope = slope * torch.nn.Parameter(torch.ones(1)) # learnable slope parameter, create a tensor out of slope
         # self.slope = torch.nn.Parameter(torch.tensor(slope)) # learnable slope parameter, create a tensor out of slope
         # self.slope.requiresGrad = True # set requiresGrad to true to true to make it trainable
-    
+
     def forward(self, x):
         """
         # Disabled, using inplace causes:
@@ -211,9 +211,9 @@ def sequential(*args):
     return nn.Sequential(*modules)
 
 
-def conv_block(in_nc, out_nc, kernel_size, stride=1, dilation=1, groups=1, bias=True, \
-               pad_type='zero', norm_type=None, act_type='relu', mode='CNA', convtype='Conv2D', \
-               spectral_norm=False):
+def conv_block(in_nc, out_nc, kernel_size, stride=1, dilation=1, groups=1,
+    bias=True, pad_type='zero', norm_type=None, act_type='relu', mode='CNA',
+    convtype='Conv2D', spectral_norm=False):
     """
     Conv layer with padding, normalization, activation
     mode: CNA --> Conv -> Norm -> Act
@@ -223,23 +223,24 @@ def conv_block(in_nc, out_nc, kernel_size, stride=1, dilation=1, groups=1, bias=
     padding = get_valid_padding(kernel_size, dilation)
     p = pad(pad_type, padding) if pad_type and pad_type != 'zero' else None
     padding = padding if pad_type == 'zero' else 0
-    
+
     if convtype=='PartialConv2D':
-        c = PartialConv2d(in_nc, out_nc, kernel_size=kernel_size, stride=stride, padding=padding, \
-               dilation=dilation, bias=bias, groups=groups)
+        c = PartialConv2d(in_nc, out_nc, kernel_size=kernel_size, stride=stride,
+            padding=padding, dilation=dilation, bias=bias, groups=groups)
     elif convtype=='DeformConv2D':
-        c = DeformConv2d(in_nc, out_nc, kernel_size=kernel_size, stride=stride, padding=padding, \
-               dilation=dilation, bias=bias, groups=groups)
+        c = DeformConv2d(in_nc, out_nc, kernel_size=kernel_size, stride=stride,
+            padding=padding, dilation=dilation, bias=bias, groups=groups)
     elif convtype=='Conv3D':
-        c = nn.Conv3d(in_nc, out_nc, kernel_size=kernel_size, stride=stride, padding=padding, \
-                dilation=dilation, bias=bias, groups=groups)
-    else: #default case is standard 'Conv2D':
-        c = nn.Conv2d(in_nc, out_nc, kernel_size=kernel_size, stride=stride, padding=padding, \
-                dilation=dilation, bias=bias, groups=groups) #normal conv2d
-            
+        c = nn.Conv3d(in_nc, out_nc, kernel_size=kernel_size, stride=stride,
+            padding=padding, dilation=dilation, bias=bias, groups=groups)
+    else:
+        # default case is standard 'Conv2D':
+        c = nn.Conv2d(in_nc, out_nc, kernel_size=kernel_size, stride=stride,
+            padding=padding, dilation=dilation, bias=bias, groups=groups)  # normal conv2d
+
     if spectral_norm:
         c = nn.utils.spectral_norm(c)
-    
+
     a = act(act_type) if act_type else None
     if 'CNA' in mode:
         n = norm(norm_type, out_nc) if norm_type else None
@@ -288,7 +289,7 @@ def default_init_weights(module_list, init_type='kaiming', scale=1, bias_fill=0,
     """Initialize network weights.
     Args:
         module_list (list[nn.Module] | nn.Module): Modules to be initialized.
-        init_type (str): the type of initialization in: 'normal', 'kaiming' 
+        init_type (str): the type of initialization in: 'normal', 'kaiming'
             or 'orthogonal'
         scale (float): Scale initialized weights, especially for residual
             blocks. Default: 1. (for 'kaiming')
@@ -298,7 +299,7 @@ def default_init_weights(module_list, init_type='kaiming', scale=1, bias_fill=0,
             a and/or mode for 'kaiming'
             gain for 'orthogonal' and xavier
     """
-    
+
     # TODO
     # logger.info('Initialization method [{:s}]'.format(init_type))
     if not isinstance(module_list, list):
@@ -308,7 +309,7 @@ def default_init_weights(module_list, init_type='kaiming', scale=1, bias_fill=0,
             if init_type == 'normal':
                 weights_init_normal(m, bias_fill=bias_fill, **kwargs)
             if init_type == 'xavier':
-                weights_init_xavier(m, scale=scale, bias_fill=bias_fill, **kwargs)    
+                weights_init_xavier(m, scale=scale, bias_fill=bias_fill, **kwargs)
             elif init_type == 'kaiming':
                 weights_init_kaiming(m, scale=scale, bias_fill=bias_fill, **kwargs)
             elif init_type == 'orthogonal':
@@ -319,7 +320,7 @@ def default_init_weights(module_list, init_type='kaiming', scale=1, bias_fill=0,
 
 
 ####################
-# Upsampler
+# Scaling
 ####################
 
 class Upsample(nn.Module):
@@ -341,11 +342,7 @@ class Upsample(nn.Module):
             those pixels. This only has effect when :attr:`mode` is
             ``'linear'``, ``'bilinear'``, or ``'trilinear'``. Default: ``False``
     """
-    # To prevent warning: nn.Upsample is deprecated
-    # https://discuss.pytorch.org/t/which-function-is-better-for-upsampling-upsampling-or-interpolate/21811/8
-    # From: https://pytorch.org/docs/stable/_modules/torch/nn/modules/upsampling.html#Upsample
-    # Alternative: https://discuss.pytorch.org/t/using-nn-function-interpolate-inside-nn-sequential/23588/2?u=ptrblck
-    
+
     def __init__(self, size=None, scale_factor=None, mode="nearest", align_corners=None):
         super(Upsample, self).__init__()
         if isinstance(scale_factor, tuple):
@@ -356,11 +353,15 @@ class Upsample(nn.Module):
         self.size = size
         self.align_corners = align_corners
         # self.interp = nn.functional.interpolate
-    
+
     def forward(self, x):
-        return nn.functional.interpolate(x, size=self.size, scale_factor=self.scale_factor, mode=self.mode, align_corners=self.align_corners)
-        # return self.interp(x, size=self.size, scale_factor=self.scale_factor, mode=self.mode, align_corners=self.align_corners)
-    
+        return nn.functional.interpolate(
+            x, size=self.size, scale_factor=self.scale_factor,
+            mode=self.mode, align_corners=self.align_corners)
+        # return self.interp(x, size=self.size,
+        #     scale_factor=self.scale_factor, mode=self.mode,
+        #     align_corners=self.align_corners)
+
     def extra_repr(self):
         if self.scale_factor is not None:
             info = 'scale_factor=' + str(self.scale_factor)
@@ -369,14 +370,15 @@ class Upsample(nn.Module):
         info += ', mode=' + self.mode
         return info
 
-def pixelshuffle_block(in_nc, out_nc, upscale_factor=2, kernel_size=3, stride=1, bias=True, \
-                        pad_type='zero', norm_type=None, act_type='relu', convtype='Conv2D'):
+
+def pixelshuffle_block(in_nc, out_nc, upscale_factor=2,
+    kernel_size=3, stride=1, bias=True, pad_type='zero',
+    norm_type=None, act_type='relu', convtype='Conv2D'):
+    """ Pixel shuffle layer.
+    (Real-Time Single Image and Video Super-Resolution Using an
+    Efficient Sub-Pixel Convolutional Neural Network, CVPR17).
     """
-    Pixel shuffle layer
-    (Real-Time Single Image and Video Super-Resolution Using an Efficient Sub-Pixel Convolutional
-    Neural Network, CVPR17)
-    """
-    conv = conv_block(in_nc, out_nc * (upscale_factor ** 2), kernel_size, stride, bias=bias, \
+    conv = conv_block(in_nc, out_nc * (upscale_factor ** 2), kernel_size, stride, bias=bias,
                         pad_type=pad_type, norm_type=None, act_type=None, convtype=convtype)
     pixel_shuffle = nn.PixelShuffle(upscale_factor)
 
@@ -384,26 +386,197 @@ def pixelshuffle_block(in_nc, out_nc, upscale_factor=2, kernel_size=3, stride=1,
     a = act(act_type) if act_type else None
     return sequential(conv, pixel_shuffle, n, a)
 
-def upconv_block(in_nc, out_nc, upscale_factor=2, kernel_size=3, stride=1, bias=True, \
-                pad_type='zero', norm_type=None, act_type='relu', mode='nearest', convtype='Conv2D'):
-    """
-    Upconv layer described in https://distill.pub/2016/deconv-checkerboard/
-    Example to replace deconvolutions: 
+
+def upconv_block(in_nc, out_nc, upscale_factor=2, kernel_size=3,
+    stride=1, bias=True, pad_type='zero', norm_type=None,
+    act_type='relu', mode='nearest', convtype='Conv2D'):
+    """ Upconv layer described in
+    https://distill.pub/2016/deconv-checkerboard/.
+    Example to replace deconvolutions:
         - from: nn.ConvTranspose2d(in_nc, out_nc, kernel_size=4, stride=2, padding=1)
         - to: upconv_block(in_nc, out_nc,kernel_size=3, stride=1, act_type=None)
     """
-    # upsample = nn.Upsample(scale_factor=upscale_factor, mode=mode)
     upscale_factor = (1, upscale_factor, upscale_factor) if convtype == 'Conv3D' else upscale_factor
-    upsample = Upsample(scale_factor=upscale_factor, mode=mode) #Updated to prevent the "nn.Upsample is deprecated" Warning
-    conv = conv_block(in_nc, out_nc, kernel_size, stride, bias=bias, \
-                        pad_type=pad_type, norm_type=norm_type, act_type=act_type, convtype=convtype)
+    upsample = Upsample(scale_factor=upscale_factor, mode=mode)
+    conv = conv_block(in_nc, out_nc, kernel_size, stride, bias=bias,
+        pad_type=pad_type, norm_type=norm_type, act_type=act_type,
+        convtype=convtype)
     return sequential(upsample, conv)
+
+
+class DepthToSpace(nn.Module):
+    """ PixelShuffle / DepthToSpace / unsqueeze2d.
+    Rearranges data from depth into blocks of spatial data. This is
+    the reverse transformation of SpaceToDepth. More specifically,
+    this op outputs a copy of the input tensor where values from the
+    depth dimension are moved in spatial blocks to the height and width
+    dimensions.
+
+    Args:
+        block_size (int): indicates the  input block size and how the
+            data is moved. In SR its equivalent to the scale factor.
+        form: select tensorflow ('tf') or pytorch ('pt') style shuffle.
+    """
+    def __init__(self, block_size:int=2, form:str='pt'):
+        super().__init__()
+        self.bs = block_size
+        self.form = form
+
+    def forward(self, x):
+        if self.form == 'tf':
+            return depth_to_space_tf(x, self.bs)
+        return depth_to_space(x, self.bs)
+
+    def extra_repr(self):
+        return f"block_size={self.bs}"
+
+
+def depth_to_space(x, bs:int=2):
+    """ Pixel shuffle (PyTorch).
+    Equivalent to torch.nn.PixelShuffle().
+    Args:
+        x (Tensor): Input tensor (b, c, h, w).
+        bs: block_size, scale factor.
+    Returns:
+        Tensor: tensor after pixel shuffle.
+    """
+    assert bs >= 1 and isinstance(bs, int)
+    if bs == 1:
+        return x
+
+    b, c, h, w = x.size()
+    if c % (bs ** 2) != 0:
+        raise ValueError("The tensor channels must be divisible by "
+                         "(bs ** 2).")
+    new_d = -1  # c // (bs ** 2)
+    new_h = h * bs
+    new_w = w * bs
+
+    # (b, c//bs^2, bs, bs, h, w)
+    x = x.view(b, new_d, bs, bs, h, w)
+    # (b, c//bs^2, h, bs, w, bs)
+    x = x.permute(0, 1, 4, 2, 5, 3).contiguous()
+    # (b, c//bs^2, h * bs, w * bs)
+    return x.view(b, new_d, new_h, new_w)
+
+
+def depth_to_space_tf(x, bs:int=2):
+    """ Pixel shuffle (TensorFlow).
+    Equivalent to:
+        https://www.tensorflow.org/api_docs/python/tf/nn/depth_to_space
+    Args:
+        x (Tensor): Input tensor (b, c, h, w).
+        bs: block_size, scale factor.
+    Returns:
+        Tensor: tensor after pixel shuffle.
+    """
+    assert bs >= 1 and isinstance(bs, int)
+    if bs == 1:
+        return x
+
+    b, c, h, w = x.size()
+    if c % (bs ** 2) != 0:
+        raise ValueError("The tensor channels must be divisible by "
+                         "(bs ** 2).")
+    new_d = -1  # c // (bs ** 2)
+    new_h = h * bs
+    new_w = w * bs
+
+    # (b, bs, bs, c//bs^2, h, w)
+    x = x.view(b, bs, bs, new_d, h, w)
+    # (b, c//bs^2, h, bs, w, bs)
+    x = x.permute(0, 3, 4, 1, 5, 2).contiguous()
+    # (b, c//bs^2, h * bs, w * bs)
+    return x.view(b, new_d, new_h, new_w)
+
+
+class SpaceToDepth(nn.Module):
+    """ PixelUnshuffle / SpaceToDepth / squeeze2d.
+    Rearranges blocks of spatial data, into depth. This operation
+    outputs a copy of the input tensor where values from the height
+    and width dimensions are moved to the depth dimension.
+
+    Args:
+        block_size: indicates the input block size, where
+            non-overlapping blocks of size block_size x block size are
+            rearranged into depth at each location. In SR its equivalent
+            to the downscale factor.
+        form: select tensorflow ('tf') or pytorch ('pt') style unshuffle.
+    """
+    def __init__(self, block_size:int=2, form:str='pt'):
+        super().__init__()
+        self.bs = block_size
+        self.form = form
+
+    def forward(self, x):
+        if self.form == 'tf':
+            return space_to_depth_tf(x, self.bs)
+        return space_to_depth(x, self.bs)
+    
+    def extra_repr(self):
+        return f"block_size={self.bs}"
+
+
+def space_to_depth(x, bs:int=2):
+    """ Pixel unshuffle (PyTorch).
+    This is the inverse of torch.nn.PixelShuffle().
+    Equivalent to nn.PixelUnshuffle().
+    Args:
+        x (Tensor): Input tensor (b, c, h, w).
+        bs: block_size, scale factor.
+    Returns:
+        Tensor: tensor after pixel unshuffle.
+    """
+    assert bs >= 1 and isinstance(bs, int)
+    if bs == 1:
+        return x
+
+    b, c, h, w = x.size()
+    assert h % bs == 0 and w % bs == 0, "{}".format((h, w, bs))
+    new_d = -1  # c * (bs**2)
+    new_h = h // bs
+    new_w = w // bs
+
+    # (b, c, h//bs, bs, w//bs, bs)
+    x = x.view(b, c, new_h, bs, new_w, bs)
+    # (b, c, bs, bs, h//bs, w//bs)
+    x = x.permute(0, 1, 3, 5, 2, 4).contiguous()
+    # (b, c*bs^2, h//bs, w//bs)
+    return x.view(b, new_d, new_h, new_w)
+
+
+def space_to_depth_tf(x, bs:int=2):
+    """ Pixel unshuffle (TensorFlow).
+    Equivalent to:
+        https://www.tensorflow.org/api_docs/python/tf/nn/space_to_depth
+    Args:
+        x (Tensor): Input tensor (b, c, h, w).
+        bs: block_size, scale factor.
+    Returns:
+        Tensor: tensor after pixel unshuffle.
+    """
+    assert bs >= 1 and isinstance(bs, int)
+    if bs == 1:
+        return x
+
+    b, c, h, w = x.size()
+    assert h % bs == 0 and w % bs == 0, "{}".format((h, w, bs))
+    new_d = -1  # c * (bs**2)
+    new_h = h // bs
+    new_w = w // bs
+
+    # (b, c, h//bs, bs, w//bs, bs)
+    x = x.view(b, c, new_h, bs, new_w, bs)
+    # (b, bs, bs, c, h//bs, w//bs)
+    x = x.permute(0, 3, 5, 1, 2, 4).contiguous()
+    # (b, c*bs^2, h//bs, w//bs)
+    return x.view(b, new_d, new_h, new_w)
+
 
 # PPON
 def conv_layer(in_channels, out_channels, kernel_size, stride=1, dilation=1, groups=1):
     padding = int((kernel_size - 1) / 2) * dilation
     return nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding=padding, bias=True, dilation=dilation, groups=groups)
-
 
 
 
@@ -423,7 +596,7 @@ class GaussianNoise(nn.Module):
             scale = self.sigma * x.detach() if self.is_relative_detach else self.sigma * x
             sampled_noise = self.noise.repeat(*x.size()).normal_() * scale
             x = x + sampled_noise
-        return x 
+        return x
 
 def conv1x1(in_planes, out_planes, stride=1):
     return nn.Conv2d(in_planes, out_planes, kernel_size=1, stride=stride, bias=False)
@@ -472,14 +645,16 @@ class minibatch_std_concat_layer(nn.Module):
 ####################
 
 class SelfAttentionBlock(nn.Module):
-    """ 
-        Implementation of Self attention Block according to paper 
-        'Self-Attention Generative Adversarial Networks' (https://arxiv.org/abs/1805.08318)
+    """
+        Implementation of Self attention Block according to paper
+        'Self-Attention Generative Adversarial Networks'
+        (https://arxiv.org/abs/1805.08318)
         Flexible Self Attention (FSA) layer according to paper
-        Efficient Super Resolution For Large-Scale Images Using Attentional GAN (https://arxiv.org/pdf/1812.04821.pdf)
-          The FSA layer borrows the self attention layer from SAGAN, 
-          and wraps it with a max-pooling layer to reduce the size 
-          of the feature maps and enable large-size images to fit in memory.
+        Efficient Super Resolution For Large-Scale Images Using
+            Attentional GAN (https://arxiv.org/pdf/1812.04821.pdf)
+            The FSA layer borrows the self attention layer from SAGAN,
+            and wraps it with a max-pooling layer to reduce the size
+            of the feature maps and enable large-size images to fit in memory.
         Used in Generator and Discriminator Networks.
     """
 
@@ -490,7 +665,7 @@ class SelfAttentionBlock(nn.Module):
         self.max_pool = max_pool
         self.poolsize = poolsize
         self.ret_attention = ret_attention
-        
+
         if self.max_pool:
             self.pooled = nn.MaxPool2d(kernel_size=self.poolsize, stride=self.poolsize) #kernel_size=4, stride=4
             # Note: can test using strided convolutions instead of MaxPool2d! :
@@ -500,56 +675,65 @@ class SelfAttentionBlock(nn.Module):
             ## upsample_o.append(nn.Conv2d(nf, in_nc, kernel_size=9, stride=1, padding=4))
             ## self.upsample_o = nn.Sequential(*upsample_o)
 
-            # self.upsample_o = B.Upsample(scale_factor=self.poolsize, mode='bilinear', align_corners=False) 
-            
+            # self.upsample_o = B.Upsample(scale_factor=self.poolsize, mode='bilinear', align_corners=False)
+
         self.conv_f = add_spectral_norm(
-            nn.Conv1d(in_channels = in_dim , out_channels = in_dim//8 , kernel_size= 1, padding = 0), 
-            use_spectral_norm=spectral_norm) #query_conv 
+            nn.Conv1d(in_channels=in_dim, out_channels=in_dim//8,
+                kernel_size=1, padding=0),
+            use_spectral_norm=spectral_norm)  # query_conv
         self.conv_g = add_spectral_norm(
-            nn.Conv1d(in_channels = in_dim , out_channels = in_dim//8 , kernel_size= 1, padding = 0), 
-            use_spectral_norm=spectral_norm) #key_conv 
+            nn.Conv1d(in_channels=in_dim, out_channels=in_dim//8,
+                kernel_size=1, padding=0),
+            use_spectral_norm=spectral_norm)  # key_conv
         self.conv_h = add_spectral_norm(
-            nn.Conv1d(in_channels = in_dim , out_channels = in_dim , kernel_size= 1, padding = 0), 
-            use_spectral_norm=spectral_norm) #value_conv 
+            nn.Conv1d(in_channels=in_dim, out_channels=in_dim,
+                kernel_size=1, padding=0),
+            use_spectral_norm=spectral_norm)  # value_conv
 
         self.gamma = nn.Parameter(torch.zeros(1)) # Trainable interpolation parameter
         self.softmax  = nn.Softmax(dim = -1)
-        
+
     def forward(self,input):
         """
             inputs :
                 input : input feature maps( B X C X W X H)
             returns :
-                out : self attention value + input feature 
+                out : self attention value + input feature
                 attention: B X N X N (N is Width*Height)
         """
-        
-        if self.max_pool: #Downscale with Max Pool
+
+        if self.max_pool:  # Downscale with Max Pool
             x = self.pooled(input)
         else:
             x = input
-            
+
         batch_size, C, width, height = x.size()
-        
+
         N = width * height
         x = x.view(batch_size, -1, N)
-        f = self.conv_f(x) #proj_query  # B X CX(N)
-        g = self.conv_g(x) #proj_key    # B X C x (*W*H)
-        h = self.conv_h(x) #proj_value  # B X C X N
+        f = self.conv_f(x)  # proj_query  # B X CX(N)
+        g = self.conv_g(x)  # proj_key    # B X C x (*W*H)
+        h = self.conv_h(x)  # proj_value  # B X C X N
 
-        s = torch.bmm(f.permute(0, 2, 1), g) # energy, transpose check
+        # energy, transpose check
+        s = torch.bmm(f.permute(0, 2, 1), g)
         # get probabilities
-        attention = self.softmax(s) #beta #attention # BX (N) X (N) 
-        
+        # beta #attention # BX (N) X (N)
+        attention = self.softmax(s)
+
         out = torch.bmm(h, attention.permute(0,2,1))
-        out = out.view(batch_size, C, width, height) 
-        
-        if self.max_pool: #Upscale to original size
+        out = out.view(batch_size, C, width, height)
+
+        if self.max_pool:
+            # Upscale to original size
             # out = self.upsample_o(out)
-            out = Upsample(size=(input.shape[2],input.shape[3]), mode='bicubic', align_corners=False)(out) #bicubic (PyTorch > 1.0) | bilinear others.
-        
-        out = self.gamma*out + input #Add original input
-        
+            out = Upsample(
+                size=(input.shape[2],input.shape[3]),
+                mode='bicubic', align_corners=False)(out)
+
+        # add original input
+        out = self.gamma*out + input
+
         if self.ret_attention:
             return out, attention
         else:
