@@ -287,6 +287,10 @@ class BaseModel:
                 # set learning rate
                 self._set_lr(warm_up_lr_l)
 
+        self.optGstep = False
+        if self.cri_gan:
+            self.optDstep = False
+
     def get_current_learning_rate(self, current_step=None):
         if torch.__version__ >= '1.4.0':
             # Note: SWA only works for torch.__version__ >= '1.6.0'
@@ -705,7 +709,8 @@ class BaseModel:
 
         if virtual_batch and virtual_batch > batch_size:
             self.virtual_batch = virtual_batch
-            logger.info("Virtual batch enabled")
+            logger.info("Virtual batch enabled. Factor: "
+                        f"{self.virtual_batch // batch_size}")
         else:
             self.virtual_batch = batch_size
         self.accumulations = self.virtual_batch // batch_size
@@ -776,7 +781,8 @@ class BaseModel:
         in gradients, otherwise the step will be skipped and GradScaler's
         scale is updated for next iteration.
         """
-        if (step + 1) % self.accumulations == 0:
+        if (step) % self.accumulations == 0:
+            # Note: changed from (step + 1) to (step)
             if self.amp:
                 self.amp_scaler.step(optimizer)
                 self.amp_scaler.update()

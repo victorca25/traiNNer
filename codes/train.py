@@ -226,7 +226,8 @@ def fit(model, opt, dataloaders, steps_states, data_params, loggers):
 
                 virtual_step += 1
                 take_step = False
-                if virtual_step > 0 and virtual_step * batch_size % virtual_batch_size == 0:
+                if (virtual_step > 0 and
+                    virtual_step * batch_size % virtual_batch_size == 0):
                     current_step += 1
                     take_step = True
                     if current_step > total_iters:
@@ -275,14 +276,18 @@ def fit(model, opt, dataloaders, steps_states, data_params, loggers):
 
                 # update learning rate
                 if model.optGstep and model.optDstep and take_step:
-                    model.update_learning_rate(current_step, warmup_iter=opt['train'].get('warmup_iter', -1))
+                    model.update_learning_rate(
+                        current_step, warmup_iter=opt['train'].get('warmup_iter', -1))
 
                 # save latest models and training states every <save_checkpoint_freq> iterations
                 if current_step % opt['logger']['save_checkpoint_freq'] == 0 and take_step:
                     if model.swa: 
-                        model.save(current_step, opt['logger']['overwrite_chkp'], loader=dataloaders['train'])
+                        model.save(
+                            current_step, opt['logger']['overwrite_chkp'],
+                            loader=dataloaders['train'])
                     else:
-                        model.save(current_step, opt['logger']['overwrite_chkp'])
+                        model.save(
+                            current_step, opt['logger']['overwrite_chkp'])
                     model.save_training_state(
                         epoch=epoch + (n >= len(dataloaders['train'])),
                         iter_step=current_step,
