@@ -114,7 +114,10 @@ class PPONModel(SRModel):
         Can be used either with 'data' passed directly or loaded 'self.var_L'.
         """
         if isinstance(data, torch.Tensor):
-            PPON_out = self.netG(data)  # G(LR)
+            if self.unshuffle is not None:
+                PPON_out = self.netG(self.unshuffle(data))
+            else:
+                PPON_out = self.netG(data)  # G(LR)
             if self.phase == 'p1':
                 return PPON_out[0]
             elif self.phase == 'p2':
@@ -122,7 +125,10 @@ class PPONModel(SRModel):
             else:  # 'p3'
                 return PPON_out[2]
 
-        PPON_out = self.netG(self.var_L)  # G(LR)
+        if self.unshuffle is not None:
+            PPON_out = self.netG(self.unshuffle(self.var_L))
+        else:
+            PPON_out = self.netG(self.var_L)  # G(LR)
         if self.phase == 'p1':
             self.fake_H = PPON_out[0]
         elif self.phase == 'p2':
@@ -153,6 +159,12 @@ class PPONModel(SRModel):
                 self.switch_atg(True)
             else:
                 self.switch_atg(False)
+
+        # match HR resolution for batchaugment = cutblur
+        if self.upsample:
+            # TODO: assumes model and process scale == 4x
+            self.var_L = torch.nn.functional.interpolate(
+                self.var_L, scale_factor=self.upsample, mode="nearest")
 
         # batch (mixup) augmentations
         if self.mixup:

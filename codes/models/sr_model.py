@@ -104,6 +104,9 @@ class SRModel(BaseModel):
             # initialize CEM and wrap training generator
             self.setup_cem()
 
+            # setup unshuffle wrapper
+            self.setup_unshuffle()
+
         # print network
         # TODO: pass verbose flag from config file
         self.print_network(verbose=False)
@@ -137,16 +140,22 @@ class SRModel(BaseModel):
             if CEM_net is not None:
                 wrapped_netG = CEM_net.WrapArchitecture(self.netG)
                 return wrapped_netG(data)
+            elif self.unshuffle is not None:
+                return self.netG(self.unshuffle(data))
             else:
                 return self.netG(data)
 
         if CEM_net is not None:
             wrapped_netG = CEM_net.WrapArchitecture(self.netG)
             self.fake_H = wrapped_netG(self.var_L)  # G(LR)
+        elif self.unshuffle is not None:
+            self.fake_H = self.netG(self.unshuffle(self.var_L))
         else:
-            if self.outm:  # if the model has the final activation option
+            if self.outm:
+                # if the model has the final activation option
                 self.fake_H = self.netG(self.var_L, outm=self.outm)
-            else:  # regular models without the final activation option
+            else:
+                # regular models without the final activation option
                 self.fake_H = self.netG(self.var_L)  # G(LR)
 
     def backward_G(self):
@@ -197,6 +206,12 @@ class SRModel(BaseModel):
                 self.switch_atg(True)
             else:
                 self.switch_atg(False)
+
+        # match HR resolution for batchaugment = cutblur
+        if self.upsample:
+            # TODO: assumes model and process scale == 4x
+            self.var_L = nn.functional.interpolate(
+                self.var_L, scale_factor=self.upsample, mode="nearest")
 
         # batch (mixup) augmentations
         if self.mixup:

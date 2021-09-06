@@ -13,6 +13,7 @@ from . import swa
 from .losses import Adversarial
 
 from models.networks import model_val, cem2normal, define_ext
+from models.modules.architectures.block import SpaceToDepth
 from models.modules.architectures.CEM import CEMnet
 from models.modules.adatarget.atg import AdaTarget
 from dataops.batchaug import BatchAugment
@@ -87,6 +88,8 @@ class BaseModel:
         self.swa_start_iter = None
         self.metric = 0  # used for learning rate policy 'plateau'
         self.batchaugment = None
+        self.upsample = False
+        self.unshuffle = None
 
     def feed_data(self, data: dict):
         """Unpack input data from the dataloader and perform necessary
@@ -370,8 +373,8 @@ class BaseModel:
             torch.save(state_dict, save_path)
 
     def load_network(self, load_path:str, network:nn.Module,
-            strict:bool=True, submodule:str=None,
-            model_type:str=None, param_key:str=None):
+        strict:bool=True, submodule:str=None,
+        model_type:str=None, param_key:str=None):
         """
         Load pretrained model into instantiated network.
         :param load_path: The path of model to be loaded into the network.
@@ -402,6 +405,15 @@ class BaseModel:
         # load specific keys of the model
         if param_key is not None:
             load_net = load_net[param_key]
+
+        # when layer names match, but shapes don't:
+        # validate loaded_net and network layer sizes
+        network_dict = network.state_dict()
+        load_net = {
+            k:v if v.size() == network_dict[k].size()
+            else network_dict[k]
+            for k, v in zip(network_dict.keys(), load_net.values())
+            }
 
         # remove unnecessary 'module.' if needed
         # for k, v in deepcopy(load_net).items():
@@ -604,8 +616,11 @@ class BaseModel:
         train_opt = self.opt['train']
         self.mixup = train_opt.get('mixup')
         if self.mixup:
-            # TODO: cutblur needs model to be modified so LR and HR have the same dimensions (1x)
             self.batchaugment = BatchAugment(train_opt)
+            if "cutblur" in self.batchaugment.mixopts:
+                # cutblur needs LR and HR to have the same dimensions (1x)
+                if self.opt["scale"] != 1:
+                    self.upsample = self.opt["scale"]
             logger.info("Batch augmentations enabled")
 
     def setup_fs(self):
@@ -744,6 +759,14 @@ class BaseModel:
                 self.netG,
                 training_patch_size=self.opt['datasets']['train']['crop_size'])
             logger.info("CEM enabled")
+
+    def setup_unshuffle(self):
+        unshuffle_scale = self.opt.get("unshuffle_scale")
+        unshuffle = self.opt.get("use_unshuffle")
+        if unshuffle and unshuffle_scale:
+            self.unshuffle = SpaceToDepth(unshuffle_scale)
+            logger.info("Pixel Unshuffle wrapper enabled. "
+                        f"Scale: {unshuffle_scale}")
 
     def switch_atg(self, train=False):
         if not train and self.atg_train:

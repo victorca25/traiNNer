@@ -351,7 +351,7 @@ def define_F(opt):
         netF = perceptual.ResNet101FeatureExtractor(
             use_input_norm=use_input_norm, device=device, z_norm=z_norm)
     else:
-        #VGG network (default)
+        # VGG network (default)
         netF = perceptual.FeatureExtractor(
             listen_list=listen_list, net=net,
             use_input_norm=use_input_norm, z_norm=z_norm,

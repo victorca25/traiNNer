@@ -16,6 +16,22 @@ def get_network_G_config(network_G, scale, crop_size):
     full_network_G = {}
     full_network_G['strict'] = network_G.pop('strict', False) # True | False: whether to load the model in strict mode or not
 
+    if "unshuffle" in network_G and network_G["unshuffle"]:
+        if "unshuffle_scale" in network_G:
+            unshuffle_scale = network_G["unshuffle_scale"]
+        else:
+            net_scale = network_G.get("scale")
+            if net_scale and net_scale != scale:
+                unshuffle_scale = net_scale // scale
+            else:
+                # raise ValueError("Unshuffle scale could not be inferred.")
+                unshuffle_scale = None
+
+        full_network_G["unshuffle_scale"] = unshuffle_scale
+        in_nc = network_G.get('in_nc', 3)
+        if unshuffle_scale and in_nc == 3 or in_nc == 1:
+            network_G["in_nc"] = in_nc * unshuffle_scale**2
+
     # SR networks
     if kind_G in ('rrdb_net', 'esrgan', 'evsrgan', 'esrgan-lite'):
         # ESRGAN (or EVSRGAN):
@@ -375,8 +391,22 @@ def get_network_defaults(opt, is_train):
 
     # network_G:
     network_G = opt.pop('network_G', None)
+
+    use_unshuffle = opt.get('use_unshuffle')
+    if use_unshuffle and "unshuffle" not in network_G:
+        network_G["unshuffle"] = True
+        unshuffle_scale = opt.get('unshuffle_scale')
+        # inject unshuffle config to get correct in_nc
+        if unshuffle_scale and "unshuffle_scale" not in network_G:
+            network_G["unshuffle_scale"] = unshuffle_scale
+
     network_G = get_network_G_config(network_G, scale, crop_size)
     model_G = network_G['type']
+
+    if "unshuffle_scale" in network_G:
+        # make unshuffle scale a global param
+        opt["unshuffle_scale"] = network_G.pop("unshuffle_scale")
+
     opt['network_G'] = network_G
 
     # network_D:
