@@ -1,6 +1,6 @@
 # Using Pixel-Unshuffle wrapper
 
-It is possible to enable a "Pixel-Unshuffle" (also known as: Inverse [Pixel Shuffle](https://arxiv.org/pdf/1609.05158v2.pdf), Space to Depth, etc) which allows to convert an image tensor of shape `(∗, C, H × r, W × r)` to a tensor of shape `(∗, C × r^2, H, W)`, where `r` is a downsscale factor (or block size).
+It is possible to enable a "Pixel-Unshuffle" (also known as: Inverse [Pixel Shuffle](https://arxiv.org/pdf/1609.05158v2.pdf), Space to Depth, etc) which allows to convert an image tensor of shape `(∗, C, H × r, W × r)` to a tensor of shape `(∗, C × r^2, H, W)`, where `r` is a downscale factor (or block size).
 
 <p align="center">
     <a href="https://paperswithcode.com/method/pixelshuffle#">
@@ -46,7 +46,7 @@ use_unshuffle: true
 unshuffle_scale": 4
 ```
 
-One caveat with this option is that at the moment LR and HR validation images must be provided at the same resolution, since the nearest-neighbor upscale is not being applied automatically at the moment.
+One caveat with this option is that at the moment LR and HR validation images must be provided at the same resolution, since the nearest-neighbor upscale is not being applied automatically to validation images at the moment.
 
 Note that at this time, this is the only supported configuration for Cutblur. A pretrained  `4x_cutblur.pth` model is available [here](https://drive.google.com/drive/folders/1AsJmeA7UWSTBmWOliCEWgpr_k_q0Ccxc?usp=sharing).
 
