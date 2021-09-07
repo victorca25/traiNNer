@@ -90,4 +90,8 @@ Pretrained models for both 1x and 2x ESRGAN models are available [here](https://
 
 ## Real-ESRGAN
 
-Note that `Real-ESRGAN` used this same approach for 2x and 1x models, keeping the original 4x network scale, but unnecessarily changes the names of the network parameters, so they cannot be loaded directly. For this reason, the rESRGAN models with the original parameter names can be found [here](https://drive.google.com/drive/folders/11Vg7l-WItpdTneg-l5heHgwW-DecdRbA?usp=sharing). The 2x model can be loaded using the above 2x scale models Pixel-Unshuffle configuration, however, these models are not compatible to interpolate with the models from the model database.
+Note that `Real-ESRGAN` used this same approach for 2x and 1x models, keeping the original 4x network scale, but unnecessarily changes the names of the network parameters, so they cannot be loaded directly. For this reason, the rESRGAN models with the original parameter names can be found [here](https://drive.google.com/drive/folders/11Vg7l-WItpdTneg-l5heHgwW-DecdRbA?usp=sharing). The 2x model can be loaded using the above 2x scale models Pixel-Unshuffle configuration, however, these models are not compatible to interpolate with the models from the model database. The 4x anime model (`RealESRGAN_x4plus_anime_6B.pth`) was trained using 6 blocks (`nb=6`) in the network, which can be configured using:
+
+```yaml
+    which_model_G: esrgan-mid
+```

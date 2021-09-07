@@ -33,7 +33,7 @@ def get_network_G_config(network_G, scale, crop_size):
             network_G["in_nc"] = in_nc * unshuffle_scale**2
 
     # SR networks
-    if kind_G in ('rrdb_net', 'esrgan', 'evsrgan', 'esrgan-lite'):
+    if kind_G in ('rrdb_net', 'esrgan', 'evsrgan', 'esrgan-lite', 'esrgan-anime-lite', 'esrgan-mid'):
         # ESRGAN (or EVSRGAN):
         full_network_G['type'] = "rrdb_net" # RRDB_net (original ESRGAN arch)
         full_network_G['norm_type'] = network_G.pop('norm_type', None)  # "instance" normalization, "batch" normalization or no norm
@@ -41,6 +41,9 @@ def get_network_G_config(network_G, scale, crop_size):
         if kind_G == 'esrgan-lite':
             full_network_G['nf'] = network_G.pop('nf', 32)  # number of filters in the first conv layer
             full_network_G['nb'] = network_G.pop('nb', 12)  # number of RRDB blocks
+        if kind_G in ('esrgan-anime-lite', 'esrgan-mid'):
+            full_network_G['nf'] = network_G.pop('nf', 64)  # number of filters in the first conv layer
+            full_network_G['nb'] = network_G.pop('nb', 6)  # number of RRDB blocks
         else:
             full_network_G['nf'] = network_G.pop('nf', 64)  # number of filters in the first conv layer
             full_network_G['nb'] = network_G.pop('nb', 23)  # number of RRDB blocks
