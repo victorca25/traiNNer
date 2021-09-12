@@ -522,14 +522,20 @@ class GramMatrix(nn.Module):
 
 class FFTloss(nn.Module):
     """Frequency loss."""
-    def __init__(self, loss_f = nn.L1Loss, reduction='mean'):
+    def __init__(self, loss_f=nn.L1Loss, reduction='mean'):
         super(FFTloss, self).__init__()
         self.criterion = loss_f(reduction=reduction)
 
     def forward(self, img1, img2):
         zeros=torch.zeros(img1.size()).to(img1.device)
+        # Pytorch < 1.9.0
+        # return self.criterion(
+        #     torch.fft(torch.stack((img1, zeros),-1),2),
+        #     torch.fft(torch.stack((img2, zeros),-1),2))
+        # Pytorch >= 1.9.0
         return self.criterion(
-            torch.fft(torch.stack((img1,zeros),-1),2),torch.fft(torch.stack((img2,zeros),-1),2))
+            torch.fft.fft(torch.stack((img1, zeros),-1),2),
+            torch.fft.fft(torch.stack((img2, zeros),-1),2))
 
 
 class OFLoss(nn.Module):
@@ -544,10 +550,10 @@ class OFLoss(nn.Module):
         self.legit_range = legit_range
         self.out_norm = out_norm
 
-    def forward(self, img1):
+    def forward(self, x):
         norm = get_outnorm(x, self.out_norm)
-        img_clamp = img1.clamp(self.legit_range[0], self.legit_range[1])
-        return torch.log((img1 - img_clamp).abs() + 1).sum() * norm
+        img_clamp = x.clamp(self.legit_range[0], self.legit_range[1])
+        return torch.log((x - img_clamp).abs() + 1).sum() * norm
 
 
 class RangeLoss(nn.Module):

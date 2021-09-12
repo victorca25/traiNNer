@@ -55,10 +55,8 @@ class VSRModel(BaseModel):
 
             # initialize losses
             # generator losses:
-            # for the losses that don't require high precision (can use half precision)
             self.generatorlosses = losses.GeneratorLoss(opt, self.device)
-            # for losses that need high precision (use out of the AMP context)
-            self.precisegeneratorlosses = losses.PreciseGeneratorLoss(opt, self.device)
+
             # TODO: show the configured losses names in logger
             # print(self.generatorlosses.loss_list)
 
@@ -220,8 +218,8 @@ class VSRModel(BaseModel):
 
                 # regular losses
                 # loss_SR = criterion(self.fake_H, self.real_H[:, idx_center, :, :, :]) #torch.nn.MSELoss()
-                loss_results, self.log_dict = self.generatorlosses(centralSR, 
-                                    centralHR, self.log_dict, self.f_low)
+                loss_results, self.log_dict = self.generatorlosses(
+                    centralSR, centralHR, self.log_dict, self.f_low)
                 l_g_total += sum(loss_results)/self.accumulations
 
                 # optical flow reconstruction loss
@@ -231,13 +229,16 @@ class VSRModel(BaseModel):
                     l_g_ofr = 0
                     for i in range(self.n_frames):
                         if i != self.idx_center:
-                            loss_L1 = self.cri_ofr(F.avg_pool2d(self.var_L[:, i, :, :, :], kernel_size=2),
+                            loss_L1 = self.cri_ofr(
+                                F.avg_pool2d(self.var_L[:, i, :, :, :], kernel_size=2),
                                 F.avg_pool2d(self.var_L[:, self.idx_center, :, :, :], kernel_size=2),
                                 flow_L1[i])
                             loss_L2 = self.cri_ofr(
-                                self.var_L[:, i, :, :, :], self.var_L[:, self.idx_center, :, :, :], flow_L2[i])
+                                self.var_L[:, i, :, :, :],
+                                self.var_L[:, self.idx_center, :, :, :], flow_L2[i])
                             loss_L3 = self.cri_ofr(
-                                self.real_H[:, i, :, :, :], self.real_H[:, self.idx_center, :, :, :], flow_L3[i])
+                                self.real_H[:, i, :, :, :],
+                                self.real_H[:, self.idx_center, :, :, :], flow_L3[i])
                             # ofr weights option. lambda2 = 0.2, lambda1 = 0.1 in the paper
                             l_g_ofr += loss_L3 + self.ofr_wl2 * loss_L2 + self.ofr_wl1 * loss_L1
 
@@ -257,10 +258,11 @@ class VSRModel(BaseModel):
             #/with self.cast():
 
             # high precision generator losses (can be affected by AMP half precision)
-            if self.precisegeneratorlosses.loss_list:
-                precise_loss_results, self.log_dict = self.precisegeneratorlosses(
-                        centralSR, centralHR, self.log_dict, self.f_low)
-                l_g_total += sum(precise_loss_results)/self.accumulations
+            if self.generatorlosses.precise_loss_list:
+                loss_results, self.log_dict = self.generatorlosses(
+                    centralSR, centralHR, self.log_dict, self.f_low,
+                    precise=True)
+                l_g_total += sum(loss_results)/self.accumulations
 
             # calculate G gradients
             self.calc_gradients(l_g_total)

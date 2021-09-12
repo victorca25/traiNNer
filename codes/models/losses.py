@@ -526,51 +526,29 @@ class Adversarial(nn.Module):
 
 
 class GeneratorLoss(nn.Module):
+    """ Generator loss builder.
+    Instantiates all configured losses. Also separately instantiates
+    losses that require high precision calculations and cannot be
+    inside the AMP context.
+    """
     def __init__(self, opt=None, device:str='cpu',
         allow_featnets:bool=True):
         super(GeneratorLoss, self).__init__()
 
         train_opt = opt['train']
 
-        #TODO: these checks can be moved to options.py when everything is stable
+        # TODO: these checks can be moved to options.py when everything is stable
         # parsing the losses options
         pixel_weight = train_opt.get('pixel_weight', 0)
         pixel_criterion = train_opt.get('pixel_criterion', None) # 'skip'
 
-        if allow_featnets:
-            feature_weight = train_opt.get('feature_weight', 0)
-            style_weight = train_opt.get('style_weight', 0)
-            feat_opts = train_opt.get("perceptual_opt")
-            if feat_opts:
-                feature_network = feat_opts.get('feature_network', 'vgg19')
-            else:
-                feature_network = train_opt.get('feature_network', 'vgg19')
-            feature_criterion = check_loss_names(
-                feature_criterion=train_opt['feature_criterion'],
-                feature_network=feature_network)
-        else:
-            feature_weight = 0
-            style_weight = 0
-        
         hfen_weight = train_opt.get('hfen_weight', 0)
-        hfen_criterion = check_loss_names(hfen_criterion=train_opt['hfen_criterion'])
-
-        # grad_weight = train_opt.get('grad_weight', 0)
-        # grad_type = train_opt.get('grad_type', None) 
+        hfen_criterion = check_loss_names(
+            hfen_criterion=train_opt['hfen_criterion'])
 
         tv_weight = train_opt.get('tv_weight', 0)
-        tv_type = check_loss_names(tv_type=train_opt['tv_type'], tv_norm=train_opt['tv_norm'])
-
-        # ssim_weight = train_opt.get('ssim_weight', 0)
-        # ssim_type = train_opt.get('ssim_type', None)
-
-        if allow_featnets:
-            lpips_weight = train_opt.get('lpips_weight', 0)
-            lpips_network = train_opt.get('lpips_net', 'vgg')
-            lpips_type = train_opt.get('lpips_type', 'net-lin')
-            lpips_criterion = check_loss_names(lpips_criterion=train_opt['lpips_type'], lpips_network=lpips_network)
-        else:
-            lpips_weight = 0
+        tv_type = check_loss_names(
+            tv_type=train_opt['tv_type'], tv_norm=train_opt['tv_norm'])
 
         color_weight = train_opt.get('color_weight', 0)
         color_criterion = train_opt.get('color_criterion', None)
@@ -600,17 +578,56 @@ class GeneratorLoss(nn.Module):
             gpl_type = 'gpl'
             gpl_weight = spl_weight
 
+        of_weight = train_opt.get('of_weight', 0)
+        of_type = train_opt.get('of_type', None)
+
         if allow_featnets:
+            # feature and style losses
+            feature_weight = train_opt.get('feature_weight', 0)
+            style_weight = train_opt.get('style_weight', 0)
+            feat_opts = train_opt.get("perceptual_opt")
+            if feat_opts:
+                feature_network = feat_opts.get(
+                    'feature_network', 'vgg19')
+            else:
+                feature_network = train_opt.get(
+                    'feature_network', 'vgg19')
+            feature_criterion = check_loss_names(
+                feature_criterion=train_opt['feature_criterion'],
+                feature_network=feature_network)
+
+            # lpips loss
+            lpips_weight = train_opt.get('lpips_weight', 0)
+            lpips_network = train_opt.get('lpips_net', 'vgg')
+            lpips_type = train_opt.get('lpips_type', 'net-lin')
+            lpips_criterion = check_loss_names(
+                lpips_criterion=train_opt['lpips_type'],
+                lpips_network=lpips_network)
+
+            # contextual loss
             cx_weight = train_opt.get('cx_weight', 0)
             cx_type = train_opt.get('cx_type', None)
         else:
+            feature_weight = 0
+            style_weight = 0
+            lpips_weight = 0
             cx_weight = 0
 
-        # fft_weight = train_opt.get('fft_weight', 0)
-        # fft_type = train_opt.get('fft_type', None)
+        # Precise losses
+        grad_weight = train_opt.get('grad_weight', 0)
+        grad_type = train_opt.get('grad_type', None)
 
-        of_weight = train_opt.get('of_weight', 0)
-        of_type = train_opt.get('of_type', None)
+        ssim_weight = train_opt.get('ssim_weight', 0)
+        ssim_type = train_opt.get('ssim_type', None)
+
+        fft_weight = train_opt.get('fft_weight', 0)
+        fft_type = train_opt.get('fft_type', None)
+
+        fdpl_weight = train_opt.get('fdpl_weight', 0)
+        fdpl_type = train_opt.get('fdpl_type', None)
+
+        range_weight = train_opt.get('range_weight', 0)
+        range_type = 'range'
 
         # building the loss
         self.loss_list = []
@@ -624,34 +641,26 @@ class GeneratorLoss(nn.Module):
             cri_hfen = get_loss_fn(
                 hfen_criterion, hfen_weight, device=device)
             self.loss_list.append(cri_hfen)
-        
-        # if grad_weight > 0 and grad_type:
-        #     cri_grad = get_loss_fn(
-        #          grad_type, grad_weight, device=device)
-        #     self.loss_list.append(cri_grad)
 
-        # if ssim_weight > 0 and ssim_type:
-        #     cri_ssim = get_loss_fn(
-        #           ssim_type, ssim_weight, opt=train_opt,
-        #           allow_featnets=allow_featnets, device=device)
-        #     self.loss_list.append(cri_ssim)
-        
         if tv_weight > 0 and tv_type:
-            cri_tv = get_loss_fn(tv_type, tv_weight)
+            cri_tv = get_loss_fn(
+                tv_type, tv_weight, device=device)
             self.loss_list.append(cri_tv)
 
         if cx_weight > 0 and cx_type:
-            cri_cx = get_loss_fn(cx_type, cx_weight, device=device, opt=opt)
+            cri_cx = get_loss_fn(
+                cx_type, cx_weight, device=device, opt=opt)
             self.loss_list.append(cri_cx)
 
         if (feature_weight > 0 or style_weight > 0) and feature_criterion:
             # TODO: clean up, moved the network instantiation to get_loss_fn()
             # self.netF = networks.define_F(opt).to(device)
             # cri_fea = get_loss_fn(feature_criterion, 1, network=self.netF, device=device)
-            cri_fea = get_loss_fn(feature_criterion, 1, opt=opt, device=device)
+            cri_fea = get_loss_fn(
+                feature_criterion, 1, opt=opt, device=device)
             self.loss_list.append(cri_fea)
             self.cri_fea = True  # can use to fetch netF, could use "cri_fea"
-        else: 
+        else:
             self.cri_fea = None
 
         if lpips_weight > 0 and lpips_criterion:
@@ -665,20 +674,19 @@ class GeneratorLoss(nn.Module):
                 use_gpu=(True if opt['gpu_ids'] else False),  # torch.cuda.is_available(),
                 model_path=None, spatial=lpips_spatial)
             cri_lpips = get_loss_fn(
-                lpips_criterion, lpips_weight, network=lpips_net, opt=opt, device=device)
+                lpips_criterion, lpips_weight, network=lpips_net,
+                opt=opt, device=device)
             self.loss_list.append(cri_lpips)
 
         if  cpl_weight > 0 and cpl_type:
-            cri_cpl = get_loss_fn(cpl_type, cpl_weight, opt=opt, device=device)
+            cri_cpl = get_loss_fn(
+                cpl_type, cpl_weight, opt=opt, device=device)
             self.loss_list.append(cri_cpl)
 
         if  gpl_weight > 0 and gpl_type:
-            cri_gpl = get_loss_fn(gpl_type, gpl_weight, opt=opt, device=device)
+            cri_gpl = get_loss_fn(
+                gpl_type, gpl_weight, opt=opt, device=device)
             self.loss_list.append(cri_gpl)
-
-        # if fft_weight > 0 and fft_type:
-        #     cri_fft = get_loss_fn(fft_type, fft_weight, device=device)
-        #     self.loss_list.append(cri_fft)
 
         if of_weight > 0 and of_type:
             cri_of = get_loss_fn(of_type, of_weight, device=device)
@@ -693,298 +701,182 @@ class GeneratorLoss(nn.Module):
             cri_avg = get_loss_fn(
                 avg_criterion, avg_weight, opt=opt, device=device)
             self.loss_list.append(cri_avg)
-        
+
         if ms_weight > 0 and ms_criterion:
-            cri_avg = get_loss_fn(
+            cri_ms = get_loss_fn(
                 ms_criterion, ms_weight, opt=opt, device=device)
-            self.loss_list.append(cri_avg)
+            self.loss_list.append(cri_ms)
 
-    def forward(self, sr, hr, log_dict, fsfilter=None, selector=None):
-        if fsfilter:  # low-pass filter
-            hr_f = fsfilter(hr)
-            sr_f = fsfilter(sr)
-        
-        # to visualize the batch for debugging
-        # tmp_vis(sr)
-        # tmp_vis(hr)
-        # tmp_vis(sr_f)
-        # tmp_vis(hr_f)
+        # Precise losses
+        self.precise_loss_list = []
 
-        if selector and isinstance(selector, list):
-            loss_list = []
-            for selected_loss in selector:
-                for i, l in enumerate(self.loss_list):
-                    if l['function']:
-                        if selected_loss in l['name']:
-                            if selected_loss == 'pix' and 'pix-multiscale' in l['name']:
-                                continue
-                            loss_list.append(l)
-        else:
-            loss_list = self.loss_list
-
-        if not loss_list:
-            return [], log_dict
-
-        loss_results = []
-        for i, l in enumerate(loss_list):
-            if l['function']:
-                if fsfilter:
-                    # branch selecting the ones that should use LPF
-                    if ('tv' in l['name'] or 'overflow' in l['name']
-                            or 'range' in l['name']):
-                        # Note: Using sr_f here means it will only preserve total variation / denoise on
-                        # the LF, which may or may not be a valid proposition, test!
-                        effective_loss = l['weight']*l['function'](sr_f)  # fake_H
-                    elif ('pix' in l['name'] or 'hfen' in l['name']
-                            or 'cpl' in l['name'] or 'gpl' in l['name']
-                            or 'gradient' in l['name'] or 'fdpl'in l['name']):
-                        effective_loss = l['weight']*l['function'](sr_f, hr_f)  # (fake_H, real_H)
-                    elif 'ssim' in l['name']:
-                        effective_loss = l['weight']*(1 - l['function'](sr_f, hr_f))  # (fake_H, real_H)
-                    elif 'fea-vgg' in l['name']:
-                        percep_loss, style_loss = l['function'](sr, hr)  # (fake_H, real_H)
-                        effective_loss = 0
-                        if percep_loss:
-                            effective_loss += l['weight']*percep_loss
-                        if style_loss:
-                            effective_loss += l['weight']*style_loss
-                    else:
-                        effective_loss = l['weight']*l['function'](sr, hr)  # (fake_H, real_H)
-                else:
-                    if ('tv' in l['name'] or 'overflow' in l['name']
-                            or 'range' in l['name']):
-                        effective_loss = l['weight']*l['function'](sr)  # fake_H
-                    elif 'ssim' in l['name']:
-                        effective_loss = l['weight']*(1 - l['function'](sr, hr))  # (fake_H, real_H)
-                    elif 'fea-vgg' in l['name']:
-                        percep_loss, style_loss = l['function'](sr, hr)  # (fake_H, real_H)
-                        effective_loss = 0
-                        if percep_loss:
-                            effective_loss += l['weight']*percep_loss
-                        if style_loss:
-                            effective_loss += l['weight']*style_loss
-                    else:
-                        effective_loss = l['weight']*l['function'](sr, hr)  # (fake_H, real_H)
-                # print(l['name'],effective_loss)
-                loss_results.append(effective_loss)
-                log_dict[l['name']] = effective_loss.item()
-        return loss_results, log_dict
-
-
-class PreciseGeneratorLoss(nn.Module):
-    """
-    To separately instantiate losses that require high precision calculations and 
-        cannot be inside the AMP context. 
-        In principle, it's the same as GeneratorLoss, but each one initialize 
-        different losses if configured in the options.
-        If not using AMP, both classes will be equivalent.
-    """
-    def __init__(self, opt=None, device:str='cpu',
-        allow_featnets:bool=True):
-        super(PreciseGeneratorLoss, self).__init__()
-
-        train_opt = opt['train']
-
-        #TODO: these checks can be moved to options.py when everything is stable
-        # parsing the losses options
-        # pixel_weight = train_opt.get('pixel_weight', 0)
-        # pixel_criterion = train_opt.get('pixel_criterion', None) # 'skip'
-
-        # if allow_featnets:
-        #     feature_weight = train_opt.get('feature_weight', 0)
-        #     style_weight = train_opt.get('style_weight', 0)
-        #     feat_opts = train_opt.get("perceptual_opt")
-        #     if feat_opts:
-        #         feature_network = feat_opts.get('feature_network', 'vgg19')
-        #     else:
-        #         feature_network = train_opt.get('feature_network', 'vgg19')
-        #     feature_criterion = check_loss_names(
-        #         feature_criterion=train_opt['feature_criterion'],
-        #         feature_network=feature_network)
-        # else:
-        #     feature_weight = 0
-        #     style_weight = 0
-        
-        # hfen_weight = train_opt.get('hfen_weight', 0)
-        # hfen_criterion = check_loss_names(hfen_criterion=train_opt['hfen_criterion'])
-
-        grad_weight = train_opt.get('grad_weight', 0)
-        grad_type = train_opt.get('grad_type', None) 
-
-        # tv_weight = train_opt.get('tv_weight', 0)
-        # tv_type = check_loss_names(tv_type=train_opt['tv_type'], tv_norm=train_opt['tv_norm'])
-
-        ssim_weight = train_opt.get('ssim_weight', 0)
-        ssim_type = train_opt.get('ssim_type', None)
-
-        # if allow_featnets:
-        #     lpips_weight = train_opt.get('lpips_weight', 0)
-        #     lpips_network = train_opt.get('lpips_net', 'vgg')
-        #     lpips_type = train_opt.get('lpips_type', 'net-lin')
-        #     lpips_criterion = check_loss_names(lpips_criterion=train_opt['lpips_type'], lpips_network=lpips_network)
-        # else:
-        #     lpips_weight = 0
-
-        # if allow_featnets:
-        #     cx_weight = train_opt.get('cx_weight', 0)
-        #     cx_type = train_opt.get('cx_type', None)
-        # else:
-        #     cx_weight = 0
-
-        fft_weight = train_opt.get('fft_weight', 0)
-        fft_type = train_opt.get('fft_type', None)
-
-        fdpl_weight = train_opt.get('fdpl_weight', 0)
-        fdpl_type = train_opt.get('fdpl_type', None)
-
-        range_weight = train_opt.get('range_weight', 0) 
-        range_type = 'range'
-
-
-        # building the loss
-        self.loss_list = []
-
-        # if hfen_weight > 0 and hfen_criterion:
-        #     cri_hfen = get_loss_fn(
-        #       hfen_criterion, hfen_weight, device=device)
-        #     self.loss_list.append(cri_hfen)
-        
         if grad_weight > 0 and grad_type:
             cri_grad = get_loss_fn(
                 grad_type, grad_weight, device=device)
-            self.loss_list.append(cri_grad)
+            self.precise_loss_list.append(cri_grad)
 
         if ssim_weight > 0 and ssim_type:
             cri_ssim = get_loss_fn(
                 ssim_type, ssim_weight, opt=train_opt,
                 allow_featnets=allow_featnets, device=device)
-            self.loss_list.append(cri_ssim)
-        
-        # if tv_weight > 0 and tv_type:
-        #     cri_tv = get_loss_fn(
-        #           tv_type, tv_weight, device=device)
-        #     self.loss_list.append(cri_tv)
-
-        # if cx_weight > 0 and cx_type:
-        #     cri_cx = get_loss_fn(
-        #           cx_type, cx_weight, opt=train_opt, device=device)
-        #     self.loss_list.append(cri_cx)
-
-        # if (feature_weight > 0 or style_weight > 0) and feature_criterion:
-        #     cri_fea = get_loss_fn(feature_criterion, 1, opt=opt, device=device)
-        #     self.loss_list.append(cri_fea)
-        #     self.cri_fea = True
-        # else: 
-        #     self.cri_fea = None
-
-        # if lpips_weight > 0 and lpips_criterion:
-        #     # return a spatial map of perceptual distance.
-        #     # Needs to use .mean() for the backprop if True,
-        #     # the mean distance is approximately the same as
-        #     # the non-spatial distance
-        #     lpips_spatial = True
-        #     lpips_net = ps.PerceptualLoss(
-        #         model=lpips_type, net=lpips_network,
-        #         use_gpu=(True if opt['gpu_ids'] else False),  # torch.cuda.is_available(),
-        #         model_path=None, spatial=lpips_spatial)
-        #     cri_lpips = get_loss_fn(
-        #         lpips_criterion, lpips_weight, network=lpips_net, opt=opt, device=device)
-        #     self.loss_list.append(cri_lpips)
+            self.precise_loss_list.append(cri_ssim)
 
         if fft_weight > 0 and fft_type:
             cri_fft = get_loss_fn(
                 fft_type, fft_weight, device=device)
-            self.loss_list.append(cri_fft)
+            self.precise_loss_list.append(cri_fft)
 
         if fdpl_weight > 0 and fdpl_type:
             cri_fdpl = get_loss_fn(
                 fdpl_type, fdpl_weight, opt=train_opt, device=device)
-            self.loss_list.append(cri_fdpl)
+            self.precise_loss_list.append(cri_fdpl)
 
         if range_weight > 0 and range_type:
             cri_range = get_loss_fn(
                 range_type, range_weight, device=device, opt=opt)
-            self.loss_list.append(cri_range)
+            self.precise_loss_list.append(cri_range)
 
-    def forward(self, sr, hr, log_dict, fsfilter=None, selector=None):
-        # make sure both sr and hr are not in float16 or int, change to float32 (torch.float32/torch.float)
-        # in some cases could even need torch.float64/torch.double, may have to add the case here
-        if sr.dtype in (torch.float16, torch.int8, torch.int32):
-            sr = sr.float()
-        if hr.dtype in (torch.float16, torch.int8, torch.int32):
-            hr = hr.float()
-        
-        assert sr.dtype == hr.dtype, \
-            'Error: SR and HR have different precision in precise losses: {} and {}'.format(sr.dtype, hr.dtype)
-        assert sr.type() == hr.type(), \
-            'Error: SR and HR are on different devices in precise losses: {} and {}'.format(sr.type(), hr.type())
-        
+    def selector_filter(self, selector=None, precise=False):
+        if precise:
+            losses = self.precise_loss_list
+        else:
+            losses = self.loss_list
+
+        if selector and isinstance(selector, list):
+            loss_list = []
+            for selected_loss in selector:
+                for l in losses:
+                    if l['function'] and selected_loss in l['name']:
+                        if (selected_loss == 'pix' and
+                            'pix-multiscale' in l['name']):
+                            continue
+                        loss_list.append(l)
+        else:
+            loss_list = losses
+        return loss_list
+
+    def calc_losses_regular(self, loss_list, log_dict, sr, hr):
+        loss_results = []
+        for l in loss_list:
+            if l['function']:
+                if ('tv' in l['name'] or 'overflow' in l['name']
+                        or 'range' in l['name']):
+                    # fake_H
+                    effective_loss = l['weight']*l['function'](sr)
+                elif 'ssim' in l['name']:
+                    # (fake_H, real_H)
+                    effective_loss = l['weight']*(1 - l['function'](sr, hr))
+                elif 'fea-vgg' in l['name']:
+                    # (fake_H, real_H)
+                    percep_loss, style_loss = l['function'](sr, hr)
+                    effective_loss = 0
+                    if percep_loss:
+                        effective_loss += l['weight']*percep_loss
+                    if style_loss:
+                        effective_loss += l['weight']*style_loss
+                else:
+                    # (fake_H, real_H)
+                    effective_loss = l['weight']*l['function'](sr, hr)
+                # print(l['name'],effective_loss)
+                loss_results.append(effective_loss)
+                log_dict[l['name']] = effective_loss.item()
+        return loss_results
+
+    def calc_losses_fs(self, loss_list, log_dict, sr, hr, sr_f, hr_f):
+        loss_results = []
+        for l in loss_list:
+            if l['function']:
+                # branch selecting the ones that should use LPF
+                if ('tv' in l['name'] or 'overflow' in l['name']
+                        or 'range' in l['name']):
+                    # Note: Using sr_f here means it will only preserve
+                    # total variation / denoise on the LF, which may or
+                    # may not be a valid proposition, test!
+                    # fake_H
+                    effective_loss = l['weight']*l['function'](sr_f)
+                elif ('pix' in l['name'] or 'hfen' in l['name']
+                        or 'cpl' in l['name'] or 'gpl' in l['name']
+                        or 'gradient' in l['name'] or 'fdpl' in l['name']):
+                    # (fake_H, real_H)
+                    effective_loss = l['weight']*l['function'](sr_f, hr_f)
+                elif 'ssim' in l['name']:
+                    # (fake_H, real_H)
+                    effective_loss = l['weight']*(1 - l['function'](sr_f, hr_f))
+                elif 'fea-vgg' in l['name']:
+                    # (fake_H, real_H)
+                    percep_loss, style_loss = l['function'](sr, hr)
+                    effective_loss = 0
+                    if percep_loss:
+                        effective_loss += l['weight']*percep_loss
+                    if style_loss:
+                        effective_loss += l['weight']*style_loss
+                else:
+                    # (fake_H, real_H)
+                    effective_loss = l['weight']*l['function'](sr, hr)
+                # print(l['name'],effective_loss)
+                loss_results.append(effective_loss)
+                log_dict[l['name']] = effective_loss.item()
+        return loss_results
+
+    def get_results(self, sr, hr, log_dict, fsfilter, selector,
+        precise=False):
+        hr_f, sr_f = None, None
         if fsfilter:  # low-pass filter
             hr_f = fsfilter(hr)
             sr_f = fsfilter(sr)
-        
+
         # to visualize the batch for debugging
         # tmp_vis(sr)
         # tmp_vis(hr)
         # tmp_vis(sr_f)
         # tmp_vis(hr_f)
 
-        if selector and isinstance(selector, list):
-            loss_list = []
-            for selected_loss in selector:
-                for i, l in enumerate(self.loss_list):
-                    if l['function']:
-                        if selected_loss in l['name']:
-                            if selected_loss == 'pix' and 'pix-multiscale' in l['name']:
-                                continue
-                            loss_list.append(l)
-        else:
-            loss_list = self.loss_list
+        loss_list = self.selector_filter(selector, precise)
 
         if not loss_list:
             return [], log_dict
 
-        loss_results = []
-        for i, l in enumerate(loss_list):
-            if l['function']:
-                if fsfilter:
-                    # branch selecting the ones that should use LPF
-                    if ('tv' in l['name'] or 'overflow' in l['name']
-                        or 'range' in l['name']):
-                        # Note: Using sr_f here means it will only preserve total variation / denoise on
-                        # the LF, which may or may not be a valid proposition, test!
-                        effective_loss = l['weight']*l['function'](sr_f)  # fake_H
-                    elif ('pix' in l['name'] or 'hfen' in l['name']
-                            or 'cpl' in l['name'] or 'gpl' in l['name']
-                            or 'gradient' in l['name'] or 'fdpl' in l['name']):
-                        effective_loss = l['weight']*l['function'](sr_f, hr_f)  # (fake_H, real_H)
-                    elif 'ssim' in l['name']:
-                        effective_loss = l['weight']*(1 - l['function'](sr_f, hr_f))  # (fake_H, real_H)
-                    elif 'fea-vgg' in l['name']:
-                        percep_loss, style_loss = l['function'](sr, hr)  # (fake_H, real_H)
-                        effective_loss = 0
-                        if percep_loss:
-                            effective_loss += l['weight']*percep_loss
-                        if style_loss:
-                            effective_loss += l['weight']*style_loss
-                    else:
-                        effective_loss = l['weight']*l['function'](sr, hr)  # (fake_H, real_H)
-                else:
-                    if ('tv' in l['name'] or 'overflow' in l['name']
-                            or 'range' in l['name']):
-                        effective_loss = l['weight']*l['function'](sr)  # fake_H
-                    elif 'ssim' in l['name']:
-                        effective_loss = l['weight']*(1 - l['function'](sr, hr))  # (fake_H, real_H)
-                    elif 'fea-vgg' in l['name']:
-                        percep_loss, style_loss = l['function'](sr, hr)  # (fake_H, real_H)
-                        effective_loss = 0
-                        if percep_loss:
-                            effective_loss += l['weight']*percep_loss
-                        if style_loss:
-                            effective_loss += l['weight']*style_loss
-                    else:
-                        effective_loss = l['weight']*l['function'](sr, hr)  # (fake_H, real_H)
-                # print(l['name'],effective_loss)
-                loss_results.append(effective_loss)
-                log_dict[l['name']] = effective_loss.item()
+        if fsfilter:
+            loss_results = self.calc_losses_fs(
+                loss_list, log_dict, sr, hr, sr_f, hr_f)
+        else:
+            loss_results = self.calc_losses_regular(
+                loss_list, log_dict, sr, hr)
+
+        return loss_results, log_dict
+
+    def get_results_precise(self, sr, hr, log_dict, fsfilter, selector):
+        """
+        For the precise losses, need to make sure both sr and hr are not
+        in float16 or int, change to float32 (torch.float32/torch.float).
+        In some cases could even need torch.float64/torch.double,
+        may have to add the case here.
+        """
+        if sr.dtype in (torch.float16, torch.int8, torch.int32):
+            sr = sr.float()
+        if hr.dtype in (torch.float16, torch.int8, torch.int32):
+            hr = hr.float()
+
+        if sr.dtype != hr.dtype:
+            raise TypeError("Error: SR and HR have different "
+                f"precision in precise losses: {sr.dtype} and {hr.dtype}")
+        if sr.type() != hr.type():
+            raise TypeError("Error: SR and HR are on different "
+                f"devices in precise losses: {sr.type()} and {hr.type()}")
+
+        return self.get_results(
+            sr, hr, log_dict, fsfilter, selector, precise=True)
+
+    def forward(self, sr, hr, log_dict, fsfilter=None,
+        selector=None, precise=False):
+
+        if precise:
+            # calculate precise losses
+            loss_results, log_dict = self.get_results_precise(
+                sr, hr, log_dict, fsfilter, selector)
+        else:
+            # calculate regular losses
+            loss_results, log_dict = self.get_results(
+                sr, hr, log_dict, fsfilter, selector)
+
         return loss_results, log_dict

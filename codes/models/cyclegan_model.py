@@ -126,21 +126,17 @@ class CycleGANModel(BaseModel):
 
             # initialize losses
             # generator losses:
-            # for the losses that don't require high precision (can use half precision)
-            self.cyclelosses = losses.GeneratorLoss(opt, self.device)
-            # for losses that need high precision (use out of the AMP context)
-            self.precisecyclelosses = losses.PreciseGeneratorLoss(opt, self.device)
+            self.generatorlosses = losses.GeneratorLoss(opt, self.device)
+
             # TODO: show the configured losses names in logger
-            # print(self.cyclelosses.loss_list)
+            # print(self.generatorlosses.loss_list)
 
             # add identity loss if configured
             if self.is_train and self.lambda_idt and self.lambda_idt > 0.0:
                 # TODO: using the same losses as cycle/generator, could be
                 #   different. Use filters like in WBC.
                 # self.idtlosses = losses.GeneratorLoss(opt, self.device)
-                self.idtlosses = self.cyclelosses
-                # self.preciseidtlosses = losses.PreciseGeneratorLoss(opt, self.device)
-                self.preciseidtlosses = self.precisecyclelosses
+                self.idtlosses = self.generatorlosses
 
             # discriminator loss:
             self.setup_gan()
@@ -219,6 +215,7 @@ class CycleGANModel(BaseModel):
         with self.cast():
             if self.lambda_idt and self.lambda_idt > 0:
                 self.idt_A = self.netG_A(self.real_B)
+                self.idt_B = self.netG_B(self.real_A)
                 log_idt_dict_A = OrderedDict()
                 log_idt_dict_B = OrderedDict()
 
@@ -232,7 +229,6 @@ class CycleGANModel(BaseModel):
                     self.log_dict_A[f'{kidt_A}_idt'] = vidt_A
 
                 # G_B should be identity if real_A is fed: ||G_B(A) - A||
-                self.idt_B = self.netG_B(self.real_A)
                 loss_idt_B, log_idt_dict_B = self.idtlosses(
                     self.idt_B, self.real_A, log_idt_dict_B, self.f_low)
                 l_g_total += sum(loss_idt_B) * self.lambda_idt / self.accumulations
@@ -257,45 +253,49 @@ class CycleGANModel(BaseModel):
 
             loss_results = []
             # Forward cycle loss || G_B(G_A(A)) - A||
-            loss_results, self.log_dict_A = self.cyclelosses(
+            loss_results, self.log_dict_A = self.generatorlosses(
                 self.rec_A, self.real_A, self.log_dict_A, self.f_low)
             l_g_total += sum(loss_results) / self.accumulations
 
             # Backward cycle loss || G_A(G_B(B)) - B||
-            loss_results, self.log_dict_B = self.cyclelosses(
+            loss_results, self.log_dict_B = self.generatorlosses(
                 self.rec_B, self.real_B, self.log_dict_B, self.f_low)
             l_g_total += sum(loss_results) / self.accumulations
 
-        if self.lambda_idt and self.lambda_idt > 0 and self.preciseidtlosses.loss_list:
+        if (self.lambda_idt and self.lambda_idt > 0 and
+            self.idtlosses.precise_loss_list):
             # Identity loss (precise losses)
             # G_A should be identity if real_B is fed: ||G_A(B) - B||
             # self.idt_A = self.netG_A(self.real_B)
-            precise_loss_idt_A, log_idt_dict_A = self.preciseidtlosses(
-                self.idt_A, self.real_B, log_idt_dict_A, self.f_low)
-            l_g_total += sum(precise_loss_idt_A) * self.lambda_idt / self.accumulations
+            loss_idt_A, log_idt_dict_A = self.idtlosses(
+                self.idt_A, self.real_B, log_idt_dict_A, self.f_low,
+                precise=True)
+            l_g_total += sum(loss_idt_A) * self.lambda_idt / self.accumulations
             for kidt_A, vidt_A in log_idt_dict_A.items():
                 self.log_dict_A[f'{kidt_A}_idt'] = vidt_A
 
             # G_B should be identity if real_A is fed: ||G_B(A) - A||
             # self.idt_B = self.netG_B(self.real_A)
-            precise_loss_idt_B, log_idt_dict_B = self.preciseidtlosses(
-                self.idt_B, self.real_A, log_idt_dict_B, self.f_low)
-            l_g_total += sum(precise_loss_idt_B) * self.lambda_idt / self.accumulations
+            loss_idt_B, log_idt_dict_B = self.idtlosses(
+                self.idt_B, self.real_A, log_idt_dict_B, self.f_low,
+                precise=True)
+            l_g_total += sum(loss_idt_B) * self.lambda_idt / self.accumulations
             for kidt_B, vidt_B in log_idt_dict_B.items():
                 self.log_dict_B[f'{kidt_B}_idt'] = vidt_B
 
         # high precision generator losses (can be affected by AMP half precision)
-        if self.precisecyclelosses.loss_list:
-            precise_loss_results = []
+        if self.generatorlosses.precise_loss_list:
             # Forward cycle loss || G_B(G_A(A)) - A||
-            precise_loss_results, self.log_dict_A = self.precisecyclelosses(
-                    self.rec_A, self.real_A, self.log_dict_A, self.f_low)
-            l_g_total += sum(precise_loss_results) / self.accumulations
+            loss_results, self.log_dict_A = self.generatorlosses(
+                self.rec_A, self.real_A, self.log_dict_A, self.f_low,
+                precise=True)
+            l_g_total += sum(loss_results) / self.accumulations
 
             # Backward cycle loss || G_A(G_B(B)) - B||
-            precise_loss_results, self.log_dict_B = self.precisecyclelosses(
-                    self.rec_B, self.real_B, self.log_dict_B, self.f_low)
-            l_g_total += sum(precise_loss_results) / self.accumulations
+            loss_results, self.log_dict_B = self.generatorlosses(
+                self.rec_B, self.real_B, self.log_dict_B, self.f_low,
+                precise=True)
+            l_g_total += sum(loss_results) / self.accumulations
 
         # calculate G gradients
         self.calc_gradients(l_g_total)

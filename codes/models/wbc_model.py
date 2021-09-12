@@ -143,10 +143,8 @@ class WBCModel(BaseModel):
 
             # initialize losses
             # generator losses:
-            # for the losses that don't require high precision (can use half precision)
             self.generatorlosses = losses.GeneratorLoss(opt, self.device)
-            # for losses that need high precision (use out of the AMP context)
-            self.precisegeneratorlosses = losses.PreciseGeneratorLoss(opt, self.device)
+
             # TODO: show the configured losses names in logger
             # print(self.generatorlosses.loss_list)
 
@@ -324,14 +322,15 @@ class WBCModel(BaseModel):
                     self.log_dict[f'{ksel}_{sn}'] = vsel  # * w
 
         # high precision generator losses (can be affected by AMP half precision)
-        if self.precisegeneratorlosses.loss_list:
+        if self.generatorlosses.precise_loss_list:
             if self.lambda_idt and self.lambda_idt > 0 and self.idt_losses:
                 # Identity loss (precise losses)
                 # G should be identity if real_B is fed: ||G(B) - B|| = 0
-                precise_loss_idt_B, log_idt_dict = self.precisegeneratorlosses(
+                loss_idt_B, log_idt_dict = self.generatorlosses(
                     self.idt_B, self.real_B, log_idt_dict,
-                    self.f_low, selector=self.idt_losses)
-                l_g_total += sum(precise_loss_idt_B) * self.lambda_idt / self.accumulations
+                    self.f_low, selector=self.idt_losses,
+                    precise=True)
+                l_g_total += sum(loss_idt_B) * self.lambda_idt / self.accumulations
                 for kidt_B, vidt_B in log_idt_dict.items():
                     self.log_dict[f'{kidt_B}_idt'] = vidt_B
 
@@ -339,9 +338,10 @@ class WBCModel(BaseModel):
                 rep_names, sel_fakes, sel_reals, selectors, rep_ws):
                 if not sel:
                     continue
-                precise_loss_results, log_dict = self.precisegeneratorlosses(
-                    fake, real, {}, self.f_low, selector=sel)
-                l_g_total += w * sum(precise_loss_results) / self.accumulations
+                loss_results, log_dict = self.generatorlosses(
+                    fake, real, {}, self.f_low, selector=sel,
+                    precise=True)
+                l_g_total += w * sum(loss_results) / self.accumulations
                 for ksel, vsel in log_dict.items():
                     self.log_dict[f'{ksel}_{sn}'] = vsel  # * w
 

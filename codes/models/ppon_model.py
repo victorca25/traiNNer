@@ -12,9 +12,9 @@ class PPONModel(SRModel):
 
         if self.is_train:
             # Generator losses:
-            # Note: self.generatorlosses and self.precisegeneratorlosses already
-            # defined in SRModel, only need to select which losses will be
-            # used in each phase. Discriminator by default only on phase 3.
+            # Note: self.generatorlosses already defined in SRModel, only
+            # need to select which losses will be used in each phase.
+            # Discriminator by default only on phase 3.
             # Content
             self.p1_losses = opt['train'].get('p1_losses', ['pix'])
 
@@ -209,11 +209,11 @@ class PPONModel(SRModel):
                     l_g_total += l_g_gan / self.accumulations
 
             # high precision generator losses (can be affected by AMP half precision)
-            if self.precisegeneratorlosses.loss_list:
-                precise_loss_results, self.log_dict = self.precisegeneratorlosses(
+            if self.generatorlosses.precise_loss_list:
+                loss_results, self.log_dict = self.generatorlosses(
                     self.fake_H, self.real_H, self.log_dict, self.f_low,
-                    selector=losses_selector)
-                l_g_total += sum(precise_loss_results) / self.accumulations
+                    selector=losses_selector, precise=True)
+                l_g_total += sum(loss_results) / self.accumulations
 
             # calculate G gradients
             self.calc_gradients(l_g_total)

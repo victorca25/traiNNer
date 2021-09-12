@@ -126,7 +126,7 @@ class SRFlowModel(SRModel):
             self.log_dict['nll_loss'] = l_g_nll.item()
             l_g_total += l_g_nll / self.accumulations
 
-        if self.generatorlosses.loss_list or self.precisegeneratorlosses.loss_list:
+        if self.generatorlosses.loss_list or self.generatorlosses.precise_loss_list:
             # switch ATG to train
             if self.atg:
                 if eff_step > self.atg_start_iter:
@@ -170,11 +170,12 @@ class SRFlowModel(SRModel):
                         self.fake_H, self.real_H, self.log_dict, self.f_low)
                     l_g_total += sum(loss_results) / self.accumulations
 
-            if self.precisegeneratorlosses.loss_list:
+            if self.generatorlosses.precise_loss_list:
                 # high precision generator losses (can be affected by AMP half precision)
-                precise_loss_results, self.log_dict = self.precisegeneratorlosses(
-                    self.fake_H, self.real_H, self.log_dict, self.f_low)
-                l_g_total += sum(precise_loss_results) / self.accumulations
+                loss_results, self.log_dict = self.generatorlosses(
+                    self.fake_H, self.real_H, self.log_dict, self.f_low,
+                    precise=True)
+                l_g_total += sum(loss_results) / self.accumulations
 
         # calculate G gradients
         self.calc_gradients(l_g_total)

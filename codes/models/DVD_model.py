@@ -57,11 +57,8 @@ class DVDModel(BaseModel):
             """
             #Initialize the losses with the opt parameters
             # Generator losses:
-            # for the losses that don't require high precision (can use half precision)
             self.generatorlosses = losses.GeneratorLoss(opt, self.device)
-            # for losses that need high precision (use out of the AMP context)
-            self.precisegeneratorlosses = losses.PreciseGeneratorLoss(
-                opt, self.device)
+
             # TODO: show the configured losses names in logger
             # print(self.generatorlosses.loss_list)
 
@@ -232,14 +229,16 @@ class DVDModel(BaseModel):
 
             #/with self.cast():
             # high precision generator losses (can be affected by AMP half precision)
-            if self.precisegeneratorlosses.loss_list:
-                precise_loss_results, self.log_dict = self.precisegeneratorlosses(
-                    self.fake_T, self.var_T, self.log_dict)
-                l_g_total += sum(precise_loss_results)/self.accumulations
+            if self.generatorlosses.precise_loss_list:
+                loss_results, self.log_dict = self.generatorlosses(
+                    self.fake_T, self.var_T, self.log_dict,
+                    precise=True)
+                l_g_total += sum(loss_results)/self.accumulations
 
-                precise_loss_results, self.log_dict = self.precisegeneratorlosses(
-                    self.fake_B, self.var_B, self.log_dict)
-                l_g_total += sum(precise_loss_results)/self.accumulations
+                loss_results, self.log_dict = self.generatorlosses(
+                    self.fake_B, self.var_B, self.log_dict,
+                    precise=True)
+                l_g_total += sum(loss_results)/self.accumulations
 
             if self.amp:
                 # call backward() on scaled loss to create scaled gradients.

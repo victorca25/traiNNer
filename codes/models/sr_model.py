@@ -64,10 +64,8 @@ class SRModel(BaseModel):
 
             # initialize losses
             # generator losses:
-            # for the losses that don't require high precision (can use half precision)
             self.generatorlosses = losses.GeneratorLoss(opt, self.device)
-            # for losses that need high precision (use out of the AMP context)
-            self.precisegeneratorlosses = losses.PreciseGeneratorLoss(opt, self.device)
+
             # TODO: show the configured losses names in logger
             # print(self.generatorlosses.loss_list)
 
@@ -177,10 +175,11 @@ class SRModel(BaseModel):
                 l_g_total += l_g_gan / self.accumulations
 
         # high precision generator losses (can be affected by AMP half precision)
-        if self.precisegeneratorlosses.loss_list:
-            precise_loss_results, self.log_dict = self.precisegeneratorlosses(
-                    self.fake_H, self.real_H, self.log_dict, self.f_low)
-            l_g_total += sum(precise_loss_results) / self.accumulations
+        if self.generatorlosses.precise_loss_list:
+            loss_results, self.log_dict = self.generatorlosses(
+                self.fake_H, self.real_H, self.log_dict, self.f_low,
+                precise=True)
+            l_g_total += sum(loss_results) / self.accumulations
 
         # calculate G gradients
         self.calc_gradients(l_g_total)
