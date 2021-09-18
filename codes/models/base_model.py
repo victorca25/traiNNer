@@ -409,11 +409,12 @@ class BaseModel:
         # when layer names match, but shapes don't:
         # validate loaded_net and network layer sizes
         network_dict = network.state_dict()
-        load_net = {
-            k:v if v.size() == network_dict[k].size()
-            else network_dict[k]
-            for k, v in zip(network_dict.keys(), load_net.values())
-            }
+        if len(load_net) == len(network_dict):
+            load_net = {
+                k:v if v.size() == network_dict[k].size()
+                else network_dict[k]
+                for k, v in zip(network_dict.keys(), load_net.values())
+                }
 
         # remove unnecessary 'module.' if needed
         # for k, v in deepcopy(load_net).items():
