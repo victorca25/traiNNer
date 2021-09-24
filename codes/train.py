@@ -458,7 +458,7 @@ def fit(model, opt, dataloaders, steps_states, data_params, loggers):
             model.save(current_step, True)
         n = n if 'n' in locals() else 0
         model.save_training_state(epoch + (n >= len(dataloaders['train'])), current_step, True)
-        logger.info(f'Training interrupted. Latest models and training states saved at <epoch:{:3d}, iter:{:8,d}>. '.format(epoch, current_step) + logger_m[:-2])
+        logger.info('Training interrupted. Latest models and training states saved at <epoch:{:3d}, iter:{:8,d}>. '.format(epoch, current_step) + logger_m[:-2])
 
 
 def main():
