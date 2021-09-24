@@ -293,7 +293,7 @@ def fit(model, opt, dataloaders, steps_states, data_params, loggers):
                         iter_step=current_step,
                         latest=opt['logger']['overwrite_chkp']
                     )
-                    logger.info('Models and training states saved.')
+                    logger.info('Models and training states saved at <epoch:{:3d}, iter:{:8,d}>. '.format(epoch, current_step) + logger_m[:-2])
 
                 # validation (for SR and other models with validations)
                 if dataloaders.get('val', None) and current_step % opt['train']['val_freq'] == 0 and take_step:
@@ -458,7 +458,7 @@ def fit(model, opt, dataloaders, steps_states, data_params, loggers):
             model.save(current_step, True)
         n = n if 'n' in locals() else 0
         model.save_training_state(epoch + (n >= len(dataloaders['train'])), current_step, True)
-        logger.info('Training interrupted. Latest models and training states saved.')
+        logger.info(f'Training interrupted. Latest models and training states saved at <epoch:{:3d}, iter:{:8,d}>. '.format(epoch, current_step) + logger_m[:-2])
 
 
 def main():
