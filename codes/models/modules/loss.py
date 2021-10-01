@@ -15,7 +15,6 @@ from dataops.common import norm, denorm, extract_patches_2d
 
 
 
-
 def get_outnorm(x:torch.Tensor, out_norm:str='') -> torch.Tensor:
     """ Common function to get a loss normalization value. Can
         normalize by either the batch size ('b'), the number of
@@ -118,37 +117,24 @@ class GANLoss(nn.Module):
         else:
             return torch.empty_like(input).fill_(self.fake_label_val)  # torch.zeros_like(d_sr_out)
 
-    def forward(self, input, target_is_real, is_disc = None):
+    def forward(self, x, target_is_real, is_disc = None):
         """Calculate loss given Discriminator's output and grount truth labels.
         Parameters:
-            input (tensor): typically the prediction output from a discriminator
+            x (tensor): typically the prediction output from a discriminator
             target_is_real (bool): if the ground truth label is for real images or fake images
             is_disc (bool): if the phase is for discriminator or not
         Returns:
             the calculated loss.
         """
         if self.gan_type == 'hinge':  # TODO: test
-            if isinstance(input, list):
-                loss = 0
-                for pred_i in input:
-                    if isinstance(pred_i, list):
-                        pred_i = pred_i[-1]
-                    loss_tensor = self(pred_i, target_is_real, is_disc)
-                    bs = 1 if len(loss_tensor.size()) == 0 else loss_tensor.size(0)
-                    new_loss = torch.mean(loss_tensor.view(bs, -1), dim=1)
-                    loss += new_loss
-                return loss / len(input)
-            else:
-                if is_disc:
-                    input = -input if target_is_real else input
-                    return self.loss(1 + input).mean()
-                else:
-                    # assert target_is_real
-                    return (-input).mean()
-        else:
-            target_label = self.get_target_label(input, target_is_real)
-            loss = self.loss(input, target_label)
-            return loss
+            if is_disc:
+                x = -x if target_is_real else x
+                return self.loss(1 + x).mean()
+            # assert target_is_real
+            return (-x).mean()
+        target_label = self.get_target_label(x, target_is_real)
+        loss = self.loss(x, target_label)
+        return loss
 
 
 class GradientPenaltyLoss(nn.Module):

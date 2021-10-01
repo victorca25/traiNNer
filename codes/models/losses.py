@@ -389,7 +389,10 @@ class Adversarial(nn.Module):
             # if is a list, its [pred_g_real, feats_real], else its just pred_g_real
             if isinstance(pred_g_real, list):
                 feats_real = pred_g_real[1]
-                pred_g_real = pred_g_real[0].detach()  # detach to avoid backpropagation to D
+                pred_g_real = pred_g_real[0]
+                if not isinstance(pred_g_real, list):
+                    # detach to avoid backpropagation to D
+                    pred_g_real = pred_g_real.detach()
         else:  # normal gan
             feats_real = None
             feats_fake = None
@@ -410,13 +413,15 @@ class Adversarial(nn.Module):
             if self.form == "standard":
                 # pred_g_real not needed if non-relativistic
                 for pred_fake in pred_g_fake:
-                    l_g_gan += self.l_gan_w * self.cri_gan(pred_fake[0], True)
+                    for i in range(len(pred_fake)):
+                        l_g_gan += self.l_gan_w * self.cri_gan(pred_fake[i], True)
             elif isinstance(pred_g_real, list):
                 # relativistic
                 for pred_real, pred_fake in zip(pred_g_real, pred_g_fake):
-                    l_g_gan += self.l_gan_w * (
-                        self.cri_gan(pred_real[0].detach() - torch.mean(pred_fake[0]), False) +
-                        self.cri_gan(pred_fake[0] - torch.mean(pred_real[0].detach()), True)) / 2
+                    for i in range(len(pred_fake)):
+                        l_g_gan += self.l_gan_w * (
+                            self.cri_gan(pred_real[i].detach() - torch.mean(pred_fake[i]), False) +
+                            self.cri_gan(pred_fake[i] - torch.mean(pred_real[i].detach()), True)) / 2
         elif self.form == "standard":
             # pred_g_real not needed if non-relativistic
             l_g_gan = self.l_gan_w * self.cri_gan(pred_g_fake, True)
@@ -430,8 +435,8 @@ class Adversarial(nn.Module):
         # Features Perceptual loss, extracted from the discriminator
         if self.use_featmaps:
             l_g_disfea = 0
-            for hr_feat_map, sr_feat_map in zip(feats_fake, feats_real):
-                l_g_disfea += self.cri_disfea['function'](sr_feat_map, hr_feat_map)
+            for sr_feat_map, hr_feat_map in zip(feats_fake, feats_real):
+                l_g_disfea += self.cri_disfea['function'](sr_feat_map, hr_feat_map.detach())
             l_g_disfea = self.cri_disfea['weight'] * l_g_disfea / len(feats_fake)
             l_g_gan += l_g_disfea
 
@@ -481,13 +486,15 @@ class Adversarial(nn.Module):
             l_d_fake = 0
             if self.form == "standard":
                 for pred_real, pred_fake in zip(pred_d_real, pred_d_fake):
-                    l_d_real += self.cri_gan(pred_real[0], True)
-                    l_d_fake += self.cri_gan(pred_fake[0], False)
+                    for i in range(len(pred_fake)):
+                        l_d_real += self.cri_gan(pred_real[i], True)
+                        l_d_fake += self.cri_gan(pred_fake[i], False)
             else:
                 # relativistic
                 for pred_real, pred_fake in zip(pred_d_real, pred_d_fake):
-                    l_d_real += self.cri_gan(pred_real[0] - torch.mean(pred_fake[0]), True)
-                    l_d_fake += self.cri_gan(pred_fake[0] - torch.mean(pred_real[0]), False)
+                    for i in range(len(pred_fake)):
+                        l_d_real += self.cri_gan(pred_real[i] - torch.mean(pred_fake[i]), True)
+                        l_d_fake += self.cri_gan(pred_fake[i] - torch.mean(pred_real[i]), False)
                 # leave only the largest D for the logs:
                 pred_d_real = pred_d_real[0][0]
                 pred_d_fake = pred_d_fake[0][0]

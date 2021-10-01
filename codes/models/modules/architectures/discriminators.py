@@ -392,7 +392,7 @@ class Discriminator_VGG_128_fea(nn.Module):
         feature_maps.append(x)
         x = self.conv9(x)
         feature_maps.append(x)
-        
+
         x = x.view(x.size(0), -1)
         x = self.classifier(x)
         if return_maps:
@@ -451,7 +451,7 @@ class Discriminator_VGG_fea(nn.Module):
             self.classifier = nn.Sequential(
                 nn.Linear(cur_nc * cur_size * cur_size, 100), nn.LeakyReLU(0.2, True), nn.Linear(100, 1))
 
-    #TODO: modify to a listening dictionary like VGG_Model(), can select what maps to use
+    # TODO: modify to a listening dictionary like VGG_Model(), can select what maps to use
     def forward(self, x, return_maps=False):
         feature_maps = []
         # x = self.features(x)
@@ -474,11 +474,10 @@ class NLayerDiscriminator(nn.Module):
     PatchGAN discriminator
     https://arxiv.org/pdf/1611.07004v3.pdf
     https://arxiv.org/pdf/1803.07422.pdf
-
     """
 
     def __init__(self, input_nc, ndf=64, n_layers=3, norm_layer=nn.BatchNorm2d, 
-        use_sigmoid=False, getIntermFeat=False, patch=True, use_spectral_norm=False):
+        use_sigmoid=False, get_feats=False, patch=True, use_spectral_norm=False):
         """Construct a PatchGAN discriminator
         Parameters:
             input_nc (int): the number of channels in input images
@@ -489,68 +488,94 @@ class NLayerDiscriminator(nn.Module):
             use_spectral_norm (bool): Select if Spectral Norm will be used
         """
         super(NLayerDiscriminator, self).__init__()
-        '''
+        """
         if type(norm_layer) == functools.partial:  # no need to use bias as BatchNorm2d has affine parameters
             use_bias = norm_layer.func == nn.InstanceNorm2d
         else:
             use_bias = norm_layer == nn.InstanceNorm2d
-        '''
+        """
 
         if use_spectral_norm:
             # disable Instance or Batch Norm if using Spectral Norm
             norm_layer = B.Identity
 
-        #self.getIntermFeat = getIntermFeat # not used for now
-        #use_sigmoid not used for now
-        #TODO: test if there are benefits by incorporating the use of intermediate features from pix2pixHD
+        self.get_feats = get_feats
+        self.n_layers = n_layers
+        # use_sigmoid  # not used for now
 
         use_bias = False
         kw = 4
         padw = 1 # int(np.ceil((kw-1.0)/2))
 
-        sequence = [B.add_spectral_norm(
-                        nn.Conv2d(input_nc, ndf, kernel_size=kw, stride=2, padding=padw), 
-                        use_spectral_norm), 
-                    nn.LeakyReLU(0.2, True)]
+        sequence = [[B.add_spectral_norm(
+                nn.Conv2d(input_nc, ndf, kernel_size=kw,
+                    stride=2, padding=padw),
+                use_spectral_norm),
+            nn.LeakyReLU(0.2, True)]]
+
         nf_mult = 1
         nf_mult_prev = 1
-        for n in range(1, n_layers):  # gradually increase the number of filters
+        for n in range(1, n_layers):
+            # gradually increase the number of filters
             nf_mult_prev = nf_mult
             nf_mult = min(2 ** n, 8)
-            sequence += [
+            sequence += [[
                 B.add_spectral_norm(
-                    nn.Conv2d(ndf * nf_mult_prev, ndf * nf_mult, kernel_size=kw, stride=2, padding=padw, bias=use_bias),
+                    nn.Conv2d(
+                        ndf * nf_mult_prev, ndf * nf_mult,
+                        kernel_size=kw, stride=2, padding=padw,
+                        bias=use_bias),
                     use_spectral_norm),
                 norm_layer(ndf * nf_mult),
                 nn.LeakyReLU(0.2, True)
-            ]
+            ]]
 
         nf_mult_prev = nf_mult
         nf_mult = min(2 ** n_layers, 8)
-        sequence += [
+        sequence += [[
             B.add_spectral_norm(
-                nn.Conv2d(ndf * nf_mult_prev, ndf * nf_mult, kernel_size=kw, stride=1, padding=padw, bias=use_bias),
+                nn.Conv2d(
+                    ndf * nf_mult_prev, ndf * nf_mult,
+                    kernel_size=kw, stride=1, padding=padw,
+                    bias=use_bias),
                 use_spectral_norm),
             norm_layer(ndf * nf_mult),
             nn.LeakyReLU(0.2, True)
-        ]
+        ]]
 
         if patch:
-            # output patches as results
-            sequence += [B.add_spectral_norm(
-                nn.Conv2d(ndf * nf_mult, 1, kernel_size=kw, stride=1, padding=padw),
-                use_spectral_norm)]  # output 1 channel prediction map
+            # output as 1 channel prediction map patches
+            sequence += [[B.add_spectral_norm(
+                nn.Conv2d(
+                    ndf * nf_mult, 1, kernel_size=kw, stride=1,
+                    padding=padw),
+                use_spectral_norm)]]
         else:
             # linear vector classification output
-            sequence += [B.Mean([1, 2]), nn.Linear(ndf * nf_mult, 1)]
+            sequence += [[B.Mean([1, 2]), nn.Linear(ndf * nf_mult, 1)]]
         
         if use_sigmoid:
-            sequence += [nn.Sigmoid()]
-        
-        self.model = nn.Sequential(*sequence)
+            sequence += [[nn.Sigmoid()]]
 
-    def forward(self, x):
-        """Standard forward."""
+        if get_feats:
+            for n in range(len(sequence)):
+                setattr(self, 'model'+str(n), nn.Sequential(*sequence[n]))
+        else:
+            sequence_stream = []
+            for n in range(len(sequence)):
+                sequence_stream += sequence[n]
+            self.model = nn.Sequential(*sequence_stream)
+
+    def forward(self, x, return_maps=False):
+        if self.get_feats:
+            res = [x]
+            for n in range(self.n_layers+2):
+                model = getattr(self, 'model'+str(n))
+                res.append(model(res[-1]))
+            if return_maps:
+                return [res[-1], res[1:-1]]
+            return res[-1]
+        # Standard forward.
         return self.model(x)
 
 
@@ -558,10 +583,10 @@ class MultiscaleDiscriminator(nn.Module):
     r"""
     Multiscale PatchGAN discriminator
     https://arxiv.org/pdf/1711.11585.pdf
-
     """
-    def __init__(self, input_nc, ndf=64, n_layers=3, norm_layer=nn.BatchNorm2d, 
-                 use_sigmoid=False, num_D=3, getIntermFeat=False):
+    def __init__(self, input_nc, ndf=64, n_layers=3,
+            norm_layer=nn.BatchNorm2d, use_sigmoid=False,
+            num_D=3, get_feats=False):
         """Construct a pyramid of PatchGAN discriminators
         Parameters:
             input_nc (int)  -- the number of channels in input images
@@ -570,44 +595,57 @@ class MultiscaleDiscriminator(nn.Module):
             norm_layer      -- normalization layer
             use_sigmoid     -- boolean to use sigmoid in patchGAN discriminators
             num_D (int)     -- number of discriminators/downscales in the pyramid
-            getIntermFeat   -- boolean to get intermediate features (unused for now)
+            get_feats       -- boolean to get intermediate features (unused for now)
         """
         super(MultiscaleDiscriminator, self).__init__()
         self.num_D = num_D
         self.n_layers = n_layers
-        self.getIntermFeat = getIntermFeat
+        self.get_feats = get_feats
      
         for i in range(num_D):
-            netD = NLayerDiscriminator(input_nc, ndf, n_layers, norm_layer, use_sigmoid, getIntermFeat)
-            if getIntermFeat:                                
+            netD = NLayerDiscriminator(
+                input_nc, ndf, n_layers, norm_layer, use_sigmoid,
+                get_feats)
+            if get_feats:
                 for j in range(n_layers+2):
-                    setattr(self, 'scale'+str(i)+'_layer'+str(j), getattr(netD, 'model'+str(j)))                                   
+                    setattr(self, 'scale'+str(i)+'_layer'+str(j),
+                        getattr(netD, 'model'+str(j)))
             else:
                 setattr(self, 'layer'+str(i), netD.model)
 
-        self.downsample = nn.AvgPool2d(3, stride=2, padding=[1, 1], count_include_pad=False)
+        self.downsample = nn.AvgPool2d(
+            3, stride=2, padding=[1, 1], count_include_pad=False)
 
-    def singleD_forward(self, model, input):
-        if self.getIntermFeat:
-            result = [input]
+    def singleD_forward(self, model, x, return_maps=False):
+        if self.get_feats:
+            result = [x]
             for i in range(len(model)):
                 result.append(model[i](result[-1]))
-            return result[1:]
-        else:
-            return [model(input)]
+            if return_maps:
+                return [result[-1], result[1:-1]]
+            return [result[-1]]
+        return [model(x)]
 
-    def forward(self, input):        
+    def forward(self, x, return_maps=False):
         num_D = self.num_D
         result = []
-        input_downsampled = input
+        input_downsampled = x
         for i in range(num_D):
-            if self.getIntermFeat:
+            if self.get_feats:
                 model = [getattr(self, 'scale'+str(num_D-1-i)+'_layer'+str(j)) for j in range(self.n_layers+2)]
             else:
                 model = getattr(self, 'layer'+str(num_D-1-i))
-            result.append(self.singleD_forward(model, input_downsampled))
+            result.append(
+                self.singleD_forward(model, input_downsampled, return_maps))
             if i != (num_D-1):
                 input_downsampled = self.downsample(input_downsampled)
+        if return_maps:
+            last_res = []
+            feat_maps = []
+            for i in range(len(result)):
+                last_res.append(result[i][0])
+                feat_maps.extend(result[i][1])
+            return [last_res, feat_maps]
         return result
 
 

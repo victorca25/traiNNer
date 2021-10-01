@@ -359,6 +359,7 @@ def get_network_D_config(network_D, scale, crop_size, model_G):
         full_network_D['ndf'] = network_D.pop('nf', 64)  # num. of features in conv layers
         if kind_D in ['patchgan', 'nlayerdiscriminator', 'multiscale']:
             full_network_D['n_layers'] = network_D.pop('n_layers', None) or network_D.pop('nlayer', 3)
+            full_network_D['get_feats'] = network_D.pop('get_feats', False)  # use intermediate feature maps
         if kind_D in ['patchgan'] or kind_D in ['nlayerdiscriminator']:
             full_network_D['patch'] = network_D.pop('patch_output', True)  # discriminator will return full result as image patch
             full_network_D['use_spectral_norm'] = network_D.pop('spectral_norm', None) or network_D.pop('use_spectral_norm', False)
