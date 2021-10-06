@@ -1,6 +1,8 @@
-torchvision
 PyYAML
-torch
 numpy
 opencv-python
 tensorboardX
+
+# Pytorch
+--find-links https://download.pytorch.org/whl/torch_stable.html
+torch==1.9.1+cu111 torchvision==0.10.1+cu111
