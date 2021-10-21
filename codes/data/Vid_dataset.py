@@ -3,19 +3,18 @@
 # sys.path.append('../')
 # from dataops.colors import ycbcr_to_rgb, yuv_to_rgb
 
-import os #, glob
+import os  # , glob
 import random
-import numpy as np
+
 import cv2
-import torch
-from torch.utils.data.dataset import Dataset
-import dataops.common as util
-
-from dataops.augmentations import Scale, NoisePatches, RandomNoisePatches, get_blur, get_noise
-from dataops.debug import tmp_vis, describe_numpy, describe_tensor
-
 import dataops.augmennt.augmennt as transforms
-
+import dataops.common as util
+import numpy as np
+import torch
+from dataops.augmentations import (NoisePatches, RandomNoisePatches, Scale,
+                                   get_blur, get_noise)
+from dataops.debug import describe_numpy, describe_tensor, tmp_vis
+from torch.utils.data.dataset import Dataset
 
 
 class VidTrainsetLoader(Dataset):
@@ -156,7 +155,7 @@ class VidTrainsetLoader(Dataset):
             if self.paths_LR:
                 # LR images are provided at the correct scale
                 LR_img = util.read_img(None, paths_LR[int(idx_frame)+(frameskip*i_frame)], out_nc=self.image_channels)
-                if LR_img.shape == HR_img.shape:
+                if scale != 1 and LR_img.shape == HR_img.shape:
                     LR_img, resize_type = Scale(img=HR_img, scale=scale, algo=ds_algo, ds_kernel=ds_kernel, resize_type=resize_type)
             else:
                 # generate LR images on the fly

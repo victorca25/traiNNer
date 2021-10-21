@@ -123,10 +123,10 @@ network_D:
 
 # Schedulers options:
 train:
-    lr_G: 0.001 # 2e-4 # starting lr_g #Test, default: 1e-4
+    lr_G: 0.0001 # 2e-4 # starting lr_g #Test, default: 1e-4
     weight_decay_G: 0
     beta1_G: 0.9
-    lr_D: 0.001 # 2e-4 # starting lr_d #Test, default: 1e-4
+    lr_D: 0.0001 # 2e-4 # starting lr_d #Test, default: 1e-4
     weight_decay_D: 0
     beta1_D: 0.9
 
@@ -207,8 +207,8 @@ train:
 
     # video losses
     ofr_type: ofr #optical flow reconstruction
-    ofr_weight: [0.1, 0.2, 0.1, 0.01] #SOFVSR defaults: lambda1 = 0.1 (loss_L1), lambda2 = 0.2 (loss_L2), lambda3 = 0.1 (regularization), lambda4 = 0.01 (total)
-    
+    ofr_weight: [1, 2, 1, 0.1] #SOFVSR defaults: lambda1 = 1 (loss_L1), lambda2 = 2 (loss_L2), lambda3 = 1 (regularization), lambda4 = 0.1 (total)
+
     # Adversarial loss:
     gan_type: vanilla # "vanilla" | "wgan-gp" | "lsgan" 
     gan_weight: 5e-5 # 
