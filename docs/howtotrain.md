@@ -17,7 +17,7 @@ In some cases, like SRGAN and ESRGAN, the recommendation is to use a PSNR-orient
 
 1. Prepare datasets, usually the DIV2K dataset. More details are in [`codes/data`](https://github.com/victorca25/traiNNer/tree/master/codes/data).
 2. Optional: If the intention is to replicate the original paper here you would prepare the PSNR-oriented pretrained model. You can also use the original `RRDB_PSNR_x4.pth` as the pretrained model for that purpose, otherwise *any* existing model will work as pretrained.
-3. Modify one of the configuration template file, for example `options/sr/train_sr.yml` or `options/sr/train_sr.json`
+3. Modify one of the configuration template file, for example `options/sr/train_sr.yml` or `options/sr/train_sr.json`. Note that the `crop_size` variable in the case of Super-Resolution refers to the crop size of the target images. For example, in a 4x SR case, a `crop_size` of 128 pixels means an LR crop size of `128/4 = 32` pixels.
 4. Run command: `python train.py -opt options/sr/train_sr.yml` or `python train.py -opt options/sr/train_sr.json`
 
 ## Single-Image Super-Resolution PPON models
