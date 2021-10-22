@@ -186,6 +186,8 @@ train:
     # overwrite_val_imgs: true
     # val_comparison: true
     metrics: 'psnr,ssim,lpips'
+    grad_clip: norm
+    grad_clip_value: 0.1 # "auto"
 
 logger:
     print_freq: 200
