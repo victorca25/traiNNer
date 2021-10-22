@@ -105,6 +105,9 @@ class SRModel(BaseModel):
             # setup unshuffle wrapper
             self.setup_unshuffle()
 
+            # setup gradient clipping
+            self.setup_gradclip(opt_G_nets)
+
         # print network
         # TODO: pass verbose flag from config file
         self.print_network(verbose=False)

@@ -34,7 +34,9 @@ This is a general and non-exhaustive changelog of the mayor changes at certain m
 -   Updated the `TV` regularization for better logic and configurable output normalization to match different implementations. (configuration via options file TBD)
 -   Added option to use standard `GAN` formulation (besides relativistic `GAN` formulation), configurable with `gan_opt` in the options file.
 -   Added a `unet` discriminator alternative, with optional spectral normalization option.
+-   Added features extraction/matching for `patchgan` and `multiscale patchgan` discriminators, to be used as a feature loss, equivalent to `discriminator_vgg_128_fea` and `discriminator_vgg_fea`. Note that there's an additional option required to enable, under `which_model_D`, set `get_feats: true`.
 -   Renamed project to `traiNNer` for simpler understandability of the repository function, similar to `iNNfer` for inference and `augmeNNt` for the augmentations.
+-   Added option to use gradient clipping. Clipping by both value (`clip_grad_value_`) and norm (`clip_grad_norm_`) is supported. The clipping value can be provided or in the `norm` case, `auto` can be used to automatically calculate the clipping value. Options: `grad_clip` and `grad_clip_value`.
 
 ## v2.0:
 -   Add automatic loading models of either the original ESRGAN architecture or the modified one.
