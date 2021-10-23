@@ -905,6 +905,8 @@ class BaseModel:
         grad_clip_value = torch.quantile(
             torch.FloatTensor(self.grad_history),
             clip_percentile/100)
+        
+        return grad_clip_value
 
     def apply_gradclip(self):
         """Apply gradient clipping."""
