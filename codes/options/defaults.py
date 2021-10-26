@@ -110,7 +110,7 @@ def get_network_G_config(network_G, scale, crop_size):
         full_network_G['convtype'] = network_G.pop('convtype', "Conv2D")  # Conv2D | PartialConv2D | DeformConv2D | Conv3D
         full_network_G['finalact'] = network_G.pop('finalact', None)  # Activation function, ie use "tanh" to make outputs fit in [-1, 1] range. Default = None. Coordinate with znorm.
         full_network_G['res_scale'] = network_G.pop('res_scale', 1)
-    #TODO: msrresnet
+    # TODO: msrresnet
     elif kind_G in ('sft_arch', 'sft_net'):
         full_network_G['type'] = "sft_arch"  # SFT-GAN
     elif kind_G in ('pan_net', 'pan'):
@@ -125,6 +125,16 @@ def get_network_G_config(network_G, scale, crop_size):
         full_network_G['self_attention'] = network_G.pop('self_attention', False)
         full_network_G['double_scpa'] = network_G.pop('double_scpa', False)
         full_network_G['ups_inter_mode'] = network_G.pop('ups_inter_mode', "nearest")
+    elif kind_G in ('a2n_net', 'a2n', 'aan'):
+        # A2N
+        full_network_G['type'] = "a2n_net"
+        full_network_G['in_nc'] = network_G.pop('in_nc', 3) # num. of input image channels: 3 for RGB and 1 for grayscale
+        full_network_G['out_nc'] = network_G.pop('out_nc', 3) # num. of output image channels: 3 for RGB and 1 for grayscale
+        full_network_G['nf'] = network_G.pop('nf', 40)  # number of filters in each conv layer
+        full_network_G['unf'] = network_G.pop('unf', 24)  # number of filters during upscale
+        full_network_G['nb'] = network_G.pop('nb', 16)  # number of blocks
+        full_network_G['scale'] = network_G.pop('scale', scale)
+        full_network_G['mode'] = network_G.pop('mode', "n")
     elif kind_G in ('abpn_net', 'abpn'):
         full_network_G['type'] = "abpn_net"  # ABPN_net
         full_network_G['input_dim'] = network_G.pop('in_nc', None) or network_G.pop('input_dim', 3) # num. of input image channels: 3 for RGB and 1 for grayscale
@@ -202,7 +212,7 @@ def get_network_G_config(network_G, scale, crop_size):
         full_network_G['ngf'] = network_G.pop('ngf', 64) # # of gen filters in the last conv layer
         full_network_G['norm_type'] = network_G.pop('norm_type', "batch") # "instance" normalization or "batch" normalization
         full_network_G['use_dropout'] = network_G.pop('use_dropout', False) # whether to use dropout or not
-        #TODO: add:
+        # TODO: add:
         # full_network_G['dropout_prob'] = network_G.pop('dropout_prob', 0.5) # the default dropout probability
         full_network_G['upsample_mode'] = network_G.pop('upsample_mode', "deconv") # deconv | upconv # the type of upsample to use, deconvolution or upsample+convolution
     elif 'resnet' in kind_G and kind_G != 'sr_resnet':
@@ -219,7 +229,7 @@ def get_network_G_config(network_G, scale, crop_size):
         full_network_G['ngf'] = network_G.pop('ngf', 64)  # num. of gen filters in the last conv layer
         full_network_G['norm_type'] = network_G.pop('norm_type', "instance") # "instance" normalization or "batch" normalization
         full_network_G['use_dropout'] = network_G.pop('use_dropout', False) # whether to use dropout or not
-        #TODO: add:
+        # TODO: add:
         # full_network_G['dropout_prob'] = network_G.pop('dropout_prob', 0.5) # the default dropout probability
         full_network_G['upsample_mode'] = network_G.pop('upsample_mode', "deconv") # deconv | upconv # the type of upsample to use, deconvolution or upsample+convolution
         full_network_G['padding_type'] = network_G.pop('padding_type', "reflect")
@@ -286,7 +296,7 @@ def get_network_G_config(network_G, scale, crop_size):
     else:
         raise NotImplementedError(f'Generator model [{kind_G:s}] not recognized')
 
-    #TODO: check if any options in network_G went unprocessed
+    # TODO: check if any options in network_G went unprocessed
     if bool(network_G):
         print(network_G)
 
@@ -373,10 +383,10 @@ def get_network_D_config(network_D, scale, crop_size, model_G):
     else:
         raise NotImplementedError(f'Discriminator model [{kind_D:s}] not recognized')
 
-    #TODO: add check for vgg_# to validate the crop size matches the discriminator patch size
+    # TODO: add check for vgg_# to validate the crop size matches the discriminator patch size
     # with: vgg_size = kind[18:] and int(vgg_size)
 
-    #TODO: check if any options in network_D went unprocessed
+    # TODO: check if any options in network_D went unprocessed
     if bool(network_D):
         print(network_D)
 
@@ -389,9 +399,9 @@ def get_network_defaults(opt, is_train):
     else:
         crop_size = opt.get('img_size')
 
-    #TODO: could check dataset type to match model, not needed
+    # TODO: could check dataset type to match model, not needed
 
-    #TODO: can check model type and validate networks (sr, video, i2i, etc)
+    # TODO: can check model type and validate networks (sr, video, i2i, etc)
 
     # network_G:
     network_G = opt.pop('network_G', None)

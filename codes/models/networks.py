@@ -147,6 +147,9 @@ def get_network(opt, step=0, selector=None):
     elif kind == 'pan_net':
         from models.modules.architectures import PAN_arch
         net = PAN_arch.PAN
+    elif kind == 'a2n_net':
+        from models.modules.architectures import PAN_arch
+        net = PAN_arch.AAN
     elif kind == 'sofvsr_net':
         from models.modules.architectures import SOFVSR_arch
         net = SOFVSR_arch.SOFVSR
