@@ -1,0 +1,8 @@
+*.yml
+*.json
+!train_deinterlace.yml
+!train_sftgan.json
+!train_srflow.yml
+!train_template.json
+!train_template.yml
+!train_video.yml
