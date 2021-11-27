@@ -15,6 +15,7 @@ import types
 import collections
 import warnings
 
+from ...colors import linear2srgb, srgb2linear
 from .common import preserve_channel_dim, preserve_shape
 from .common import _cv2_str2pad, _cv2_str2interpolation
 
@@ -168,13 +169,14 @@ def resize(img, size, interpolation='BILINEAR'):
         raise TypeError('img should be numpy image. Got {}'.format(type(img)))
     if not (isinstance(size, int) or (isinstance(size, collections.Iterable) and len(size) == 2)):
         raise TypeError('Got inappropriate size arg: {}'.format(size))
-    
+
     w, h, =  size
     if isinstance(size, int):
         # h, w, c = img.shape #this would defeat the purpose of "size"
-        
+
         if (w <= h and w == size) or (h <= w and h == size):
             return img
+        img = srgb2linear(img)
         if w < h:
             ow = size
             oh = int(size * h / w)
@@ -184,9 +186,10 @@ def resize(img, size, interpolation='BILINEAR'):
             ow = int(size * w / h)
             output = cv2.resize(img, dsize=(ow, oh), interpolation=_cv2_str2interpolation[interpolation])
     else:
+        img = srgb2linear(img)
         output = cv2.resize(img, dsize=(size[1], size[0]), interpolation=_cv2_str2interpolation[interpolation])
-    
-    return output
+
+    return linear2srgb(output)
 
 
 def scale(*args, **kwargs):

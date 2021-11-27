@@ -5,7 +5,8 @@ import glob
 
 import numpy as np
 import dataops.common as util
-from dataops.common import fix_img_channels, get_image_paths, read_img, np2tensor
+from dataops.colors import linear2srgb, srgb2linear
+from dataops.common import fix_img_channels, np2tensor
 from dataops.debug import *
 from dataops.imresize import resize as imresize  # resize # imresize_np
 
@@ -202,20 +203,24 @@ class MLResize:
             if len(self.out_shape) < 3:
                 self.out_shape = self.out_shape + (image_channels(img),)
 
+        img = srgb2linear(img)
+
         if self.kind == 'transforms':
             if self.out_shape:
-                return resize(
-                    np.copy(img),
+                img = resize(
+                    img,
                     w=self.out_shape[1], h=self.out_shape[0],
                     method=self.interpolation)
-            return scale_(
-                np.copy(img), self.scale, method=self.interpolation)
-        scale = None if self.out_shape else 1/self.scale
-        # return imresize_np(
-        #       np.copy(img), scale=scale, antialiasing=self.antialiasing, interpolation=self.interpolation)
-        return imresize(
-            np.copy(img), scale, out_shape=self.out_shape,
-            antialiasing=self.antialiasing, interpolation=self.interpolation)
+            else:
+                img = scale_(
+                    img, self.scale, method=self.interpolation)
+        else:
+            scale = None if self.out_shape else 1/self.scale
+            img = imresize(
+                img, scale, out_shape=self.out_shape,
+                antialiasing=self.antialiasing, interpolation=self.interpolation)
+
+        return linear2srgb(img)
 
 
 def get_resize(size=None, scale=None, ds_algo=None,

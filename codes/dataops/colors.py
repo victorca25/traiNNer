@@ -193,14 +193,65 @@ def yuv_to_rgb(input: torch.Tensor, consts='yuv') -> torch.Tensor:
     b: torch.Tensor = y + Wb * u_shifted
     return torch.stack((r, g, b), -3)
 
-# Not tested:
-def rgb2srgb(imgs):
-    return torch.where(imgs<=0.04045,imgs/12.92,torch.pow((imgs+0.055)/1.055,2.4))
 
-# Not tested:
-def srgb2rgb(imgs):
-    return torch.where(imgs<=0.0031308,imgs*12.92,1.055*torch.pow((imgs),1/2.4)-0.055)
+def srgb2linear(img):
+    """Convert sRGB images to linear RGB color space.
+    Tensors are left as f32 in the range [0, 1].
+    Uint8 numpy arrays are converted from uint8 in the range [0, 255]
+    to f32 in the range [0, 1].
+    F32 numpy arrays are assumed to be already be linear RGB.
+    Always returns a new array.
+    All values are exact as per the sRGB spec.
+    """
+    a = 0.055
+    att = 12.92
+    gamma = 2.4
+    th = 0.04045
 
+    if isinstance(img, torch.Tensor):
+        return torch.where(
+                img <= th, img / att, torch.pow((img + a)/(1 + a), gamma))
+
+    if img.dtype == np.uint8:
+        linear = np.float32(img) / 255.0
+
+        return np.where(
+            linear <= th, linear / att, np.power((linear + a) / (1 + a), gamma))
+
+    return img.copy()
+
+
+def linear2srgb(img):
+    """Convert linear RGB to the sRGB colour space.
+    Tensors are left as f32 in the range [0, 1].
+    F32 numpy arrays are converted back to the expected uint8 format
+    in the range [0, 255].
+    Uint8 numpy arrays are assumed to already be sRGB.
+    Always returns a new array.
+    All values are exact as per the sRGB spec.
+    """
+    a = 0.055
+    att = 12.92
+    gamma = 2.4
+    th = 0.0031308
+
+    if isinstance(img, torch.Tensor):
+        return torch.where(
+                img <= th,
+                img * att, (1 + a) * torch.pow((img), 1 / gamma) - a)
+
+    if img.dtype == np.float32:
+        srgb = np.clip(img, 0.0, 1.0)
+
+        srgb = np.where(
+            srgb <= th, srgb * att, (1 + a) * np.power(srgb, 1.0 / gamma) - a)
+
+        np.clip(srgb * 255, 0.0, 255, out=srgb)
+        np.around(srgb, out=srgb)
+
+        return srgb.astype(np.uint8)
+
+    return img.copy()
 
 
 def color_shift(image: torch.Tensor, mode:str='uniform',
