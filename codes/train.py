@@ -240,7 +240,7 @@ def fit(model, opt, dataloaders, steps_states, data_params, loggers):
                 # log
                 def eta(t_iter):
                     # calculate training ETA in hours
-                    return (t_iter * (opt['train']['niter'] - current_step)) / 3600 if t_iter > 0 else 0
+                    return (t_iter * (opt['train']['niter'] - current_step)) / 3600 / opt['logger']['print_freq'] if t_iter > 0 else 0
 
                 if current_step % opt['logger']['print_freq'] == 0 and take_step:
                     # iteration end time
