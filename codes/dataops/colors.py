@@ -240,7 +240,7 @@ def linear2srgb(img):
                 img <= th,
                 img * att, (1 + a) * torch.pow((img), 1 / gamma) - a)
 
-    if img.dtype == np.float32:
+    if img.dtype == np.float32 or img.dtype == np.float64:
         srgb = np.clip(img, 0.0, 1.0)
 
         srgb = np.where(
