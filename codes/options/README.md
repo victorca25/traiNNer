@@ -150,7 +150,7 @@ is equivalent to:
 
 ```yaml
 network_G:  # configurations for the Generator network
-  which_model_G: RRDB_net  # check:  https://github.com/victorca25/traiNNer/tree/master/codes/models/modules/architectures
+    which_model_G: RRDB_net  # check:  https://github.com/victorca25/traiNNer/tree/master/codes/models/modules/architectures
     norm_type: null  # norm type, null | "batch"
     mode: CNA  # Convolution mode: CNA for Conv-Norm_Activation or NAC
     nf: 64  # number of features (filters) for each layer
