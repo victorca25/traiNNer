@@ -924,16 +924,16 @@ def erase(img, i, j, h, w, v=None, inplace=False):
     if type(v) is list: 
         if len(v) == 3 and len(img.shape) == 3: 
             #img[i:i + h, j:j + w, 0].fill(v[0])
-            img[i:i + h, j:j + w, 0] = v[0]
+            img[i:h, j:w, 0] = v[0]
             #img[i:i + h, j:j + w, 1].fill(v[1])
-            img[i:i + h, j:j + w, 1] = v[1]
+            img[i:h, j:w, 1] = v[1]
             #img[i:i + h, j:j + w, 2].fill(v[2])
-            img[i:i + h, j:j + w, 2] = v[2]
+            img[i:h, j:w, 2] = v[2]
         else: # == 1
-            img[i:i + h, j:j + w, :].fill(v[0])
+            img[i:h, j:w, :].fill(v[0])
     elif isinstance(v, numbers.Number): 
-        #img[i:i + h, j:j + w, :] = v
-        img[i:i + h, j:j + w, :].fill(v)
+        #img[i:h, j:w, :] = v
+        img[i:h, j:w, :].fill(v)
     elif isinstance(v, np.ndarray):
-        img[i:i + h, j:j + w, :] = v
+        img[i:h, j:w, :] = v
     return img
