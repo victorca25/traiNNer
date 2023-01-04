@@ -315,6 +315,12 @@ def fit(model, opt, dataloaders, steps_states, data_params, loggers):
                         img_dir = os.path.join(opt['path']['val_images'], img_name)
                         util.mkdir(img_dir)
 
+                        if opt['use_tb_logger'] and opt['logger']['tb_log_generated']:
+                            tb_logger.add_image(f"Generated (SR) [{img_name}]", visuals['SR'].clamp(0, 1), current_step)
+
+                        if opt['use_tb_logger'] and opt['logger']['tb_log_lr']:
+                            tb_logger.add_image(f"Low Resolution [{img_name}]", visuals['LR'].clamp(0, 1), current_step)
+
                         # Save SR images for reference
                         sr_img = None
                         if hasattr(model, 'heats'):  # SRFlow
